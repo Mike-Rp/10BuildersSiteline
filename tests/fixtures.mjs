@@ -1,0 +1,40 @@
+import { initialState } from "../src/model.ts"
+import { activeSubcontractors, applyWorkflow } from "../src/workflows.ts"
+export const NOW = Date.parse("2026-10-14T08:00:00Z")
+export const currentProject = (state) =>
+  state.projects.find((p) => p.id === "p4")
+export const evidence = (name = "evidence.png") => ({
+  id: crypto.randomUUID(),
+  label: "Selected evidence",
+  name,
+  uploaded: true,
+  owner: "Demo",
+  date: "2026-10-14",
+  size: 200,
+  mime: "image/png",
+  clientVisible: false,
+})
+export const execute = (state, actor, command, now = NOW) =>
+  applyWorkflow(state, actor, { projectId: "p4", ...command }, now)
+export function activeFixture() {
+  let state = execute(initialState(), "a2", { type: "accept_opm" })
+  for (let i = 0; i < 6; i++)
+    state = execute(state, "a2", {
+      type: "upload_registered",
+      docIndex: i,
+      doc: evidence(`required-${i}.png`),
+    })
+  state = execute(state, "a4", { type: "accept_assignment" })
+  state = execute(state, "a5", { type: "accept_assignment" })
+  const companyId = activeSubcontractors(currentProject(state))[0].companyId
+  state = execute(state, "a4", { type: "contact_company", companyId })
+  state = execute(state, "a4", {
+    type: "respond_company",
+    companyId,
+    accepted: true,
+  })
+  return execute(state, "a4", {
+    type: "upload_agreement",
+    doc: evidence("signed.png"),
+  })
+}

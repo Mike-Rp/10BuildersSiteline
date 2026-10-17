@@ -1,0 +1,11 @@
+{
+  "title": "sitelineui",
+  "description": "Manage construction projects efficiently with role-based access for administrators, project managers, and clients, ensuring seamless coordination and progress tracking.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
