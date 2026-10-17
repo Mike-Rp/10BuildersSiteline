@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
+import { apiEnabled, downloadApiFile } from "./api/client"
 import {
   accountError,
   clientForEmail,
@@ -50,7 +51,8 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-// Local files are stored separately from JSON state. This is browser storage, not secure cloud storage.
+// With the API, files are fetched from the server (see src/api/client.ts);
+// otherwise they stay in this browser's IndexedDB (not secure cloud storage).
 function fileDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("siteline-files", 1)
@@ -61,6 +63,8 @@ function fileDB(): Promise<IDBDatabase> {
   })
 }
 async function saveFile(id: string, file: File) {
+  if (apiEnabled)
+    throw new Error("Uploading files is not available yet in view-only mode.")
   const db = await fileDB()
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction("files", "readwrite")
@@ -71,6 +75,7 @@ async function saveFile(id: string, file: File) {
   db.close()
 }
 export async function fileFor(id: string): Promise<Blob | undefined> {
+  if (apiEnabled) return downloadApiFile(id)
   const db = await fileDB()
   const file = await new Promise<Blob | undefined>((resolve, reject) => {
     const req = db.transaction("files").objectStore("files").get(id)

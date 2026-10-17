@@ -1,0 +1,156 @@
+// Client for the Thesis-Backend (Express) API.
+//
+// VITE_API_URL points at it, e.g. http://localhost:3000/api/v1. When it is not
+// set the app keeps its local demo behaviour.
+let base = (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, "")
+
+export const apiEnabled = Boolean(base)
+// For tests and scripts that run outside Vite.
+export const setApiBase = (url: string) => {
+  base = url.replace(/\/+$/, "")
+}
+
+const TOKEN_KEY = "siteline-api-token"
+let memoryToken = ""
+
+export function getToken(): string {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || memoryToken
+  } catch {
+    return memoryToken
+  }
+}
+export function setToken(token: string) {
+  memoryToken = token
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token)
+    else sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* The token stays in memory for this tab. */
+  }
+}
+
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+type Envelope<T> = { code?: number; message?: string; count?: number; data: T }
+
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  if (!base) throw new ApiError("The API address is not configured.", 0)
+  const headers = new Headers(init.headers)
+  const token = getToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json")
+  let response: Response
+  try {
+    response = await fetch(base + path, { ...init, headers })
+  } catch {
+    throw new ApiError("Cannot reach the server. Check that the backend is running.", 0)
+  }
+  if (response.status === 401 && token) setToken("")
+  return response
+}
+
+export async function api<T = unknown>(
+  path: string,
+  init: RequestInit & { json?: unknown } = {},
+): Promise<T> {
+  const { json, ...rest } = init
+  const response = await request(path, {
+    ...rest,
+    body: json === undefined ? rest.body : JSON.stringify(json),
+  })
+  let body: (Envelope<T> & { error?: { message?: string } }) | undefined
+  try {
+    body = await response.json()
+  } catch {
+    body = undefined
+  }
+  if (!response.ok)
+    throw new ApiError(
+      body?.error?.message || body?.message || `Request failed (${response.status}).`,
+      response.status,
+    )
+  return (body?.data ?? (body as unknown)) as T
+}
+
+// Lists: asks for large pages and follows page numbers until the data repeats.
+export async function apiList<T = Record<string, any>>(path: string): Promise<T[]> {
+  const sep = path.includes("?") ? "&" : "?"
+  const size = 100
+  const out: T[] = []
+  let firstOfPrevious: unknown
+  for (let page = 1; page <= 20; page++) {
+    const rows = await api<T[]>(`${path}${sep}page=${page}&pageSize=${size}`)
+    if (!Array.isArray(rows) || !rows.length) break
+    const first = JSON.stringify(rows[0])
+    if (first === firstOfPrevious) break
+    firstOfPrevious = first
+    out.push(...rows)
+    if (rows.length < size) break
+  }
+  return out
+}
+
+export async function login(email: string, password: string) {
+  const data = await api<{
+    token: string
+    user: {
+      id: string
+      full_name: string
+      email: string
+      role: "admin" | "opm" | "spm" | "client"
+      status: string
+      temp_password_issued: boolean
+    }
+  }>("/auth/login", { method: "POST", json: { email: email.trim(), password } })
+  setToken(data.token)
+  return data.user
+}
+
+export async function logout() {
+  try {
+    if (getToken()) await api("/auth/logout", { method: "POST" })
+  } catch {
+    /* The session is cleared locally either way. */
+  } finally {
+    setToken("")
+  }
+}
+
+// Decodes the user id and role from the stored token (no verification: the
+// server checks every request).
+export function tokenUser(): { id: string; role: string } | undefined {
+  const token = getToken()
+  if (!token) return undefined
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    )
+    const id = payload.sub || payload.details?.id
+    const role = payload.details?.role
+    if (payload.exp && payload.exp * 1000 < Date.now()) return undefined
+    return id ? { id, role } : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// Authenticated file download (documents, photos).
+const fileUrls = new Map<string, string>()
+export const registerFileUrl = (docId: string, url: string | null | undefined) => {
+  if (url) fileUrls.set(docId, url)
+}
+export async function downloadApiFile(docId: string): Promise<Blob | undefined> {
+  const url = fileUrls.get(docId)
+  if (!url) return undefined
+  const path = url.replace(/^https?:\/\/[^/]+/, "").replace(/^\/api\/v1/, "")
+  const response = await request(path)
+  return response.ok ? response.blob() : undefined
+}

@@ -52,7 +52,7 @@ export function sessionAccount(
   }
 }
 
-function assertCanSignIn(
+export function assertCanSignIn(
   state: Pick<State, "rules">,
   account: Account,
 ): Account {

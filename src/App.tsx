@@ -2,7 +2,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { authenticate, sessionAccount } from "./auth"
+import { assertCanSignIn, authenticate, sessionAccount } from "./auth"
+import {
+  api,
+  apiEnabled,
+  ApiError,
+  login as apiLogin,
+  logout as apiLogout,
+  tokenUser,
+} from "./api/client"
+import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import PlannedTimeline from "./PlannedTimeline"
@@ -95,7 +104,20 @@ const STATUS: Record<string, string> = {
   deactivated: "Deactivated",
   archived: "Archived",
 }
+// Signed-out placeholder for Supabase mode: no seed data, only an in-memory
+// administrator stub so render-time lookups never fail. It is never persisted.
+function signedOutState(): State {
+  const seed = initialState()
+  return {
+    ...seed,
+    accounts: seed.accounts.filter((a) => a.role === "admin").slice(0, 1),
+    projects: [],
+    companies: [],
+    events: [],
+  }
+}
 function loadState(): State {
+  if (apiEnabled) return signedOutState()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -255,7 +277,13 @@ function Search({
     </div>
   )
 }
-export default function App() {
+const API_READ_ONLY_MESSAGE =
+  "Connected to the server in view-only mode. Saving changes is not available yet."
+const ACCOUNT_UNAVAILABLE_MESSAGE =
+  "This account is not active. Contact your Administrator."
+const INVALID_CREDENTIALS_MESSAGE =
+  "The email or password you entered is incorrect."
+function AppInner() {
   const [state, setState] = useState<State>(loadState)
   const [sessionId, setSessionId] = useState(() => {
     try {
@@ -268,7 +296,8 @@ export default function App() {
   stateRef.current = state
   const actor =
     state.accounts.find((a) => a.id === sessionId) ||
-    state.accounts.find((a) => a.id === "a1")!
+    state.accounts.find((a) => a.role === "admin") ||
+    state.accounts[0]
   const [page, setPage] = useState("Dashboard")
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
@@ -317,7 +346,9 @@ export default function App() {
       ["request", "approval", "progress", "notice"].includes(e.type),
   ).length
   const admin =
-    actor.role === "admin" ? actor : state.accounts.find((a) => a.id === "a1")!
+    actor.role === "admin"
+      ? actor
+      : state.accounts.find((a) => a.role === "admin") || actor
   const nameFor = (id: string) =>
     state.accounts.find((a) => a.id === id)?.name || "Unassigned"
   const projectFor = (id: string) =>
@@ -333,6 +364,22 @@ export default function App() {
     } catch {
       /* No stored session; show sign-in. */
     }
+    if (apiEnabled) {
+      const saved = tokenUser()
+      if (!saved) {
+        setCheckingSession(false)
+        return
+      }
+      api<Parameters<typeof startApiSession>[0]>("/auth/me")
+        .then(startApiSession)
+        .then((account) => {
+          setSessionId(account.id)
+          setSignedOut(false)
+        })
+        .catch(() => clearSession())
+        .finally(() => setCheckingSession(false))
+      return
+    }
     const account = sessionAccount(stateRef.current, storedId)
     if (account) {
       setSessionId(account.id)
@@ -343,6 +390,8 @@ export default function App() {
     setCheckingSession(false)
   }, [])
   useEffect(() => {
+    // With the API the server is the source of truth; nothing is kept in the browser.
+    if (apiEnabled) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
       setStorageError(false)
@@ -447,6 +496,10 @@ export default function App() {
       setToast("Sign in again to continue.")
       return
     }
+    if (apiEnabled) {
+      setToast(API_READ_ONLY_MESSAGE)
+      return
+    }
     setState((s) => log(change(s), title, detail, type, target))
     setToast(title)
   }
@@ -475,8 +528,41 @@ export default function App() {
       /* The signed-out state remains effective in memory. */
     }
   }
+  // Loads everything the signed-in role may see and checks the account may sign in.
+  async function startApiSession(user: {
+    id: string
+    role: Account["role"]
+    full_name?: string
+    email?: string
+  }): Promise<Account> {
+    const loaded = await loadApiState(user)
+    const account = loaded.accounts.find((a) => a.id === user.id)
+    try {
+      if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
+      assertCanSignIn(loaded, account)
+    } catch (error) {
+      await apiLogout()
+      throw error
+    }
+    stateRef.current = loaded
+    setState(loaded)
+    return account
+  }
   async function signIn(email: string, password: string) {
-    const account = authenticate(stateRef.current, email, password)
+    let account: Account
+    if (apiEnabled) {
+      let user: Awaited<ReturnType<typeof apiLogin>>
+      try {
+        user = await apiLogin(email, password)
+      } catch (error) {
+        throw new Error(
+          error instanceof ApiError && error.status !== 401 && error.status !== 400
+            ? error.message
+            : INVALID_CREDENTIALS_MESSAGE,
+        )
+      }
+      account = await startApiSession(user)
+    } else account = authenticate(stateRef.current, email, password)
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
@@ -490,7 +576,8 @@ export default function App() {
     } catch {
       /* The session remains in memory until the tab closes. */
     }
-    setState((current) => ({
+    if (!apiEnabled)
+      setState((current) => ({
       ...current,
       events: [
         {
@@ -511,6 +598,13 @@ export default function App() {
   function endSession() {
     clearSession()
     setSignedOut(true)
+    if (apiEnabled) {
+      // End the server session and drop the loaded data from memory.
+      apiLogout()
+      const empty = signedOutState()
+      stateRef.current = empty
+      setState(empty)
+    }
   }
   function sendWorkflow(command: WorkflowCommand) {
     if (signedOut)
@@ -518,6 +612,7 @@ export default function App() {
         ok: false,
         error: "Your session has ended. Sign in again to continue.",
       }
+    if (apiEnabled) return { ok: false, error: API_READ_ONLY_MESSAGE }
     try {
       const next = applyWorkflow(stateRef.current, actor.id, command)
       stateRef.current = next
@@ -3495,5 +3590,18 @@ export default function App() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <>
+      <AppInner />
+      {apiEnabled && (
+        <div className="api-mode-banner" role="status">
+          Live data from the server · view only
+        </div>
+      )}
+    </>
   )
 }

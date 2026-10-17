@@ -1,0 +1,77 @@
+// Child process: runs the real app in jsdom, signs in as one user against the
+// API at VITE_API_URL, opens every page and reports crashes. Used by ui-smoke.mjs.
+import { JSDOM } from "jsdom"
+import { createServer } from "vite"
+
+const [, , email, ...navLabels] = process.argv
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: "http://localhost:8443/", pretendToBeVisual: true })
+const w = dom.window
+const set = (k, v) => Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true })
+for (const k of ["window", "document", "HTMLElement", "Element", "Node", "Event", "KeyboardEvent", "MouseEvent", "InputEvent", "File", "FileReader", "Blob", "DOMParser", "MutationObserver", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame", "sessionStorage", "localStorage", "HTMLInputElement", "HTMLSelectElement", "HTMLTextAreaElement", "SVGElement", "CustomEvent"])
+  set(k, w[k])
+set("navigator", w.navigator)
+set("IS_REACT_ACT_ENVIRONMENT", true)
+w.matchMedia = w.matchMedia || (() => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }))
+set("matchMedia", w.matchMedia)
+for (const k of ["ResizeObserver", "IntersectionObserver"]) set(k, class { observe() {} unobserve() {} disconnect() {} })
+w.scrollTo = () => {}
+w.HTMLElement.prototype.scrollIntoView = () => {}
+globalThis.URL.createObjectURL = () => "blob:test"
+globalThis.URL.revokeObjectURL = () => {}
+
+const problems = []
+const origError = console.error
+console.error = (...a) => {
+  const text = a.map((x) => (x instanceof Error ? x.stack : String(x))).join(" ")
+  if (!/not wrapped in act|Not implemented|Warning: .*(key|DOM nesting|validateDOMNesting)/i.test(text)) problems.push(text.slice(0, 500))
+  origError(...a.map(String).map((s) => s.slice(0, 200)))
+}
+w.addEventListener("error", (e) => problems.push("window error: " + (e.error?.stack || e.message)))
+process.on("unhandledRejection", (e) => problems.push("unhandled rejection: " + (e?.stack || e)))
+
+const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const waitFor = async (fn, what, ms = 15000) => {
+  const end = Date.now() + ms
+  while (Date.now() < end) {
+    if (fn()) return
+    await sleep(50)
+  }
+  throw new Error("Timed out waiting for " + what + "\nPAGE: " + document.body.textContent.slice(0, 300))
+}
+const text = () => document.body.textContent || ""
+const setValue = (input, value) => {
+  const proto = Object.getPrototypeOf(input)
+  Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value)
+  input.dispatchEvent(new w.Event("input", { bubbles: true }))
+}
+
+await server.ssrLoadModule("/src/main.tsx")
+await waitFor(() => document.querySelector("form.login-form"), "the login form")
+const inputs = document.querySelectorAll("form.login-form input")
+setValue(inputs[0], email)
+setValue(inputs[1], "Password@123")
+await sleep(50)
+document.querySelector("form.login-form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }))
+await waitFor(() => !document.querySelector("form.login-form") || document.querySelector(".login-form .error, [role=alert]"), "sign-in to finish", 30000)
+if (document.querySelector("form.login-form")) throw new Error("Sign-in failed: " + (document.querySelector("form.login-form .error, form.login-form [role=alert]")?.textContent || text().slice(0, 200)))
+await sleep(500)
+
+const results = { email, signedIn: true, root: document.getElementById("root").innerHTML.length, pages: {} }
+results.banner = text().includes("Live data from the server")
+results.home = text().replace(/\s+/g, " ").slice(0, 160)
+const clickable = () => [...document.querySelectorAll("button, a, [role=button]")]
+for (const label of navLabels) {
+  const target = clickable().find((el) => el.textContent.trim().replace(/\s+/g, " ").startsWith(label))
+  if (!target) {
+    results.pages[label] = "no such button"
+    continue
+  }
+  target.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }))
+  await sleep(250)
+  results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
+}
+results.problems = problems
+console.log("RESULT " + JSON.stringify(results))
+await server.close()
+process.exit(0)
