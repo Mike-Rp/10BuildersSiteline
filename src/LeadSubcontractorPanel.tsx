@@ -132,7 +132,9 @@ export default function LeadSubcontractorPanel({
         {candidate.committed ||
         candidate.company.availability === "committed" ? (
           <Badge tone="amber">
-            Committed through {dateLabel(candidate.company.committedUntil!)}
+            {candidate.company.committedUntil
+              ? `Committed through ${dateLabel(candidate.company.committedUntil)}`
+              : "Committed to another project"}
           </Badge>
         ) : (
           <Badge tone={candidate.availableManpower > 0 ? "green" : "amber"}>
