@@ -229,7 +229,7 @@ export function clientProgressReport(
   )!
   return [
     "SITELINE — PROJECT PROGRESS REPORT",
-    "Prototype text export — not a certified PDF.",
+    "Text export — not a certified PDF.",
     "",
     `Project: ${project.name}`,
     `Type: ${project.type}`,
@@ -267,4 +267,66 @@ export function phaseTimeline(
           ? "current" as const
           : "upcoming" as const,
   }))
+}
+
+export type ClientDocumentFolder = {
+  id: string
+  name: string
+  description: string
+  kind: "document" | "photo"
+  files: ClientDocument[]
+}
+export type ClientDocumentCategory = {
+  id: string
+  name: string
+  description: string
+  folders: ClientDocumentFolder[]
+  fileCount: number
+}
+
+// Repository levels for the Client portal. Built only from the client-scoped
+// project view, so internal documents, folders and counts never appear.
+// Categories without client-visible files are left out.
+export function clientDocumentIndex(
+  view: Pick<ClientProjectView, "documents" | "photos">,
+): ClientDocumentCategory[] {
+  const categories = [
+    {
+      id: "agreements",
+      name: "Project Agreements & Supporting Documents",
+      description: "Project records shared with you by the project team.",
+      folders: [
+        {
+          id: "intake",
+          name: "Project Intake",
+          description: "Registered project documents made available to you.",
+          kind: "document" as const,
+          files: view.documents.filter((doc) => doc.uploaded),
+        },
+      ],
+    },
+    {
+      id: "progress",
+      name: "Progress & Site Reports",
+      description: "Site photographs shared with you by the project team.",
+      folders: [
+        {
+          id: "site-photos",
+          name: "Site Photos",
+          description: "Photographs explicitly made available to you.",
+          kind: "photo" as const,
+          files: view.photos.filter((doc) => doc.uploaded),
+        },
+      ],
+    },
+  ]
+  return categories
+    .map((category) => ({
+      ...category,
+      fileCount: category.folders.reduce(
+        (total, folder) => total + folder.files.length,
+        0,
+      ),
+    }))
+    .filter((category) => category.fileCount > 0)
 }

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon } from "./ui"
 import { Chart, downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
-import { DemoSessionPicker } from "./RoleWorkspace"
 import PhaseTimeline from "./PhaseTimeline"
 import { dateLabel, initials, today, type Account, type Doc } from "./model"
-import type { ClientDocument, ClientProjectView } from "./client-access"
+import {
+  clientDocumentIndex,
+  type ClientDocument,
+  type ClientProjectView,
+} from "./client-access"
+import DocumentRepository from "./DocumentRepository"
 
-type DemoIdentity = Pick<Account, "id" | "name" | "role" | "status">
 type Viewer = {
   projectId: string
   documentId: string
@@ -48,11 +51,9 @@ function Panel({
 export default function ClientPortal({
   actor,
   projects,
-  sessions,
   readNoticeIds,
   mutedTypes,
   onMute,
-  onSwitch,
   onResolve,
   onReport,
   onRecord,
@@ -62,15 +63,12 @@ export default function ClientPortal({
   onPause,
   idleWarning,
   onStayActive,
-  demoMode,
 }: {
   actor: Pick<Account, "id" | "name" | "email" | "status">
   projects: ClientProjectView[]
-  sessions: DemoIdentity[]
   readNoticeIds: string[]
   mutedTypes: string[]
   onMute: (type: string) => void
-  onSwitch: (id: string) => void
   onResolve: (
     projectId: string,
     documentId: string,
@@ -84,7 +82,6 @@ export default function ClientPortal({
   onPause: () => void
   idleWarning: boolean
   onStayActive: () => void
-  demoMode: boolean
 }) {
   const [page, setPage] = useState("Project Overview")
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
@@ -152,13 +149,17 @@ export default function ClientPortal({
     setBell(false)
     setError("")
   }
-  function openDocument(documentId: string, kind: Viewer["kind"] = "document") {
-    if (!project) return
+  function openDocument(
+    documentId: string,
+    kind: Viewer["kind"] = "document",
+    targetProjectId = project?.id,
+  ) {
+    if (!targetProjectId) return
     try {
-      const doc = onResolve(project.id, documentId, kind)
-      setViewer({ projectId: project.id, documentId, kind })
+      const doc = onResolve(targetProjectId, documentId, kind)
+      setViewer({ projectId: targetProjectId, documentId, kind })
       onRecord(
-        project.id,
+        targetProjectId,
         kind === "photo"
           ? "Client viewed shared site photograph"
           : "Client viewed authorized document",
@@ -194,7 +195,7 @@ export default function ClientPortal({
         "Client progress report exported",
         "Approved and baseline Client-visible history only.",
       )
-      setMessage("Approved progress report exported as a prototype text file.")
+      setMessage("Approved progress report exported as a text file.")
     } catch (reason) {
       setError((reason as Error).message)
     }
@@ -473,8 +474,7 @@ export default function ClientPortal({
         <div className="client-two-column">
           <Panel
             title="Schedule performance"
-            subtitle="Illustrative planned-versus-actual schedule curves."
-            actions={<Badge>Sample schedule</Badge>}
+            subtitle="Planned-versus-actual schedule curves."
           >
             <Chart compact seed={73 + projects.indexOf(project) * 29} />
             <p className="client-chart-disclaimer">
@@ -599,9 +599,8 @@ export default function ClientPortal({
             <div className="notice neutral">
               <Icon name="shield" />
               <p>
-                Contact your Administrator for account or access changes.
-                Production authentication and password reset are not configured
-                in this local demo.
+                Contact your Administrator for account, password or access
+                changes.
               </p>
             </div>
           </Panel>
@@ -658,9 +657,9 @@ export default function ClientPortal({
           <div className="notice">
             <Icon name="activity" />
             <p>
-              These planned-versus-actual curves are illustrative, as in the
-              source prototype. They do not change the recorded project progress
-              of {project.progress}% or authorize schedule commitments.
+              These planned-versus-actual curves are for schedule tracking. They
+              do not change the recorded project progress of {project.progress}%
+              or authorize schedule commitments.
             </p>
           </div>
           <Panel
@@ -673,12 +672,32 @@ export default function ClientPortal({
       )
     if (page === "Project Documents")
       return (
-        <Panel
-          title="Authorized project repository"
-          subtitle={`${uploaded} uploaded records available · Client-visible documents only`}
-        >
-          {documents()}
-        </Panel>
+        <DocumentRepository
+          projects={projects.map((view) => ({
+            id: view.id,
+            name: view.name,
+            subtitle: `${view.type} · ${view.phase}`,
+            categories: clientDocumentIndex(view).map((category) => ({
+              ...category,
+              folders: category.folders.map((folder) => ({
+                ...folder,
+                files: folder.files.map((doc) => ({
+                  id: doc.id,
+                  label: doc.label,
+                  name: doc.name,
+                  date: doc.date,
+                  downloadable: folder.kind === "document",
+                })),
+              })),
+            })),
+          }))}
+          onOpen={(id, fileId) => {
+            const view = projects.find((p) => p.id === id)
+            const isPhoto = view?.photos.some((doc) => doc.id === fileId)
+            openDocument(fileId, isPhoto ? "photo" : "document", id)
+          }}
+          onDownload={(id, fileId) => downloadDocument(id, fileId)}
+        />
       )
     if (page === "Progress History")
       return (
@@ -753,7 +772,7 @@ export default function ClientPortal({
             <Button
               variant="icon-button"
               icon="logout"
-              aria-label={demoMode ? "Leave Client demo session" : "Sign out"}
+              aria-label="Sign out"
               onClick={onPause}
             />
           </div>
@@ -780,13 +799,6 @@ export default function ClientPortal({
             <strong>{page}</strong>
           </div>
           <div className="topbar-actions">
-            {demoMode && (
-              <DemoSessionPicker
-                sessions={sessions}
-                value={actor.id}
-                onChange={onSwitch}
-              />
-            )}
             <div className="notification-container">
               <Button
                 icon="bell"
@@ -910,10 +922,6 @@ export default function ClientPortal({
             <span>
               SITELINE <span>Built for the work ahead.</span>
             </span>
-            <span>
-              Local demo · Secure authentication and storage require backend
-              services
-            </span>
           </div>
         </main>
       </div>
@@ -954,13 +962,10 @@ export default function ClientPortal({
               <Icon name="building" size={30} />
             </span>
             <h1>SITELINE</h1>
-            <p>Your Client demo session is paused.</p>
+            <p>Your session has ended.</p>
             <Button variant="primary" onClick={onResume}>
-              Resume Client demo
+              Sign in again
             </Button>
-            <small>
-              This is simulated access, not production authentication.
-            </small>
           </div>
         </div>
       )}

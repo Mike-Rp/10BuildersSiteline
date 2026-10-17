@@ -4,11 +4,9 @@ import { Button, Field, Icon } from "./ui"
 export default function LoginPage({
   checkingSession = false,
   onSignIn,
-  onOpenDemo,
 }: {
   checkingSession?: boolean
   onSignIn: (email: string, password: string) => Promise<void>
-  onOpenDemo: () => void
 }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -20,7 +18,7 @@ export default function LoginPage({
     event.preventDefault()
     setError("")
     if (!email.trim() || !password) {
-      setError("Enter your work email and password.")
+      setError("Enter your work email or username and password.")
       return
     }
     setLoading(true)
@@ -57,10 +55,11 @@ export default function LoginPage({
           </div>
 
           <form className="login-form" onSubmit={submit} noValidate>
-            <Field label="Work Email">
+            <Field label="Work Email or Username">
               <input
-                type="email"
-                inputMode="email"
+                type="text"
+                autoCapitalize="none"
+                spellCheck={false}
                 autoComplete="username"
                 placeholder="name@10builders.com"
                 value={email}
@@ -113,14 +112,6 @@ export default function LoginPage({
 
           <div className="login-foot">
             <p>Accounts are provided by an administrator.</p>
-            <button
-              type="button"
-              className="demo-link"
-              onClick={onOpenDemo}
-              disabled={loading || checkingSession}
-            >
-              Open product demo
-            </button>
           </div>
         </section>
 

@@ -1,7 +1,8 @@
 // @refresh reset
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import RoleWorkspace, { DemoSessionPicker } from "./RoleWorkspace"
+import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import { authenticate, sessionAccount } from "./auth"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import PlannedTimeline from "./PlannedTimeline"
@@ -57,15 +58,18 @@ import {
   type State,
 } from "./model"
 import { projectDocumentIndex } from "./project-document-index"
+import DocumentRepository, {
+  findIndexedDoc,
+  staffRepositoryCategories,
+} from "./DocumentRepository"
 
 const STORAGE_KEY = "siteline-admin-workspace-v1"
-const ACCESS_MODE_KEY = "siteline-access-mode"
+const SESSION_KEY = "siteline-session-account"
 const NAV = [
   { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
   { label: "Active sites", icon: "building" },
   { label: "Project intake", icon: "plus" },
   { label: "Schedule performance", icon: "trend" },
-  { label: "Approvals", icon: "shield" },
   { label: "Project documents", icon: "folder", group: "RESOURCES" },
   { label: "Engineer documents", icon: "doc" },
   { label: "Engineer directory", icon: "helmet" },
@@ -255,7 +259,7 @@ export default function App() {
   const [state, setState] = useState<State>(loadState)
   const [sessionId, setSessionId] = useState(() => {
     try {
-      return sessionStorage.getItem("siteline-demo-session") || "a1"
+      return sessionStorage.getItem(SESSION_KEY) || "a1"
     } catch {
       return "a1"
     }
@@ -272,6 +276,7 @@ export default function App() {
   const [query, setQuery] = useState("")
   const [globalQuery, setGlobalQuery] = useState("")
   const [filter, setFilter] = useState("all")
+  const [subconTab, setSubconTab] = useState("registered")
   const [tab, setTab] = useState("closed")
   const [mobileNav, setMobileNav] = useState(false)
   const [notifications, setNotifications] = useState(false)
@@ -287,18 +292,12 @@ export default function App() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
-  const [demoMode, setDemoMode] = useState(false)
   const [idleWarning, setIdleWarning] = useState(false)
   const [storageError, setStorageError] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
   const [licenseFilter, setLicenseFilter] = useState("all")
   const [activityFilter, setActivityFilter] = useState("all")
-  const [documentPath, setDocumentPath] = useState<{
-    projectId?: string
-    categoryId?: string
-    folderId?: string
-  }>({})
   const active = state.projects.filter((p) => p.status === "active")
   const intake = state.projects.filter((p) =>
     ["pending", "draft", "changes_requested"].includes(p.status),
@@ -328,40 +327,20 @@ export default function App() {
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
   useEffect(() => {
-    let active = true
+    let storedId: string | null = null
     try {
-      if (sessionStorage.getItem(ACCESS_MODE_KEY) === "demo") {
-        setDemoMode(true)
-        setSignedOut(false)
-        setCheckingSession(false)
-        return
-      }
+      storedId = sessionStorage.getItem(SESSION_KEY)
     } catch {
-      /* Continue with the server session check. */
+      /* No stored session; show sign-in. */
     }
-    fetch("/api/auth/session", { credentials: "include" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("No active session")
-        const result = (await response.json()) as { accountId?: string }
-        const account = stateRef.current.accounts.find(
-          (candidate) => candidate.id === result.accountId,
-        )
-        if (!account || account.status !== "active")
-          throw new Error("Account access is unavailable")
-        if (!active) return
-        setSessionId(account.id)
-        setDemoMode(false)
-        setSignedOut(false)
-      })
-      .catch(() => {
-        if (active) setSignedOut(true)
-      })
-      .finally(() => {
-        if (active) setCheckingSession(false)
-      })
-    return () => {
-      active = false
+    const account = sessionAccount(stateRef.current, storedId)
+    if (account) {
+      setSessionId(account.id)
+      setSignedOut(false)
+    } else {
+      clearSession()
     }
+    setCheckingSession(false)
   }, [])
   useEffect(() => {
     try {
@@ -420,7 +399,7 @@ export default function App() {
         Math.max(0, time - 60000),
       )
       logout = setTimeout(() => {
-        setSignedOut(true)
+        endSession()
         setIdleWarning(false)
       }, time)
     }
@@ -465,7 +444,7 @@ export default function App() {
     target = page,
   ) {
     if (signedOut || actor.role !== "admin") {
-      setToast("Reopen the demo session to continue.")
+      setToast("Sign in again to continue.")
       return
     }
     setState((s) => log(change(s), title, detail, type, target))
@@ -475,45 +454,49 @@ export default function App() {
     setPage(next)
     setQuery("")
     setFilter("all")
+    setSubconTab("registered")
     setRoleFilter("all")
     setLicenseFilter("all")
     setMobileNav(false)
     setNotifications(false)
   }
-  function switchDemoSession(id: string) {
-    const account = stateRef.current.accounts.find((a) => a.id === id)
-    if (
-      !account ||
-      account.status !== "active" ||
-      licenseState(account, stateRef.current.rules.grace) === "Grace expired"
-    ) {
-      window.alert(
-        "This account cannot start a demo session. An Administrator must resolve its status or license first.",
-      )
-      return
+  function openPendingRequests() {
+    navigate("Subcon directory")
+    setSubconTab("pending")
+  }
+  function openTarget(target: string) {
+    if (target === "Approvals") openPendingRequests()
+    else navigate(target)
+  }
+  function clearSession() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY)
+    } catch {
+      /* The signed-out state remains effective in memory. */
     }
+  }
+  async function signIn(email: string, password: string) {
+    const account = authenticate(stateRef.current, email, password)
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
     setCredentials(undefined)
     setNotifications(false)
+    setSessionId(account.id)
     setSignedOut(false)
-    setDemoMode(true)
     setPage("Dashboard")
-    setSessionId(id)
     try {
-      sessionStorage.setItem(ACCESS_MODE_KEY, "demo")
-      sessionStorage.setItem("siteline-demo-session", id)
+      sessionStorage.setItem(SESSION_KEY, account.id)
     } catch {
-      /* Session selection remains in memory. */
+      /* The session remains in memory until the tab closes. */
     }
     setState((current) => ({
       ...current,
       events: [
         {
           id: uid(),
-          title: "Demo session opened",
-          detail: `${account.name} · ${ROLE_NAMES[account.role]} · simulated authentication`,
+          title: "Signed in",
+          detail: `${account.name} · ${ROLE_NAMES[account.role]}`,
           type: "login",
           date: new Date().toISOString(),
           read: false,
@@ -525,74 +508,15 @@ export default function App() {
       ],
     }))
   }
-  async function signIn(email: string, password: string) {
-    let response: Response
-    try {
-      response = await fetch("/api/auth/login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-    } catch {
-      throw new Error(
-        "Authentication service is not connected. Use Demo Access to explore SITELINE.",
-      )
-    }
-    if (!response.ok) {
-      if (response.status === 401)
-        throw new Error("The email or password you entered is incorrect.")
-      throw new Error(
-        "Authentication service is unavailable. Try again later or use Demo Access.",
-      )
-    }
-    let result: { accountId?: string }
-    try {
-      result = ((await response.json()) as { accountId?: string })
-    } catch {
-      throw new Error(
-        "Authentication service is not connected. Use Demo Access to explore SITELINE.",
-      )
-    }
-    const account = stateRef.current.accounts.find(
-      (candidate) => candidate.id === result.accountId,
-    )
-    if (!account || account.status !== "active")
-      throw new Error("This account is not authorized to access SITELINE.")
-    setSessionId(account.id)
-    setDemoMode(false)
-    setSignedOut(false)
-    setPage("Dashboard")
-    try {
-      sessionStorage.setItem(ACCESS_MODE_KEY, "authenticated")
-      sessionStorage.removeItem("siteline-demo-session")
-    } catch {
-      /* The server cookie remains the source of truth for the session. */
-    }
-  }
-  function openDemo() {
-    switchDemoSession("a1")
-  }
   function endSession() {
-    if (!demoMode)
-      void fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      }).catch(() => undefined)
-    try {
-      sessionStorage.removeItem(ACCESS_MODE_KEY)
-      sessionStorage.removeItem("siteline-demo-session")
-    } catch {
-      /* The signed-out state remains effective in memory. */
-    }
+    clearSession()
     setSignedOut(true)
-    setDemoMode(false)
   }
   function sendWorkflow(command: WorkflowCommand) {
     if (signedOut)
       return {
         ok: false,
-        error: "Your local session is paused. Resume before continuing.",
+        error: "Your session has ended. Sign in again to continue.",
       }
     try {
       const next = applyWorkflow(stateRef.current, actor.id, command)
@@ -769,7 +693,7 @@ export default function App() {
     text: string,
   ) {
     if (signedOut || actor.role !== "admin")
-      return "Reopen the demo session to continue."
+      return "Sign in again to continue."
     try {
       const next = resolveClientSubconIssue(
         stateRef.current,
@@ -1012,6 +936,71 @@ export default function App() {
       </Empty>
     )
   }
+  function subconRequests(status: string) {
+    return (
+      <div className="approvals-grid">
+        {state.companies
+          .filter((c) => c.status === status)
+          .map((c) => (
+            <Panel
+              key={c.id}
+              title={c.name}
+              subtitle="Project-level subcontractor"
+              actions={<Status status={c.status} />}
+            >
+              <div className="approval-content">
+                <div className="detail-grid">
+                  <div>
+                    <small>SUBMITTED BY</small>
+                    <strong>{c.submittedBy || "Directory record"}</strong>
+                  </div>
+                  <div>
+                    <small>PROJECT</small>
+                    <strong>{projectFor(c.projectId)}</strong>
+                  </div>
+                  <div>
+                    <small>CONTACT PERSON</small>
+                    <strong>{c.contact}</strong>
+                  </div>
+                  <div>
+                    <small>CONTACT NUMBER</small>
+                    <strong>{c.phone}</strong>
+                  </div>
+                </div>
+                <p>{c.note}</p>
+                <Button
+                  variant="text-button"
+                  icon="doc"
+                  onClick={() => setDialog({ kind: "company", id: c.id })}
+                >
+                  View company & supporting documents
+                </Button>
+                {c.status === "pending" && (
+                  <div className="approval-actions">
+                    <Button
+                      variant="primary"
+                      icon="check"
+                      onClick={() => approval(c, "approved")}
+                    >
+                      Approve company
+                    </Button>
+                    <Button
+                      variant="danger-ghost"
+                      onClick={() => approval(c, "rejected")}
+                    >
+                      Reject request
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          ))}
+        {!state.companies.some((c) => c.status === status) && (
+          <Empty title="No requests in this category" />
+        )}
+      </div>
+    )
+  }
   function activityList(events: Event[], compact = false) {
     return (
       <div className={`activity-list ${compact ? "compact-activity" : ""}`}>
@@ -1027,7 +1016,10 @@ export default function App() {
                     x.id === e.id ? { ...x, read: true } : x,
                   ),
                 }))
-                if (NAV.some((n) => n.label === e.target)) {
+                if (e.target === "Approvals") {
+                  openPendingRequests()
+                  setDialog(undefined)
+                } else if (NAV.some((n) => n.label === e.target)) {
                   navigate(e.target)
                   setDialog(undefined)
                 } else if (e.projectId) {
@@ -1135,7 +1127,7 @@ export default function App() {
             <button
               className="metric-card"
               key={m.title}
-              onClick={() => navigate(m.target)}
+              onClick={() => openTarget(m.target)}
             >
               <div className="metric-top">
                 <span>{m.title}</span>
@@ -1175,7 +1167,9 @@ export default function App() {
             <Button
               variant="text-button"
               onClick={() =>
-                navigate(pending.length ? "Approvals" : "Engineer directory")
+                pending.length
+                  ? openPendingRequests()
+                  : navigate("Engineer directory")
               }
             >
               Review items
@@ -1309,7 +1303,7 @@ export default function App() {
           </span>
           <span>
             <i className="status-dot green" />
-            Administrator workspace · Local demo
+            Administrator workspace
           </span>
         </div>
       </>
@@ -1490,324 +1484,31 @@ export default function App() {
           </div>
         </>
       )
-    if (page === "Approvals")
-      return (
-        <>
-          {pageHeading(
-            "Subcontractor approvals",
-            "Review new companies before they join the shared directory.",
-          )}
-          <div className="tabs standalone">
-            {[
-              ["all", `Pending requests (${pending.length})`],
-              ["approved", "Approved"],
-              ["rejected", "Rejected"],
-              ["archived", "Archived"],
-            ].map(([v, l]) => (
-              <button
-                key={v}
-                className={filter === v ? "active" : ""}
-                onClick={() => setFilter(v)}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-          <div className="approvals-grid">
-            {state.companies
-              .filter((c) =>
-                filter === "all" ? c.status === "pending" : c.status === filter,
-              )
-              .map((c) => (
-                <Panel
-                  key={c.id}
-                  title={c.name}
-                  subtitle="Project-level subcontractor"
-                  actions={<Status status={c.status} />}
-                >
-                  <div className="approval-content">
-                    <div className="detail-grid">
-                      <div>
-                        <small>SUBMITTED BY</small>
-                        <strong>{c.submittedBy || "Directory record"}</strong>
-                      </div>
-                      <div>
-                        <small>PROJECT</small>
-                        <strong>{projectFor(c.projectId)}</strong>
-                      </div>
-                      <div>
-                        <small>CONTACT PERSON</small>
-                        <strong>{c.contact}</strong>
-                      </div>
-                      <div>
-                        <small>CONTACT NUMBER</small>
-                        <strong>{c.phone}</strong>
-                      </div>
-                    </div>
-                    <p>{c.note}</p>
-                    <Button
-                      variant="text-button"
-                      icon="doc"
-                      onClick={() => setDialog({ kind: "company", id: c.id })}
-                    >
-                      View company & supporting documents
-                    </Button>
-                    {c.status === "pending" && (
-                      <div className="approval-actions">
-                        <Button
-                          variant="primary"
-                          icon="check"
-                          onClick={() => approval(c, "approved")}
-                        >
-                          Approve company
-                        </Button>
-                        <Button
-                          variant="danger-ghost"
-                          onClick={() => approval(c, "rejected")}
-                        >
-                          Reject request
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </Panel>
-              ))}
-            {!state.companies.some((c) =>
-              filter === "all" ? c.status === "pending" : c.status === filter,
-            ) && <Empty title="No requests in this category" />}
-          </div>
-        </>
-      )
-    if (page === "Project documents") {
-      const repositoryProject = state.projects.find(
-        (project) => project.id === documentPath.projectId,
-      )
-      const repository = repositoryProject
-        ? projectDocumentIndex(repositoryProject)
-        : []
-      const repositoryCategory = repository.find(
-        (category) => category.id === documentPath.categoryId,
-      )
-      const repositoryFolder = repositoryCategory?.folders.find(
-        (folder) => folder.id === documentPath.folderId,
-      )
-      const levelTitle = repositoryFolder
-        ? repositoryFolder.name
-        : repositoryCategory
-          ? repositoryCategory.name
-          : repositoryProject
-            ? repositoryProject.name
-            : "Project repository"
-      const levelDescription = repositoryFolder
-        ? repositoryFolder.description
-        : repositoryCategory
-          ? repositoryCategory.description
-          : repositoryProject
-            ? "Choose a document category to continue."
-            : "Choose a project to browse its original records."
+    if (page === "Project documents")
       return (
         <>
           {pageHeading(
             "Project documents",
             "Browse original project records without creating duplicate files.",
           )}
-          <Panel
-            title={levelTitle}
-            subtitle={levelDescription}
-            className="document-browser"
-            actions={
-              !repositoryProject ? (
-                <Search
-                  value={query}
-                  onChange={setQuery}
-                  placeholder="Find a project"
-                />
-              ) : (
-                <Badge>
-                  {repositoryFolder
-                    ? `${repositoryFolder.files.length} files`
-                    : `${repositoryCategory?.fileCount ?? repository.reduce((total, category) => total + category.fileCount, 0)} files`}
-                </Badge>
-              )
-            }
-          >
-            {repositoryProject && (
-              <nav
-                className="document-browser-path"
-                aria-label="Document repository path"
-              >
-                <Button
-                  variant="text-button"
-                  onClick={() => setDocumentPath({})}
-                >
-                  Projects
-                </Button>
-                <Icon name="chevron" size={14} />
-                <Button
-                  variant="text-button"
-                  onClick={() =>
-                    setDocumentPath({ projectId: repositoryProject.id })
-                  }
-                >
-                  {repositoryProject.name}
-                </Button>
-                {repositoryCategory && (
-                  <>
-                    <Icon name="chevron" size={14} />
-                    <Button
-                      variant="text-button"
-                      onClick={() =>
-                        setDocumentPath({
-                          projectId: repositoryProject.id,
-                          categoryId: repositoryCategory.id,
-                        })
-                      }
-                    >
-                      {repositoryCategory.name}
-                    </Button>
-                  </>
-                )}
-                {repositoryFolder && (
-                  <>
-                    <Icon name="chevron" size={14} />
-                    <strong>{repositoryFolder.name}</strong>
-                  </>
-                )}
-              </nav>
-            )}
-            {!repositoryProject && (
-              <div className="document-browser-grid">
-                {state.projects
-                  .filter((project) => matches(project.name))
-                  .map((project) => {
-                    const categories = projectDocumentIndex(project)
-                    const fileCount = categories.reduce(
-                      (total, category) => total + category.fileCount,
-                      0,
-                    )
-                    return (
-                      <Button
-                        variant="document-nav-card"
-                        key={project.id}
-                        onClick={() =>
-                          setDocumentPath({ projectId: project.id })
-                        }
-                      >
-                        <span className="document-nav-icon">
-                          <Icon name="building" size={28} />
-                        </span>
-                        <span className="document-nav-copy">
-                          <strong>{project.name}</strong>
-                          <small>
-                            {project.type} · {project.phase}
-                          </small>
-                        </span>
-                        <span className="document-nav-meta">
-                          {fileCount} original file
-                          {fileCount === 1 ? "" : "s"}
-                          <Icon name="arrow" size={17} />
-                        </span>
-                      </Button>
-                    )
-                  })}
-              </div>
-            )}
-            {repositoryProject && !repositoryCategory && (
-              <div className="document-browser-grid">
-                {repository.map((category) => (
-                  <Button
-                    variant="document-nav-card"
-                    key={category.id}
-                    onClick={() =>
-                      setDocumentPath({
-                        projectId: repositoryProject.id,
-                        categoryId: category.id,
-                      })
-                    }
-                  >
-                    <span className="document-nav-icon">
-                      <Icon name="folder" size={28} />
-                    </span>
-                    <span className="document-nav-copy">
-                      <strong>{category.name}</strong>
-                      <small>{category.description}</small>
-                    </span>
-                    <span className="document-nav-meta">
-                      {category.fileCount} file
-                      {category.fileCount === 1 ? "" : "s"}
-                      <Icon name="arrow" size={17} />
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
-            {repositoryCategory && !repositoryFolder && (
-              <div className="document-browser-grid">
-                {repositoryCategory.folders.map((folder) => (
-                  <Button
-                    variant="document-nav-card"
-                    key={folder.id}
-                    onClick={() =>
-                      setDocumentPath({
-                        projectId: repositoryProject!.id,
-                        categoryId: repositoryCategory.id,
-                        folderId: folder.id,
-                      })
-                    }
-                  >
-                    <span className="document-nav-icon compact">
-                      <Icon name="folder" size={24} />
-                    </span>
-                    <span className="document-nav-copy">
-                      <strong>{folder.name}</strong>
-                      <small>{folder.description}</small>
-                    </span>
-                    <span className="document-nav-meta">
-                      {folder.files.length} file
-                      {folder.files.length === 1 ? "" : "s"}
-                      <Icon name="arrow" size={17} />
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
-            {repositoryFolder &&
-              (repositoryFolder.files.length ? (
-                <div className="document-reference-list">
-                  {repositoryFolder.files.map(({ doc, source }) => (
-                    <div className="document-reference-row" key={doc.id}>
-                      <span className="file-icon">
-                        <Icon name="doc" />
-                      </span>
-                      <div className="document-info">
-                        <strong>{doc.label}</strong>
-                        <p>
-                          {doc.name} · {dateLabel(doc.date)} · {doc.owner}
-                        </p>
-                        <small>
-                          <Icon name="activity" size={14} />
-                          Referenced from {source}
-                        </small>
-                      </div>
-                      <Button
-                        variant="text-button"
-                        onClick={() => previewDoc(doc)}
-                      >
-                        View original
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Empty title="No files in this subfolder">
-                  Original uploads will appear here automatically when the
-                  responsible role submits them.
-                </Empty>
-              ))}
-          </Panel>
+          <DocumentRepository
+            projects={state.projects.map((project) => ({
+              id: project.id,
+              name: project.name,
+              subtitle: `${project.type} · ${project.phase}`,
+              categories: staffRepositoryCategories(
+                projectDocumentIndex(project),
+              ),
+            }))}
+            onOpen={(projectId, fileId) => {
+              const project = state.projects.find((p) => p.id === projectId)
+              const doc =
+                project && findIndexedDoc(projectDocumentIndex(project), fileId)
+              if (doc) previewDoc(doc)
+            }}
+          />
         </>
       )
-    }
     if (page === "Engineer documents")
       return (
         <>
@@ -1960,6 +1661,24 @@ export default function App() {
               Add Company
             </Button>,
           )}
+          <div className="tabs standalone">
+            {[
+              ["registered", "Registered companies"],
+              ["pending", `Pending requests (${pending.length})`],
+              ["rejected", "Rejected"],
+              ["archived", "Archived"],
+            ].map(([v, l]) => (
+              <button
+                key={v}
+                className={subconTab === v ? "active" : ""}
+                onClick={() => setSubconTab(v)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          {subconTab !== "registered" && subconRequests(subconTab)}
+          {subconTab === "registered" && (
           <Panel
             title="Registered companies"
             subtitle={`${state.companies.filter((c) => c.status === "approved").length} approved subcontractors`}
@@ -2041,6 +1760,7 @@ export default function App() {
               <Empty title="No companies match these filters" />
             )}
           </Panel>
+          )}
         </>
       )
     if (page === "Team")
@@ -2305,8 +2025,7 @@ export default function App() {
             <Icon name="shield" />
             <p>
               Administrator-only rules. Each change requires confirmation and
-              immediately updates related eligibility checks. This is a local
-              simulation, not server-enforced authorization.
+              immediately updates related eligibility checks.
             </p>
           </div>
           <Panel
@@ -2377,9 +2096,8 @@ export default function App() {
             <div className="notice neutral">
               <Icon name="doc" />
               <p>
-                Accounts and records persist in this browser. Authentication,
-                password reset, secure file storage, email delivery and
-                multi-user permissions require backend services. No public
+                Accounts and records are stored in this browser. Account access
+                and password changes are managed by the Administrator. No public
                 sharing is enabled.
               </p>
             </div>
@@ -2706,7 +2424,7 @@ export default function App() {
                 <Button
                   onClick={() => updateAccount({ ...a, cooldown: undefined })}
                 >
-                  Clear cooldown (demo)
+                  Clear cooldown
                 </Button>
               </div>
             )}
@@ -2860,7 +2578,7 @@ export default function App() {
                     commit(
                       (s) => s,
                       "License renewal reminder recorded",
-                      `${a.name} · No email or SMS is sent in this demo.`,
+                      `${a.name} · Reminder logged in SITELINE.`,
                       "notice",
                       "Engineer directory",
                     )
@@ -3040,7 +2758,6 @@ export default function App() {
       <LoginPage
         checkingSession={checkingSession}
         onSignIn={signIn}
-        onOpenDemo={openDemo}
       />
     )
   if (actor.role === "client") {
@@ -3055,18 +2772,10 @@ export default function App() {
           status: actor.status,
         }}
         projects={views}
-        sessions={state.accounts.map(({ id, name, role, status }) => ({
-          id,
-          name,
-          role,
-          status,
-        }))}
-        onSwitch={switchDemoSession}
-        demoMode={demoMode}
         onResolve={(projectId, documentId, kind) => {
           if (signedOut)
             throw new Error(
-              "Resume your local Client session before opening records.",
+              "Sign in again before opening records.",
             )
           return kind === "document"
             ? resolveClientDocument(
@@ -3085,7 +2794,7 @@ export default function App() {
         onReport={(projectId) => {
           if (signedOut)
             throw new Error(
-              "Resume your local Client session before exporting records.",
+              "Sign in again before exporting records.",
             )
           return clientProgressReport(stateRef.current, actor.id, projectId)
         }}
@@ -3158,7 +2867,7 @@ export default function App() {
           })
         }
         paused={signedOut}
-        onResume={() => setSignedOut(false)}
+        onResume={endSession}
         onPause={endSession}
         idleWarning={idleWarning}
         onStayActive={() => setIdleWarning(false)}
@@ -3172,8 +2881,6 @@ export default function App() {
         state={state}
         actor={actor}
         onCommand={sendWorkflow}
-        onSwitch={switchDemoSession}
-        demoMode={demoMode}
         onRead={(ids) =>
           setState((current) => ({
             ...current,
@@ -3204,7 +2911,7 @@ export default function App() {
         paused={signedOut}
         idleWarning={idleWarning}
         onStayActive={() => setIdleWarning(false)}
-        onResume={() => setSignedOut(false)}
+        onResume={endSession}
         onPause={endSession}
       />
     )
@@ -3246,7 +2953,7 @@ export default function App() {
               >
                 <Icon name={n.icon} size={19} />
                 <span>{n.label}</span>
-                {n.label === "Approvals" && pending.length > 0 && (
+                {n.label === "Subcon directory" && pending.length > 0 && (
                   <b className="nav-count">{pending.length}</b>
                 )}
                 {n.label === "Dashboard" && page === n.label && <i />}
@@ -3269,10 +2976,10 @@ export default function App() {
             <Button
               icon="logout"
               variant="icon-button"
-              aria-label={demoMode ? "Leave demo session" : "Sign out"}
+              aria-label="Sign out"
               onClick={() =>
                 setConfirmation({
-                  title: demoMode ? "Leave this demo session?" : "Sign out?",
+                  title: "Sign out?",
                   message:
                     "Your local workspace records are retained in this browser.",
                   action: endSession,
@@ -3303,20 +3010,12 @@ export default function App() {
             <strong>{page}</strong>
           </div>
           <div className="topbar-actions">
-            {demoMode && (
-              <DemoSessionPicker
-                state={state}
-                value={actor.id}
-                onChange={switchDemoSession}
-              />
-            )}
             <button
               className="global-search-trigger"
               onClick={() => setDialog({ kind: "search" })}
             >
               <Icon name="search" size={18} />
               <span>Search workspace</span>
-              <kbd>⌘ K</kbd>
             </button>
             <span className="topbar-divider" />
             <div className="notification-container">
@@ -3692,16 +3391,13 @@ export default function App() {
               Active sites for monitoring, or manage people and records under
               Resources.
             </p>
-            <h4>About this demo</h4>
+            <h4>Records and access</h4>
             <p>
-              You are using a simulated Administrator session. Records persist
-              locally; uploaded files use this browser’s IndexedDB. Seeded
-              document records do not include original PDFs. Schedule curves are
-              illustrative.
+              Records are saved in this browser, and uploaded files are stored
+              with them. Older document records may not include an attached
+              original file.
             </p>
             <p>
-              Production authentication, secure storage, email delivery,
-              background jobs and multi-user access controls require a backend.
               Other roles cannot be impersonated or accepted on behalf of from
               this Administrator workspace.
             </p>

@@ -402,6 +402,8 @@ tbody tr:hover { background: var(--surface-subtle); }
 .document-upload strong { font-size: 14px; font-weight: 550; }
 .document-browser-path { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 15px 24px; border-bottom: 1px solid var(--color-line); background: var(--surface-subtle); color: var(--color-muted); }
 .document-browser-path .button { padding: 0; min-height: auto; }
+.document-browser-back { padding: 12px 24px 0; }
+.document-browser-crumb { display: inline-flex; align-items: center; gap: 7px; color: var(--color-muted); font-size: 14px; }
 .document-browser-path strong { color: var(--color-ink); font-size: 14px; font-weight: 550; }
 .document-browser-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding: 24px; }
 .button.document-nav-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 220px; padding: 22px; text-align: left; white-space: normal; color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 8px; box-shadow: var(--shadow); transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }

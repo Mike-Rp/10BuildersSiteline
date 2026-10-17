@@ -1,10 +1,22 @@
 // @refresh reset
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import LeadSubcontractorPanel from "./LeadSubcontractorPanel"
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import DocumentRepository, {
+  findIndexedDoc,
+  staffRepositoryCategories,
+  type RepositoryPath,
+} from "./DocumentRepository"
+import { projectDocumentIndexFor } from "./project-document-index"
 import {
   dateLabel,
   DOC_LABELS,
@@ -30,6 +42,7 @@ import {
   ISSUES,
   isAssigned,
   leadConfirmed,
+  officePmStage,
   leadId,
   ownedProjects,
   phaseOwner,
@@ -43,56 +56,21 @@ import {
   type WorkflowCommand,
 } from "./workflows"
 
-const DEMO_SESSION_ACCOUNT_IDS = new Set(["a1", "a2", "a4", "a5", "a9"])
-
-export function DemoSessionPicker({
-  state,
-  sessions,
-  value,
-  onChange,
-}: {
-  state?: Pick<State, "accounts">
-  sessions?: Pick<Account, "id" | "name" | "role" | "status">[]
-  value: string
-  onChange: (id: string) => void
-}) {
-  return (
-    <label className="demo-session-picker">
-      <span>Demo session</span>
-      <select
-        aria-label="Demo user"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {(sessions || state?.accounts || [])
-          .filter(
-            (a) =>
-              DEMO_SESSION_ACCOUNT_IDS.has(a.id) &&
-              ["admin", "opm", "spm", "client"].includes(a.role) &&
-              (a.status === "active" || a.id === value),
-          )
-          .map((a) => (
-            <option key={a.id} value={a.id} disabled={a.status !== "active"}>
-              {a.name} · {ROLE_NAMES[a.role]}
-            </option>
-          ))}
-      </select>
-    </label>
-  )
-}
 function Panel({
   title,
   subtitle,
   children,
   actions,
+  className = "",
 }: {
   title: string
   subtitle?: string
   children: ReactNode
   actions?: ReactNode
+  className?: string
 }) {
   return (
-    <section className="panel">
+    <section className={`panel ${className}`}>
       <header className="panel-header">
         <div>
           <h2>{title}</h2>
@@ -126,7 +104,6 @@ const OPM_NAV = [
   ["Active sites", "building"],
   ["Deadlines", "clock"],
   ["Rework & approvals", "shield"],
-  ["SPM responses", "users"],
   ["Schedule performance", "trend"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
@@ -158,7 +135,6 @@ export default function RoleWorkspace({
   state,
   actor,
   onCommand,
-  onSwitch,
   onRead,
   onMute,
   paused,
@@ -166,12 +142,10 @@ export default function RoleWorkspace({
   onStayActive,
   onResume,
   onPause,
-  demoMode,
 }: {
   state: State
   actor: Account
   onCommand: (command: WorkflowCommand) => Result
-  onSwitch: (id: string) => void
   onRead: (ids: string[]) => void
   onMute: (type: string) => void
   paused: boolean
@@ -179,7 +153,6 @@ export default function RoleWorkspace({
   onStayActive: () => void
   onResume: () => void
   onPause: () => void
-  demoMode: boolean
 }) {
   const isOpm = actor.role === "opm"
   const nav = isOpm ? OPM_NAV : SPM_NAV
@@ -190,12 +163,36 @@ export default function RoleWorkspace({
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
   )
   const [dialog, setDialog] = useState<RoleDialog>()
+  // Project Monitoring modal: one modal that switches between its monitoring
+  // content and the project repository. Reset whenever the modal closes.
+  const [monitorView, setMonitorView] = useState<"monitoring" | "repository">(
+    "monitoring",
+  )
+  const [repoPath, setRepoPath] = useState<RepositoryPath>({})
+  const [repoQuery, setRepoQuery] = useState("")
+  const monitorScroll = useRef(0)
+  const modalBody = useRef<Element | null>(null)
+  // Runs right after the modal switches views: the repository starts at the
+  // top, and Project Monitoring returns to where it was.
+  useLayoutEffect(() => {
+    if (modalBody.current)
+      modalBody.current.scrollTop =
+        monitorView === "repository" ? 0 : monitorScroll.current
+  }, [monitorView])
+  useEffect(() => {
+    if (dialog?.kind === "project") return
+    setMonitorView("monitoring")
+    setRepoPath({})
+    setRepoQuery("")
+    monitorScroll.current = 0
+  }, [dialog?.kind, dialog?.projectId])
   const [preview, setPreview] = useState<Doc>()
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [query, setQuery] = useState("")
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
+  const [confirmTab, setConfirmTab] = useState("mine")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
@@ -250,6 +247,14 @@ export default function RoleWorkspace({
       : !assignmentBlock(p, actor.id) &&
         p.team.some((t) => t.accountId === actor.id && t.status === "pending"),
   )
+  // Projects with a Site PM phase that is still pending or declined.
+  const responseProjects = projects.filter(
+    (p) =>
+      p.opmAccepted || workflowFor(p).responses.length || p.status === "pending",
+  )
+  const responsesNeedingAction = responseProjects.filter((p) =>
+    p.team.some((t) => t.status !== "confirmed"),
+  )
   const pendingUpdates = allActive.filter((p) => workflowFor(p).pendingUpdate)
   const pendingRework = allActive.filter((p) => workflowFor(p).pendingRework)
   const qaCount = allActive.reduce(
@@ -302,10 +307,16 @@ export default function RoleWorkspace({
   }
   function navigate(next: string) {
     setPage(next)
+    setConfirmTab("mine")
     setQuery("")
     setError("")
     setMobileNav(false)
     setBell(false)
+  }
+  // Old SPM responses links open the Site PM responses tab of Confirmation queue.
+  function openSiteResponses() {
+    navigate("Confirmation queue")
+    setConfirmTab("responses")
   }
   function openDocuments(p: Project) {
     setPickedId(p.id)
@@ -345,22 +356,6 @@ export default function RoleWorkspace({
         </div>
         {action}
       </div>
-    )
-  }
-  function projectSelect(list = projects) {
-    return (
-      <Field label="Project">
-        <select
-          value={picked?.id || ""}
-          onChange={(e) => setPickedId(e.target.value)}
-        >
-          {list.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </Field>
     )
   }
   function timeline(p: Project) {
@@ -442,24 +437,37 @@ export default function RoleWorkspace({
   }
   function confirmationCard(p: Project) {
     const work = workflowFor(p)
+    const stage = officePmStage(p)
     return (
       <Panel
         key={p.id}
+        className={stage.kind === "action" ? "action-required" : ""}
         title={p.name}
         subtitle={`${p.type} · ${p.area} sqm · ${p.floors} floors`}
         actions={
-          <Status
-            value={
-              p.status === "changes_requested"
-                ? "changes requested"
-                : p.opmAccepted
-                  ? "Office PM accepted"
-                  : "awaiting Office PM"
-            }
-          />
+          <div className="button-group">
+            {stage.kind === "action" && (
+              <Badge tone="amber">Action Required</Badge>
+            )}
+            <Status
+              value={
+                p.status === "changes_requested"
+                  ? "changes requested"
+                  : p.opmAccepted
+                    ? "Office PM accepted"
+                    : "awaiting Office PM"
+              }
+            />
+          </div>
         }
       >
         <div className="role-card-content">
+          {stage.message && (
+            <p className={`stage-message ${stage.kind}`}>
+              <Icon name={stage.kind === "action" ? "alert" : "clock"} size={16} />
+              {stage.message}
+            </p>
+          )}
           {timeline(p)}
           <div className="role-project-facts">
             <span>
@@ -541,7 +549,7 @@ export default function RoleWorkspace({
                     ? "View project documents"
                     : "Resume Document Upload"}
                 </Button>
-                <Button onClick={() => navigate("SPM responses")}>
+                <Button onClick={openSiteResponses}>
                   Track Site PM responses
                 </Button>
               </div>
@@ -760,89 +768,18 @@ export default function RoleWorkspace({
       </>
     )
   }
-  function documentWorkspace() {
-    if (!picked)
-      return (
-        <Empty title="No assigned projects">
-          An Administrator must assign you to a project first.
-        </Empty>
-      )
-    if (!isOpm)
-      return (
-        <>
-          {header(
-            "Document repository",
-            "Your agreement submissions and current phase checklist status.",
-          )}
-          {projects.map((p) => (
-            <Panel
-              key={p.id}
-              title={p.name}
-              subtitle={`${p.phase} · ${p.progress}% recorded progress`}
-            >
-              <div className="role-card-content">
-                <div className="notice">
-                  <Icon name="shield" />
-                  <p>
-                    Site PM access is view-only for the submitted subcontractor
-                    agreement. Office PM permits, budgets and registered
-                    contracts are not exposed here.
-                  </p>
-                </div>
-                {p.docs
-                  .filter((d) => d.label === DOC_LABELS[6])
-                  .map((d) => (
-                    <div className="role-document-row" key={d.id}>
-                      <span className="file-icon">
-                        <Icon name="doc" />
-                      </span>
-                      <div>
-                        <h3>{d.label}</h3>
-                        <p>
-                          {d.uploaded
-                            ? `Uploaded · ${d.name}`
-                            : "Not yet uploaded by the Lead Site PM"}
-                        </p>
-                      </div>
-                      {d.uploaded ? (
-                        <Button onClick={() => showDoc(p, d)}>
-                          View watermarked submission
-                        </Button>
-                      ) : (
-                        <Status value="pending" />
-                      )}
-                    </div>
-                  ))}
-                <h3 className="subsection-title">
-                  Current phase checklist · {p.phase}
-                </h3>
-                {checklistFor(p).map((i) => (
-                  <div className="repository-check" key={i.id}>
-                    <span>{i.label}</span>
-                    <Status value={i.status} />
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          ))}
-        </>
-      )
-    const contract = picked.docs.find(
+  // Existing Office PM upload UI and rules, now shown inside a project's view.
+  function requiredDocuments(p: Project) {
+    const contract = p.docs.find(
       (d) => d.label === "Client Contract Agreement" && d.uploaded,
     )
-    return (
-      <>
-        {header(
-          "Project documents",
-          "Complete the six required records before Site PM acceptance.",
-        )}
-        <div className="role-project-picker">{projectSelect()}</div>
+    const panel = (
         <Panel
-          title={picked.name}
-          subtitle={`${registeredCount(picked)} / 6 required Office PM documents uploaded`}
+          title="Required documents"
+          subtitle={`${registeredCount(p)} / 6 required Office PM documents uploaded`}
           actions={
-            <Badge tone={registeredComplete(picked) ? "green" : "amber"}>
-              {registeredComplete(picked)
+            <Badge tone={registeredComplete(p) ? "green" : "amber"}>
+              {registeredComplete(p)
                 ? "Documents complete"
                 : "In progress"}
             </Badge>
@@ -850,10 +787,10 @@ export default function RoleWorkspace({
         >
           <div className="role-card-content">
             <div className="document-completion">
-              <progress max={6} value={registeredCount(picked)} />
-              <strong>{registeredCount(picked)} / 6</strong>
+              <progress max={6} value={registeredCount(p)} />
+              <strong>{registeredCount(p)} / 6</strong>
             </div>
-            {!picked.opmAccepted && (
+            {!p.opmAccepted && (
               <div className="notice">
                 <Icon name="shield" />
                 <p>
@@ -866,90 +803,92 @@ export default function RoleWorkspace({
               </div>
             )}
             <h3>Admin-uploaded Client Contract Agreement</h3>
-            {picked.opmAccepted && contract ? (
+            {p.opmAccepted && contract ? (
               <DocumentList
                 docs={[contract]}
-                onPreview={(doc) => showDoc(picked, doc)}
+                onPreview={(doc) => showDoc(p, doc)}
               />
             ) : (
               <p className="role-muted subsection">
                 {" "}
-                {picked.opmAccepted
-                  ? "No original Admin contract is present for this seeded demonstration intake. Newly created intake projects include their uploaded agreement."
+                {p.opmAccepted
+                  ? "No original Admin contract file is attached to this intake record. Newly created intake projects include their uploaded agreement."
                   : "View and download become available after you accept."}
               </p>
             )}
-            <div className="registered-documents">
-              {DOC_LABELS.slice(0, 6).map((label, i) => {
-                const doc = picked.docs.find((d) => d.label === label)
-                return (
-                  <section
-                    className={`registered-document ${
-                      doc?.uploaded ? "complete" : ""
-                    }`}
-                    key={label}
-                  >
-                    <span className="document-number">
-                      {doc?.uploaded ? (
-                        <Icon name="check" size={20} />
-                      ) : (
-                        String(i + 1).padStart(2, "0")
-                      )}
-                    </span>
-                    <div>
-                      <h3>{label}</h3>
-                      <p>
-                        {doc?.uploaded
-                          ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
-                          : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
-                      </p>
-                    </div>
-                    {doc?.uploaded ? (
-                      <div className="button-group">
-                        <Badge tone="green">Uploaded & locked</Badge>
-                        <Button
-                          variant="icon-button"
-                          icon="search"
-                          aria-label={`Preview ${label}`}
-                          onClick={() => showDoc(picked, doc)}
-                        />
-                        <Button
-                          variant="icon-button"
-                          icon="download"
-                          aria-label={`Download ${label}`}
-                          onClick={() => downloadDoc(doc)}
-                        />
+            {p.opmAccepted && (
+              <div className="registered-documents">
+                {DOC_LABELS.slice(0, 6).map((label, i) => {
+                  const doc = p.docs.find((d) => d.label === label)
+                  return (
+                    <section
+                      className={`registered-document ${
+                        doc?.uploaded ? "complete" : ""
+                      }`}
+                      key={label}
+                    >
+                      <span className="document-number">
+                        {doc?.uploaded ? (
+                          <Icon name="check" size={20} />
+                        ) : (
+                          String(i + 1).padStart(2, "0")
+                        )}
+                      </span>
+                      <div>
+                        <h3>{label}</h3>
+                        <p>
+                          {doc?.uploaded
+                            ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
+                            : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
+                        </p>
                       </div>
-                    ) : (
-                      <Upload
-                        label={label}
-                        owner={actor.name}
-                        disabled={
-                          !picked.opmAccepted || picked.status !== "pending"
-                        }
-                        buttonLabel={`Upload ${label}`}
-                        onSave={(d) =>
-                          act(
-                            {
-                              type: "upload_registered",
-                              projectId: picked.id,
-                              docIndex: i,
-                              doc: d,
-                            },
-                            `${label} uploaded.`,
-                          )
-                        }
-                      />
-                    )}
-                  </section>
-                )
-              })}
-            </div>
-            {registeredComplete(picked) && (
+                      {doc?.uploaded ? (
+                        <div className="button-group">
+                          <Badge tone="green">Uploaded & locked</Badge>
+                          <Button
+                            variant="icon-button"
+                            icon="search"
+                            aria-label={`Preview ${label}`}
+                            onClick={() => showDoc(p, doc)}
+                          />
+                          <Button
+                            variant="icon-button"
+                            icon="download"
+                            aria-label={`Download ${label}`}
+                            onClick={() => downloadDoc(doc)}
+                          />
+                        </div>
+                      ) : (
+                        <Upload
+                          label={label}
+                          owner={actor.name}
+                          disabled={
+                            !p.opmAccepted || p.status !== "pending"
+                          }
+                          buttonLabel={`Upload ${label}`}
+                          onSave={(d) =>
+                            act(
+                              {
+                                type: "upload_registered",
+                                projectId: p.id,
+                                docIndex: i,
+                                doc: d,
+                              },
+                              `${label} uploaded.`,
+                            )
+                          }
+                        />
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
+            )}
+            {registeredComplete(p) && (
               <div className="notice">
                 <Icon name="check" />
                 <p>
-                  All six documents are confirmed. {actorName(leadId(picked))}{" "}
+                  All six documents are confirmed. {actorName(leadId(p))}{" "}
                   must accept first, then the remaining Site PMs. Uploading
                   documents does not activate the project.
                 </p>
@@ -966,7 +905,7 @@ export default function RoleWorkspace({
               </div>
               <Status
                 value={
-                  picked.docs.some(
+                  p.docs.some(
                     (d) => d.label === DOC_LABELS[6] && d.uploaded,
                   )
                     ? "uploaded"
@@ -976,30 +915,151 @@ export default function RoleWorkspace({
             </div>
           </div>
         </Panel>
-        <Panel
-          title="Document repository — your projects"
-          subtitle="Read-only project folders. Upload from the registered checklist above."
-        >
-          <div className="role-card-content">
-            {projects
-              .filter((p) => p.opmId === actor.id)
-              .map((p) => (
-                <details key={p.id} className="repository-folder">
-                  <summary>
-                    <Icon name="folder" />
-                    <strong>{p.name}</strong>
-                    <span>
-                      {p.docs.filter((d) => d.uploaded).length} files on record
-                    </span>
-                  </summary>
-                  <DocumentList
-                    docs={p.docs}
-                    onPreview={(doc) => showDoc(p, doc)}
-                  />
-                </details>
-              ))}
-          </div>
-        </Panel>
+    )
+    return registeredComplete(p) ? (
+      <details className="role-details">
+        <summary>6/6 required documents complete</summary>
+        {panel}
+      </details>
+    ) : (
+      panel
+    )
+  }
+  // Review statuses already stored in the workflow: checklist item status, or
+  // a submission that is waiting in the pending update / rework slot.
+  function reviewStatusFor(p: Project, docId: string) {
+    const work = workflowFor(p)
+    for (const items of Object.values(work.checklist)) {
+      const item = items.find((entry) => entry.doc?.id === docId)
+      if (item) return item.status
+    }
+    if (
+      work.pendingUpdate?.evidence?.id === docId ||
+      work.pendingRework?.evidence?.id === docId
+    )
+      return "pending"
+    return undefined
+  }
+  function repositoryProject(p: Project) {
+    return {
+      id: p.id,
+      name: p.name,
+      subtitle: `${p.type} · ${p.phase}`,
+      categories: staffRepositoryCategories(
+        projectDocumentIndexFor(p, actor),
+        isOpm ? (doc) => reviewStatusFor(p, doc.id) : undefined,
+        isOpm,
+      ),
+    }
+  }
+  function openIndexedDoc(p: Project | undefined, fileId: string) {
+    const doc = p && findIndexedDoc(projectDocumentIndexFor(p, actor), fileId)
+    if (p && doc) showDoc(p, doc)
+  }
+  function repositoryBrowser(scoped: Project[]) {
+    return (
+      <DocumentRepository
+        className="role-document-browser"
+        {...(!isOpm && {
+          rootLabel: "Document repository",
+          rootClickable: true,
+          projectSubtitle: (id: string) => {
+            const p = scoped.find((item) => item.id === id)
+            return p
+              ? `${p.type} · ${p.phase} · ${p.progress}% recorded progress`
+              : ""
+          },
+          projectIntro: (id: string) => (
+            <div className="role-card-content">
+              <div className="notice">
+                <Icon name="shield" />
+                <p>
+                  Site PM access is view-only for the submitted subcontractor
+                  agreement. Office PM permits, budgets and registered contracts
+                  are not exposed here.
+                </p>
+              </div>
+            </div>
+          ),
+        })}
+        {...(isOpm && {
+          rootLabel: "Documents",
+          rootClickable: true,
+          fileDetails: true,
+          renderStatus: (value: string) => <Status value={value} />,
+          projectSubtitle: (id: string) => {
+            const p = scoped.find((item) => item.id === id)
+            return p ? `${p.type} · ${p.phase}` : ""
+          },
+          projectStatus: (id: string) => {
+            const p = scoped.find((item) => item.id === id)
+            if (!p) return { label: "", tone: "neutral" as const }
+            const stage = officePmStage(p)
+            if (
+              stage.kind === "action" &&
+              (stage.reason === "confirm" || stage.reason === "documents")
+            )
+              return {
+                label: `${registeredCount(p)}/6 required documents uploaded`,
+                tone: "action" as const,
+              }
+            if (!p.opmAccepted)
+              return {
+                label:
+                  p.status === "changes_requested"
+                    ? "Waiting for Administrator resubmission"
+                    : "Accept assignment first",
+                tone: "neutral" as const,
+              }
+            return registeredComplete(p)
+              ? { label: "Required documents complete", tone: "success" as const }
+              : {
+                  label: `${registeredCount(p)}/6 required uploaded`,
+                  tone: "neutral" as const,
+                }
+          },
+          projectIntro: (id: string) => {
+            const p = scoped.find((item) => item.id === id)
+            return p ? requiredDocuments(p) : null
+          },
+          onDownload: (projectId: string, fileId: string) => {
+            const p = scoped.find((item) => item.id === projectId)
+            const doc =
+              p && findIndexedDoc(projectDocumentIndexFor(p, actor), fileId)
+            if (doc) void downloadDoc(doc)
+          },
+        })}
+        projects={scoped.map(repositoryProject)}
+        onOpen={(projectId, fileId) =>
+          openIndexedDoc(scoped.find((item) => item.id === projectId), fileId)
+        }
+      />
+    )
+  }
+  function documentWorkspace() {
+    if (!picked)
+      return (
+        <Empty title="No projects available.">
+          An Administrator must assign you to a project first.
+        </Empty>
+      )
+    if (!isOpm)
+      return (
+        <>
+          {header(
+            "Document repository",
+            "Original project records you are authorized to view.",
+          )}
+          {repositoryBrowser(projects)}
+        </>
+      )
+    return (
+      <>
+        {header(
+          "Project documents",
+          "Choose a project to upload its required documents and browse its records.",
+        )}
+        {repositoryBrowser(projects.filter((p) => p.opmId === actor.id))}
       </>
     )
   }
@@ -2182,7 +2242,8 @@ export default function RoleWorkspace({
             className="deadline-list-item"
             onClick={() => {
               setPickedId(p.id)
-              navigate(isOpm ? "SPM responses" : "Assignments")
+              if (isOpm) openSiteResponses()
+              else navigate("Assignments")
             }}
           >
             <span className="activity-icon request">
@@ -2295,7 +2356,9 @@ export default function RoleWorkspace({
               onClick={() => {
                 onRead([e.id])
                 setBell(false)
-                if (nav.some(([label]) => label === e.target))
+                if (isOpm && e.target === "SPM responses")
+                  openSiteResponses()
+                else if (nav.some(([label]) => label === e.target))
                   navigate(e.target)
                 else if (
                   e.projectId &&
@@ -2336,77 +2399,83 @@ export default function RoleWorkspace({
       </div>
     )
   }
+  function responseCard(p: Project) {
+    return (
+      <Panel
+        key={p.id}
+        title={p.name}
+        subtitle={`${p.team.filter((t) => t.status === "confirmed").length}/${p.team.length} phase assignments confirmed`}
+      >
+        <div className="role-card-content">
+          {workflowFor(p).deadline && (
+            <div className="notice">
+              <Icon name="clock" />
+              <p>
+                Current response window:{" "}
+                {actorName(workflowFor(p).deadline!.accountId)}. Hard
+                deadline{" "}
+                {new Date(workflowFor(p).deadline!.hard).toLocaleString()}
+                .
+              </p>
+            </div>
+          )}
+          {assignmentRoster(p, true)}
+          {workflowFor(p).responses.length > 0 && (
+            <details className="role-details">
+              <summary>Response history</summary>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Site PM</th>
+                      <th>Phase</th>
+                      <th>Response</th>
+                      <th>Date</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workflowFor(p)
+                      .responses.slice()
+                      .reverse()
+                      .map((r) => (
+                        <tr key={r.id}>
+                          <td>{actorName(r.accountId)}</td>
+                          <td>{r.phase}</td>
+                          <td>
+                            <Status value={r.status} />
+                          </td>
+                          <td>{dateLabel(r.date)}</td>
+                          <td className="wrap-cell">{r.note}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+        </div>
+      </Panel>
+    )
+  }
   function responseTracking() {
+    const completed = responseProjects.filter((p) =>
+      p.team.every((t) => t.status === "confirmed"),
+    )
     return (
       <>
-        {header(
-          "Site PM response tracking",
-          "Know who accepted, who is waiting, and where reassignment is needed.",
+        {responsesNeedingAction.map(responseCard)}
+        {!responsesNeedingAction.length && (
+          <Empty title="No Site PM responses need action">
+            Every phase assignment on your projects is confirmed.
+          </Empty>
         )}
-        {projects
-          .filter(
-            (p) =>
-              p.opmAccepted ||
-              workflowFor(p).responses.length ||
-              p.status === "pending",
-          )
-          .map((p) => (
-            <Panel
-              key={p.id}
-              title={p.name}
-              subtitle={`${p.team.filter((t) => t.status === "confirmed").length}/${p.team.length} phase assignments confirmed`}
-            >
-              <div className="role-card-content">
-                {workflowFor(p).deadline && (
-                  <div className="notice">
-                    <Icon name="clock" />
-                    <p>
-                      Current response window:{" "}
-                      {actorName(workflowFor(p).deadline!.accountId)}. Hard
-                      deadline{" "}
-                      {new Date(workflowFor(p).deadline!.hard).toLocaleString()}
-                      .
-                    </p>
-                  </div>
-                )}
-                {assignmentRoster(p, true)}
-                {workflowFor(p).responses.length > 0 && (
-                  <details className="role-details">
-                    <summary>Response history</summary>
-                    <div className="table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Site PM</th>
-                            <th>Phase</th>
-                            <th>Response</th>
-                            <th>Date</th>
-                            <th>Note</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {workflowFor(p)
-                            .responses.slice()
-                            .reverse()
-                            .map((r) => (
-                              <tr key={r.id}>
-                                <td>{actorName(r.accountId)}</td>
-                                <td>{r.phase}</td>
-                                <td>
-                                  <Status value={r.status} />
-                                </td>
-                                <td>{dateLabel(r.date)}</td>
-                                <td className="wrap-cell">{r.note}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </details>
-                )}
-              </div>
-            </Panel>
-          ))}
+        {completed.length > 0 && (
+          <details className="role-details">
+            <summary>Completed ({completed.length})</summary>
+            {completed.map(responseCard)}
+          </details>
+        )}
       </>
     )
   }
@@ -2822,7 +2891,7 @@ export default function RoleWorkspace({
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>
-            <DocumentList docs={p.docs} onPreview={(doc) => showDoc(p, doc)} />
+            {registeredSummary(p)}
           </section>
         )}
         <div className="modal-actions">
@@ -2854,6 +2923,94 @@ export default function RoleWorkspace({
           )}
         </div>
       </>
+    )
+  }
+  function registeredSummary(p: Project) {
+    const index = projectDocumentIndexFor(p, actor)
+    const recent = index
+      .flatMap((category) =>
+        category.folders.flatMap((folder) => folder.files.map((file) => file.doc)),
+      )
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      .slice(0, 3)
+    return (
+      <>
+        <div className="tag-list subsection">
+          {index.map((category) => (
+            <span key={category.id}>
+              {category.name} · {category.fileCount}
+            </span>
+          ))}
+        </div>
+        {recent.length ? (
+          recent.map((doc) => (
+            <button
+              className="assignment-history"
+              key={doc.id}
+              onClick={() => showDoc(p, doc)}
+            >
+              <Icon name="doc" />
+              <span>
+                <strong>{doc.label}</strong>
+                <small>
+                  {doc.name} · {dateLabel(doc.date)} · {doc.owner}
+                </small>
+              </span>
+              <Icon name="search" size={18} />
+            </button>
+          ))
+        ) : (
+          <p className="role-muted subsection">No documents available yet.</p>
+        )}
+        <Button
+          icon="folder"
+          onClick={(event) => {
+            const body = event.currentTarget.closest(".modal-body")
+            modalBody.current = body
+            monitorScroll.current = body?.scrollTop ?? 0
+            setMonitorView("repository")
+          }}
+        >
+          View All in Document Repository
+        </Button>
+      </>
+    )
+  }
+  function monitoringRepository(p: Project) {
+    return (
+      <div style={{ minHeight: "calc(92vh - 190px)" }}>
+        <div className="document-browser-back">
+          <Button
+            variant="text-button"
+            onClick={(event) => {
+              const body = event.currentTarget.closest(".modal-body")
+              modalBody.current = body
+              setMonitorView("monitoring")
+            }}
+          >
+            ← Back to Project Monitoring
+          </Button>
+        </div>
+        <DocumentRepository
+          className="role-document-browser"
+          projects={[repositoryProject(p)]}
+          lockedProjectId={p.id}
+          rootLabel="Document repository"
+          path={repoPath}
+          onPathChange={setRepoPath}
+          query={repoQuery}
+          onQueryChange={setRepoQuery}
+          searchInProject
+          fileDetails
+          renderStatus={(value) => <Status value={value} />}
+          emptyDetail="Original uploads will appear here when submitted through the responsible workflow."
+          onOpen={(_projectId, fileId) => openIndexedDoc(p, fileId)}
+          onDownload={(_projectId, fileId) => {
+            const doc = findIndexedDoc(projectDocumentIndexFor(p, actor), fileId)
+            if (doc) void downloadDoc(doc)
+          }}
+        />
+      </div>
     )
   }
   function companyDetail(c: Company) {
@@ -2954,10 +3111,29 @@ export default function RoleWorkspace({
         return (
           <>
             {header(
-              "Assignment confirmations",
-              "Review projects assigned to you before starting document upload.",
+              "Confirmation queue",
+              "Track every acceptance needed before a project goes live.",
             )}
-            {intakes.length ? (
+            <div className="tabs standalone">
+              {[
+                ["mine", `My confirmations (${intakes.length})`],
+                [
+                  "responses",
+                  `Site PM responses (${responsesNeedingAction.length})`,
+                ],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={confirmTab === value ? "active" : ""}
+                  onClick={() => setConfirmTab(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {confirmTab === "responses" ? (
+              responseTracking()
+            ) : intakes.length ? (
               intakes.map(confirmationCard)
             ) : (
               <Empty title="No intake assignments awaiting confirmation" />
@@ -2980,7 +3156,7 @@ export default function RoleWorkspace({
             )}
             <Panel
               title="Upcoming responsibilities"
-              subtitle="Timers run while this local demo is open and are checked again on reload."
+              subtitle="Timers run while SITELINE is open and are checked again on reload."
             >
               {deadlineList()}
             </Panel>
@@ -2988,8 +3164,6 @@ export default function RoleWorkspace({
         )
       case "Rework & approvals":
         return reviews()
-      case "SPM responses":
-        return responseTracking()
       case "Subcon directory":
         return directory()
       case "Schedule performance":
@@ -3002,9 +3176,9 @@ export default function RoleWorkspace({
             <div className="notice">
               <Icon name="activity" />
               <p>
-                Charts reconstruct the source’s seeded illustrative S-curves.
+                Planned-versus-actual curves are for schedule tracking.
                 Recorded percentages are driven by approved QA/QC items, not by
-                these sample charts.
+                these charts.
               </p>
             </div>
             {allActive.map((p, i) => (
@@ -3108,9 +3282,7 @@ export default function RoleWorkspace({
                   <Icon name="shield" />
                   <p>
                     Only Administrator can change organization rules, account
-                    scope, professional credentials and account status. This
-                    demo uses explicit local session selection, not production
-                    authentication.
+                    scope, professional credentials and account status.
                   </p>
                 </div>
               </div>
@@ -3164,19 +3336,18 @@ export default function RoleWorkspace({
                 {label === "Assignments" && tasks.length > 0 && (
                   <b className="nav-count">{tasks.length}</b>
                 )}
+                {isOpm &&
+                  label === "Confirmation queue" &&
+                  tasks.length + responsesNeedingAction.length > 0 && (
+                    <b className="nav-count">
+                      {tasks.length + responsesNeedingAction.length}
+                    </b>
+                  )}
               </button>
             </div>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {demoMode && (
-            <div className="role-demo-note">
-              <Icon name="shield" size={17} />
-              <span>
-                Local demo · Permissions are simulated, not server security.
-              </span>
-            </div>
-          )}
           <div className="sidebar-person">
             <span className="avatar">{initials(actor.name)}</span>
             <span>
@@ -3186,7 +3357,7 @@ export default function RoleWorkspace({
             <Button
               variant="icon-button"
               icon="logout"
-              aria-label={demoMode ? "Leave demo session" : "Sign out"}
+              aria-label="Sign out"
               onClick={onPause}
             />
           </div>
@@ -3213,13 +3384,6 @@ export default function RoleWorkspace({
             <strong>{page}</strong>
           </div>
           <div className="topbar-actions">
-            {demoMode && (
-              <DemoSessionPicker
-                state={state}
-                value={actor.id}
-                onChange={onSwitch}
-              />
-            )}
             <div className="notification-container">
               <Button
                 icon="bell"
@@ -3293,9 +3457,6 @@ export default function RoleWorkspace({
           <div className="workspace-footer">
             <span>
               SITELINE <span>Built for the work ahead.</span>
-            </span>
-            <span>
-              Shared local records · No real email or secure authentication
             </span>
           </div>
         </main>
@@ -3429,12 +3590,20 @@ export default function RoleWorkspace({
         detail &&
         projects.some((p) => p.id === detail.id) && (
           <Modal
-            title="Project monitoring"
-            subtitle={`${ROLE_NAMES[actor.role]} · ${actor.name}`}
+            title={
+              monitorView === "repository" ? "Project documents" : "Project monitoring"
+            }
+            subtitle={
+              monitorView === "repository"
+                ? `${ROLE_NAMES[actor.role]} · ${detail.name}`
+                : `${ROLE_NAMES[actor.role]} · ${actor.name}`
+            }
             wide
             onClose={() => setDialog(undefined)}
           >
-            {projectDetail(detail)}
+            {monitorView === "repository" && isOpm
+              ? monitoringRepository(detail)
+              : projectDetail(detail)}
           </Modal>
         )}
       {dialog?.kind === "company" && company && (
@@ -3598,13 +3767,10 @@ export default function RoleWorkspace({
               <Icon name="building" size={28} />
             </span>
             <h1>SITELINE</h1>
-            <p>{actor.name}'s local demo session is paused.</p>
+            <p>{actor.name}, your session has ended.</p>
             <Button variant="primary" onClick={onResume}>
-              Resume demo session
+              Sign in again
             </Button>
-            <small>
-              Authentication and server-enforced sessions require a backend.
-            </small>
           </div>
         </div>
       )}

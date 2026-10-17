@@ -1,10 +1,11 @@
 import {
   DOC_LABELS,
   projectPhaseNames,
+  type Account,
   type Doc,
   type Project,
 } from "./model.ts"
-import { workflowFor } from "./workflows.ts"
+import { documentAccess, isAssigned, workflowFor } from "./workflows.ts"
 
 export type ProjectDocumentFile = {
   doc: Doc
@@ -225,4 +226,31 @@ export function projectDocumentIndex(
       0,
     ),
   }))
+}
+
+// The same index, limited to files an Office PM or Site PM can already open
+// through view_document. Counts are recomputed from the remaining files.
+export function projectDocumentIndexFor(
+  project: Project,
+  actor: Pick<Account, "id" | "role">,
+): ProjectDocumentCategory[] {
+  const inScope =
+    actor.role === "opm"
+      ? project.opmId === actor.id
+      : actor.role === "spm" && isAssigned(project, actor.id)
+  return projectDocumentIndex(project).map((category) => {
+    const folders = category.folders.map((folder) => ({
+      ...folder,
+      files: inScope
+        ? folder.files.filter(
+            ({ doc }) => !documentAccess(project, actor, doc.id).error,
+          )
+        : [],
+    }))
+    return {
+      ...category,
+      folders,
+      fileCount: folders.reduce((total, f) => total + f.files.length, 0),
+    }
+  })
 }

@@ -96,11 +96,11 @@ export async function downloadDoc(doc: Doc) {
     file ||
       new Blob(
         [
-          `SITELINE · SAMPLE DOCUMENT RECORD\n\n${doc.label}\nFilename: ${doc.name}\nOwner: ${doc.owner}\nDate: ${doc.date}\n\nThis seeded demonstration record has no original file. Documents uploaded in this browser download their actual file.`,
+          `SITELINE · DOCUMENT RECORD\n\n${doc.label}\nFilename: ${doc.name}\nOwner: ${doc.owner}\nDate: ${doc.date}\n\nThis record has no attached original file. Documents uploaded in SITELINE download their actual file.`,
         ],
         { type: "text/plain" },
       ),
-    file ? doc.name : `${doc.label} — sample record.txt`,
+    file ? doc.name : `${doc.label} — record.txt`,
   )
 }
 export function Upload({
@@ -373,12 +373,12 @@ export function Preview({
         ) : (
           <div className="sample-record">
             <Icon name="doc" size={40} />
-            <h3>{loaded ? "Sample document record" : "Loading document…"}</h3>
+            <h3>{loaded ? "Document record" : "Loading document…"}</h3>
             <p>{doc.label}</p>
             <p>
               {downloadable
-                ? "This seeded record contains metadata only. Files uploaded here can be previewed and downloaded in full."
-                : "This seeded record contains metadata only. Site PM submissions are view-only; Office PM retains the download copy."}
+                ? "This record contains metadata only. Files uploaded here can be previewed and downloaded in full."
+                : "This record contains metadata only. Site PM submissions are view-only; Office PM retains the download copy."}
             </p>
           </div>
         )}
@@ -400,7 +400,7 @@ export function Preview({
             variant="primary"
             onClick={() => (onDownload ? onDownload() : downloadDoc(doc))}
           >
-            Download {url ? "original" : "sample record"}
+            Download {url ? "original" : "record"}
           </Button>
         )}
       </div>
@@ -543,8 +543,8 @@ export function Chart({
             <strong>{last.actualDaily.toFixed(2)}%</strong>
           </div>
           <p>
-            The source generates seeded S-curve samples. These figures are not
-            live project measurements.
+            Planned-versus-actual curves support schedule tracking. These
+            figures are not live project measurements.
           </p>
         </div>
       )}

@@ -153,6 +153,50 @@ export function teamConfirmed(p: Project) {
 export function allocationReady(p: Project) {
   return p.opmAccepted && registeredComplete(p) && teamConfirmed(p)
 }
+// What the Office PM should do next on an intake project, from existing
+// project state only. Only "action" means the Office PM can act right now.
+export type OfficePmStage = {
+  kind: "action" | "waiting" | "complete" | "idle"
+  reason?: "confirm" | "documents" | "reassign"
+  message: string
+}
+export function officePmStage(p: Project): OfficePmStage {
+  if (p.status === "completed")
+    return { kind: "complete", message: "Project completed" }
+  if (p.status === "active")
+    return { kind: "complete", message: "Project already active" }
+  if (p.status === "changes_requested")
+    return { kind: "waiting", message: "Waiting for Administrator resubmission" }
+  if (p.status !== "pending") return { kind: "idle", message: "" }
+  if (!p.opmAccepted)
+    return {
+      kind: "action",
+      reason: "confirm",
+      message: "Office PM confirmation required",
+    }
+  if (!registeredComplete(p))
+    return {
+      kind: "action",
+      reason: "documents",
+      message: `${registeredCount(p)}/6 required documents uploaded`,
+    }
+  if (p.team.some((row) => row.status === "declined"))
+    return {
+      kind: "action",
+      reason: "reassign",
+      message: "Reassign declined Site PM phases",
+    }
+  if (!leadConfirmed(p))
+    return { kind: "waiting", message: "Waiting for Lead Site PM response" }
+  if (!teamConfirmed(p))
+    return { kind: "waiting", message: "Waiting for Site PM responses" }
+  return {
+    kind: "waiting",
+    message: p.clientSubcon
+      ? "Waiting for client subcontractor review and activation"
+      : "Waiting for subcontractor allocation",
+  }
+}
 export const CLIENT_SUBCON_DOC = "Client & Subcontractor Agreement"
 export function clientSubconReview(p: Project): ClientSubconReview {
   return p.clientSubconReview || { issues: [] }
@@ -670,6 +714,65 @@ function advanceIfReady(state: State, p: Project, now: number) {
     now,
   )
 }
+// The canonical document view rule for Office PM and Site PM. view_document
+// enforces it; repository screens use it to show only files the actor can open.
+// It assumes the actor is already in the project's scope (see applyWorkflow).
+export function documentAccess(
+  p: Project,
+  actor: Pick<Account, "id" | "role">,
+  docId: string | undefined,
+): { doc?: Doc; error: string } {
+  const work = workflowFor(p)
+  const available = [
+    ...p.docs,
+    ...work.photos,
+    ...p.history.flatMap((entry) =>
+      entry.evidence ? [entry.evidence] : [],
+    ),
+    ...Object.values(work.checklist).flatMap((items) =>
+      items.flatMap((item) => (item.doc ? [item.doc] : [])),
+    ),
+    ...(work.pendingUpdate?.evidence ? [work.pendingUpdate.evidence] : []),
+    ...(work.pendingRework?.evidence ? [work.pendingRework.evidence] : []),
+  ]
+  const doc = available.find((d) => d.id === docId)
+  if (!doc || !doc.uploaded)
+    return { error: "This document is not in your assigned project." }
+  if (actor.role === "opm") {
+    if (!p.opmAccepted)
+      return {
+        doc,
+        error: "Accept the project before viewing its internal documents.",
+      }
+  } else {
+    const ownEvidence = Object.entries(work.checklist).some(
+      ([phase, items]) =>
+        p.team.some((t) => t.phase === phase && t.accountId === actor.id) &&
+        items.some((item) => item.doc?.id === doc.id),
+    )
+    const canView =
+      doc.label === DOC_LABELS[6] ||
+      work.photos.some((d) => d.id === doc.id) ||
+      ownEvidence ||
+      (work.pendingUpdate?.authorId === actor.id &&
+        work.pendingUpdate.evidence?.id === doc.id) ||
+      (work.pendingRework?.authorId === actor.id &&
+        work.pendingRework.evidence?.id === doc.id) ||
+      p.history.some(
+        (entry) =>
+          entry.authorId === actor.id && entry.evidence?.id === doc.id,
+      ) ||
+      (leadId(p) === actor.id &&
+        doc.label === "Client & Subcontractor Agreement")
+    if (!canView)
+      return {
+        doc,
+        error:
+          "This internal document is not accessible in the Site PM workspace.",
+      }
+  }
+  return { doc, error: "" }
+}
 export function applyWorkflow(
   state: State,
   actorId: string,
@@ -714,53 +817,8 @@ export function applyWorkflow(
   ) => event(next, p, actor.id, title, detail, type, target, undefined, now)
   switch (command.type) {
     case "view_document": {
-      const available = [
-        ...p.docs,
-        ...work.photos,
-        ...p.history.flatMap((entry) =>
-          entry.evidence ? [entry.evidence] : [],
-        ),
-        ...Object.values(work.checklist).flatMap((items) =>
-          items.flatMap((item) => (item.doc ? [item.doc] : [])),
-        ),
-        ...(work.pendingUpdate?.evidence ? [work.pendingUpdate.evidence] : []),
-        ...(work.pendingRework?.evidence ? [work.pendingRework.evidence] : []),
-      ]
-      const doc = available.find((d) => d.id === command.doc?.id)
-      assert(
-        doc && doc.uploaded,
-        "This document is not in your assigned project.",
-      )
-      if (actor.role === "opm")
-        assert(
-          p.opmAccepted,
-          "Accept the project before viewing its internal documents.",
-        )
-      else {
-        const ownEvidence = Object.entries(work.checklist).some(
-          ([phase, items]) =>
-            p.team.some((t) => t.phase === phase && t.accountId === actor.id) &&
-            items.some((item) => item.doc?.id === doc.id),
-        )
-        const canView =
-          doc.label === DOC_LABELS[6] ||
-          work.photos.some((d) => d.id === doc.id) ||
-          ownEvidence ||
-          (work.pendingUpdate?.authorId === actor.id &&
-            work.pendingUpdate.evidence?.id === doc.id) ||
-          (work.pendingRework?.authorId === actor.id &&
-            work.pendingRework.evidence?.id === doc.id) ||
-          p.history.some(
-            (entry) =>
-              entry.authorId === actor.id && entry.evidence?.id === doc.id,
-          ) ||
-          (leadId(p) === actor.id &&
-            doc.label === "Client & Subcontractor Agreement")
-        assert(
-          canView,
-          "This internal document is not accessible in the Site PM workspace.",
-        )
-      }
+      const { doc, error } = documentAccess(p, actor, command.doc?.id)
+      assert(doc && !error, error)
       record(
         "Document viewed (watermarked)",
         doc.label,

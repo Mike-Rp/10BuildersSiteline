@@ -102,10 +102,10 @@ function AgreementViewer({ doc }: { doc: Doc }) {
         ) : (
           <div className="sample-record">
             <Icon name="doc" size={40} />
-            <h3>{loaded ? "Sample agreement record" : "Loading agreement…"}</h3>
+            <h3>{loaded ? "Agreement record" : "Loading agreement…"}</h3>
             <p>
               {loaded
-                ? "This seeded record has no original file in this browser. Agreements uploaded by Admin here display as a scrollable PDF."
+                ? "This record has no attached original file. Agreements uploaded by Admin display as a scrollable PDF."
                 : "Preparing the document preview."}
             </p>
           </div>

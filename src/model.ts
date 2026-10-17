@@ -738,6 +738,17 @@ export function scheduleSeries(seed = 1, progress = 62) {
     return row
   }).map((row) => ({ ...row, sampleProgress: progress }))
 }
+const SEED_PHONES: Record<string, string> = {
+  a1: "0917 331 4420",
+  a2: "0917 482 1036",
+  a3: "0918 225 7741",
+  a4: "0917 609 3352",
+  a5: "0919 714 2268",
+  a6: "0918 390 5517",
+  a7: "0917 856 0943",
+  a8: "0919 263 8105",
+  a9: "0917 540 6629",
+}
 function account(
   id: string,
   name: string,
@@ -752,7 +763,7 @@ function account(
     scope,
     projectTypes: types,
     email: `${name.split(" ")[0].toLowerCase()}.${name.split(" ").at(-1)?.toLowerCase()}@10builders.com`,
-    phone: "0917 331 4420",
+    phone: SEED_PHONES[id] || "0917 331 4420",
     status: "active",
     added: "2026-02-14",
     license:
