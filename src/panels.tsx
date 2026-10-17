@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
+
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
+
 import { apiEnabled, downloadApiFile } from "./api/client"
+
 import {
   accountError,
   clientForEmail,
@@ -25,6 +28,9 @@ import {
   validateFile,
   endAfterStart,
   plannedDays,
+  localToday,
+  latestStartDate,
+  startDateError,
   type Account,
   type Company,
   type Doc,
@@ -36,123 +42,197 @@ import {
 const INTAKE_PROJECT_TYPES = [
   {
     name: "Residential",
+
     description: "Houses, condominiums, apartments, and residential buildings.",
+
     icon: "home",
   },
+
   {
     name: "Commercial",
+
     description: "Offices, retail spaces, hotels, and business establishments.",
+
     icon: "storefront",
   },
+
   {
     name: "Mixed-Use",
+
     description: "Developments combining residential and commercial spaces.",
+
     icon: "mixed-building",
   },
 ] as const
 
 // With the API, files are fetched from the server (see src/api/client.ts);
+
 // otherwise they stay in this browser's IndexedDB (not secure cloud storage).
+
 function fileDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("siteline-files", 1)
+
     req.onupgradeneeded = () => req.result.createObjectStore("files")
+
     req.onsuccess = () => resolve(req.result)
+
     req.onerror = () =>
       reject(new Error("Local document storage is unavailable."))
   })
 }
+
 async function saveFile(id: string, file: File) {
   if (apiEnabled)
     throw new Error("Uploading files is not available yet in view-only mode.")
+
   const db = await fileDB()
+
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction("files", "readwrite")
+
     tx.objectStore("files").put(file, id)
+
     tx.oncomplete = () => resolve()
+
     tx.onerror = () => reject(new Error("Unable to save file."))
   })
+
   db.close()
 }
+
 export async function fileFor(id: string): Promise<Blob | undefined> {
   if (apiEnabled) return downloadApiFile(id)
+
   const db = await fileDB()
+
   const file = await new Promise<Blob | undefined>((resolve, reject) => {
     const req = db.transaction("files").objectStore("files").get(id)
+
     req.onsuccess = () => resolve(req.result)
+
     req.onerror = () => reject(req.error)
   })
+
   db.close()
+
   return file
 }
+
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
+
   const a = document.createElement("a")
+
   a.href = url
+
   a.download = name
+
   document.body.appendChild(a)
+
   a.click()
+
   a.remove()
+
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
 export async function downloadDoc(doc: Doc) {
   const file = await fileFor(doc.id)
+
   downloadBlob(
     file ||
       new Blob(
         [
           `SITELINE · DOCUMENT RECORD\n\n${doc.label}\nFilename: ${doc.name}\nOwner: ${doc.owner}\nDate: ${doc.date}\n\nThis record has no attached original file. Documents uploaded in SITELINE download their actual file.`,
         ],
+
         { type: "text/plain" },
       ),
+
     file ? doc.name : `${doc.label} — record.txt`,
   )
 }
+
 export function Upload({
   label,
+
   onSave,
+
   owner = "Administrator",
+
   disabled = false,
+
   buttonLabel = "Upload document",
+
   ariaLabel,
+
   spreadsheet = false,
 }: {
   label: string
+
   onSave: (doc: Doc) => void
+
   owner?: string
+
   disabled?: boolean
+
   buttonLabel?: string
+
   ariaLabel?: string
+
   spreadsheet?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
+
   const [file, setFile] = useState<File>()
+
   const [preview, setPreview] = useState("")
+
   const [error, setError] = useState("")
+
   const [saving, setSaving] = useState(false)
+
   function clear() {
     if (preview) URL.revokeObjectURL(preview)
+
     setFile(undefined)
+
     setPreview("")
+
     if (input.current) input.current.value = ""
   }
+
   async function confirm() {
     if (!file || validateFile(file, spreadsheet)) return
+
     setSaving(true)
+
     try {
       const id = uid()
+
       await saveFile(id, file)
+
       onSave({
         id,
+
         label,
+
         name: file.name,
+
         uploaded: true,
+
         clientVisible: false,
+
         owner,
+
         date: today(),
+
         size: file.size,
+
         mime: file.type,
       })
+
       clear()
     } catch (e) {
       setError((e as Error).message)
@@ -160,6 +240,7 @@ export function Upload({
       setSaving(false)
     }
   }
+
   return (
     <>
       <input
@@ -169,11 +250,16 @@ export function Upload({
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
         onChange={(e) => {
           const selected = e.target.files?.[0]
+
           if (!selected) return
+
           const message = validateFile(selected, spreadsheet)
+
           setError(message)
+
           if (!message) {
             setFile(selected)
+
             setPreview(URL.createObjectURL(selected))
           } else e.target.value = ""
         }}
@@ -223,6 +309,7 @@ export function Upload({
             <Button
               onClick={() => {
                 clear()
+
                 setTimeout(() => input.current?.click(), 0)
               }}
             >
@@ -237,17 +324,26 @@ export function Upload({
     </>
   )
 }
+
 export function DocumentList({
   docs,
+
   onPreview,
+
   onUpload,
+
   uploadLabel,
+
   spreadsheet = false,
 }: {
   docs: Doc[]
+
   onPreview: (doc: Doc) => void
+
   onUpload?: (doc: Doc) => void
+
   uploadLabel?: string
+
   spreadsheet?: boolean
 }) {
   return (
@@ -309,41 +405,62 @@ export function DocumentList({
     </div>
   )
 }
+
 export function Preview({
   doc,
+
   onClose,
+
   viewer = "Patricia N. Domingo",
+
   downloadable = true,
+
   onDownload,
 }: {
   doc: Doc
+
   onClose: () => void
+
   viewer?: string
+
   downloadable?: boolean
+
   onDownload?: () => void
 }) {
   const [url, setUrl] = useState("")
+
   const [loaded, setLoaded] = useState(false)
+
   useEffect(() => {
     let cancelled = false
+
     let objectUrl = ""
+
     fileFor(doc.id)
+
       .then((file) => {
         if (cancelled) return
+
         if (file) {
           objectUrl = URL.createObjectURL(file)
+
           setUrl(objectUrl)
         }
+
         setLoaded(true)
       })
+
       .catch(() => {
         if (!cancelled) setLoaded(true)
       })
+
     return () => {
       cancelled = true
+
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [doc.id])
+
   return (
     <Modal
       title={doc.label}
@@ -351,6 +468,7 @@ export function Preview({
       wide
       onClose={() => {
         if (url) URL.revokeObjectURL(url)
+
         onClose()
       }}
     >
@@ -412,40 +530,64 @@ export function Preview({
     </Modal>
   )
 }
+
 export function Chart({
   compact = false,
+
   seed = 73,
 }: {
   compact?: boolean
+
   seed?: number
 }) {
   const series = scheduleSeries(seed)
+
   const chartRef = useRef<HTMLDivElement>(null)
+
   const [chartWidth, setChartWidth] = useState(560)
+
   useEffect(() => {
     const node = chartRef.current
+
     if (!node) return
+
     const measure = () =>
       setChartWidth(
         Math.max(200, Math.floor(node.getBoundingClientRect().width)),
       )
+
     measure()
+
     const observer = new ResizeObserver(measure)
+
     observer.observe(node)
+
     return () => observer.disconnect()
   }, [])
+
   const left = 46
+
   const right = chartWidth - 22
+
   const x = (index: number) =>
     left + (index * (right - left)) / (series.length - 1)
+
   const last = series.at(-1)!
+
   const variance = last.actual - last.planned
+
   const planned = series
+
     .map((p, i) => `${x(i)},${205 - p.planned * 1.8}`)
+
     .join(" ")
+
   const actual = series
+
     .map((p, i) => `${x(i)},${205 - p.actual * 1.8}`)
+
     .join(" ")
+
   return (
     <div className={`schedule ${compact ? "compact" : ""}`}>
       <div className="chart-summary">
@@ -556,45 +698,73 @@ export function Chart({
     </div>
   )
 }
+
 export function AccountForm({
   state,
+
   account,
+
   clientOnly = false,
+
   onSave,
+
   onUseExisting,
+
   onClose,
 }: {
   state: State
+
   account?: Account
+
   clientOnly?: boolean
+
   onSave: (a: Account, pass?: string) => void
+
   onUseExisting?: (a: Account) => void
+
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<Account>(
     account || {
       id: uid(),
+
       name: "",
+
       email: "",
+
       phone: "",
+
       role: clientOnly ? "client" : "spm",
+
       scope: [],
+
       projectTypes: [],
+
       status: clientOnly ? "pending-setup" : "invited",
+
       added: today(),
+
       license: "",
+
       expiry: "",
+
       docs: [],
     },
   )
+
   const [pass, setPass] = useState(password())
+
   const [error, setError] = useState("")
+
   const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
+
   const existingClient = clientOnly
     ? clientForEmail(state, draft.email, draft.id)
     : undefined
+
   function submit(e: FormEvent) {
     e.preventDefault()
+
     const err = clientOnly
       ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
         ? "A client name and valid email are required."
@@ -606,22 +776,32 @@ export function AccountForm({
           ? "This email is already in use. Select the existing client instead."
           : ""
       : accountError(draft, state)
+
     setError(err)
+
     if (!err)
       onSave(
         {
           ...draft,
+
           name: draft.name.trim(),
+
           email: draft.email.trim(),
+
           phone: draft.phone.trim(),
         },
+
         account ? undefined : pass,
       )
   }
+
   function chips(
     values: string[],
+
     current: string[],
+
     key: "scope" | "projectTypes",
+
     max: number,
   ) {
     return (
@@ -634,13 +814,16 @@ export function AccountForm({
             onClick={() => {
               if (!current.includes(value) && current.length >= max) {
                 setError(`Select no more than ${max} tags.`)
+
                 return
               }
+
               patch({
                 [key]: current.includes(value)
                   ? current.filter((v) => v !== value)
                   : [...current, value],
               })
+
               setError("")
             }}
           >
@@ -650,6 +833,7 @@ export function AccountForm({
       </div>
     )
   }
+
   return (
     <form onSubmit={submit}>
       <div className="form-grid">
@@ -661,7 +845,9 @@ export function AccountForm({
               onChange={(e) =>
                 patch({
                   role: e.target.value as Account["role"],
+
                   scope: [],
+
                   projectTypes: [],
                 })
               }
@@ -689,6 +875,7 @@ export function AccountForm({
             value={draft.email}
             onChange={(e) => {
               patch({ email: e.target.value })
+
               setError("")
             }}
             placeholder="name@company.com"
@@ -727,8 +914,11 @@ export function AccountForm({
           </h3>
           {chips(
             ["Residential", "Commercial", "Mixed-Use"],
+
             draft.projectTypes,
+
             "projectTypes",
+
             2,
           )}
         </section>
@@ -812,54 +1002,79 @@ export function AccountForm({
     </form>
   )
 }
+
 export function AccountDeactivationForm({
   account,
+
   activeProjects,
+
   admin,
+
   onConfirm,
+
   onClose,
 }: {
   account: Account
+
   activeProjects: Project[]
+
   admin: Account
+
   onConfirm: (letter: Doc, noticeDays: number) => string | undefined
+
   onClose: () => void
 }) {
   const [noticeDays, setNoticeDays] = useState(30)
+
   const [letter, setLetter] = useState<Doc>()
+
   const [confirmed, setConfirmed] = useState(false)
+
   const [error, setError] = useState("")
+
   const blocked = activeProjects.length > 0
+
   const effectiveDate = new Date(
     Date.now() + noticeDays * 86400000,
   ).toISOString()
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
+
         if (blocked) {
           setError(
             "Routine resignation is unavailable while active project assignments remain.",
           )
+
           return
         }
+
         if (!letter) {
           setError("Upload and confirm the employee resignation letter.")
+
           return
         }
+
         if (
           !Number.isInteger(noticeDays) ||
           noticeDays < 0 ||
           noticeDays > 180
         ) {
           setError("Enter a whole notice period from 0 to 180 days.")
+
           return
         }
+
         if (!confirmed) {
           setError("Administrator confirmation is required.")
+
           return
         }
+
         const message = onConfirm(letter, noticeDays)
+
         if (message) setError(message)
       }}
     >
@@ -912,6 +1127,7 @@ export function AccountDeactivationForm({
                 value={noticeDays}
                 onChange={(event) => {
                   setNoticeDays(Number(event.target.value))
+
                   setError("")
                 }}
               />
@@ -931,6 +1147,7 @@ export function AccountDeactivationForm({
                   buttonLabel="Upload resignation letter"
                   onSave={(document) => {
                     setLetter(document)
+
                     setError("")
                   }}
                 />
@@ -951,6 +1168,7 @@ export function AccountDeactivationForm({
               checked={confirmed}
               onChange={(event) => {
                 setConfirmed(event.target.checked)
+
                 setError("")
               }}
             />
@@ -975,123 +1193,196 @@ export function AccountDeactivationForm({
     </form>
   )
 }
+
 export function IntakeForm({
   state,
+
   project,
+
   onSubmit,
+
   onClient,
+
   onClose,
 }: {
   state: State
+
   project?: Project
+
   onSubmit: (p: Project) => void
+
   onClient: (a: Account) => void
+
   onClose: () => void
 }) {
   const [step, setStep] = useState(project ? 2 : 1)
+
   const [newClient, setNewClient] = useState(false)
+
   const [error, setError] = useState("")
+
   const [run, setRun] = useState(0)
+
   const [ownSubcon, setOwnSubcon] = useState(!!project?.clientSubcon)
+
   const [agreementPreview, setAgreementPreview] = useState<Doc>()
+
   const [draft, setDraft] = useState<Project>(
     project
       ? { ...project, team: project.team.map((t) => ({ ...t })) }
       : {
           id: uid(),
+
           name: "",
+
           type: "",
+
           area: "",
+
           floors: "",
+
           start: "",
+
           end: "",
+
           clientId: "",
+
           status: "pending",
+
           opmId: "",
+
           team: [],
+
           phase: "Mobilization",
+
           progress: 0,
+
           opmAccepted: false,
+
           docs: projectDocs(),
+
           created: today(),
+
           location: "",
+
           note: "",
+
           excludedOpms: [],
+
           history: [],
         },
   )
+
   const patch = (p: Partial<Project>) => setDraft((d) => ({ ...d, ...p }))
+
   const clients = state.accounts.filter(
     (a) =>
       a.role === "client" && !["suspended", "deactivated"].includes(a.status),
   )
+
   const selectedClient = clients.find((client) => client.id === draft.clientId)
+
   const allocationPhases = project
     ? projectPhaseNames(project).map((name) => ({
         name,
+
         disciplines: projectPhaseDisciplines(project, name),
       }))
     : phaseDefinitions(draft.type)
+
   function recommend(version = 0) {
     const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
+
     const team = allocationPhases.map((phase, sequence) => {
       const candidates = spmCandidates(state, draft.type, phase.name, draft.id)
+
       return {
         phase: phase.name,
+
         accountId:
           candidates[version % Math.max(1, candidates.length)]?.account.id ||
           "",
+
         status: "pending" as const,
+
         requiredDisciplines: [...phase.disciplines],
+
         sequence,
       }
     })
+
     patch({ opmId: opms[version % Math.max(1, opms.length)]?.id || "", team })
+
     setRun(version)
   }
+
   const datesInvalid =
     !!draft.start && !!draft.end && !endAfterStart(draft.start, draft.end)
+
   const duration = datesInvalid ? null : plannedDays(draft.start, draft.end)
+
   function validDetails() {
     if (!draft.type.trim())
       return "Select a project type to generate allocation."
+
     if (
       ![
         draft.name,
+
         draft.area,
+
         draft.floors,
+
         draft.start,
+
         draft.clientId,
       ].every((v) => v.trim())
     )
       return "Complete all required project fields."
+
+    const startErr = project ? "" : startDateError(draft.start)
+
+    if (startErr) return startErr
+
     if (!draft.end) return "Enter the Target End Date."
+
     if (!endAfterStart(draft.start, draft.end))
       return "Target End Date must be later than Target Start Date."
+
     if (
       !(Number(draft.area.replace(/,/g, "")) > 0) ||
       !(Number(draft.floors) > 0) ||
       !Number.isInteger(Number(draft.floors))
     )
       return "Enter a positive floor area and whole number of floors."
+
     return ""
   }
+
   function next(e: FormEvent) {
     e.preventDefault()
+
     const err = validDetails()
+
     setError(err)
+
     if (err) return
+
     recommend()
+
     setStep(2)
   }
+
   function submit() {
     let err = validDetails()
+
     if (
       !draft.docs.some(
         (d) => d.label === "Client Contract Agreement" && d.uploaded,
       )
     )
       err = "Upload and confirm the signed Client Contract Agreement."
+
     if (ownSubcon) {
       if (!draft.clientSubcon?.trim())
         err = "Enter the subcontractor company name."
@@ -1108,6 +1399,7 @@ export function IntakeForm({
       )
         err = "Upload and confirm the Client–Subcontractor Agreement."
     }
+
     if (
       !opmCandidates(state, draft.type, draft.id, draft.excludedOpms).some(
         (a) => a.id === draft.opmId,
@@ -1115,6 +1407,7 @@ export function IntakeForm({
     )
       err =
         "Select an eligible Office PM. A cooldown, capacity limit or account status may block assignment."
+
     if (
       draft.team.length !== allocationPhases.length ||
       draft.team.some(
@@ -1126,34 +1419,48 @@ export function IntakeForm({
     )
       err =
         "Every phase needs an eligible Site PM. Review team capacity and qualifications."
+
     setError(err)
+
     if (!err)
       onSubmit({
         ...draft,
+
         status: "pending",
+
         opmAccepted: false,
+
         clientSubcon: ownSubcon ? draft.clientSubcon?.trim() : undefined,
+
         clientSubconEmail: ownSubcon
           ? draft.clientSubconEmail?.trim()
           : undefined,
+
         team: draft.team.map((t) => ({ ...t, status: "pending" })),
       })
   }
+
   const count = headcount(draft.type, draft.area, draft.floors)
+
   const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
+
   const requiredDisciplines = [
     ...new Set(allocationPhases.flatMap((phase) => phase.disciplines)),
   ]
+
   const assignedSitePms = new Set(
     draft.team.map((row) => row.accountId).filter(Boolean),
   ).size
+
   const clientSubconAgreement = draft.docs.find(
     (doc) => doc.label === "Client & Subcontractor Agreement" && doc.uploaded,
   )
+
   const projectTypeError =
     step === 1 && !draft.type && error
       ? "Select a project type to generate allocation."
       : ""
+
   return (
     <>
       <div className="intake-steps">
@@ -1193,6 +1500,7 @@ export function IntakeForm({
               >
                 {INTAKE_PROJECT_TYPES.map((option) => {
                   const selected = draft.type === option.name
+
                   return (
                     <Button
                       key={option.name}
@@ -1203,6 +1511,7 @@ export function IntakeForm({
                       aria-checked={selected}
                       onClick={() => {
                         patch({ type: option.name })
+
                         if (projectTypeError) setError("")
                       }}
                     >
@@ -1232,12 +1541,20 @@ export function IntakeForm({
                 </small>
               )}
             </fieldset>
-            <Field label="Target start date *">
+            <Field
+              label="Target start date *"
+              error={
+                project ? undefined : startDateError(draft.start) || undefined
+              }
+            >
               <input
                 type="date"
                 required
                 value={draft.start}
+                min={project ? undefined : localToday()}
+                max={project ? undefined : latestStartDate()}
                 onChange={(e) => patch({ start: e.target.value })}
+                aria-invalid={!project && !!startDateError(draft.start)}
                 disabled={!!project}
               />
             </Field>
@@ -1432,14 +1749,20 @@ export function IntakeForm({
               {allocationPhases.map((phase, index) => {
                 const candidates = spmCandidates(
                   state,
+
                   draft.type,
+
                   phase.name,
+
                   draft.id,
                 )
+
                 const row = draft.team.find((t) => t.phase === phase.name)
+
                 const current = candidates.find(
                   (c) => c.account.id === row?.accountId,
                 )
+
                 return (
                   <div className="allocation-row" key={phase.name}>
                     <div className="allocation-phase">
@@ -1593,6 +1916,7 @@ export function IntakeForm({
                                 item.label !==
                                 "Client & Subcontractor Agreement",
                             ),
+
                             doc,
                           ],
                         })
@@ -1630,12 +1954,16 @@ export function IntakeForm({
             onClose={() => setNewClient(false)}
             onUseExisting={(client) => {
               patch({ clientId: client.id })
+
               setNewClient(false)
+
               setError("")
             }}
             onSave={(a) => {
               onClient(a)
+
               patch({ clientId: a.id })
+
               setNewClient(false)
             }}
           />
@@ -1651,47 +1979,69 @@ export function IntakeForm({
     </>
   )
 }
+
 export function LicenseForm({
   account,
+
   onSave,
+
   onClose,
 }: {
   account: Account
+
   onSave: (a: Account) => void
+
   onClose: () => void
 }) {
   const [number, setNumber] = useState(account.license)
+
   const [expiry, setExpiry] = useState(account.expiry)
+
   const [certifications, setCertifications] = useState(
     (account.certifications || []).join(", "),
   )
+
   const [doc, setDoc] = useState<Doc>()
+
   const [error, setError] = useState("")
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
+
         if (!number.trim() || !expiry || !doc) {
           setError(
             "License number, expiry date and a confirmed supporting document are required.",
           )
+
           return
         }
+
         onSave({
           ...account,
+
           license: number,
+
           expiry,
+
           renewed: false,
+
           certifications: certifications
+
             .split(",")
+
             .map((s) => s.trim())
+
             .filter(Boolean),
+
           docs: [
             ...account.docs.map((existing) =>
               existing.label === "PRC License"
                 ? { ...existing, label: "PRC License (superseded)" }
                 : existing,
             ),
+
             doc,
           ],
         })
@@ -1742,45 +2092,72 @@ export function LicenseForm({
     </form>
   )
 }
+
 export function CompanyForm({
   owner,
+
   status = "approved",
+
   onSave,
+
   onClose,
 }: {
   owner: string
+
   status?: Company["status"]
+
   onSave: (company: Company) => void
+
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<Company>({
     id: uid(),
+
     name: "",
+
     contact: "",
+
     phone: "",
+
     email: "",
+
     status,
+
     submittedBy: owner,
+
     projectId: "",
+
     availability: "available",
+
     manpowerCount: 0,
+
     activeProjectIds: [],
+
     manpowerDocuments: [],
+
     documents: [],
+
     note: "",
+
     version: 1,
   })
+
   const [error, setError] = useState("")
+
   const patch = (values: Partial<Company>) =>
     setDraft((company) => ({ ...company, ...values }))
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
+
         if (!draft.name.trim()) {
           setError("Company name is required.")
+
           return
         }
+
         onSave({ ...draft, name: draft.name.trim() })
       }}
     >
@@ -1892,36 +2269,53 @@ export function CompanyForm({
 
 export function SettingsForm({
   rules,
+
   onSave,
 }: {
   rules: Rules
+
   onSave: (rules: Rules, label: string) => void
 }) {
   const [draft, setDraft] = useState(rules)
+
   const [confirm, setConfirm] = useState<keyof Rules>()
+
   const [error, setError] = useState("")
+
   const labels: Record<keyof Rules, [string, string, number]> = {
     grace: [
       "License grace period",
+
       "Days after license expiry before sign-in is blocked.",
+
       0,
     ],
+
     cap: [
       "Active projects per assignee",
+
       "Maximum concurrent project workload for allocation eligibility.",
+
       1,
     ],
+
     response: [
       "Site PM response window",
+
       "Business days before an unanswered assignment is escalated.",
+
       1,
     ],
+
     idle: [
       "Idle session timeout",
+
       "Minutes of inactivity before a local session warning.",
+
       1,
     ],
   }
+
   return (
     <>
       <div className="settings-rules">
@@ -1951,9 +2345,12 @@ export function SettingsForm({
                     onClick={() => {
                       if (!Number.isInteger(draft[key]) || draft[key] < min) {
                         setError(`Enter a whole number of at least ${min}.`)
+
                         return
                       }
+
                       setError("")
+
                       setConfirm(key)
                     }}
                   >
@@ -1990,8 +2387,10 @@ export function SettingsForm({
               onClick={() => {
                 onSave(
                   { ...rules, [confirm]: draft[confirm] },
+
                   labels[confirm][0],
                 )
+
                 setConfirm(undefined)
               }}
             >
