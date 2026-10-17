@@ -30,5 +30,6 @@ export const DUMMY_USERNAMES: Readonly<
   admin: { accountId: "a1", password: "Password" }, // Patricia N. Domingo — Administrator
   opm: { accountId: "a2", password: "Password" }, // Renz D. Villaverde — Office PM
   spm: { accountId: "a4", password: "Password" }, // Karlo M. Espiritu — Lead Site PM
+  spm2: { accountId: "a5", password: "Password" }, // Rafael D. Mercado — Site PM (not the Lead on Alden Heights)
   clnt: { accountId: "a9", password: "Password" }, // Ferdinand Uy — Client
 }
