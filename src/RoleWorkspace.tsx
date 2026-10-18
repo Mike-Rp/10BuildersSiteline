@@ -6,7 +6,9 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import LeadSubcontractorPanel from "./LeadSubcontractorPanel"
+import LeadSubcontractorPanel, {
+  SubcontractorAllocationReadOnly,
+} from "./LeadSubcontractorPanel"
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -573,6 +575,12 @@ export default function RoleWorkspace({
             <summary>View Site PM team by phase</summary>
             {assignmentRoster(p, true)}
           </details>
+          {p.opmAccepted && p.opmId === actor.id && (
+            <details className="role-details">
+              <summary>View subcontractor allocation (read-only)</summary>
+              <SubcontractorAllocationReadOnly state={state} project={p} />
+            </details>
+          )}
         </div>
       </Panel>
     )
@@ -2806,6 +2814,12 @@ export default function RoleWorkspace({
           <h3>Personnel by phase</h3>
           {assignmentRoster(p, isOpm && p.status !== "completed")}
         </section>
+        {isOpm && p.opmId === actor.id && (
+          <section className="detail-section">
+            <h3>Subcontractor allocation</h3>
+            <SubcontractorAllocationReadOnly state={state} project={p} />
+          </section>
+        )}
         <section className="detail-section">
           <h3>Progress history</h3>
           {p.history

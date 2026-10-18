@@ -11,6 +11,7 @@ import {
   processWorkflowTimers,
   registeredComplete,
   REVIEW_MS,
+  subcontractorRecommendations,
   workflowFor,
 } from "../src/workflows.ts"
 
@@ -29,6 +30,11 @@ const doc = (name = "evidence.png") => ({
 })
 const run = (state, actor, command, time = NOW) =>
   applyWorkflow(state, actor, { projectId: "p4", ...command }, time)
+// The company the system ranks first (no conflicting commitment, has manpower).
+const suggested = (state) =>
+  subcontractorRecommendations(state, project(state)).find(
+    (candidate) => !candidate.committed && candidate.availableManpower > 0,
+  ).company.id
 function documentsReady() {
   let state = run(initialState(), "a2", { type: "accept_opm" })
   for (let i = 0; i < 6; i++)
@@ -46,7 +52,7 @@ function teamReady() {
 }
 function activeProject() {
   let state = teamReady()
-  const companyId = workflowFor(project(state)).selections[0].companyId
+  const companyId = suggested(state)
   state = run(state, "a4", { type: "contact_company", companyId })
   state = run(state, "a4", {
     type: "respond_company",
@@ -155,7 +161,8 @@ test("role, project ownership and Lead-only rights cannot be bypassed", () => {
 })
 test("contact is a local attempt only; manually accepted companies are immutable", () => {
   let state = teamReady()
-  const companyId = workflowFor(project(state)).selections[0].companyId
+  const companyId = suggested(state)
+  state = run(state, "a4", { type: "select_company", companyId })
   assert.throws(
     () =>
       run(state, "a4", { type: "respond_company", companyId, accepted: true }),
@@ -186,7 +193,7 @@ test("agreement activation requires consent, a valid file and an eligible client
     () => run(state, "a4", { type: "upload_agreement", doc: doc() }),
     /accepted before/,
   )
-  const companyId = workflowFor(project(state)).selections[0].companyId
+  const companyId = suggested(state)
   state = run(state, "a4", { type: "contact_company", companyId })
   state = run(state, "a4", {
     type: "respond_company",

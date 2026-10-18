@@ -1,5 +1,5 @@
 // @refresh reset
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { assertCanSignIn } from "./auth"
@@ -59,6 +59,7 @@ import {
   today,
   uid,
   workload,
+  projectDateErrors,
   type Account,
   type Company,
   type Doc,
@@ -67,25 +68,22 @@ import {
   type State,
 } from "./model"
 import { projectDocumentIndex } from "./project-document-index"
+import {
+  ADMIN_NAV,
+  DIRECTORY_TABS,
+  DOCUMENT_TABS,
+  adminBreadcrumb,
+  resolveAdminTarget,
+  type DirectoryTab,
+  type DocumentsTab,
+} from "./adminNav"
 import DocumentRepository, {
   findIndexedDoc,
   staffRepositoryCategories,
 } from "./DocumentRepository"
 
 const SESSION_KEY = "siteline-session-account"
-const NAV = [
-  { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
-  { label: "Active sites", icon: "building" },
-  { label: "Project intake", icon: "plus" },
-  { label: "Schedule performance", icon: "trend" },
-  { label: "Project documents", icon: "folder", group: "RESOURCES" },
-  { label: "Engineer documents", icon: "doc" },
-  { label: "Engineer directory", icon: "helmet" },
-  { label: "Subcon directory", icon: "users" },
-  { label: "Team", icon: "users", group: "ORGANIZATION" },
-  { label: "Archive", icon: "archive" },
-  { label: "Settings", icon: "settings" },
-]
+const NAV = ADMIN_NAV
 type Dialog = {
   kind: string
   id?: string
@@ -222,6 +220,8 @@ function AppInner() {
   const [globalQuery, setGlobalQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [subconTab, setSubconTab] = useState("registered")
+  const [documentsTab, setDocumentsTab] = useState<DocumentsTab>("project")
+  const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("engineers")
   const [tab, setTab] = useState("closed")
   const [mobileNav, setMobileNav] = useState(false)
   const [notifications, setNotifications] = useState(false)
@@ -390,19 +390,34 @@ function AppInner() {
     setState((s) => log(change(s), title, detail, type, target))
     setToast(title)
   }
-  function navigate(next: string) {
-    setPage(next)
+  function resetListState() {
     setQuery("")
     setFilter("all")
     setSubconTab("registered")
     setRoleFilter("all")
     setLicenseFilter("all")
+  }
+  // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
+  function navigate(next: string) {
+    const target = resolveAdminTarget(next)
+    setPage(target ? target.page : next)
+    resetListState()
+    if (target?.documentsTab) setDocumentsTab(target.documentsTab)
+    if (target?.directoryTab) setDirectoryTab(target.directoryTab)
+    if (target?.subconTab) setSubconTab(target.subconTab)
     setMobileNav(false)
     setNotifications(false)
   }
+  function selectDocumentsTab(tab: DocumentsTab) {
+    resetListState()
+    setDocumentsTab(tab)
+  }
+  function selectDirectoryTab(tab: DirectoryTab) {
+    resetListState()
+    setDirectoryTab(tab)
+  }
   function openPendingRequests() {
-    navigate("Subcon directory")
-    setSubconTab("pending")
+    navigate("Approvals")
   }
   function openTarget(target: string) {
     if (target === "Approvals") openPendingRequests()
@@ -527,6 +542,12 @@ function AppInner() {
     if (pass) setCredentials({ name: a.name, password: pass })
   }
   function addProject(p: Project) {
+    // Backstop for the intake form: new projects need realistic dates based on today.
+    const isNew = !state.projects.some((x) => x.id === p.id)
+    if (isNew) {
+      const dateErrs = projectDateErrors(p.start, p.end || "")
+      if (dateErrs.start || dateErrs.end || !p.start || !p.end) return
+    }
     commit(
       (s) => ({
         ...s,
@@ -987,7 +1008,10 @@ function AppInner() {
                 if (e.target === "Approvals") {
                   openPendingRequests()
                   setDialog(undefined)
-                } else if (NAV.some((n) => n.label === e.target)) {
+                } else if (
+                  NAV.some((n) => n.label === e.target) ||
+                  resolveAdminTarget(e.target)
+                ) {
                   navigate(e.target)
                   setDialog(undefined)
                 } else if (e.projectId) {
@@ -1451,13 +1475,8 @@ function AppInner() {
           </div>
         </>
       )
-    if (page === "Project documents")
-      return (
+    const projectDocumentsTab = () => (
         <>
-          {pageHeading(
-            "Project documents",
-            "Browse original project records without creating duplicate files.",
-          )}
           <DocumentRepository
             projects={state.projects.map((project) => ({
               id: project.id,
@@ -1476,13 +1495,8 @@ function AppInner() {
           />
         </>
       )
-    if (page === "Engineer documents")
-      return (
+    const engineerDocumentsTab = () => (
         <>
-          {pageHeading(
-            "Engineer documents",
-            "Professional credentials and company-wide employment agreements.",
-          )}
           <Panel
             title="Personnel document repository"
             actions={
@@ -1517,13 +1531,8 @@ function AppInner() {
           </Panel>
         </>
       )
-    if (page === "Engineer directory")
-      return (
+    const engineersTab = () => (
         <>
-          {pageHeading(
-            "Engineer directory",
-            "The qualifications, capacity, and people behind every project.",
-          )}
           <Panel
             title="In-house personnel"
             subtitle={`${engineers.length} engineers and administrators`}
@@ -1614,20 +1623,8 @@ function AppInner() {
           </Panel>
         </>
       )
-    if (page === "Subcon directory")
-      return (
+    const subcontractorsTab = () => (
         <>
-          {pageHeading(
-            "Subcontractor directory",
-            "Verified company records with availability and project commitments.",
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={() => setDialog({ kind: "add-company" })}
-            >
-              Add Company
-            </Button>,
-          )}
           <div className="tabs standalone">
             {[
               ["registered", "Registered companies"],
@@ -1728,6 +1725,92 @@ function AppInner() {
               )}
             </Panel>
           )}
+        </>
+      )
+    // Documents and Directory: one sidebar item each, existing pages as tab contents.
+    const pageTabs = <T extends string>(
+      label: string,
+      items: [T, string][],
+      active: T,
+      select: (tab: T) => void,
+    ) => (
+      <div className="tabs standalone" role="tablist" aria-label={label}>
+        {items.map(([id, text], index) => (
+          <button
+            key={id}
+            role="tab"
+            data-tab={id}
+            aria-selected={active === id}
+            tabIndex={active === id ? 0 : -1}
+            className={active === id ? "active" : ""}
+            onClick={() => select(id)}
+            onKeyDown={(e) => {
+              const step =
+                e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0
+              if (!step) return
+              e.preventDefault()
+              const list = e.currentTarget.parentElement
+              const nextId = items[(index + step + items.length) % items.length][0]
+              select(nextId)
+              ;(
+                list?.querySelector(
+                  `[role="tab"][data-tab="${nextId}"]`,
+                ) as HTMLElement | null
+              )?.focus()
+            }}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    )
+    if (page === "Documents")
+      return (
+        <>
+          {pageHeading(
+            "Documents",
+            "Project records and engineer credentials in one place.",
+          )}
+          {pageTabs(
+            "Documents sections",
+            DOCUMENT_TABS,
+            documentsTab,
+            selectDocumentsTab,
+          )}
+          <div role="tabpanel">
+            {documentsTab === "project"
+              ? projectDocumentsTab()
+              : engineerDocumentsTab()}
+          </div>
+        </>
+      )
+    if (page === "Directory")
+      return (
+        <>
+          {pageHeading(
+            "Directory",
+            "Your engineers and verified subcontractor companies.",
+            directoryTab === "subcontractors" ? (
+              <Button
+                variant="primary"
+                icon="plus"
+                onClick={() => setDialog({ kind: "add-company" })}
+              >
+                Add Company
+              </Button>
+            ) : undefined,
+          )}
+          {pageTabs(
+            "Directory sections",
+            DIRECTORY_TABS,
+            directoryTab,
+            selectDirectoryTab,
+          )}
+          <div role="tabpanel">
+            {directoryTab === "engineers"
+              ? engineersTab()
+              : subcontractorsTab()}
+          </div>
         </>
       )
     if (page === "Team")
@@ -2911,7 +2994,7 @@ function AppInner() {
               >
                 <Icon name={n.icon} size={19} />
                 <span>{n.label}</span>
-                {n.label === "Subcon directory" && pending.length > 0 && (
+                {n.label === "Directory" && pending.length > 0 && (
                   <b className="nav-count">{pending.length}</b>
                 )}
                 {n.label === "Dashboard" && page === n.label && <i />}
@@ -2965,7 +3048,18 @@ function AppInner() {
             />
             <span>Workspace</span>
             <Icon name="chevron" size={14} />
-            <strong>{page}</strong>
+            {adminBreadcrumb(page, documentsTab, directoryTab).map(
+              (part, index, all) => (
+                <Fragment key={part}>
+                  {index > 0 && <Icon name="chevron" size={14} />}
+                  {index === all.length - 1 ? (
+                    <strong>{part}</strong>
+                  ) : (
+                    <span>{part}</span>
+                  )}
+                </Fragment>
+              ),
+            )}
           </div>
           <div className="topbar-actions">
             <button

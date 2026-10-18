@@ -328,6 +328,7 @@ export type SubcontractorSelection = {
   companyId: string
   status: "selected" | "contacted" | "accepted" | "declined" | "replaced" | "archived"
   contactAt?: string
+  contactLog?: string[]
   responseAt?: string
   replacedAt?: string
   replacedBy?: string
@@ -439,6 +440,65 @@ export const plannedDays = (start?: string, end?: string) =>
   start && end ? Math.round((dayValue(end) - dayValue(start)) / DAY_MS) : null
 export const endAfterStart = (start: string, end: string) =>
   !!start && !!end && dayValue(end) > dayValue(start)
+
+// Project dates are based on the user's LOCAL calendar day (not UTC).
+const pad2 = (n: number) => String(n).padStart(2, "0")
+export const localToday = (now: Date = new Date()) =>
+  `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
+export const addDays = (iso: string, days: number) =>
+  new Date(dayValue(iso) + days * DAY_MS).toISOString().slice(0, 10)
+export const MAX_PROJECT_YEARS_AHEAD = 10
+export const latestProjectDate = (now: Date = new Date()) => {
+  const [y, m, d] = localToday(now).split("-").map(Number)
+  const lastDay = new Date(Date.UTC(y + MAX_PROJECT_YEARS_AHEAD, m, 0)).getUTCDate()
+  return `${y + MAX_PROJECT_YEARS_AHEAD}-${pad2(m)}-${pad2(Math.min(d, lastDay))}`
+}
+const isRealDate = (v: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  if (!m) return false
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === mo - 1 &&
+    dt.getUTCDate() === d
+  )
+}
+export const DATE_ERRORS = {
+  invalid: "Enter a valid date.",
+  startPast: "Start date can't be before today.",
+  endNotAfter: "End date must be after the start date.",
+  tooFar: "Date is too far in the future.",
+}
+/** Validates target start/end for a NEW project. Empty values are not errors here (required-ness is checked separately). */
+export function projectDateErrors(
+  start: string,
+  end: string,
+  now: Date = new Date(),
+): { start?: string; end?: string } {
+  const out: { start?: string; end?: string } = {}
+  const t = localToday(now)
+  const max = latestProjectDate(now)
+  const startOk = !!start && isRealDate(start)
+  if (start) {
+    if (!startOk) out.start = DATE_ERRORS.invalid
+    else if (start < t) out.start = DATE_ERRORS.startPast
+    else if (start > max) out.start = DATE_ERRORS.tooFar
+  }
+  if (end) {
+    if (!isRealDate(end)) out.end = DATE_ERRORS.invalid
+    else if (end > max) out.end = DATE_ERRORS.tooFar
+    else if (startOk && !out.start && !endAfterStart(start, end))
+      out.end = DATE_ERRORS.endNotAfter
+    else if (!startOk && end <= t) out.end = DATE_ERRORS.endNotAfter
+  }
+  return out
+}
+export const startsInLabel = (start: string, now: Date = new Date()) => {
+  const n = plannedDays(localToday(now), start)
+  if (n === null || n < 0) return ""
+  return n === 0 ? "Starts today" : `Starts in ${n} ${n === 1 ? "day" : "days"}`
+}
 export function timelineStatus(p: {
   start: string
   end?: string

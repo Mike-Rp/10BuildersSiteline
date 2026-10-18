@@ -3,6 +3,11 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Upload } from "./panels"
 import { AgreementPreviewModal } from "./ClientSubconReview"
 import {
+  eligibleCandidates,
+  featuredCandidate,
+  recommendationReason,
+} from "./featuredCompany"
+import {
   dateLabel,
   DOC_LABELS,
   initials,
@@ -13,12 +18,12 @@ import {
 } from "./model"
 import {
   activationChecks,
-  activeSubcontractors,
   allocationReady,
   clientSubconAgreement,
   clientSubconReview,
   openClientSubconIssue,
   leadId,
+  projectSubcontractor,
   subcontractorRecommendation,
   subcontractorRecommendations,
   workflowFor,
@@ -26,6 +31,123 @@ import {
 } from "./workflows"
 
 type Recommendation = ReturnType<typeof subcontractorRecommendation>
+function CompanyAvailability({ candidate }: { candidate: Recommendation }) {
+  return (
+    <div className="subcon-availability">
+      {candidate.committed || candidate.company.availability === "committed" ? (
+        <Badge tone="amber">
+          {candidate.company.committedUntil
+            ? `Committed through ${dateLabel(candidate.company.committedUntil)}`
+            : "Committed to another project"}
+        </Badge>
+      ) : (
+        <Badge tone={candidate.availableManpower > 0 ? "green" : "amber"}>
+          {candidate.availableManpower > 0
+            ? `${candidate.availableManpower} manpower available`
+            : "Availability needs confirmation"}
+        </Badge>
+      )}
+      <small>
+        {candidate.otherProjects} other active project
+        {candidate.otherProjects === 1 ? "" : "s"} ·{" "}
+        {candidate.company.manpowerDocuments.length} manpower list document
+        {candidate.company.manpowerDocuments.length === 1 ? "" : "s"}
+      </small>
+    </div>
+  )
+}
+/** Office PM view of the allocation. Read-only by design: it renders no actions. */
+export function SubcontractorAllocationReadOnly({
+  state,
+  project,
+}: {
+  state: State
+  project: Project
+}) {
+  const work = workflowFor(project)
+  const lead = state.accounts.find((a) => a.id === leadId(project))
+  const current = projectSubcontractor(project)
+  const company = current
+    ? state.companies.find((c) => c.id === current.companyId)
+    : undefined
+  const log = current?.contactLog || (current?.contactAt ? [current.contactAt] : [])
+  const declined = work.selections.filter((s) => s.status === "declined")
+  const nameOf = (id: string) =>
+    state.companies.find((c) => c.id === id)?.name || "Company record unavailable"
+  return (
+    <div className="role-card-content">
+      <div className="notice">
+        <Icon name="shield" />
+        <p>
+          Read-only. Only the Lead Site PM{lead ? `, ${lead.name},` : ""} decides
+          subcontractor allocation. Office PM approval is not part of this step.
+        </p>
+      </div>
+      {project.clientSubcon ? (
+        <p>
+          Client-provided subcontractor: <strong>{project.clientSubcon}</strong>
+          {project.clientSubconReview?.acknowledgedAt
+            ? " · acknowledged by the Lead Site PM"
+            : " · awaiting the Lead Site PM’s review"}
+        </p>
+      ) : !current ? (
+        <p>
+          {allocationReady(project)
+            ? "No subcontractor has been contacted yet."
+            : "Allocation is locked until all required Site PMs have accepted."}
+        </p>
+      ) : (
+        <article className="subcon-team-card">
+          <div className="section-title">
+            <Badge tone={current.status === "accepted" ? "green" : "amber"}>
+              {current.status === "accepted"
+                ? "Accepted · locked"
+                : "Awaiting response"}
+            </Badge>
+          </div>
+          <h3>{company?.name || "Company record unavailable"}</h3>
+          <p>
+            {company?.contact || "No contact person on file"} ·{" "}
+            {company?.phone || "No phone on file"}
+          </p>
+          {company && (
+            <CompanyAvailability
+              candidate={subcontractorRecommendation(state, project, company)}
+            />
+          )}
+          <h4>Contact log</h4>
+          {log.length === 0 ? (
+            <p className="role-muted">No contact attempts recorded.</p>
+          ) : (
+            <ol className="plain-list">
+              {log.map((at, index) => (
+                <li key={`${at}-${index}`}>
+                  Attempt {index + 1} · {new Date(at).toLocaleString()}
+                </li>
+              ))}
+            </ol>
+          )}
+          {current.responseAt && (
+            <p>
+              Decision recorded · {new Date(current.responseAt).toLocaleString()}
+            </p>
+          )}
+        </article>
+      )}
+      {declined.length > 0 && (
+        <section className="subcon-history">
+          <h3>Declined for this project</h3>
+          {declined.map((s) => (
+            <p key={s.companyId}>
+              {nameOf(s.companyId)}
+              {s.responseAt && ` · ${new Date(s.responseAt).toLocaleString()}`}
+            </p>
+          ))}
+        </section>
+      )}
+    </div>
+  )
+}
 export default function LeadSubcontractorPanel({
   state,
   project,
@@ -48,21 +170,24 @@ export default function LeadSubcontractorPanel({
   onOpenActive: () => void
 }) {
   const [availability, setAvailability] = useState("all")
-  const [replaceId, setReplaceId] = useState("")
-  const [replacement, setReplacement] = useState("")
-  const [replaceError, setReplaceError] = useState("")
   const [agreementOpen, setAgreementOpen] = useState(false)
   const [confirmActivation, setConfirmActivation] = useState(false)
   const [activationError, setActivationError] = useState("")
   const [activatedNow, setActivatedNow] = useState(false)
   const work = workflowFor(project)
-  const team = activeSubcontractors(project)
-  const accepted = team.filter(
-    (selection) => selection.status === "accepted",
-  ).length
-  const awaiting = team.filter(
-    (selection) => selection.status === "contacted",
-  ).length
+  // One subcontractor per project: the company contacted (awaiting reply) or accepted.
+  const current = projectSubcontractor(project)
+  const currentCompany = current
+    ? state.companies.find((company) => company.id === current.companyId)
+    : undefined
+  const confirmed = current?.status === "accepted"
+  const contactLog =
+    current?.contactLog || (current?.contactAt ? [current.contactAt] : [])
+  const declinedIds = new Set(
+    work.selections
+      .filter((selection) => selection.status === "declined")
+      .map((selection) => selection.companyId),
+  )
   const checks = activationChecks(state, project)
   const clientOwned = !!project.clientSubcon
   const review = clientSubconReview(project)
@@ -74,18 +199,29 @@ export default function LeadSubcontractorPanel({
   const active = project.status === "active"
   const recommendations = subcontractorRecommendations(state, project)
   const candidates = recommendations.filter(
-    (candidate) =>
-      !team.some((selection) => selection.companyId === candidate.company.id),
+    (candidate) => candidate.company.id !== current?.companyId,
   )
+  const recommendedId = candidates.find(
+    (candidate) => !declinedIds.has(candidate.company.id),
+  )?.company.id
+  // Before any contact: the system's top eligible pick is featured; the rest are alternatives.
+  const eligible = eligibleCandidates(state, project)
+  const featured = featuredCandidate(state, project)
+  const otherCandidates = candidates
+    .filter((candidate) => candidate.company.id !== featured?.company.id)
+    .filter(
+      (candidate) =>
+        availability === "all" ||
+        (availability === "uncommitted"
+          ? !candidate.committed
+          : candidate.committed),
+    )
   const filteredCandidates = candidates.filter(
     (candidate) =>
       availability === "all" ||
       (availability === "uncommitted"
         ? !candidate.committed
         : candidate.committed),
-  )
-  const replacedCompany = state.companies.find(
-    (company) => company.id === replaceId,
   )
   const agreement = project.docs.find(
     (doc) => doc.label === DOC_LABELS[6] && doc.uploaded,
@@ -121,36 +257,8 @@ export default function LeadSubcontractorPanel({
   function command(action: WorkflowCommand, message: string) {
     return onAction({ ...action, projectId: project.id }, message)
   }
-  function chooseReplacement(companyId: string) {
-    setReplaceId(companyId)
-    setReplacement("")
-    setReplaceError("")
-  }
   function availabilityDetails(candidate: Recommendation) {
-    return (
-      <div className="subcon-availability">
-        {candidate.committed ||
-        candidate.company.availability === "committed" ? (
-          <Badge tone="amber">
-            {candidate.company.committedUntil
-              ? `Committed through ${dateLabel(candidate.company.committedUntil)}`
-              : "Committed to another project"}
-          </Badge>
-        ) : (
-          <Badge tone={candidate.availableManpower > 0 ? "green" : "amber"}>
-            {candidate.availableManpower > 0
-              ? `${candidate.availableManpower} manpower available`
-              : "Availability needs confirmation"}
-          </Badge>
-        )}
-        <small>
-          {candidate.otherProjects} other active project
-          {candidate.otherProjects === 1 ? "" : "s"} ·{" "}
-          {candidate.company.manpowerDocuments.length} manpower list document
-          {candidate.company.manpowerDocuments.length === 1 ? "" : "s"}
-        </small>
-      </div>
-    )
+    return <CompanyAvailability candidate={candidate} />
   }
   return (
     <section className="lead-subcontractor-panel">
@@ -187,8 +295,8 @@ export default function LeadSubcontractorPanel({
               { label: "Sign & activate", complete: active },
             ]
           : [
-              { label: "Select project partners", complete: team.length > 0 },
-              { label: "Record their decisions", complete: responsesComplete },
+              { label: "Contact a subcontractor", complete: !!current },
+              { label: "Record their decision", complete: responsesComplete },
               { label: "Sign & activate", complete: active },
             ]
         ).map((step, index) => (
@@ -203,16 +311,16 @@ export default function LeadSubcontractorPanel({
       {!clientOwned && (
         <div className="subcon-summary">
           <div>
-            <span>Selected partners</span>
-            <strong>{team.length.toString().padStart(2, "0")}</strong>
+            <span>Subcontractor contacted</span>
+            <strong>{current ? "01" : "00"}</strong>
           </div>
           <div>
             <span>Accepted & locked</span>
-            <strong>{accepted.toString().padStart(2, "0")}</strong>
+            <strong>{confirmed ? "01" : "00"}</strong>
           </div>
           <div>
             <span>Awaiting a decision</span>
-            <strong>{awaiting.toString().padStart(2, "0")}</strong>
+            <strong>{current && !confirmed ? "01" : "00"}</strong>
           </div>
         </div>
       )}
@@ -278,212 +386,219 @@ export default function LeadSubcontractorPanel({
       )}
       {!clientOwned && (
         <>
-          <section className="subcon-selected-section">
+          {!confirmed && !active && (current || featured) && (
             <div className="section-title">
-              <h3>
-                Proposed project team{" "}
-                <span className="count-pill">{team.length}</span>
-              </h3>
-              {!active && (
-                <Button icon="plus" onClick={onNewCompany}>
-                  Suggest Company
-                </Button>
-              )}
+              <p className="role-muted">
+                The system ranks verified companies. Contact one; you record
+                its answer yourself. Nothing is emailed or called.
+              </p>
+              <Button icon="plus" onClick={onNewCompany}>
+                Propose new company
+              </Button>
             </div>
-            <p className="role-muted subsection">
-              Selecting a company does not record its acceptance. Every selected
-              partner must be approved and manually accepted before the signed
-              agreement.
-            </p>
-            <div className="subcon-selected-grid">
-              {team.map((selection) => {
-                const company = state.companies.find(
-                  (company) => company.id === selection.companyId,
-                )
-                if (!company)
-                  return (
-                    <div className="role-error" key={selection.companyId}>
-                      A selected company record is missing. Activation is
-                      blocked; ask Admin to review the request.
+          )}
+          {current && currentCompany && (
+            <section className="subcon-selected-section">
+              <div className="section-title">
+                <h3>Project subcontractor</h3>
+              </div>
+              <article
+                className={`subcon-team-card ${confirmed ? "is-accepted" : ""}`}
+              >
+                <div className="section-title">
+                  <span className="company-monogram">
+                    {initials(currentCompany.name)}
+                  </span>
+                  <Badge tone={confirmed ? "green" : "amber"}>
+                    {confirmed ? "Accepted · locked" : "Awaiting response"}
+                  </Badge>
+                </div>
+                <h3>{currentCompany.name}</h3>
+                <p>
+                  {currentCompany.contact || "No contact person on file"} ·{" "}
+                  {currentCompany.phone || "No phone on file"}
+                </p>
+                {availabilityDetails(
+                  subcontractorRecommendation(state, project, currentCompany),
+                )}
+                {confirmed ? (
+                  <div className="subcon-acceptance-lock">
+                    <Icon name="shield" />
+                    <div>
+                      <strong>
+                        Locked · Subcontractor confirmed: {currentCompany.name}
+                      </strong>
+                      <p>
+                        No contact, replacement or new selection is possible for
+                        this project. Next: upload the signed Site PM–
+                        Subcontractor Agreement below.
+                      </p>
                     </div>
-                  )
-                const candidate = subcontractorRecommendation(
-                  state,
-                  project,
-                  company,
-                )
-                const companyApproved = company.status === "approved"
-                const locked = selection.status === "accepted"
-                return (
-                  <article
-                    className={`subcon-team-card ${
-                      locked ? "is-accepted" : ""
-                    }`}
-                    key={company.id}
-                  >
-                    <div className="section-title">
-                      <span className="company-monogram">
-                        {initials(company.name)}
-                      </span>
-                      <Badge tone={locked ? "green" : "amber"}>
-                        {!companyApproved
-                          ? `${company.status} company`
-                          : locked
-                            ? "Accepted · locked"
-                            : selection.status === "contacted"
-                              ? "Contact attempt recorded"
-                              : "Not contacted"}
-                      </Badge>
-                    </div>
-                    <h3>{company.name}</h3>
-                    <p>
-                      {company.contact || "No contact person on file"} ·{" "}
-                      {company.phone || "No phone on file"}
-                    </p>
-                    {availabilityDetails(candidate)}
-                    {locked ? (
-                      <div className="subcon-acceptance-lock">
-                        <Icon name="shield" />
-                        <div>
-                          <strong>Acceptance is locked</strong>
-                          <p>
-                            This company cannot be swapped, archived, or changed
-                            to Decline.
-                          </p>
-                        </div>
+                  </div>
+                ) : (
+                  !active && (
+                    <>
+                      <div className="subcon-contact-actions">
+                        <Button
+                          icon="clock"
+                          onClick={() =>
+                            command(
+                              {
+                                type: "contact_company",
+                                companyId: currentCompany.id,
+                              },
+                              "Another contact attempt recorded. No email was sent.",
+                            )
+                          }
+                        >
+                          Log another attempt
+                        </Button>
                       </div>
-                    ) : !companyApproved ? (
-                      <div className="notice subsection">
-                        <Icon name="clock" />
-                        <p>
-                          Administrator approval is required before contacting
-                          or accepting this company. It does not count as
-                          committed workforce.
-                        </p>
-                      </div>
-                    ) : (
-                      !active && (
-                        <div className="subcon-contact-actions">
+                      <div className="subcon-contact-actions">
+                        <strong>Record response</strong>
+                        <div className="subcon-decision-buttons">
                           <Button
-                            icon="clock"
+                            variant="primary"
+                            icon="check"
                             onClick={() =>
                               command(
                                 {
-                                  type: "contact_company",
-                                  companyId: company.id,
+                                  type: "respond_company",
+                                  companyId: currentCompany.id,
+                                  accepted: true,
                                 },
-                                "Contact attempt recorded only. No email was sent.",
+                                "Acceptance recorded. This subcontractor is now locked.",
                               )
                             }
                           >
-                            Try to Contact Subcon
-                          </Button>
-                          {selection.status === "contacted" && (
-                            <div className="subcon-decision-buttons">
-                              <Button
-                                variant="primary"
-                                icon="check"
-                                onClick={() =>
-                                  command(
-                                    {
-                                      type: "respond_company",
-                                      companyId: company.id,
-                                      accepted: true,
-                                    },
-                                    "Actual acceptance recorded. This subcontractor is now locked.",
-                                  )
-                                }
-                              >
-                                Record Accept
-                              </Button>
-                              <Button
-                                variant="danger-ghost"
-                                onClick={() =>
-                                  command(
-                                    {
-                                      type: "respond_company",
-                                      companyId: company.id,
-                                      accepted: false,
-                                    },
-                                    "Decline recorded. This company can now be replaced.",
-                                  )
-                                }
-                              >
-                                Record Decline
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                    {(selection.contactAt || selection.responseAt) && (
-                      <dl className="subcon-timestamps">
-                        {selection.contactAt && (
-                          <div>
-                            <dt>Contact attempt</dt>
-                            <dd>
-                              {new Date(selection.contactAt).toLocaleString()}
-                            </dd>
-                          </div>
-                        )}
-                        {selection.responseAt && (
-                          <div>
-                            <dt>Decision recorded</dt>
-                            <dd>
-                              {new Date(selection.responseAt).toLocaleString()}
-                            </dd>
-                          </div>
-                        )}
-                      </dl>
-                    )}
-                    <div className="subcon-card-footer">
-                      {companyApproved && (
-                        <Button
-                          variant="text-button"
-                          onClick={() => onCrew(company.id)}
-                        >
-                          View company details
-                          <Icon name="arrow" size={16} />
-                        </Button>
-                      )}
-                      {!locked && !active && (
-                        <div className="button-group">
-                          <Button onClick={() => chooseReplacement(company.id)}>
-                            Replace subcontractor
+                            Accepted
                           </Button>
                           <Button
-                            variant="icon-button"
-                            icon="close"
-                            aria-label={`Archive ${company.name} from proposed team`}
+                            variant="danger-ghost"
                             onClick={() =>
                               command(
                                 {
-                                  type: "archive_company",
-                                  companyId: company.id,
+                                  type: "respond_company",
+                                  companyId: currentCompany.id,
+                                  accepted: false,
                                 },
-                                "Company archived from the proposed team.",
+                                "Decline recorded. You can now contact another company.",
                               )
                             }
-                          />
+                          >
+                            Declined
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-            {team.length === 0 && (
-              <Empty title="Choose your first project partner">
-                Review the ranked candidates below. An empty team cannot proceed
-                to agreement upload.
-              </Empty>
-            )}
-          </section>
-          {!active && (
+                      </div>
+                    </>
+                  )
+                )}
+                <h4>Contact log</h4>
+                {contactLog.length === 0 ? (
+                  <p className="role-muted">No contact attempts recorded.</p>
+                ) : (
+                  <ol className="plain-list">
+                    {contactLog.map((at, index) => (
+                      <li key={`${at}-${index}`}>
+                        Attempt {index + 1} · {new Date(at).toLocaleString()}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {current.responseAt && (
+                  <p>
+                    Decision recorded ·{" "}
+                    {new Date(current.responseAt).toLocaleString()}
+                  </p>
+                )}
+                <div className="subcon-card-footer">
+                  <Button
+                    variant="text-button"
+                    onClick={() => onCrew(currentCompany.id)}
+                  >
+                    View company details
+                    <Icon name="arrow" size={16} />
+                  </Button>
+                </div>
+              </article>
+            </section>
+          )}
+          {!confirmed && !active && !current && featured && (
             <section className="subcon-recommendation-section">
               <div className="section-title">
                 <div>
-                  <h3>Suggested subcontractors</h3>
+                  <h3>Recommended subcontractor</h3>
+                  <p className="role-muted subsection">
+                    The system’s top pick. It is only a suggestion: nothing is
+                    recorded until you contact the company.
+                  </p>
+                </div>
+              </div>
+              <article className="subcon-candidate-card subcon-featured-card">
+                <div className="section-title">
+                  <span className="company-monogram">
+                    {initials(featured.company.name)}
+                  </span>
+                  <Badge tone="green">Recommended</Badge>
+                </div>
+                <h3>{featured.company.name}</h3>
+                <p>
+                  {featured.company.contact || "No contact person on file"} ·{" "}
+                  {featured.company.phone || "No phone on file"}
+                </p>
+                <Badge tone={featured.committed ? "amber" : "green"}>
+                  {featured.committed
+                    ? "Conflicting commitment"
+                    : "No conflicting commitment"}
+                </Badge>
+                {availabilityDetails(featured)}
+                <p>
+                  <strong>Why recommended:</strong>{" "}
+                  {recommendationReason(featured, eligible)}
+                </p>
+                <div className="subcon-contact-actions">
+                  <Button
+                    variant="primary"
+                    icon="clock"
+                    onClick={() =>
+                      command(
+                        {
+                          type: "contact_company",
+                          companyId: featured.company.id,
+                        },
+                        "Contact attempt recorded only. No email was sent.",
+                      )
+                    }
+                  >
+                    Contact this company
+                  </Button>
+                  <Button
+                    variant="text-button"
+                    onClick={() => onCrew(featured.company.id)}
+                  >
+                    View company details
+                    <Icon name="arrow" size={16} />
+                  </Button>
+                </div>
+              </article>
+            </section>
+          )}
+          {!confirmed && !active && !current && !featured && (
+            <section className="subcon-recommendation-section">
+              <Empty title="No verified companies available">
+                No verified companies available. Propose a new company for Admin
+                verification.
+              </Empty>
+              <Button icon="plus" onClick={onNewCompany}>
+                Propose new company
+              </Button>
+            </section>
+          )}
+          {!confirmed && !active && !current && eligible.length > 1 && (
+            <section className="subcon-recommendation-section">
+              <div className="section-title">
+                <div>
+                  <h3>Other verified companies</h3>
                   <p className="role-muted subsection">
                     Ranked by company commitments and currently available
                     workforce.
@@ -498,9 +613,8 @@ export default function LeadSubcontractorPanel({
                   </p>
                   <p>
                     A standing commitment beyond this project’s target start
-                    demotes a company and excludes it from automatic selection.
-                    You may still select it manually after verifying
-                    availability.
+                    demotes a company. You may still contact any suggested
+                    company after verifying availability.
                   </p>
                 </details>
               </div>
@@ -521,53 +635,181 @@ export default function LeadSubcontractorPanel({
                 </Field>
               </div>
               <div className="subcon-candidate-grid">
-                {filteredCandidates.map((candidate) => (
-                  <article
-                    className="subcon-candidate-card"
-                    key={candidate.company.id}
-                  >
-                    <div className="section-title">
-                      <span className="company-monogram">
-                        {initials(candidate.company.name)}
-                      </span>
+                {otherCandidates.map((candidate) => {
+                  const declined = declinedIds.has(candidate.company.id)
+                  return (
+                    <article
+                      className="subcon-candidate-card"
+                      key={candidate.company.id}
+                    >
+                      <div className="section-title">
+                        <span className="company-monogram">
+                          {initials(candidate.company.name)}
+                        </span>
+                        {declined && (
+                          <Badge tone="amber">Declined for this project</Badge>
+                        )}
+                      </div>
+                      <h3>{candidate.company.name}</h3>
+                      <p>
+                        {candidate.company.contact || "No contact person on file"}{" "}
+                        · {candidate.company.phone || "No phone on file"}
+                      </p>
                       <Badge tone={candidate.committed ? "amber" : "green"}>
                         {candidate.committed
                           ? "Conflicting commitment"
                           : "No conflicting commitment"}
                       </Badge>
-                    </div>
-                    <h3>{candidate.company.name}</h3>
-                    {availabilityDetails(candidate)}
-                    <Button
-                      className="full-width"
-                      variant="primary"
-                      icon="plus"
-                      onClick={() =>
-                        command(
-                          {
-                            type: "select_company",
-                            companyId: candidate.company.id,
-                          },
-                          "Company selected. Record contact and its actual response next.",
-                        )
-                      }
+                      {availabilityDetails(candidate)}
+                      <Button
+                        className="full-width"
+                        icon="clock"
+                        disabled={declined}
+                        onClick={() =>
+                          command(
+                            {
+                              type: "contact_company",
+                              companyId: candidate.company.id,
+                            },
+                            "Contact attempt recorded only. No email was sent.",
+                          )
+                        }
+                      >
+                        Contact instead
+                      </Button>
+                      {declined && (
+                        <small className="role-muted">
+                          This company declined this project and cannot be
+                          contacted again.
+                        </small>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+              {otherCandidates.length === 0 && (
+                <Empty title="No other companies match">
+                  Change the filter to see the other verified companies.
+                </Empty>
+              )}
+            </section>
+          )}
+          {!confirmed && !active && !!current && (
+            <section className="subcon-recommendation-section">
+              <div className="section-title">
+                <div>
+                  <h3>Suggested subcontractors</h3>
+                  <p className="role-muted subsection">
+                    Verified companies, ranked by commitments and currently
+                    available workforce.
+                  </p>
+                </div>
+                <details className="subcon-ranking-explainer">
+                  <summary>How ranking works</summary>
+                  <p>
+                    Companies without a conflicting commitment are listed first,
+                    followed by fewer active-project commitments and more
+                    current company availability.
+                  </p>
+                  <p>
+                    A standing commitment beyond this project’s target start
+                    demotes a company. You may still contact any suggested
+                    company after verifying availability.
+                  </p>
+                </details>
+              </div>
+              <div className="subcon-candidate-filters">
+                <Field label="Filter company commitment">
+                  <select
+                    value={availability}
+                    onChange={(event) => setAvailability(event.target.value)}
+                  >
+                    <option value="all">All availability</option>
+                    <option value="uncommitted">
+                      No conflicting company commitment
+                    </option>
+                    <option value="committed">
+                      Committed beyond project start
+                    </option>
+                  </select>
+                </Field>
+              </div>
+              <div className="subcon-candidate-grid">
+                {filteredCandidates.map((candidate) => {
+                  const declined = declinedIds.has(candidate.company.id)
+                  return (
+                    <article
+                      className="subcon-candidate-card"
+                      key={candidate.company.id}
                     >
-                      Add to proposed team
-                    </Button>
-                  </article>
-                ))}
+                      <div className="section-title">
+                        <span className="company-monogram">
+                          {initials(candidate.company.name)}
+                        </span>
+                        {candidate.company.id === recommendedId && (
+                          <Badge tone="green">Recommended</Badge>
+                        )}
+                        {declined && (
+                          <Badge tone="amber">Declined for this project</Badge>
+                        )}
+                      </div>
+                      <h3>{candidate.company.name}</h3>
+                      <p>
+                        {candidate.company.contact || "No contact person on file"}{" "}
+                        · {candidate.company.phone || "No phone on file"}
+                      </p>
+                      <Badge tone={candidate.committed ? "amber" : "green"}>
+                        {candidate.committed
+                          ? "Conflicting commitment"
+                          : "No conflicting commitment"}
+                      </Badge>
+                      {availabilityDetails(candidate)}
+                      <Button
+                        className="full-width"
+                        variant="primary"
+                        icon="clock"
+                        disabled={declined || !!current}
+                        onClick={() =>
+                          command(
+                            {
+                              type: "contact_company",
+                              companyId: candidate.company.id,
+                            },
+                            "Contact attempt recorded only. No email was sent.",
+                          )
+                        }
+                      >
+                        Contact this company
+                      </Button>
+                      {declined ? (
+                        <small className="role-muted">
+                          This company declined this project and cannot be
+                          contacted again.
+                        </small>
+                      ) : (
+                        current && (
+                          <small className="role-muted">
+                            Waiting for {currentCompany?.name || "the company"}
+                            ’s response. Record it before contacting another
+                            company.
+                          </small>
+                        )
+                      )}
+                    </article>
+                  )
+                })}
               </div>
               {filteredCandidates.length === 0 && (
-                <Empty title="No additional candidates match">
-                  Change the filters, suggest a company, or review the
-                  companies already on the proposed team.
+                <Empty title="No candidates match">
+                  Change the filter, or propose a new company for Admin
+                  verification.
                 </Empty>
               )}
             </section>
           )}
           {history.length > 0 && (
             <section className="subcon-history">
-              <h3>Archived team history</h3>
+              <h3>Subcontractor history</h3>
               {history.map((selection) => (
                 <div className="subcon-history-row" key={selection.companyId}>
                   <span className="file-icon">
@@ -583,21 +825,14 @@ export default function LeadSubcontractorPanel({
                     </strong>
                     <p>
                       {selection.status === "declined"
-                        ? "Declined by subcontractor"
+                        ? `Declined for this project${selection.responseAt ? ` · ${new Date(selection.responseAt).toLocaleString()}` : ""}`
                         : selection.status === "archived"
-                          ? "Archived before acceptance"
+                          ? "Archived before contact"
                           : "Replaced before acceptance"}
                       {selection.replacedBy &&
                         ` · Replaced by ${state.companies.find((company) => company.id === selection.replacedBy)?.name || selection.replacedBy}`}
                     </p>
                   </div>
-                  {!active && selection.status === "declined" && (
-                    <Button
-                      onClick={() => chooseReplacement(selection.companyId)}
-                    >
-                      Choose replacement
-                    </Button>
-                  )}
                 </div>
               ))}
             </section>
@@ -605,9 +840,10 @@ export default function LeadSubcontractorPanel({
           <div className="notice subsection">
             <Icon name="doc" />
             <p>
-              <strong>Contact tracking, not email.</strong> “Try to Contact
-              Subcon” records a local attempt and timestamp. Karlo records the
-              actual Accept or Decline manually. No email or invitation is sent.
+              <strong>Contact tracking, not email.</strong> “Contact this
+              company” records a local attempt with a timestamp. You record the
+              actual Accepted or Declined answer manually. No email or
+              invitation is sent.
             </p>
           </div>
         </>
@@ -846,74 +1082,6 @@ export default function LeadSubcontractorPanel({
           onAction={onAction}
           onClose={() => setAgreementOpen(false)}
         />
-      )}
-      {replaceId && (
-        <Modal
-          title="Replace subcontractor"
-          subtitle={replacedCompany?.name || "Previous company"}
-          onClose={() => setReplaceId("")}
-        >
-          <div className="notice">
-            <Icon name="shield" />
-            <p>
-              Accepted companies cannot be replaced. The new company starts
-              unconfirmed and requires its own contact attempt and manually
-              recorded response.
-            </p>
-          </div>
-          <Field label="Replacement company">
-            <select
-              value={replacement}
-              onChange={(event) => setReplacement(event.target.value)}
-            >
-              <option value="">Choose an approved replacement</option>
-              {candidates
-                .filter((candidate) => candidate.company.id !== replaceId)
-                .map((candidate) => (
-                  <option
-                    value={candidate.company.id}
-                    key={candidate.company.id}
-                  >
-                    {candidate.company.name} · {candidate.availableManpower}{" "}
-                    manpower available
-                    {candidate.committed ? " · conflicting commitment" : ""}
-                  </option>
-                ))}
-            </select>
-          </Field>
-          {replaceError && (
-            <p className="error" role="alert">
-              {replaceError}
-            </p>
-          )}
-          <div className="modal-actions">
-            <Button onClick={() => setReplaceId("")}>Cancel</Button>
-            <Button
-              variant="primary"
-              disabled={!replacement}
-              onClick={() => {
-                if (
-                  command(
-                    {
-                      type: "replace_company",
-                      companyId: replaceId,
-                      replacementCompanyId: replacement,
-                      expectedVersion: work.version,
-                    },
-                    "Replacement selected. New contact and response are required.",
-                  )
-                )
-                  setReplaceId("")
-                else
-                  setReplaceError(
-                    "The replacement was not applied. Check the current team status and try again.",
-                  )
-              }}
-            >
-              Confirm replacement
-            </Button>
-          </div>
-        </Modal>
       )}
     </section>
   )

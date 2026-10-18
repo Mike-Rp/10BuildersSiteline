@@ -1013,6 +1013,10 @@ tbody tr:hover { background: var(--surface-subtle); }
 .subcon-candidate-card h3 { margin-top: 23px; font-size: 17px; line-height: 1.5; }
 .subcon-candidate-card > p { margin-top: 8px; }
 .subcon-candidate-card .subcon-availability { padding-top: 18px; }
+.subcon-featured-card { gap: 12px; padding: 28px; background: var(--color-surface); border-color: var(--color-steel); }
+.subcon-featured-card h3 { margin-top: 12px; font-size: 20px; }
+.subcon-featured-card .subcon-availability { padding-top: 0; }
+.subcon-featured-card .subcon-contact-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
 .subcon-candidate-card > .button { white-space: normal; }
 .subcon-history { margin-top: 27px; padding-top: 24px; border-top: 1px solid var(--color-line); }
 .subcon-history-row { display: flex; align-items: center; gap: 15px; padding: 19px 0; border-bottom: 1px solid var(--color-line); }

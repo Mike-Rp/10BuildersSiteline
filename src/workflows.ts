@@ -216,7 +216,10 @@ export function clientSubconAcknowledged(p: Project) {
 }
 export function consentComplete(state: State, p: Project) {
   if (p.clientSubcon) return clientSubconAcknowledged(p)
-  const selections = activeSubcontractors(p)
+  // Only the contacted/accepted company counts; un-actioned "selected" rows are suggestions.
+  const selections = activeSubcontractors(p).filter(
+    (s) => s.status !== "selected",
+  )
   return (
     selections.length > 0 &&
     selections.every(
@@ -234,6 +237,28 @@ export function activeSubcontractors(p: Project) {
       s.status !== "declined" &&
       s.status !== "replaced" &&
       s.status !== "archived",
+  )
+}
+/** The project's single subcontractor in progress (contacted) or confirmed (accepted), if any. */
+export function projectSubcontractor(p: Project) {
+  return workflowFor(p).selections.find(
+    (s) => s.status === "contacted" || s.status === "accepted",
+  )
+}
+export const SUBCON_IN_PROGRESS =
+  "This project already has a subcontractor in progress."
+export const SUBCON_LOCKED =
+  "A subcontractor has already accepted this project. Allocation is locked."
+function assertCanStartSubcontractor(p: Project, companyId: string) {
+  const current = projectSubcontractor(p)
+  assert(current?.status !== "accepted", SUBCON_LOCKED)
+  assert(!current || current.companyId === companyId, SUBCON_IN_PROGRESS)
+  const existing = workflowFor(p).selections.find(
+    (s) => s.companyId === companyId,
+  )
+  assert(
+    existing?.status !== "declined",
+    "This company declined this project and cannot be contacted again.",
   )
 }
 export function subcontractorRecommendation(
@@ -925,12 +950,7 @@ export function applyWorkflow(
       if (nextPerson) startDeadline(p, nextPerson, next.rules.response, now)
       else work.deadline = undefined
       if (teamConfirmed(p)) {
-        const suggestion = subcontractorRecommendations(next, p).find(
-          (candidate) =>
-            !candidate.committed && candidate.availableManpower > 0,
-        )?.company
-        if (!work.selections.length && suggestion)
-          work.selections.push({ companyId: suggestion.id, status: "selected" })
+        // The system only ranks suggestions; the Lead Site PM contacts a company.
         p.note =
           "All Site PMs accepted. Lead Site PM subcontractor coordination is available."
         record(
@@ -1010,11 +1030,12 @@ export function applyWorkflow(
         (c) => c.id === command.companyId && c.status === "approved",
       )
       assert(c, "Select an approved company from the directory.")
+      assertCanStartSubcontractor(p, c.id)
       const existing = work.selections.find((s) => s.companyId === c.id)
       assert(
         !existing ||
-          existing.status === "declined" ||
-          existing.status === "replaced",
+          existing.status === "replaced" ||
+          existing.status === "archived",
         "This company is already on the team.",
       )
       if (existing)
@@ -1048,6 +1069,8 @@ export function applyWorkflow(
         previous.status !== "replaced",
         "This subcontractor has already been replaced.",
       )
+      assert(projectSubcontractor(p)?.status !== "accepted", SUBCON_LOCKED)
+      assert(!projectSubcontractor(p), SUBCON_IN_PROGRESS)
       assert(
         command.replacementCompanyId &&
           command.replacementCompanyId !== previous.companyId,
@@ -1067,6 +1090,14 @@ export function applyWorkflow(
           (selection) => selection.companyId === replacement.id,
         ),
         "The replacement company is already on the team.",
+      )
+      assert(
+        !work.selections.some(
+          (selection) =>
+            selection.companyId === replacement.id &&
+            selection.status === "declined",
+        ),
+        "This company declined this project and cannot be contacted again.",
       )
       if (command.expectedVersion !== undefined)
         assert(
@@ -1110,6 +1141,7 @@ export function applyWorkflow(
         selection && selection.status !== "accepted",
         "Accepted subcontractors cannot be archived or replaced.",
       )
+      assert(selection.status !== "contacted", SUBCON_IN_PROGRESS)
       selection.status = "archived"
       selection.archivedAt = date
       selection.archivedBy = actor.id
@@ -1209,6 +1241,37 @@ export function applyWorkflow(
       const company = next.companies.find(
         (c) => c.id === command.companyId && c.status === "approved",
       )
+      if (command.type === "contact_company") {
+        // One step: create the project's selection (if new) and log the attempt.
+        const target = next.companies.find(
+          (c) => c.id === command.companyId && c.status === "approved",
+        )
+        assert(target, "Select an approved subcontractor first.")
+        const known = work.selections.find((s) => s.companyId === target.id)
+        assert(
+          !known || known.status !== "accepted",
+          "Accepted subcontractors are locked.",
+        )
+        assert(
+          known?.status !== "replaced",
+          "Select a replacement or add this company again before making contact.",
+        )
+        assertCanStartSubcontractor(p, target.id)
+        const row =
+          known ||
+          work.selections[
+            work.selections.push({ companyId: target.id, status: "selected" }) -
+              1
+          ]
+        row.status = "contacted"
+        row.contactAt = date
+        row.contactLog = [...(row.contactLog || []), date]
+        record(
+          "Subcontractor contact attempt recorded",
+          `${target.name} · no email or external invitation sent.`,
+        )
+        break
+      }
       assert(selection && company, "Select an approved subcontractor first.")
       assert(
         selection.status !== "accepted",
@@ -1218,34 +1281,25 @@ export function applyWorkflow(
         selection.status !== "replaced" && selection.status !== "declined",
         "Select a replacement or add this company again before making contact.",
       )
-      if (command.type === "contact_company") {
-        selection.status = "contacted"
-        selection.contactAt = date
-        record(
-          "Subcontractor contact attempt recorded",
-          `${company.name} · no email or external invitation sent.`,
-        )
-      } else {
-        assert(
-          typeof command.accepted === "boolean",
-          "Manually choose Accept or Decline.",
-        )
-        assert(
-          selection.status === "contacted",
-          "Record a contact attempt before recording the actual response.",
-        )
-        selection.status = command.accepted ? "accepted" : "declined"
-        selection.responseAt = date
-        if (command.accepted && !company.activeProjectIds.includes(p.id))
-          company.activeProjectIds.push(p.id)
-        record(
-          command.accepted
-            ? "Subcontractor acceptance recorded"
-            : "Subcontractor declined",
-          `${company.name} · response manually recorded by Lead Site PM.`,
-          command.accepted ? "approval" : "request",
-        )
-      }
+      assert(
+        typeof command.accepted === "boolean",
+        "Manually choose Accept or Decline.",
+      )
+      assert(
+        selection.status === "contacted",
+        "Record a contact attempt before recording the actual response.",
+      )
+      selection.status = command.accepted ? "accepted" : "declined"
+      selection.responseAt = date
+      if (command.accepted && !company.activeProjectIds.includes(p.id))
+        company.activeProjectIds.push(p.id)
+      record(
+        command.accepted
+          ? "Subcontractor acceptance recorded"
+          : "Subcontractor declined",
+        `${company.name} · response manually recorded by Lead Site PM.`,
+        command.accepted ? "approval" : "request",
+      )
       break
     }
     case "activate_project": {

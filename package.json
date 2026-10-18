@@ -12,6 +12,7 @@
     "test:ui": "node --experimental-strip-types tests/ui-smoke.mjs"
   },
   "dependencies": {
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "xlsx": "^0.18.5"

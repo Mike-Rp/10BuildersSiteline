@@ -1,7 +1,15 @@
 import { recordedProgress, type ProgressProject } from "./progress"
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FocusEvent,
+  type FormEvent,
+} from "react"
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
 import { apiEnabled, downloadApiFile } from "./api/client"
+import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import {
   accountError,
   clientForEmail,
@@ -25,6 +33,12 @@ import {
   validateFile,
   endAfterStart,
   plannedDays,
+  addDays,
+  localToday,
+  latestProjectDate,
+  projectDateErrors,
+  startsInLabel,
+  DATE_ERRORS,
   type Account,
   type Company,
   type Doc,
@@ -130,6 +144,28 @@ export function Upload({
   const [preview, setPreview] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+  // Browsers that ignore "#toolbar=0" (Firefox, Safari, mobile) get page 1 as an image.
+  const isPdf =
+    !!file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name))
+  const needsFallback = isPdf && !canHideNativePdfToolbar(navigator)
+  const [pageImage, setPageImage] = useState("")
+  const [pageFailed, setPageFailed] = useState(false)
+  useEffect(() => {
+    setPageImage("")
+    setPageFailed(false)
+    if (!needsFallback || !preview) return
+    let cancelled = false
+    renderPdfFirstPage(preview)
+      .then((src) => {
+        if (!cancelled) setPageImage(src)
+      })
+      .catch(() => {
+        if (!cancelled) setPageFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [needsFallback, preview])
   function clear() {
     if (preview) URL.revokeObjectURL(preview)
     setFile(undefined)
@@ -209,11 +245,33 @@ export function Upload({
               src={preview}
               alt="Selected document"
             />
+          ) : needsFallback ? (
+            <div
+              className="pdf-preview"
+              style={{ overflow: "auto" }}
+              role="group"
+              aria-label="Document preview"
+            >
+              {pageImage ? (
+                <img
+                  src={pageImage}
+                  alt="First page of the selected document"
+                  style={{ width: "100%", display: "block" }}
+                />
+              ) : (
+                <p>
+                  {pageFailed
+                    ? "Preview unavailable. You can still confirm this file."
+                    : "Loading preview…"}
+                </p>
+              )}
+            </div>
           ) : (
             <object
               className="pdf-preview"
-              data={preview}
+              data={`${preview}#toolbar=0&navpanes=0&scrollbar=1`}
               type="application/pdf"
+              aria-label="Document preview"
             >
               <p>Preview unavailable. You can still confirm this file.</p>
             </object>
@@ -984,7 +1042,7 @@ export function IntakeForm({
           type: "",
           area: "",
           floors: "",
-          start: "",
+          start: localToday(),
           end: "",
           clientId: "",
           status: "pending",
@@ -1030,9 +1088,49 @@ export function IntakeForm({
     patch({ opmId: opms[version % Math.max(1, opms.length)]?.id || "", team })
     setRun(version)
   }
-  const datesInvalid =
-    !!draft.start && !!draft.end && !endAfterStart(draft.start, draft.end)
-  const duration = datesInvalid ? null : plannedDays(draft.start, draft.end)
+  // Date rules apply to new projects only; an existing project's dates are locked here.
+  const [badDate, setBadDate] = useState({ start: false, end: false })
+  const [endCleared, setEndCleared] = useState(false)
+  const dateErrs: { start?: string; end?: string } = project
+    ? {}
+    : projectDateErrors(draft.start, draft.end || "")
+  const startError =
+    dateErrs.start || (badDate.start ? DATE_ERRORS.invalid : undefined)
+  const endError =
+    dateErrs.end || (badDate.end ? DATE_ERRORS.invalid : undefined)
+  const datesBlocked = !project && (!!startError || !!endError)
+  const datesInvalid = !!endError
+  const duration =
+    datesBlocked || !draft.start || !draft.end
+      ? null
+      : plannedDays(draft.start, draft.end)
+  const todayIso = localToday()
+  const maxIso = latestProjectDate()
+  const endMin = addDays(
+    draft.start && !startError && draft.start >= todayIso
+      ? draft.start
+      : todayIso,
+    1,
+  )
+  function changeStart(e: ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setBadDate((b) => ({ ...b, start: e.target.validity.badInput }))
+    const nextErr = projectDateErrors(value, draft.end || "")
+    if (draft.end && !!value && nextErr.end === DATE_ERRORS.endNotAfter) {
+      patch({ start: value, end: "" })
+      setEndCleared(true)
+      setBadDate((b) => ({ ...b, end: false }))
+    } else {
+      patch({ start: value })
+    }
+  }
+  function changeEnd(e: ChangeEvent<HTMLInputElement>) {
+    setEndCleared(false)
+    setBadDate((b) => ({ ...b, end: e.target.validity.badInput }))
+    patch({ end: e.target.value })
+  }
+  const markBad = (field: "start" | "end") => (e: FocusEvent<HTMLInputElement>) =>
+    setBadDate((b) => ({ ...b, [field]: e.target.validity.badInput }))
   function validDetails() {
     if (!draft.type.trim())
       return "Select a project type to generate allocation."
@@ -1046,9 +1144,10 @@ export function IntakeForm({
       ].every((v) => v.trim())
     )
       return "Complete all required project fields."
+    if (datesBlocked) return startError || endError || DATE_ERRORS.invalid
     if (!draft.end) return "Enter the Target End Date."
     if (!endAfterStart(draft.start, draft.end))
-      return "Target End Date must be later than Target Start Date."
+      return DATE_ERRORS.endNotAfter
     if (
       !(Number(draft.area.replace(/,/g, "")) > 0) ||
       !(Number(draft.floors) > 0) ||
@@ -1213,35 +1312,50 @@ export function IntakeForm({
                 </small>
               )}
             </fieldset>
-            <Field label="Target start date *">
+            <Field
+              label="Target start date *"
+              error={startError ? `⚠ ${startError}` : undefined}
+            >
               <input
                 type="date"
                 required
                 value={draft.start}
-                onChange={(e) => patch({ start: e.target.value })}
+                min={project ? undefined : todayIso}
+                max={project ? undefined : maxIso}
+                onChange={changeStart}
+                onBlur={markBad("start")}
+                aria-invalid={!!startError}
                 disabled={!!project}
               />
             </Field>
             <Field
               label="Target end date *"
               error={
-                datesInvalid
-                  ? "Target End Date must be later than Target Start Date."
-                  : undefined
+                endError
+                  ? `⚠ ${endError}`
+                  : endCleared
+                    ? "⚠ End date was cleared because it is no longer after the start date."
+                    : undefined
               }
               hint={
                 duration
-                  ? `Planned duration: ${duration.toLocaleString()} calendar days`
-                  : "Planned duration is calculated from both dates."
+                  ? `Planned duration: ${duration.toLocaleString()} calendar days${
+                      startsInLabel(draft.start)
+                        ? ` · ${startsInLabel(draft.start)}`
+                        : ""
+                    }`
+                  : "Set valid dates to see the duration."
               }
             >
               <input
                 type="date"
                 required
                 value={draft.end || ""}
-                min={draft.start || undefined}
-                onChange={(e) => patch({ end: e.target.value })}
-                aria-invalid={datesInvalid}
+                min={project ? draft.start || undefined : endMin}
+                max={project ? undefined : maxIso}
+                onChange={changeEnd}
+                onBlur={markBad("end")}
+                aria-invalid={datesInvalid || endCleared}
                 disabled={!!project}
               />
             </Field>
@@ -1320,7 +1434,12 @@ export function IntakeForm({
           {error && !projectTypeError && <p className="error">{error}</p>}
           <div className="modal-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" icon="arrow">
+            <Button
+              type="submit"
+              variant="primary"
+              icon="arrow"
+              disabled={datesBlocked}
+            >
               Generate allocation
             </Button>
           </div>
@@ -1591,7 +1710,12 @@ export function IntakeForm({
           )}
           <div className="modal-actions">
             <Button onClick={() => setStep(1)}>Back to details</Button>
-            <Button variant="primary" onClick={submit} icon="arrow">
+            <Button
+              variant="primary"
+              onClick={submit}
+              icon="arrow"
+              disabled={datesBlocked}
+            >
               {project
                 ? "Resubmit to Office PM"
                 : "Confirm & send to Office PM"}
