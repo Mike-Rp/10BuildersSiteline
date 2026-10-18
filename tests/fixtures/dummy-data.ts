@@ -1,12 +1,4 @@
-// TEMPORARY DUMMY CREDENTIALS — replace with a real backend.
-//
-// SITELINE has no authentication server yet. These passwords let the seeded
-// accounts in `initialState()` (src/model.ts) sign in locally so every role can
-// be tested. They ship in the browser bundle, so they are NOT secure. Delete
-// this file once sign-in is handled by a real authentication service.
-//
-// Keyed by account ID. The sign-in email comes from the account record itself.
-// Never display these values in the UI.
+// Legacy login fixtures for unit tests only. Never imported by the application.
 export const DUMMY_CREDENTIALS: Readonly<Record<string, string>> = {
   a1: "Domingo@2026", // Patricia N. Domingo — Administrator
   a2: "Villaverde@2026", // Renz D. Villaverde — Office PM
@@ -24,9 +16,10 @@ export const DUMMY_CREDENTIALS: Readonly<Record<string, string>> = {
 // Usernames are case-insensitive; passwords are exact. Each signs in as the
 // listed seeded account, so the normal account status checks still apply.
 // Remove these together with DUMMY_CREDENTIALS.
-export const DUMMY_USERNAMES: Readonly<
-  Record<string, { accountId: string; password: string }>
-> = {
+export const DUMMY_USERNAMES: Readonly<Record<string, {
+  accountId: string
+  password: string
+}>> = {
   admin: { accountId: "a1", password: "Password" }, // Patricia N. Domingo — Administrator
   opm: { accountId: "a2", password: "Password" }, // Renz D. Villaverde — Office PM
   spm: { accountId: "a4", password: "Password" }, // Karlo M. Espiritu — Lead Site PM

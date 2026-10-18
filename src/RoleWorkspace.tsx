@@ -250,7 +250,9 @@ export default function RoleWorkspace({
   // Projects with a Site PM phase that is still pending or declined.
   const responseProjects = projects.filter(
     (p) =>
-      p.opmAccepted || workflowFor(p).responses.length || p.status === "pending",
+      p.opmAccepted ||
+      workflowFor(p).responses.length ||
+      p.status === "pending",
   )
   const responsesNeedingAction = responseProjects.filter((p) =>
     p.team.some((t) => t.status !== "confirmed"),
@@ -464,7 +466,10 @@ export default function RoleWorkspace({
         <div className="role-card-content">
           {stage.message && (
             <p className={`stage-message ${stage.kind}`}>
-              <Icon name={stage.kind === "action" ? "alert" : "clock"} size={16} />
+              <Icon
+                name={stage.kind === "action" ? "alert" : "clock"}
+                size={16}
+              />
               {stage.message}
             </p>
           )}
@@ -761,9 +766,9 @@ export default function RoleWorkspace({
         </div>
         <Panel
           title="Schedule performance"
-          subtitle="Planned vs. actual progress (illustrative data)."
+          subtitle="Recorded completion and project history."
         >
-          <Chart compact />
+          <Chart compact projects={allActive} />
         </Panel>
       </>
     )
@@ -774,147 +779,140 @@ export default function RoleWorkspace({
       (d) => d.label === "Client Contract Agreement" && d.uploaded,
     )
     const panel = (
-        <Panel
-          title="Required documents"
-          subtitle={`${registeredCount(p)} / 6 required Office PM documents uploaded`}
-          actions={
-            <Badge tone={registeredComplete(p) ? "green" : "amber"}>
-              {registeredComplete(p)
-                ? "Documents complete"
-                : "In progress"}
-            </Badge>
-          }
-        >
-          <div className="role-card-content">
-            <div className="document-completion">
-              <progress max={6} value={registeredCount(p)} />
-              <strong>{registeredCount(p)} / 6</strong>
-            </div>
-            {!p.opmAccepted && (
-              <div className="notice">
-                <Icon name="shield" />
-                <p>
-                  Accept your Office PM assignment before uploading any required
-                  project document.
-                </p>
-                <Button onClick={() => navigate("Confirmation queue")}>
-                  Review assignment
-                </Button>
-              </div>
-            )}
-            <h3>Admin-uploaded Client Contract Agreement</h3>
-            {p.opmAccepted && contract ? (
-              <DocumentList
-                docs={[contract]}
-                onPreview={(doc) => showDoc(p, doc)}
-              />
-            ) : (
-              <p className="role-muted subsection">
-                {" "}
-                {p.opmAccepted
-                  ? "No original Admin contract file is attached to this intake record. Newly created intake projects include their uploaded agreement."
-                  : "View and download become available after you accept."}
-              </p>
-            )}
-            {p.opmAccepted && (
-              <div className="registered-documents">
-                {DOC_LABELS.slice(0, 6).map((label, i) => {
-                  const doc = p.docs.find((d) => d.label === label)
-                  return (
-                    <section
-                      className={`registered-document ${
-                        doc?.uploaded ? "complete" : ""
-                      }`}
-                      key={label}
-                    >
-                      <span className="document-number">
-                        {doc?.uploaded ? (
-                          <Icon name="check" size={20} />
-                        ) : (
-                          String(i + 1).padStart(2, "0")
-                        )}
-                      </span>
-                      <div>
-                        <h3>{label}</h3>
-                        <p>
-                          {doc?.uploaded
-                            ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
-                            : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
-                        </p>
-                      </div>
-                      {doc?.uploaded ? (
-                        <div className="button-group">
-                          <Badge tone="green">Uploaded & locked</Badge>
-                          <Button
-                            variant="icon-button"
-                            icon="search"
-                            aria-label={`Preview ${label}`}
-                            onClick={() => showDoc(p, doc)}
-                          />
-                          <Button
-                            variant="icon-button"
-                            icon="download"
-                            aria-label={`Download ${label}`}
-                            onClick={() => downloadDoc(doc)}
-                          />
-                        </div>
-                      ) : (
-                        <Upload
-                          label={label}
-                          owner={actor.name}
-                          disabled={
-                            !p.opmAccepted || p.status !== "pending"
-                          }
-                          buttonLabel={`Upload ${label}`}
-                          onSave={(d) =>
-                            act(
-                              {
-                                type: "upload_registered",
-                                projectId: p.id,
-                                docIndex: i,
-                                doc: d,
-                              },
-                              `${label} uploaded.`,
-                            )
-                          }
-                        />
-                      )}
-                    </section>
-                  )
-                })}
-              </div>
-            )}
-            {registeredComplete(p) && (
-              <div className="notice">
-                <Icon name="check" />
-                <p>
-                  All six documents are confirmed. {actorName(leadId(p))}{" "}
-                  must accept first, then the remaining Site PMs. Uploading
-                  documents does not activate the project.
-                </p>
-              </div>
-            )}
-            <div className="role-document-row">
-              <Icon name="shield" />
-              <div>
-                <h3>{DOC_LABELS[6]}</h3>
-                <p>
-                  Owned by the Lead Site PM. You cannot upload it on their
-                  behalf.
-                </p>
-              </div>
-              <Status
-                value={
-                  p.docs.some(
-                    (d) => d.label === DOC_LABELS[6] && d.uploaded,
-                  )
-                    ? "uploaded"
-                    : "awaiting Lead Site PM"
-                }
-              />
-            </div>
+      <Panel
+        title="Required documents"
+        subtitle={`${registeredCount(p)} / 6 required Office PM documents uploaded`}
+        actions={
+          <Badge tone={registeredComplete(p) ? "green" : "amber"}>
+            {registeredComplete(p) ? "Documents complete" : "In progress"}
+          </Badge>
+        }
+      >
+        <div className="role-card-content">
+          <div className="document-completion">
+            <progress max={6} value={registeredCount(p)} />
+            <strong>{registeredCount(p)} / 6</strong>
           </div>
-        </Panel>
+          {!p.opmAccepted && (
+            <div className="notice">
+              <Icon name="shield" />
+              <p>
+                Accept your Office PM assignment before uploading any required
+                project document.
+              </p>
+              <Button onClick={() => navigate("Confirmation queue")}>
+                Review assignment
+              </Button>
+            </div>
+          )}
+          <h3>Admin-uploaded Client Contract Agreement</h3>
+          {p.opmAccepted && contract ? (
+            <DocumentList
+              docs={[contract]}
+              onPreview={(doc) => showDoc(p, doc)}
+            />
+          ) : (
+            <p className="role-muted subsection">
+              {" "}
+              {p.opmAccepted
+                ? "No original Admin contract file is attached to this intake record. Newly created intake projects include their uploaded agreement."
+                : "View and download become available after you accept."}
+            </p>
+          )}
+          {p.opmAccepted && (
+            <div className="registered-documents">
+              {DOC_LABELS.slice(0, 6).map((label, i) => {
+                const doc = p.docs.find((d) => d.label === label)
+                return (
+                  <section
+                    className={`registered-document ${
+                      doc?.uploaded ? "complete" : ""
+                    }`}
+                    key={label}
+                  >
+                    <span className="document-number">
+                      {doc?.uploaded ? (
+                        <Icon name="check" size={20} />
+                      ) : (
+                        String(i + 1).padStart(2, "0")
+                      )}
+                    </span>
+                    <div>
+                      <h3>{label}</h3>
+                      <p>
+                        {doc?.uploaded
+                          ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
+                          : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
+                      </p>
+                    </div>
+                    {doc?.uploaded ? (
+                      <div className="button-group">
+                        <Badge tone="green">Uploaded & locked</Badge>
+                        <Button
+                          variant="icon-button"
+                          icon="search"
+                          aria-label={`Preview ${label}`}
+                          onClick={() => showDoc(p, doc)}
+                        />
+                        <Button
+                          variant="icon-button"
+                          icon="download"
+                          aria-label={`Download ${label}`}
+                          onClick={() => downloadDoc(doc)}
+                        />
+                      </div>
+                    ) : (
+                      <Upload
+                        label={label}
+                        owner={actor.name}
+                        disabled={!p.opmAccepted || p.status !== "pending"}
+                        buttonLabel={`Upload ${label}`}
+                        onSave={(d) =>
+                          act(
+                            {
+                              type: "upload_registered",
+                              projectId: p.id,
+                              docIndex: i,
+                              doc: d,
+                            },
+                            `${label} uploaded.`,
+                          )
+                        }
+                      />
+                    )}
+                  </section>
+                )
+              })}
+            </div>
+          )}
+          {registeredComplete(p) && (
+            <div className="notice">
+              <Icon name="check" />
+              <p>
+                All six documents are confirmed. {actorName(leadId(p))} must
+                accept first, then the remaining Site PMs. Uploading documents
+                does not activate the project.
+              </p>
+            </div>
+          )}
+          <div className="role-document-row">
+            <Icon name="shield" />
+            <div>
+              <h3>{DOC_LABELS[6]}</h3>
+              <p>
+                Owned by the Lead Site PM. You cannot upload it on their behalf.
+              </p>
+            </div>
+            <Status
+              value={
+                p.docs.some((d) => d.label === DOC_LABELS[6] && d.uploaded)
+                  ? "uploaded"
+                  : "awaiting Lead Site PM"
+              }
+            />
+          </div>
+        </div>
+      </Panel>
     )
     return registeredComplete(p) ? (
       <details className="role-details">
@@ -1012,7 +1010,10 @@ export default function RoleWorkspace({
                 tone: "neutral" as const,
               }
             return registeredComplete(p)
-              ? { label: "Required documents complete", tone: "success" as const }
+              ? {
+                  label: "Required documents complete",
+                  tone: "success" as const,
+                }
               : {
                   label: `${registeredCount(p)}/6 required uploaded`,
                   tone: "neutral" as const,
@@ -1031,7 +1032,10 @@ export default function RoleWorkspace({
         })}
         projects={scoped.map(repositoryProject)}
         onOpen={(projectId, fileId) =>
-          openIndexedDoc(scoped.find((item) => item.id === projectId), fileId)
+          openIndexedDoc(
+            scoped.find((item) => item.id === projectId),
+            fileId,
+          )
         }
       />
     )
@@ -2356,8 +2360,7 @@ export default function RoleWorkspace({
               onClick={() => {
                 onRead([e.id])
                 setBell(false)
-                if (isOpm && e.target === "SPM responses")
-                  openSiteResponses()
+                if (isOpm && e.target === "SPM responses") openSiteResponses()
                 else if (nav.some(([label]) => label === e.target))
                   navigate(e.target)
                 else if (
@@ -2412,10 +2415,8 @@ export default function RoleWorkspace({
               <Icon name="clock" />
               <p>
                 Current response window:{" "}
-                {actorName(workflowFor(p).deadline!.accountId)}. Hard
-                deadline{" "}
-                {new Date(workflowFor(p).deadline!.hard).toLocaleString()}
-                .
+                {actorName(workflowFor(p).deadline!.accountId)}. Hard deadline{" "}
+                {new Date(workflowFor(p).deadline!.hard).toLocaleString()}.
               </p>
             </div>
           )}
@@ -2884,9 +2885,9 @@ export default function RoleWorkspace({
         </section>
         <section className="detail-section">
           <h3>
-            Schedule performance <Badge>Illustrative</Badge>
+            Schedule performance <Badge>Recorded</Badge>
           </h3>
-          <Chart compact />
+          <Chart compact projects={[p]} />
         </section>
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
@@ -2929,7 +2930,9 @@ export default function RoleWorkspace({
     const index = projectDocumentIndexFor(p, actor)
     const recent = index
       .flatMap((category) =>
-        category.folders.flatMap((folder) => folder.files.map((file) => file.doc)),
+        category.folders.flatMap((folder) =>
+          folder.files.map((file) => file.doc),
+        ),
       )
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
       .slice(0, 3)
@@ -3006,7 +3009,10 @@ export default function RoleWorkspace({
           emptyDetail="Original uploads will appear here when submitted through the responsible workflow."
           onOpen={(_projectId, fileId) => openIndexedDoc(p, fileId)}
           onDownload={(_projectId, fileId) => {
-            const doc = findIndexedDoc(projectDocumentIndexFor(p, actor), fileId)
+            const doc = findIndexedDoc(
+              projectDocumentIndexFor(p, actor),
+              fileId,
+            )
             if (doc) void downloadDoc(doc)
           }}
         />
@@ -3176,12 +3182,11 @@ export default function RoleWorkspace({
             <div className="notice">
               <Icon name="activity" />
               <p>
-                Planned-versus-actual curves are for schedule tracking.
-                Recorded percentages are driven by approved QA/QC items, not by
-                these charts.
+                Recorded percentages and history come from project records. A
+                planned-versus-actual comparison requires a saved baseline.
               </p>
             </div>
-            {allActive.map((p, i) => (
+            {allActive.map((p) => (
               <Panel
                 key={p.id}
                 title={p.name}
@@ -3190,7 +3195,7 @@ export default function RoleWorkspace({
                 <div className="schedule-timeline">
                   <PlannedTimeline project={p} />
                 </div>
-                <Chart seed={73 + i * 29} />
+                <Chart projects={[p]} />
               </Panel>
             ))}
             {!allActive.length && (
@@ -3591,7 +3596,9 @@ export default function RoleWorkspace({
         projects.some((p) => p.id === detail.id) && (
           <Modal
             title={
-              monitorView === "repository" ? "Project documents" : "Project monitoring"
+              monitorView === "repository"
+                ? "Project documents"
+                : "Project monitoring"
             }
             subtitle={
               monitorView === "repository"

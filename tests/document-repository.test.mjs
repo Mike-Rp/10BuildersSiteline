@@ -1,11 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { DOC_LABELS, initialState } from "../src/model.ts"
-import {
-  applyWorkflow,
-  documentAccess,
-  workflowFor,
-} from "../src/workflows.ts"
+import { DOC_LABELS } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
+import { applyWorkflow, documentAccess, workflowFor } from "../src/workflows.ts"
 import {
   projectDocumentIndex,
   projectDocumentIndexFor,
@@ -93,7 +90,11 @@ test("Site PMs never see Office PM registered documents in the repository", () =
   )
   for (const label of DOC_LABELS.slice(0, 6))
     assert.ok(!labels.includes(label), `${label} hidden from Site PM`)
-  assert.ok(filesOf(projectDocumentIndexFor(project, spm)).some((d) => d.id === "evidence-a6"))
+  assert.ok(
+    filesOf(projectDocumentIndexFor(project, spm)).some(
+      (d) => d.id === "evidence-a6",
+    ),
+  )
 })
 
 test("actors outside the project, or an Office PM before acceptance, see no files", () => {
@@ -199,7 +200,10 @@ test("the repository lists checklist evidence as files and leaves checklist reco
     state.accounts.find((a) => a.id === owner),
   )
   const listed = filesOf(index).map((doc) => doc.id)
-  assert.ok(listed.includes(approved.doc.id), "approved evidence is a listed file")
+  assert.ok(
+    listed.includes(approved.doc.id),
+    "approved evidence is a listed file",
+  )
   assert.ok(
     index.every((category) => !("checklist" in category)),
     "the repository index carries no checklist section",

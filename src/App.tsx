@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { assertCanSignIn, authenticate, sessionAccount } from "./auth"
+import { assertCanSignIn } from "./auth"
+import { stubAccount } from "./api/adapter"
 import {
   api,
   apiEnabled,
@@ -26,7 +27,6 @@ import {
   applyWorkflow,
   beginAccountResignation,
   resolveClientSubconIssue,
-  processWorkflowTimers,
   registeredComplete,
   teamConfirmed,
   type WorkflowCommand,
@@ -50,7 +50,7 @@ import {
   dateLabel,
   headcount,
   initials,
-  initialState,
+  emptyState,
   licenseState,
   projectPhaseDisciplines,
   projectPhaseNames,
@@ -72,7 +72,6 @@ import DocumentRepository, {
   staffRepositoryCategories,
 } from "./DocumentRepository"
 
-const STORAGE_KEY = "siteline-admin-workspace-v1"
 const SESSION_KEY = "siteline-session-account"
 const NAV = [
   { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
@@ -103,88 +102,6 @@ const STATUS: Record<string, string> = {
   expired: "Expired assignment",
   deactivated: "Deactivated",
   archived: "Archived",
-}
-// Signed-out placeholder for Supabase mode: no seed data, only an in-memory
-// administrator stub so render-time lookups never fail. It is never persisted.
-function signedOutState(): State {
-  const seed = initialState()
-  return {
-    ...seed,
-    accounts: seed.accounts.filter((a) => a.role === "admin").slice(0, 1),
-    projects: [],
-    companies: [],
-    events: [],
-  }
-}
-function loadState(): State {
-  if (apiEnabled) return signedOutState()
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const saved = JSON.parse(raw)
-      if (
-        Array.isArray(saved.accounts) &&
-        Array.isArray(saved.projects) &&
-        Array.isArray(saved.companies) &&
-        saved.rules
-      )
-        return {
-          ...saved,
-          accounts: saved.accounts.map((account: Account) =>
-            account.status as string === "removed"
-              ? { ...account, status: "deactivated" as const }
-              : account,
-          ),
-          projects: saved.projects.map(
-            ({
-              clientSubconTrade: _removedClientSubconScope,
-              ...project
-            }: Record<string, unknown>) => project,
-          ),
-          companies: saved.companies.map(
-            ({
-              trade: _removedTrade,
-              workers: legacyWorkers = [],
-              excelQueue: _legacyQueue,
-              ...company
-            }: Record<string, unknown>) => {
-              const workers = Array.isArray(legacyWorkers)
-                ? legacyWorkers as Array<{
-                    status?: string
-                    projects?: string[]
-                  }>
-                : []
-              const activeProjectIds = [
-                ...new Set(workers.flatMap((worker) => worker.projects || [])),
-              ]
-              return {
-                ...company,
-                availability:
-                  company.availability ||
-                  (workers.some(
-                    (worker) =>
-                      worker.status === "active" &&
-                      !(worker.projects || []).length,
-                  )
-                    ? "available"
-                    : activeProjectIds.length
-                      ? "committed"
-                      : "limited"),
-                manpowerCount:
-                  typeof company.manpowerCount === "number"
-                    ? company.manpowerCount
-                    : workers.length,
-                activeProjectIds: company.activeProjectIds || activeProjectIds,
-                manpowerDocuments: company.manpowerDocuments || [],
-              }
-            },
-          ),
-        } as State
-    }
-  } catch {
-    /* A new local workspace remains usable when storage is unavailable. */
-  }
-  return initialState()
 }
 function Status({ status }: { status: string }) {
   return (
@@ -284,20 +201,19 @@ const ACCOUNT_UNAVAILABLE_MESSAGE =
 const INVALID_CREDENTIALS_MESSAGE =
   "The email or password you entered is incorrect."
 function AppInner() {
-  const [state, setState] = useState<State>(loadState)
+  const [state, setState] = useState<State>(emptyState)
   const [sessionId, setSessionId] = useState(() => {
     try {
-      return sessionStorage.getItem(SESSION_KEY) || "a1"
+      return sessionStorage.getItem(SESSION_KEY) || ""
     } catch {
-      return "a1"
+      return ""
     }
   })
   const stateRef = useRef(state)
   stateRef.current = state
   const actor =
     state.accounts.find((a) => a.id === sessionId) ||
-    state.accounts.find((a) => a.role === "admin") ||
-    state.accounts[0]
+    stubAccount("", "", "client")
   const [page, setPage] = useState("Dashboard")
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
@@ -322,7 +238,6 @@ function AppInner() {
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
   const [idleWarning, setIdleWarning] = useState(false)
-  const [storageError, setStorageError] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
   const [licenseFilter, setLicenseFilter] = useState("all")
@@ -358,57 +273,29 @@ function AppInner() {
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
   useEffect(() => {
-    let storedId: string | null = null
-    try {
-      storedId = sessionStorage.getItem(SESSION_KEY)
-    } catch {
-      /* No stored session; show sign-in. */
-    }
-    if (apiEnabled) {
-      const saved = tokenUser()
-      if (!saved) {
-        setCheckingSession(false)
-        return
-      }
-      api<Parameters<typeof startApiSession>[0]>("/auth/me")
-        .then(startApiSession)
-        .then((account) => {
-          setSessionId(account.id)
-          setSignedOut(false)
-        })
-        .catch(() => clearSession())
-        .finally(() => setCheckingSession(false))
+    if (!tokenUser()) {
+      setCheckingSession(false)
       return
     }
-    const account = sessionAccount(stateRef.current, storedId)
-    if (account) {
-      setSessionId(account.id)
-      setSignedOut(false)
-    } else {
-      clearSession()
-    }
-    setCheckingSession(false)
-  }, [])
-  useEffect(() => {
-    // With the API the server is the source of truth; nothing is kept in the browser.
-    if (apiEnabled) return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-      setStorageError(false)
-    } catch {
-      setStorageError(true)
-    }
-  }, [state])
-  useEffect(() => {
-    const tick = () =>
-      setState((current) => {
-        const next = processWorkflowTimers(current)
-        stateRef.current = next
-        return next
+    let cancelled = false
+    api<Parameters<typeof startApiSession>[0]>("/auth/me")
+      .then(startApiSession)
+      .then((account) => {
+        if (cancelled) return
+        setSessionId(account.id)
+        setSignedOut(false)
       })
-    tick()
-    const interval = setInterval(tick, 30000)
-    return () => clearInterval(interval)
+      .catch(() => {
+        if (cancelled) return
+        clearSession()
+        apiLogout()
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingSession(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
   useEffect(() => {
     if (!toast) return
@@ -549,20 +436,25 @@ function AppInner() {
     return account
   }
   async function signIn(email: string, password: string) {
+    let user: Awaited<ReturnType<typeof apiLogin>>
+    try {
+      user = await apiLogin(email, password)
+    } catch (error) {
+      throw new Error(
+        error instanceof ApiError &&
+          error.status !== 401 &&
+          error.status !== 400
+          ? error.message
+          : INVALID_CREDENTIALS_MESSAGE,
+      )
+    }
     let account: Account
-    if (apiEnabled) {
-      let user: Awaited<ReturnType<typeof apiLogin>>
-      try {
-        user = await apiLogin(email, password)
-      } catch (error) {
-        throw new Error(
-          error instanceof ApiError && error.status !== 401 && error.status !== 400
-            ? error.message
-            : INVALID_CREDENTIALS_MESSAGE,
-        )
-      }
+    try {
       account = await startApiSession(user)
-    } else account = authenticate(stateRef.current, email, password)
+    } catch (error) {
+      await apiLogout()
+      throw error
+    }
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
@@ -576,35 +468,15 @@ function AppInner() {
     } catch {
       /* The session remains in memory until the tab closes. */
     }
-    if (!apiEnabled)
-      setState((current) => ({
-      ...current,
-      events: [
-        {
-          id: uid(),
-          title: "Signed in",
-          detail: `${account.name} · ${ROLE_NAMES[account.role]}`,
-          type: "login",
-          date: new Date().toISOString(),
-          read: false,
-          actorId: account.id,
-          recipientIds: [account.id],
-          target: "Dashboard",
-        },
-        ...current.events,
-      ],
-    }))
   }
   function endSession() {
     clearSession()
     setSignedOut(true)
-    if (apiEnabled) {
-      // End the server session and drop the loaded data from memory.
-      apiLogout()
-      const empty = signedOutState()
-      stateRef.current = empty
-      setState(empty)
-    }
+    setSessionId("")
+    apiLogout()
+    const empty = emptyState()
+    stateRef.current = empty
+    setState(empty)
   }
   function sendWorkflow(command: WorkflowCommand) {
     if (signedOut)
@@ -762,6 +634,7 @@ function AppInner() {
   function startResignation(a: Account, letter: Doc, noticeDays: number) {
     if (signedOut || actor.role !== "admin")
       return "Reopen the Administrator session to continue."
+    if (apiEnabled) return API_READ_ONLY_MESSAGE
     try {
       const next = beginAccountResignation(
         stateRef.current,
@@ -787,8 +660,8 @@ function AppInner() {
     issueId: string,
     text: string,
   ) {
-    if (signedOut || actor.role !== "admin")
-      return "Sign in again to continue."
+    if (signedOut || actor.role !== "admin") return "Sign in again to continue."
+    if (apiEnabled) return API_READ_ONLY_MESSAGE
     try {
       const next = resolveClientSubconIssue(
         stateRef.current,
@@ -1363,7 +1236,7 @@ function AppInner() {
         <div className="dashboard-bottom-grid">
           <Panel
             title="Schedule performance"
-            subtitle="Planned versus actual project progress."
+            subtitle="Recorded project completion and progress history."
             actions={
               <Button
                 variant="text-button"
@@ -1374,7 +1247,7 @@ function AppInner() {
               </Button>
             }
           >
-            <Chart compact />
+            <Chart compact projects={active} />
           </Panel>
           <Panel
             title="Recent activity"
@@ -1538,25 +1411,24 @@ function AppInner() {
         <>
           {pageHeading(
             "Schedule performance",
-            "A shared perspective on planned and actual progress.",
+            "Recorded completion and progress history across projects.",
           )}
           <div className="notice">
             <Icon name="activity" />
             <p>
-              Schedule charts reconstruct the source’s seeded S-curve
-              calculations. They are illustrative, not connected to a live
-              schedule baseline. Actual project completion below comes from
-              workspace records.
+              Completion percentages and history come from project records.
+              Planned-versus-actual comparisons will appear when a saved
+              schedule baseline is available.
             </p>
           </div>
           <Panel
             title="Portfolio schedule"
-            subtitle={`${active.length} active projects · illustrative schedule`}
+            subtitle={`${active.length} active projects · recorded completion`}
           >
-            <Chart />
+            <Chart projects={active} />
           </Panel>
           <div className="schedule-cards">
-            {active.map((p, i) => (
+            {active.map((p) => (
               <Panel
                 key={p.id}
                 title={p.name}
@@ -1573,7 +1445,7 @@ function AppInner() {
                 <div className="schedule-timeline">
                   <PlannedTimeline project={p} />
                 </div>
-                <Chart compact seed={73 + i * 29} />
+                <Chart compact projects={[p]} />
               </Panel>
             ))}
           </div>
@@ -1774,87 +1646,87 @@ function AppInner() {
           </div>
           {subconTab !== "registered" && subconRequests(subconTab)}
           {subconTab === "registered" && (
-          <Panel
-            title="Registered companies"
-            subtitle={`${state.companies.filter((c) => c.status === "approved").length} approved subcontractors`}
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search company"
-              />
-            }
-          >
-            <div className="filter-bar">
-              <select
-                aria-label="Company availability"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              >
-                <option value="all">All availability</option>
-                <option value="available">Available</option>
-                <option value="busy">Fully committed</option>
-              </select>
-              <span>
-                Assignments remain project-level and are not managed here.
-              </span>
-            </div>
-            <div className="company-grid">
-              {visibleCompanies.map((c) => {
-                const projects = c.activeProjectIds.filter((projectId) =>
-                  state.projects.some(
-                    (project) =>
-                      project.id === projectId && project.status === "active",
-                  ),
-                )
-                return (
-                  <button
-                    key={c.id}
-                    className="company-card"
-                    onClick={() => setDialog({ kind: "company", id: c.id })}
-                  >
-                    <div className="company-top">
-                      <span className="company-monogram">
-                        {initials(c.name)}
-                      </span>
-                      <Badge
-                        tone={
-                          c.availability === "available" ? "green" : "amber"
-                        }
-                      >
-                        {c.availability}
-                      </Badge>
-                    </div>
-                    <h3>{c.name}</h3>
-                    <p>{c.email || "Company email not supplied"}</p>
-                    <div className="company-meta">
-                      <span>
-                        <Icon name="users" size={16} />
-                        {c.manpowerCount} available manpower
-                      </span>
-                      <span>
-                        <Icon name="building" size={16} />
-                        {projects.length} active project commitments
-                      </span>
-                    </div>
-                    <div className="coverage">
-                      <span>
-                        Manpower list documents
-                        <strong>{c.manpowerDocuments.length}</strong>
-                      </span>
-                    </div>
-                    <div className="card-bottom">
-                      <span>View company details</span>
-                      <Icon name="arrow" size={17} />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-            {!visibleCompanies.length && (
-              <Empty title="No companies match these filters" />
-            )}
-          </Panel>
+            <Panel
+              title="Registered companies"
+              subtitle={`${state.companies.filter((c) => c.status === "approved").length} approved subcontractors`}
+              actions={
+                <Search
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search company"
+                />
+              }
+            >
+              <div className="filter-bar">
+                <select
+                  aria-label="Company availability"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  <option value="all">All availability</option>
+                  <option value="available">Available</option>
+                  <option value="busy">Fully committed</option>
+                </select>
+                <span>
+                  Assignments remain project-level and are not managed here.
+                </span>
+              </div>
+              <div className="company-grid">
+                {visibleCompanies.map((c) => {
+                  const projects = c.activeProjectIds.filter((projectId) =>
+                    state.projects.some(
+                      (project) =>
+                        project.id === projectId && project.status === "active",
+                    ),
+                  )
+                  return (
+                    <button
+                      key={c.id}
+                      className="company-card"
+                      onClick={() => setDialog({ kind: "company", id: c.id })}
+                    >
+                      <div className="company-top">
+                        <span className="company-monogram">
+                          {initials(c.name)}
+                        </span>
+                        <Badge
+                          tone={
+                            c.availability === "available" ? "green" : "amber"
+                          }
+                        >
+                          {c.availability}
+                        </Badge>
+                      </div>
+                      <h3>{c.name}</h3>
+                      <p>{c.email || "Company email not supplied"}</p>
+                      <div className="company-meta">
+                        <span>
+                          <Icon name="users" size={16} />
+                          {c.manpowerCount} available manpower
+                        </span>
+                        <span>
+                          <Icon name="building" size={16} />
+                          {projects.length} active project commitments
+                        </span>
+                      </div>
+                      <div className="coverage">
+                        <span>
+                          Manpower list documents
+                          <strong>{c.manpowerDocuments.length}</strong>
+                        </span>
+                      </div>
+                      <div className="card-bottom">
+                        <span>View company details</span>
+                        <Icon name="arrow" size={17} />
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              {!visibleCompanies.length && (
+                <Empty title="No companies match these filters" />
+              )}
+            </Panel>
           )}
         </>
       )
@@ -2374,9 +2246,9 @@ function AppInner() {
             {p.status === "active" && (
               <section className="detail-section">
                 <h3>
-                  Schedule performance <Badge>Illustrative</Badge>
+                  Schedule performance <Badge>Recorded</Badge>
                 </h3>
-                <Chart compact />
+                <Chart compact projects={[p]} />
               </section>
             )}
           </>
@@ -2848,13 +2720,8 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signedOut || checkingSession)
-    return (
-      <LoginPage
-        checkingSession={checkingSession}
-        onSignIn={signIn}
-      />
-    )
+  if (signedOut || checkingSession || !actor.id)
+    return <LoginPage checkingSession={checkingSession} onSignIn={signIn} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (
@@ -2869,9 +2736,7 @@ function AppInner() {
         projects={views}
         onResolve={(projectId, documentId, kind) => {
           if (signedOut)
-            throw new Error(
-              "Sign in again before opening records.",
-            )
+            throw new Error("Sign in again before opening records.")
           return kind === "document"
             ? resolveClientDocument(
                 stateRef.current,
@@ -2888,9 +2753,7 @@ function AppInner() {
         }}
         onReport={(projectId) => {
           if (signedOut)
-            throw new Error(
-              "Sign in again before exporting records.",
-            )
+            throw new Error("Sign in again before exporting records.")
           return clientProgressReport(stateRef.current, actor.id, projectId)
         }}
         onRecord={(projectId, title, detail) => {
@@ -3192,12 +3055,6 @@ function AppInner() {
               })}
             </span>
           </div>
-          {storageError && (
-            <div className="error">
-              Browser storage is full or unavailable. Changes are only retained
-              in memory.
-            </div>
-          )}
           {renderPage()}
         </main>
       </div>
@@ -3599,7 +3456,7 @@ export default function App() {
       <AppInner />
       {apiEnabled && (
         <div className="api-mode-banner" role="status">
-          Live data from the server · view only
+          Database workspace · view only
         </div>
       )}
     </>

@@ -1,4 +1,4 @@
-import { initialState } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 import { activeSubcontractors, applyWorkflow } from "../src/workflows.ts"
 export const NOW = Date.parse("2026-10-14T08:00:00Z")
 export const currentProject = (state) =>

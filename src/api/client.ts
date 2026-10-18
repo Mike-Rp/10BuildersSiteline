@@ -1,11 +1,11 @@
-// Client for the Thesis-Backend (Express) API.
-//
-// VITE_API_URL points at it, e.g. http://localhost:3000/api/v1. When it is not
-// set the app keeps its local demo behaviour.
-let base = (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/+$/, "")
+// The backend is required. Missing configuration never enables demo data.
+let base = (
+  (import.meta.env?.VITE_API_URL as string | undefined)?.trim() ||
+  "http://localhost:3000/api/v1"
+).replace(/\/+$/, "")
 
-export const apiEnabled = Boolean(base)
-// For tests and scripts that run outside Vite.
+export const apiEnabled = true
+// Allows integration tests to point at their temporary backend.
 export const setApiBase = (url: string) => {
   base = url.replace(/\/+$/, "")
 }
@@ -38,20 +38,35 @@ export class ApiError extends Error {
   }
 }
 
-type Envelope<T> = { code?: number; message?: string; count?: number; data: T }
+type Envelope<T> = {
+  code?: number
+  message?: string
+  count?: number
+  data: T
+}
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
+async function request(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   if (!base) throw new ApiError("The API address is not configured.", 0)
   const headers = new Headers(init.headers)
   const token = getToken()
   if (token) headers.set("Authorization", `Bearer ${token}`)
-  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type"))
+  if (
+    init.body &&
+    !(init.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  )
     headers.set("Content-Type", "application/json")
   let response: Response
   try {
     response = await fetch(base + path, { ...init, headers })
   } catch {
-    throw new ApiError("Cannot reach the server. Check that the backend is running.", 0)
+    throw new ApiError(
+      "Cannot reach the server. Check that the backend is running.",
+      0,
+    )
   }
   if (response.status === 401 && token) setToken("")
   return response
@@ -66,7 +81,7 @@ export async function api<T = unknown>(
     ...rest,
     body: json === undefined ? rest.body : JSON.stringify(json),
   })
-  let body: (Envelope<T> & { error?: { message?: string } }) | undefined
+  let body: Envelope<T> & { error?: { message?: string } } | undefined
   try {
     body = await response.json()
   } catch {
@@ -74,14 +89,18 @@ export async function api<T = unknown>(
   }
   if (!response.ok)
     throw new ApiError(
-      body?.error?.message || body?.message || `Request failed (${response.status}).`,
+      body?.error?.message ||
+        body?.message ||
+        `Request failed (${response.status}).`,
       response.status,
     )
-  return (body?.data ?? (body as unknown)) as T
+  return (body?.data ?? body as unknown) as T
 }
 
 // Lists: asks for large pages and follows page numbers until the data repeats.
-export async function apiList<T = Record<string, any>>(path: string): Promise<T[]> {
+export async function apiList<T = Record<string, any>>(
+  path: string,
+): Promise<T[]> {
   const sep = path.includes("?") ? "&" : "?"
   const size = 100
   const out: T[] = []
@@ -126,7 +145,10 @@ export async function logout() {
 
 // Decodes the user id and role from the stored token (no verification: the
 // server checks every request).
-export function tokenUser(): { id: string; role: string } | undefined {
+export function tokenUser(): {
+  id: string
+  role: string
+} | undefined {
   const token = getToken()
   if (!token) return undefined
   try {
@@ -144,10 +166,15 @@ export function tokenUser(): { id: string; role: string } | undefined {
 
 // Authenticated file download (documents, photos).
 const fileUrls = new Map<string, string>()
-export const registerFileUrl = (docId: string, url: string | null | undefined) => {
+export const registerFileUrl = (
+  docId: string,
+  url: string | null | undefined,
+) => {
   if (url) fileUrls.set(docId, url)
 }
-export async function downloadApiFile(docId: string): Promise<Blob | undefined> {
+export async function downloadApiFile(
+  docId: string,
+): Promise<Blob | undefined> {
   const url = fileUrls.get(docId)
   if (!url) return undefined
   const path = url.replace(/^https?:\/\/[^/]+/, "").replace(/^\/api\/v1/, "")

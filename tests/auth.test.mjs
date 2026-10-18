@@ -4,11 +4,9 @@ import {
   ACCOUNT_UNAVAILABLE,
   INVALID_CREDENTIALS,
   LICENSE_EXPIRED,
-  authenticate,
-  sessionAccount,
 } from "../src/auth.ts"
-import { DUMMY_CREDENTIALS, DUMMY_USERNAMES } from "../src/dummy-data.ts"
-import { initialState } from "../src/model.ts"
+import { DUMMY_CREDENTIALS, DUMMY_USERNAMES } from "./fixtures/dummy-data.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 
 const withAccount = (state, id, change) => ({
   ...state,
@@ -22,8 +20,7 @@ test("every seeded account has dummy credentials and active ones sign in with th
     assert.ok(DUMMY_CREDENTIALS[account.id], `${account.id} has a password`)
     if (account.status !== "active") {
       assert.throws(
-        () =>
-          authenticate(state, account.email, DUMMY_CREDENTIALS[account.id]),
+        () => authenticate(state, account.email, DUMMY_CREDENTIALS[account.id]),
         { message: ACCOUNT_UNAVAILABLE },
       )
       continue
@@ -63,7 +60,12 @@ test("wrong password, unknown email and another account's password are rejected 
 })
 
 test("deactivated, suspended and invited accounts cannot sign in", () => {
-  for (const status of ["deactivated", "suspended", "invited", "pending-setup"]) {
+  for (const status of [
+    "deactivated",
+    "suspended",
+    "invited",
+    "pending-setup",
+  ]) {
     const state = withAccount(initialState(), "a4", { status })
     assert.throws(
       () => authenticate(state, emailOf(state, "a4"), DUMMY_CREDENTIALS.a4),
@@ -95,9 +97,16 @@ test("built-in usernames sign in as one account per role, case-insensitively", (
   const expected = { Admin: "admin", OPM: "opm", SPM: "spm", CLNT: "client" }
   for (const [username, role] of Object.entries(expected)) {
     for (const typed of [username, username.toLowerCase(), ` ${username} `]) {
-      const account = authenticate(state, typed, DUMMY_USERNAMES[username.toLowerCase()].password)
+      const account = authenticate(
+        state,
+        typed,
+        DUMMY_USERNAMES[username.toLowerCase()].password,
+      )
       assert.equal(account.role, role, typed)
-      assert.equal(account.id, DUMMY_USERNAMES[username.toLowerCase()].accountId)
+      assert.equal(
+        account.id,
+        DUMMY_USERNAMES[username.toLowerCase()].accountId,
+      )
     }
   }
 })
@@ -120,3 +129,5 @@ test("built-in usernames reject wrong passwords and inactive accounts", () => {
     message: ACCOUNT_UNAVAILABLE,
   })
 })
+
+import { authenticate, sessionAccount } from "./fixtures/local-auth.ts"

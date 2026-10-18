@@ -474,13 +474,12 @@ export default function ClientPortal({
         <div className="client-two-column">
           <Panel
             title="Schedule performance"
-            subtitle="Planned-versus-actual schedule curves."
+            subtitle="Recorded project completion and history."
           >
-            <Chart compact seed={73 + projects.indexOf(project) * 29} />
+            <Chart compact projects={[project]} />
             <p className="client-chart-disclaimer">
-              Schedule charts are source-supported illustrative data, not live
-              commitments. Recorded project completion is shown separately
-              above.
+              This chart shows recorded project progress. A schedule comparison
+              requires a saved planned baseline.
             </p>
           </Panel>
           <Panel
@@ -657,16 +656,15 @@ export default function ClientPortal({
           <div className="notice">
             <Icon name="activity" />
             <p>
-              These planned-versus-actual curves are for schedule tracking. They
-              do not change the recorded project progress of {project.progress}%
-              or authorize schedule commitments.
+              Recorded project completion is {project.progress}%. The history
+              below shows the progress entries available for this project.
             </p>
           </div>
           <Panel
             title={project.name}
             subtitle={`Current phase: ${project.phase} · Recorded completion: ${project.progress}%`}
           >
-            <Chart seed={73 + projects.indexOf(project) * 29} />
+            <Chart projects={[project]} />
           </Panel>
         </>
       )

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { initialState } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 import { projectDocumentIndex } from "../src/project-document-index.ts"
 import { workflowFor } from "../src/workflows.ts"
 

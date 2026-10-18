@@ -1,8 +1,13 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { initialState } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 import { officePmStage } from "../src/workflows.ts"
-import { activeFixture, currentProject, evidence, execute } from "./fixtures.mjs"
+import {
+  activeFixture,
+  currentProject,
+  evidence,
+  execute,
+} from "./fixtures.mjs"
 
 const stage = (state) => officePmStage(currentProject(state))
 const upload = (state, count) => {
@@ -60,6 +65,8 @@ test("a declined phase needs Office PM reassignment, and finished projects are n
 
   const active = officePmStage(currentProject(activeFixture()))
   assert.equal(active.kind, "complete")
-  const other = initialState().projects.find((p) => p.status === "changes_requested")
+  const other = initialState().projects.find(
+    (p) => p.status === "changes_requested",
+  )
   assert.equal(officePmStage(other).kind, "waiting")
 })

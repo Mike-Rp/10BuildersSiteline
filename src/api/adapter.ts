@@ -8,7 +8,7 @@
 //     project (phase team, Office PM) so those accounts are built from there.
 import {
   DOC_LABELS,
-  initialState,
+  emptyState,
   type Account,
   type ChecklistItem,
   type Company,
@@ -76,13 +76,13 @@ export function mapAccount(
   const role = a.role as Role
   const scope =
     role === "client"
-      ? ((a.scope as string[]) || [])
+      ? (a.scope as string[] || [])
           .map((name) => projectIdsByName.get(String(name).toLowerCase()))
           .filter((id): id is string => Boolean(id))
-      : ((detail?.scope?.disciplines as string[]) ?? (a.scope as string[]) ?? [])
+      : (detail?.scope?.disciplines as string[] ?? a.scope as string[] ?? [])
   const types =
     role === "opm"
-      ? ((detail?.scope?.project_types as string[]) ?? (a.scope as string[]) ?? [])
+      ? (detail?.scope?.project_types as string[] ?? a.scope as string[] ?? [])
       : []
   const license = detail?.license
   const account: Account = {
@@ -99,7 +99,8 @@ export function mapAccount(
     expiry: day(license?.license_expiry),
     docs: [],
   }
-  if (detail?.certifications?.length) account.certifications = detail.certifications
+  if (detail?.certifications?.length)
+    account.certifications = detail.certifications
   return account
 }
 
@@ -121,7 +122,11 @@ export const stubAccount = (id: string, name: string, role: Role): Account => ({
 
 // ---------------------------------------------------------------- documents
 
-export function mapDocs(projectId: string, rows: Dto[], register: (id: string, url?: string) => void): Doc[] {
+export function mapDocs(
+  projectId: string,
+  rows: Dto[],
+  register: (id: string, url?: string) => void,
+): Doc[] {
   return DOC_CODES.map((code, i) => {
     const row = rows.find((r) => r.code === code)
     const id = row?.id || `${projectId}:doc:${i}`
@@ -140,7 +145,10 @@ export function mapDocs(projectId: string, rows: Dto[], register: (id: string, u
   })
 }
 
-export function mapPhoto(row: Dto, register: (id: string, url?: string) => void): Doc {
+export function mapPhoto(
+  row: Dto,
+  register: (id: string, url?: string) => void,
+): Doc {
   register(row.id, row.download_url)
   return {
     id: row.id,
@@ -197,7 +205,9 @@ export function mapProject(parts: ProjectParts): Project {
       phase: h.stage_code,
       issue: Boolean(h.is_issue),
     }))
-  const clientAgreement = parts.contracts.find((c) => c.contract_type === "client_subcon_agreement")
+  const clientAgreement = parts.contracts.find(
+    (c) => c.contract_type === "client_subcon_agreement",
+  )
 
   const checklist: ProjectWorkflow["checklist"] = {}
   const items: Dto[] = parts.overview?.checklist?.items || []
@@ -206,7 +216,12 @@ export function mapProject(parts: ProjectParts): Project {
       (i): ChecklistItem => ({
         id: String(i.id),
         label: i.title,
-        status: i.status === "approved" ? "approved" : i.status === "pending" || i.status === "submitted" ? "submitted" : "missing",
+        status:
+          i.status === "approved"
+            ? "approved"
+            : i.status === "pending" || i.status === "submitted"
+              ? "submitted"
+              : "missing",
         version: 0,
         submittedAt: i.submitted_at ? iso(i.submitted_at) : undefined,
         reviewedAt: i.reviewed_at ? iso(i.reviewed_at) : undefined,
@@ -251,7 +266,10 @@ export function mapProject(parts: ProjectParts): Project {
     name: list.name,
     type: list.project_type,
     area: formatArea(list.floor_area_sqm),
-    floors: list.floor_count === null || list.floor_count === undefined ? "" : String(list.floor_count),
+    floors:
+      list.floor_count === null || list.floor_count === undefined
+        ? ""
+        : String(list.floor_count),
     start: day(list.target_start_date),
     clientId: parts.clientId,
     status,
@@ -259,8 +277,13 @@ export function mapProject(parts: ProjectParts): Project {
     team,
     phase: list.current_stage || team[0]?.phase || "Mobilization",
     // The backend derives % from approved checklist items; an archived project is finished.
-    progress: list.lifecycle_status === "archived" ? 100 : Number(list.current_pct ?? 0),
-    opmAccepted: ["spm_review", "active", "archived"].includes(list.lifecycle_status),
+    progress:
+      list.lifecycle_status === "archived"
+        ? 100
+        : Number(list.current_pct ?? 0),
+    opmAccepted: ["spm_review", "active", "archived"].includes(
+      list.lifecycle_status,
+    ),
     docs,
     created: day(list.created_at),
     location: "",
@@ -269,20 +292,26 @@ export function mapProject(parts: ProjectParts): Project {
     history,
     workflow,
   }
-  if (clientAgreement?.subcontractor_name) project.clientSubcon = clientAgreement.subcontractor_name
-  if (list.lifecycle_status === "archived") project.workflow!.completedAt = iso(list.archived_at || list.updated_at)
+  if (clientAgreement?.subcontractor_name)
+    project.clientSubcon = clientAgreement.subcontractor_name
+  if (list.lifecycle_status === "archived")
+    project.workflow!.completedAt = iso(list.archived_at || list.updated_at)
   return project
 }
 
 // ---------------------------------------------------------------- companies
 
-export function mapCompany(s: Dto, projectIdsByName: Map<string, string> = new Map()): Company {
+export function mapCompany(
+  s: Dto,
+  projectIdsByName: Map<string, string> = new Map(),
+): Company {
   const assigned: unknown[] = s.assigned_projects || []
   const activeProjectIds = assigned
     .map((a) =>
       typeof a === "string"
         ? projectIdsByName.get(a.toLowerCase()) || a
-        : (a as Dto)?.id || projectIdsByName.get(String((a as Dto)?.name || "").toLowerCase()),
+        : (a as Dto)?.id ||
+          projectIdsByName.get(String((a as Dto)?.name || "").toLowerCase()),
     )
     .filter((x): x is string => Boolean(x))
   const person = s.contact_person
@@ -292,10 +321,17 @@ export function mapCompany(s: Dto, projectIdsByName: Map<string, string> = new M
     contact: typeof person === "string" ? person : person?.name || "",
     phone: s.contact_phone || "",
     email: s.contact_email || "",
-    status: s.directory_status === "declined" ? "rejected" : s.directory_status === "pending" ? "pending" : "approved",
+    status:
+      s.directory_status === "declined"
+        ? "rejected"
+        : s.directory_status === "pending"
+          ? "pending"
+          : "approved",
     submittedBy: "",
     projectId: "",
-    availability: ["available", "limited", "committed"].includes(s.availability) ? s.availability : "available",
+    availability: ["available", "limited", "committed"].includes(s.availability)
+      ? s.availability
+      : "available",
     manpowerCount: Number(s.crew_count ?? 0),
     activeProjectIds,
     manpowerDocuments: [],
@@ -326,7 +362,10 @@ export function mapEvent(n: Dto, recipientId?: string): Event {
 // -------------------------------------------------------------------- state
 
 export type LoadedData = {
-  me: { id: string; role: Role }
+  me: {
+    id: string
+    role: Role
+  }
   accounts: Account[]
   projects: Project[]
   companies: Company[]
@@ -334,13 +373,13 @@ export type LoadedData = {
 }
 
 export function buildState(data: LoadedData): State {
-  const seed = initialState()
+  const defaults = emptyState()
   return {
     accounts: data.accounts,
     projects: data.projects,
     companies: data.companies,
     events: data.events.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)),
-    rules: seed.rules,
+    rules: defaults.rules,
     muted: [],
   }
 }
@@ -352,7 +391,10 @@ export function peopleFromProjects(
   list: Dto[],
   details: Map<string, Dto>,
   existing: Account[] = [],
-): { accounts: Account[]; clientIds: Map<string, string> } {
+): {
+  accounts: Account[]
+  clientIds: Map<string, string>
+} {
   const byId = new Map<string, Account>(existing.map((a) => [a.id, a]))
   const clientIds = new Map<string, string>()
   const add = (a: Account) => {
@@ -361,18 +403,32 @@ export function peopleFromProjects(
   add(me)
   for (const p of list) {
     const detail = details.get(p.id) || {}
-    for (const t of detail.phase_team || []) add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
+    for (const t of detail.phase_team || [])
+      add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
     if (detail.opm_assignment?.target_user_id)
-      add(stubAccount(detail.opm_assignment.target_user_id, detail.opm_assignment.name, "opm"))
-    else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id)) add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
+      add(
+        stubAccount(
+          detail.opm_assignment.target_user_id,
+          detail.opm_assignment.name,
+          "opm",
+        ),
+      )
+    else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id))
+      add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
     const clientName: string = p.client_name || ""
     const known = [...byId.values()].find(
-      (a) => a.role === "client" && a.name.toLowerCase() === clientName.toLowerCase(),
+      (a) =>
+        a.role === "client" &&
+        a.name.toLowerCase() === clientName.toLowerCase(),
     )
     if (known) clientIds.set(p.id, known.id)
     else if (me.role === "client") clientIds.set(p.id, me.id)
     else if (clientName) {
-      const stub = stubAccount(`client:${clientName.toLowerCase()}`, clientName, "client")
+      const stub = stubAccount(
+        `client:${clientName.toLowerCase()}`,
+        clientName,
+        "client",
+      )
       add(stub)
       clientIds.set(p.id, stub.id)
     }

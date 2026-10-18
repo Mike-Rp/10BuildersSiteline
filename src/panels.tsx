@@ -1,3 +1,4 @@
+import { recordedProgress, type ProgressProject } from "./progress"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
 import { apiEnabled, downloadApiFile } from "./api/client"
@@ -18,7 +19,6 @@ import {
   projectPhaseNames,
   projectDocs,
   ROLE_NAMES,
-  scheduleSeries,
   spmCandidates,
   today,
   uid,
@@ -312,7 +312,7 @@ export function DocumentList({
 export function Preview({
   doc,
   onClose,
-  viewer = "Patricia N. Domingo",
+  viewer = "Signed-in user",
   downloadable = true,
   onDownload,
 }: {
@@ -414,145 +414,126 @@ export function Preview({
 }
 export function Chart({
   compact = false,
-  seed = 73,
+  projects = [],
 }: {
   compact?: boolean
-  seed?: number
+  projects?: ProgressProject[]
 }) {
-  const series = scheduleSeries(seed)
-  const chartRef = useRef<HTMLDivElement>(null)
-  const [chartWidth, setChartWidth] = useState(560)
-  useEffect(() => {
-    const node = chartRef.current
-    if (!node) return
-    const measure = () =>
-      setChartWidth(
-        Math.max(200, Math.floor(node.getBoundingClientRect().width)),
-      )
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-  const left = 46
-  const right = chartWidth - 22
-  const x = (index: number) =>
-    left + (index * (right - left)) / (series.length - 1)
-  const last = series.at(-1)!
-  const variance = last.actual - last.planned
-  const planned = series
-    .map((p, i) => `${x(i)},${205 - p.planned * 1.8}`)
+  if (!projects.length)
+    return (
+      <Empty title="No project progress yet">
+        Recorded progress will appear when projects are available.
+      </Empty>
+    )
+  const project = projects.length === 1 ? projects[0] : undefined
+  const series = project ? recordedProgress(project) : []
+  const average =
+    projects.reduce((sum, item) => sum + item.progress, 0) / projects.length
+  const left = 46,
+    right = 538
+  const start = series[0]?.time ?? 0
+  const span = (series.at(-1)?.time ?? start) - start
+  const x = (time: number) =>
+    span ? left + ((time - start) / span) * (right - left) : (left + right) / 2
+  const points = series
+    .map((row) => `${x(row.time)},${205 - row.progress * 1.8}`)
     .join(" ")
-  const actual = series
-    .map((p, i) => `${x(i)},${205 - p.actual * 1.8}`)
-    .join(" ")
+  const visible = compact ? projects.slice(0, 5) : projects
   return (
     <div className={`schedule ${compact ? "compact" : ""}`}>
       <div className="chart-summary">
         <div>
-          <span>Cumulative progress</span>
+          <span>{project ? project.name : "Average recorded completion"}</span>
           <strong>
-            {last.actual.toFixed(1)}
+            {average.toFixed(1)}
             <small>%</small>
           </strong>
         </div>
-        <div className="legend">
-          <span>
-            <i />
-            Planned
-          </span>
-          <span>
-            <i />
-            Actual
-          </span>
-        </div>
+        <span>Recorded progress</span>
       </div>
-      <div ref={chartRef} className="schedule-plot">
-        <svg
-          className="schedule-svg"
-          viewBox={`0 0 ${chartWidth} 245`}
-          preserveAspectRatio="none"
-          role="img"
-          aria-label="Illustrative planned and actual cumulative progress from March to August"
-        >
-          {[0, 25, 50, 75, 100].map((p) => (
-            <g key={p}>
-              <line
-                x1={left}
-                x2={right}
-                y1={205 - p * 1.8}
-                y2={205 - p * 1.8}
-                className="chart-grid-line"
-                strokeDasharray="4 5"
-              />
-              <text x="30" y={210 - p * 1.8} textAnchor="end">
-                {p}%
-              </text>
-            </g>
-          ))}
-          <polygon
-            points={`${left},205 ${actual} ${right},205`}
-            className="chart-actual-area"
-          />
-          <polyline
-            points={planned}
-            fill="none"
-            className="chart-planned-line"
-            strokeWidth="2"
-            strokeDasharray="5 5"
-          />
-          <polyline
-            points={actual}
-            fill="none"
-            className="chart-actual-line"
-            strokeWidth="2.8"
-            strokeLinejoin="round"
-          />
-          <circle
-            cx={right}
-            cy={205 - last.actual * 1.8}
-            r="4"
-            className="chart-actual-point"
-          />
-          {["Mar", "Apr", "May", "Jun", "Jul", "Aug"].map((m, i) => (
-            <text
-              key={m}
-              x={left + (i * (right - left)) / 5}
-              y="237"
-              textAnchor={i === 0 ? "start" : i === 5 ? "end" : "middle"}
+      {project ? (
+        series.length ? (
+          <div className="schedule-plot">
+            <svg
+              className="schedule-svg"
+              viewBox="0 0 560 245"
+              role="img"
+              aria-label={`Recorded progress history for ${project.name}`}
             >
-              {m}
-            </text>
-          ))}
-        </svg>
-      </div>
-      <div className="chart-footer">
-        <span>
-          <i className="status-dot warning" />
-          {Math.abs(variance).toFixed(1)} percentage points{" "}
-          {variance < 0 ? "behind" : "ahead"} of plan
-        </span>
-        <small>Illustrative schedule data</small>
-      </div>
-      {!compact && (
+              {[0, 25, 50, 75, 100].map((value) => (
+                <g key={value}>
+                  <line
+                    x1={left}
+                    x2={right}
+                    y1={205 - value * 1.8}
+                    y2={205 - value * 1.8}
+                    className="chart-grid-line"
+                    strokeDasharray="4 5"
+                  />
+                  <text x="30" y={210 - value * 1.8} textAnchor="end">
+                    {value}%
+                  </text>
+                </g>
+              ))}
+              <polyline
+                points={points}
+                fill="none"
+                className="chart-actual-line"
+                strokeWidth="2.8"
+                strokeLinejoin="round"
+              />
+              {series.map((row, index) => (
+                <circle
+                  key={index}
+                  cx={x(row.time)}
+                  cy={205 - row.progress * 1.8}
+                  r="4"
+                  className="chart-actual-point"
+                >
+                  <title>
+                    {dateLabel(row.date)}: {row.progress}%
+                  </title>
+                </circle>
+              ))}
+              <text x={left} y="237" textAnchor="start">
+                {dateLabel(series[0].date)}
+              </text>
+              {span > 0 && (
+                <text x={right} y="237" textAnchor="end">
+                  {dateLabel(series.at(-1)!.date)}
+                </text>
+              )}
+            </svg>
+          </div>
+        ) : (
+          <Empty title="No progress history yet">
+            Recorded completion is shown above. History will appear when
+            progress updates are recorded.
+          </Empty>
+        )
+      ) : (
         <div className="daily-chart">
-          <h4>Today's progress</h4>
-          <div className="daily-bar">
-            <span>Planned</span>
-            <progress max={10} value={last.plannedDaily} />
-            <strong>{last.plannedDaily.toFixed(2)}%</strong>
-          </div>
-          <div className="daily-bar">
-            <span>Actual</span>
-            <progress max={10} value={last.actualDaily} />
-            <strong>{last.actualDaily.toFixed(2)}%</strong>
-          </div>
-          <p>
-            Planned-versus-actual curves support schedule tracking. These
-            figures are not live project measurements.
-          </p>
+          {visible.map((item) => (
+            <div className="daily-bar" key={item.id}>
+              <span>{item.name}</span>
+              <progress
+                max={100}
+                value={item.progress}
+                aria-label={`${item.name} recorded completion`}
+              />
+              <strong>{item.progress}%</strong>
+            </div>
+          ))}
+          {visible.length < projects.length && (
+            <p>
+              Showing {visible.length} of {projects.length} projects.
+            </p>
+          )}
         </div>
       )}
+      <div className="chart-footer">
+        <small>Recorded completion and history from project records.</small>
+      </div>
     </div>
   )
 }
@@ -1174,7 +1155,7 @@ export function IntakeForm({
                 required
                 value={draft.name}
                 onChange={(e) => patch({ name: e.target.value })}
-                placeholder="e.g. Alden Heights Residences — Tower B"
+                placeholder="e.g. Residential development"
                 disabled={!!project}
               />
             </Field>

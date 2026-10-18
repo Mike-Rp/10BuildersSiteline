@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { DOC_LABELS, initialState } from "../src/model.ts"
+import { DOC_LABELS } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 import { applyWorkflow, workflowFor } from "../src/workflows.ts"
 import {
   clientProjectViews,

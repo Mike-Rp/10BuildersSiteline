@@ -5,7 +5,6 @@ import {
   clientForEmail,
   eligible,
   headcount,
-  initialState,
   licenseState,
   opmCandidates,
   phaseDefinitions,
@@ -16,6 +15,7 @@ import {
   validateFile,
   workload,
 } from "../src/model.ts"
+import { initialState } from "./fixtures/demo-state.ts"
 import {
   activeAssignmentsForAccount,
   beginAccountResignation,

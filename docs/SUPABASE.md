@@ -21,7 +21,7 @@ React app (this repo)  ──/api/v1──▶  Thesis-Backend (Express)  ──P
    for host/port, then `DB_USER=postgres.<project-ref>`, `DB_NAME=postgres`, `DB_PASSWORD=<database password>`, `PGSSLMODE=no-verify`,
    `JWT_SECRET=<32+ random characters>`, and `CORS_ORIGINS` for production. Start it: `npm start` (port 3000).
 4. **Frontend `.env.local`:** `VITE_API_URL=http://localhost:3000/api/v1`, then run Vite (`./node_modules/.bin/vite`, or `pnpm dev`
-   after `pnpm approve-builds`). Without `VITE_API_URL` the app runs as the original local demo.
+   after `pnpm approve-builds`). The backend is required. If `VITE_API_URL` is unset, the app calls `http://localhost:3000/api/v1`. It never loads JavaScript demo records or a cached browser workspace.
 
 | Role | Demo login |
 |---|---|
@@ -30,11 +30,15 @@ React app (this repo)  ──/api/v1──▶  Thesis-Backend (Express)  ──P
 | Site PM | `karlo.espiritu@`, `rafael.mercado@`, `mikaela.bautista@`, `diego.salvador@`, `bea.concepcion@10builders.com` (`jomar.reyes@` is suspended) |
 | Client | `f.uy@aldenheights-hoa.com`, `maria.santos@rosariabiz.ph` |
 
+## Database-only frontend
+
+Accounts, projects, companies and activity come through the Express API. Browser workspace snapshots and built-in demo logins are no longer used. Demo records and local authentication helpers live under `tests/fixtures/` only. An unavailable backend produces a sign-in error; an empty database produces empty views. Charts show recorded completion/history without generating sample curves. UI labels, phase definitions and default rule settings remain configuration in code; the backend has no table for those rule settings.
+
 ## What works now (view-only)
 Sign-in through `/auth/login`, session restore, and loading everything each role may see: accounts (admin) with licenses and
 disciplines, projects with team, documents (downloadable), progress history, photos, notes, checklist, pending update,
 subcontractor companies and notifications. Names for non-admin roles come from the projects. Progress is the backend's:
-approved checklist items ÷ required items. A banner shows "Live data from the server · view only".
+approved checklist items ÷ required items. A banner shows "Database workspace · view only".
 
 ## Not done yet
 **Saving.** Every action that changes data (accept an intake, upload a document, submit progress, add an account…) is blocked
@@ -48,3 +52,6 @@ Also missing: the Admin rule settings (grace/cap/response/idle) have no backend 
 - `pnpm test` — unit tests plus `tests/api-backend.test.mjs`, which starts an in-process Postgres with this schema and the demo data,
   runs the real backend, and loads state for every role through the frontend's own client.
 - `pnpm test:ui` — opens the real app in jsdom, signs in as each role and visits every page (needs the sibling backend folder).
+
+## Larger test dataset
+See [BULK-TEST-DATA.md](BULK-TEST-DATA.md) for the separate seed with 5,000 workers, 5 companies, 50 admins, 120 OPMs, 120 SPMs, and 50 connected projects.
