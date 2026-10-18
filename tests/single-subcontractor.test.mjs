@@ -198,3 +198,46 @@ test("a leftover un-actioned suggestion does not block consent or activation", (
   )
   assert.equal(currentProject(state).status, "active")
 })
+
+test("Office PM and client have no allocation authority: every allocation command is rejected", () => {
+  let state = teamReady()
+  const [first, second] = approved(state)
+  state = contact(state, first)
+  const snapshot = JSON.stringify(state)
+  for (const actor of ["a2", "a9"]) {
+    for (const command of [
+      { type: "select_company", companyId: second },
+      { type: "contact_company", companyId: second },
+      { type: "respond_company", companyId: first, accepted: true },
+      { type: "replace_company", companyId: first, replacementCompanyId: second },
+      { type: "archive_company", companyId: first },
+    ])
+      assert.throws(() => execute(state, actor, command), /./, `${actor} ${command.type}`)
+  }
+  assert.equal(JSON.stringify(state), snapshot)
+})
+
+test("the Lead can choose only Admin-verified companies; unverified ones only go through request_company", () => {
+  const state = teamReady()
+  const pending = state.companies.find((c) => c.status === "pending").id
+  assert.ok(pending)
+  assert.ok(!approved(state).includes(pending))
+  assert.throws(() => contact(state, pending), /approved/)
+  assert.throws(
+    () => execute(state, "a4", { type: "select_company", companyId: pending }),
+    /approved/,
+  )
+})
+
+test("the Office PM allocation view is read-only: the component renders no actions", async () => {
+  const { readFileSync } = await import("node:fs")
+  const src = readFileSync(
+    new URL("../src/LeadSubcontractorPanel.tsx", import.meta.url),
+    "utf8",
+  ).replace(/\r\n/g, "\n")
+  const start = src.indexOf("export function SubcontractorAllocationReadOnly")
+  const end = src.indexOf("export default function LeadSubcontractorPanel")
+  assert.ok(start > 0 && end > start)
+  const body = src.slice(start, end)
+  assert.doesNotMatch(body, /<Button|onClick|onAction|command\(/)
+})
