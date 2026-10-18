@@ -8,6 +8,7 @@ import {
 } from "react"
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
 import { apiEnabled, downloadApiFile } from "./api/client"
+import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import {
   accountError,
   clientForEmail,
@@ -143,6 +144,28 @@ export function Upload({
   const [preview, setPreview] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+  // Browsers that ignore "#toolbar=0" (Firefox, Safari, mobile) get page 1 as an image.
+  const isPdf =
+    !!file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name))
+  const needsFallback = isPdf && !canHideNativePdfToolbar(navigator)
+  const [pageImage, setPageImage] = useState("")
+  const [pageFailed, setPageFailed] = useState(false)
+  useEffect(() => {
+    setPageImage("")
+    setPageFailed(false)
+    if (!needsFallback || !preview) return
+    let cancelled = false
+    renderPdfFirstPage(preview)
+      .then((src) => {
+        if (!cancelled) setPageImage(src)
+      })
+      .catch(() => {
+        if (!cancelled) setPageFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [needsFallback, preview])
   function clear() {
     if (preview) URL.revokeObjectURL(preview)
     setFile(undefined)
@@ -222,11 +245,33 @@ export function Upload({
               src={preview}
               alt="Selected document"
             />
+          ) : needsFallback ? (
+            <div
+              className="pdf-preview"
+              style={{ overflow: "auto" }}
+              role="group"
+              aria-label="Document preview"
+            >
+              {pageImage ? (
+                <img
+                  src={pageImage}
+                  alt="First page of the selected document"
+                  style={{ width: "100%", display: "block" }}
+                />
+              ) : (
+                <p>
+                  {pageFailed
+                    ? "Preview unavailable. You can still confirm this file."
+                    : "Loading preview…"}
+                </p>
+              )}
+            </div>
           ) : (
             <object
               className="pdf-preview"
-              data={preview}
+              data={`${preview}#toolbar=0&navpanes=0&scrollbar=1`}
               type="application/pdf"
+              aria-label="Document preview"
             >
               <p>Preview unavailable. You can still confirm this file.</p>
             </object>
