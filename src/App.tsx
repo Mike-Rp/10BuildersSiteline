@@ -59,6 +59,7 @@ import {
   today,
   uid,
   workload,
+  projectDateErrors,
   type Account,
   type Company,
   type Doc,
@@ -655,6 +656,12 @@ function AppInner() {
     if (pass) setCredentials({ name: a.name, password: pass })
   }
   function addProject(p: Project) {
+    // Backstop for the intake form: new projects need realistic dates based on today.
+    const isNew = !state.projects.some((x) => x.id === p.id)
+    if (isNew) {
+      const dateErrs = projectDateErrors(p.start, p.end || "")
+      if (dateErrs.start || dateErrs.end || !p.start || !p.end) return
+    }
     commit(
       (s) => ({
         ...s,

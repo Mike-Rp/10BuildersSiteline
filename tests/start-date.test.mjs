@@ -1,27 +1,73 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { latestStartDate, localToday, startDateError } from "../src/model.ts"
+import {
+  DATE_ERRORS,
+  addDays,
+  latestProjectDate,
+  localToday,
+  projectDateErrors,
+  startsInLabel,
+} from "../src/model.ts"
 
-const shift = (days) => {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  const p = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
+// Local "now" late evening in a UTC+8 zone would be the previous day in UTC.
+const lateLocal = new Date(2026, 9, 18, 23, 30)
+const NOW = new Date(2026, 9, 18, 12, 0)
 
-test("start date accepts today and future dates only", () => {
-  assert.equal(startDateError(""), "")
-  assert.equal(startDateError(localToday()), "")
-  assert.equal(startDateError(shift(30)), "")
-  assert.match(startDateError(shift(-1)), /past/)
-  assert.match(startDateError("2020-01-01"), /past/)
+test("today is the LOCAL calendar date, not the UTC date", () => {
+  assert.equal(localToday(lateLocal), "2026-10-18")
+  assert.equal(localToday(NOW), "2026-10-18")
 })
 
-test("start date rejects impossible calendar dates and absurd years", () => {
-  assert.match(startDateError("2027-02-30"), /valid date/)
-  assert.match(startDateError("2027-13-01"), /valid date/)
-  assert.match(startDateError("garbage"), /valid date/)
-  assert.match(startDateError("99999-01-01"), /valid date/)
-  assert.match(startDateError("9999-01-01"), /years/)
-  assert.equal(startDateError(latestStartDate()), "")
+test("start date must be today or later and within 10 years", () => {
+  assert.deepEqual(projectDateErrors("", "", NOW), {})
+  assert.deepEqual(projectDateErrors("2026-10-18", "", NOW), {})
+  assert.deepEqual(projectDateErrors("2027-03-01", "", NOW), {})
+  assert.equal(
+    projectDateErrors("2026-10-17", "", NOW).start,
+    DATE_ERRORS.startPast,
+  )
+  assert.equal(
+    projectDateErrors("2025-01-01", "", NOW).start,
+    DATE_ERRORS.startPast,
+  )
+  assert.equal(latestProjectDate(NOW), "2036-10-18")
+  assert.deepEqual(projectDateErrors("2036-10-18", "", NOW), {})
+  assert.equal(
+    projectDateErrors("2036-10-19", "", NOW).start,
+    DATE_ERRORS.tooFar,
+  )
+})
+
+test("invalid, incomplete and 5-digit-year dates are rejected", () => {
+  for (const bad of ["2027-02-30", "2027-13-01", "garbage", "12345-01-01"]) {
+    assert.equal(projectDateErrors(bad, "", NOW).start, DATE_ERRORS.invalid)
+    assert.equal(
+      projectDateErrors("2026-10-18", bad, NOW).end,
+      DATE_ERRORS.invalid,
+    )
+  }
+})
+
+test("end date must be at least one day after the start date", () => {
+  assert.deepEqual(projectDateErrors("2026-10-18", "2026-10-19", NOW), {})
+  assert.equal(
+    projectDateErrors("2026-10-18", "2026-10-18", NOW).end,
+    DATE_ERRORS.endNotAfter,
+  )
+  assert.equal(
+    projectDateErrors("2026-11-01", "2026-10-20", NOW).end,
+    DATE_ERRORS.endNotAfter,
+  )
+  assert.equal(
+    projectDateErrors("2026-10-18", "2036-10-19", NOW).end,
+    DATE_ERRORS.tooFar,
+  )
+})
+
+test("helpers: addDays and starts-in label", () => {
+  assert.equal(addDays("2026-10-18", 1), "2026-10-19")
+  assert.equal(addDays("2026-12-31", 1), "2027-01-01")
+  assert.equal(startsInLabel("2026-10-18", NOW), "Starts today")
+  assert.equal(startsInLabel("2026-10-19", NOW), "Starts in 1 day")
+  assert.equal(startsInLabel("2026-10-28", NOW), "Starts in 10 days")
 })
