@@ -1,12 +1,13 @@
 import { DUMMY_CREDENTIALS, DUMMY_USERNAMES } from "./dummy-data.ts"
 import { licenseState, type Account, type State } from "./model.ts"
+import { SIGN_IN_MESSAGES } from "./signInPolicy.ts"
 
 // Local sign-in until a real authentication service exists. The role always
 // comes from the matched account record; callers cannot choose it.
-export const INVALID_CREDENTIALS =
-  "The email or password you entered is incorrect."
-export const ACCOUNT_UNAVAILABLE =
-  "This account is not active. Contact your Administrator."
+// Unknown email and wrong password share one message; the inactive message is
+// only reachable after the password has been verified.
+export const INVALID_CREDENTIALS = SIGN_IN_MESSAGES.mismatch
+export const ACCOUNT_UNAVAILABLE = SIGN_IN_MESSAGES.inactive
 export const LICENSE_EXPIRED =
   "Your professional license grace period has ended. Contact your Administrator."
 

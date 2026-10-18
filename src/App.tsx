@@ -2,6 +2,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import {
+  SIGN_IN_MESSAGES,
+  guardedSignIn,
+  localAttemptStore,
+} from "./signInPolicy"
 import { assertCanSignIn, authenticate, sessionAccount } from "./auth"
 import {
   api,
@@ -277,10 +282,9 @@ function Search({
 }
 const API_READ_ONLY_MESSAGE =
   "Connected to the server in view-only mode. Saving changes is not available yet."
-const ACCOUNT_UNAVAILABLE_MESSAGE =
-  "This account is not active. Contact your Administrator."
-const INVALID_CREDENTIALS_MESSAGE =
-  "The email or password you entered is incorrect."
+const ACCOUNT_UNAVAILABLE_MESSAGE = SIGN_IN_MESSAGES.inactive
+const INVALID_CREDENTIALS_MESSAGE = SIGN_IN_MESSAGES.mismatch
+const signInAttempts = localAttemptStore()
 function AppInner() {
   const [state, setState] = useState<State>(loadState)
   const [sessionId, setSessionId] = useState(() => {
@@ -564,20 +568,25 @@ function AppInner() {
     return account
   }
   async function signIn(email: string, password: string) {
-    let account: Account
-    if (apiEnabled) {
-      let user: Awaited<ReturnType<typeof apiLogin>>
-      try {
-        user = await apiLogin(email, password)
-      } catch (error) {
-        throw new Error(
-          error instanceof ApiError && error.status !== 401 && error.status !== 400
-            ? error.message
-            : INVALID_CREDENTIALS_MESSAGE,
-        )
-      }
-      account = await startApiSession(user)
-    } else account = authenticate(stateRef.current, email, password)
+    // Temporary browser-local lockout: 5 mismatches for one email block it for 5 minutes.
+    const account: Account = await guardedSignIn(
+      signInAttempts,
+      email,
+      async () => {
+        if (!apiEnabled) return authenticate(stateRef.current, email, password)
+        let user: Awaited<ReturnType<typeof apiLogin>>
+        try {
+          user = await apiLogin(email, password)
+        } catch (error) {
+          throw new Error(
+            error instanceof ApiError && error.status !== 401 && error.status !== 400
+              ? error.message
+              : INVALID_CREDENTIALS_MESSAGE,
+          )
+        }
+        return startApiSession(user)
+      },
+    )
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)

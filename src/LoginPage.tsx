@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Button, Field, Icon } from "./ui"
+import { SIGN_IN_MESSAGES, validateSignInFields } from "./signInPolicy"
 
 export default function LoginPage({
   checkingSession = false,
@@ -13,14 +14,23 @@ export default function LoginPage({
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [touched, setTouched] = useState({ email: false, password: false })
+  const [submitted, setSubmitted] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
+  // Field errors appear on submit and when a field is left (blur).
+  const fieldErrors = validateSignInFields(email, password)
+  const emailError =
+    submitted || touched.email ? fieldErrors.email : undefined
+  const passwordError =
+    submitted || touched.password ? fieldErrors.password : undefined
+  const touch = (field: "email" | "password") =>
+    setTouched((current) => ({ ...current, [field]: true }))
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError("")
-    if (!email.trim() || !password) {
-      setError("Enter your work email or username and password.")
-      return
-    }
+    setSubmitted(true)
+    if (fieldErrors.email || fieldErrors.password) return
     setLoading(true)
     try {
       await onSignIn(email.trim(), password)
@@ -28,7 +38,7 @@ export default function LoginPage({
       setError(
         reason instanceof Error
           ? reason.message
-          : "Unable to sign in. Check your details and try again.",
+          : SIGN_IN_MESSAGES.mismatch,
       )
     } finally {
       setLoading(false)
@@ -55,7 +65,10 @@ export default function LoginPage({
           </div>
 
           <form className="login-form" onSubmit={submit} noValidate>
-            <Field label="Work Email or Username">
+            <Field
+              label="Work Email or Username"
+              error={emailError ? `⚠ ${emailError}` : undefined}
+            >
               <input
                 type="text"
                 autoCapitalize="none"
@@ -64,21 +77,42 @@ export default function LoginPage({
                 placeholder="name@10builders.com"
                 value={email}
                 disabled={loading || checkingSession}
-                onChange={(event) => setEmail(event.target.value)}
-                aria-invalid={Boolean(error)}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  setError("")
+                }}
+                onBlur={() => touch("email")}
+                aria-invalid={Boolean(error || emailError)}
                 required
               />
             </Field>
-            <Field label="Password">
+            <Field
+              label="Password"
+              error={passwordError ? `⚠ ${passwordError}` : undefined}
+            >
               <div className="password-field">
                 <input
                   type={showPassword ? "text" : "password"}
+                  aria-label="Password"
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
                   disabled={loading || checkingSession}
-                  onChange={(event) => setPassword(event.target.value)}
-                  aria-invalid={Boolean(error)}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    setError("")
+                  }}
+                  onKeyDown={(event) =>
+                    setCapsLock(event.getModifierState("CapsLock"))
+                  }
+                  onKeyUp={(event) =>
+                    setCapsLock(event.getModifierState("CapsLock"))
+                  }
+                  onBlur={() => {
+                    touch("password")
+                    setCapsLock(false)
+                  }}
+                  aria-invalid={Boolean(error || passwordError)}
                   required
                 />
                 <Button
@@ -91,6 +125,14 @@ export default function LoginPage({
                 </Button>
               </div>
             </Field>
+            {capsLock && (
+              <small className="field-error caps-lock-warning" role="status">
+                ⚠ {SIGN_IN_MESSAGES.capsLock}
+              </small>
+            )}
+            <p className="login-help">
+              Forgot your password? Contact your administrator.
+            </p>
             {error && (
               <div className="login-error" role="alert">
                 <Icon name="alert" size={18} />

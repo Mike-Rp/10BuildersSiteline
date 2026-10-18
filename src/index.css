@@ -547,6 +547,7 @@ tbody tr:hover { background: var(--surface-subtle); }
 .login-error { display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; color: var(--color-danger); background: var(--red-soft); border: 1px solid var(--danger-border); border-radius: 6px; font-size: 14px; line-height: 1.5; }
 .login-error svg { margin-top: 2px; flex: none; }
 .login-submit { min-height: 46px; font-size: 15px; }
+.login-help { color: var(--color-muted); font-size: 14px; line-height: 1.5; }
 .login-foot { margin-top: auto; padding-top: 22px; display: flex; flex-direction: column; gap: 6px; }
 .login-foot p { color: var(--color-muted); font-size: 14px; line-height: 1.5; }
 .demo-link { align-self: flex-start; padding: 0; color: var(--color-primary); background: none; border: 0; font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -770,8 +771,10 @@ tbody tr:hover { background: var(--surface-subtle); }
 @media (max-width: 900px) {
   .login-page { padding: 24px 16px; }
   .login-card { max-width: 480px; min-height: 0; }
-  .login-panel { flex-basis: 100%; padding: 32px 28px 24px; }
-  .login-info { display: none; }
+  .login-card { flex-direction: column; }
+  .login-panel { flex: none; padding: 32px 28px 24px; }
+  .login-info { flex: none; padding: 28px; }
+  .login-highlights { margin-top: 20px; padding-top: 18px; }
 }
 @media (max-width: 520px) {
   .login-page { padding: 16px 12px; }
