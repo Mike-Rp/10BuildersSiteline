@@ -39,9 +39,14 @@ function teamReady(prepare = () => {}) {
   state = run(state, { type: "accept_assignment" })
   return run(state, { type: "accept_assignment" }, "a5")
 }
+// The company the system ranks first (no conflicting commitment, has manpower).
+const suggested = (state) =>
+  subcontractorRecommendations(state, project(state)).find(
+    (candidate) => !candidate.committed && candidate.availableManpower > 0,
+  ).company.id
 function acceptedTeam() {
   let state = teamReady()
-  const companyId = activeSubcontractors(project(state))[0].companyId
+  const companyId = suggested(state)
   state = run(state, { type: "contact_company", companyId })
   return run(state, { type: "respond_company", companyId, accepted: true })
 }
@@ -76,7 +81,9 @@ test("overlapping company commitments demote candidates and prevent automatic se
   })
   const ranking = subcontractorRecommendations(state, project(state))
   assert.equal(ranking[0].company.id, "c1")
-  assert.equal(activeSubcontractors(project(state))[0].companyId, "c1")
+  assert.equal(suggested(state), "c1")
+  // The system suggests only; it never pre-selects a company for the Lead.
+  assert.equal(activeSubcontractors(project(state)).length, 0)
   assert.ok(
     ranking.find((candidate) => candidate.company.id === "c1")
       .availableManpower > 0,
@@ -92,7 +99,7 @@ test("overlapping company commitments demote candidates and prevent automatic se
 })
 test("contact records a local attempt without recording a response, and a real decision is mandatory", () => {
   let state = teamReady()
-  const companyId = activeSubcontractors(project(state))[0].companyId
+  const companyId = suggested(state)
   state = run(state, { type: "contact_company", companyId })
   const selection = activeSubcontractors(project(state))[0]
   assert.equal(selection.status, "contacted")
@@ -135,7 +142,7 @@ test("accepted partners reject archiving and atomic replacement in the action la
 })
 test("declined companies can be replaced, but the replacement needs fresh contact and acceptance", () => {
   let state = teamReady()
-  const previous = activeSubcontractors(project(state))[0].companyId
+  const previous = suggested(state)
   state = run(state, { type: "contact_company", companyId: previous })
   state = run(state, {
     type: "respond_company",
@@ -183,7 +190,8 @@ test("declined companies can be replaced, but the replacement needs fresh contac
 })
 test("replacing an unaccepted company is not falsely recorded as a subcontractor decline", () => {
   let state = teamReady()
-  const previous = activeSubcontractors(project(state))[0].companyId
+  const previous = suggested(state)
+  state = run(state, { type: "select_company", companyId: previous })
   state = run(state, {
     type: "replace_company",
     companyId: previous,
@@ -201,7 +209,10 @@ test("replacing an unaccepted company is not falsely recorded as a subcontractor
   )
 })
 test("archiving a proposed company retains its company record and project selection history", () => {
-  const state = teamReady()
+  const state = run(teamReady(), {
+    type: "select_company",
+    companyId: suggested(teamReady()),
+  })
   const companyId = activeSubcontractors(project(state))[0].companyId
   const companyBefore = state.companies.find((c) => c.id === companyId)
   const archived = run(state, { type: "archive_company", companyId })
@@ -223,8 +234,9 @@ test("archiving a proposed company retains its company record and project select
   assert.match(archived.events[0].title, /archived/)
 })
 test("replacement rejects non-Lead users, pending companies, duplicates and stale team versions", () => {
-  const state = teamReady()
-  const previous = activeSubcontractors(project(state))[0].companyId
+  const ready = teamReady()
+  const previous = suggested(ready)
+  const state = run(ready, { type: "select_company", companyId: previous })
   const replace = {
     type: "replace_company",
     companyId: previous,

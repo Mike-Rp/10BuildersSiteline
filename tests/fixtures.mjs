@@ -1,8 +1,16 @@
 import { initialState } from "../src/model.ts"
-import { activeSubcontractors, applyWorkflow } from "../src/workflows.ts"
+import {
+  applyWorkflow,
+  subcontractorRecommendations,
+} from "../src/workflows.ts"
 export const NOW = Date.parse("2026-10-14T08:00:00Z")
 export const currentProject = (state) =>
   state.projects.find((p) => p.id === "p4")
+// The company the system ranks first (no conflicting commitment, has manpower).
+export const suggestedCompanyId = (state) =>
+  subcontractorRecommendations(state, currentProject(state)).find(
+    (candidate) => !candidate.committed && candidate.availableManpower > 0,
+  ).company.id
 export const evidence = (name = "evidence.png") => ({
   id: crypto.randomUUID(),
   label: "Selected evidence",
@@ -26,7 +34,7 @@ export function activeFixture() {
     })
   state = execute(state, "a4", { type: "accept_assignment" })
   state = execute(state, "a5", { type: "accept_assignment" })
-  const companyId = activeSubcontractors(currentProject(state))[0].companyId
+  const companyId = suggestedCompanyId(state)
   state = execute(state, "a4", { type: "contact_company", companyId })
   state = execute(state, "a4", {
     type: "respond_company",

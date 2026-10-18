@@ -328,6 +328,7 @@ export type SubcontractorSelection = {
   companyId: string
   status: "selected" | "contacted" | "accepted" | "declined" | "replaced" | "archived"
   contactAt?: string
+  contactLog?: string[]
   responseAt?: string
   replacedAt?: string
   replacedBy?: string
