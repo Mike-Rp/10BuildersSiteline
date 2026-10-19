@@ -84,6 +84,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       })
 
     assert.equal(cards().length, 6)
+    assert.equal(document.querySelector(".as-card img"), null)
 
     assert.equal(document.querySelector(".as-summary strong").textContent, "15")
 

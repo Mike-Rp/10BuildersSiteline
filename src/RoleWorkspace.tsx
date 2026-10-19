@@ -2029,7 +2029,6 @@ export default function RoleWorkspace({
         <ActiveSites key={actor.id} projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
-          photoId: p.workflow?.photos.find(photo => photo.uploaded)?.id,
           needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
           renderActions={id => {

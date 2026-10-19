@@ -680,7 +680,7 @@ export default function ClientPortal({
       )
     if (page === "Active sites") return <>
       <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1><p>Approved progress and information shared with you.</p></div></div>
-      <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name, photoId: p.photos[0]?.id }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
+      <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
     </>
     if (!project)
       return (

@@ -1528,7 +1528,6 @@ function AppInner() {
           <ActiveSites key={actor.id} projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
-            photoId: p.workflow?.photos.find(photo => photo.uploaded)?.id,
             needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
           }))} onOpen={id => setDialog({ kind: "project", id })} />
         </>
