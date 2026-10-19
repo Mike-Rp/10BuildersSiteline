@@ -10,7 +10,8 @@
     "db:migrate": "node scripts/migrate-phase-checklists.js",
     "test:phase:db": "node --experimental-test-module-mocks scripts/test-phase-database.js",
     "serve": "node src/index.js",
-    "db:integrate": "node scripts/migrate-react.js"
+    "db:integrate": "node scripts/migrate-react.js",
+    "db:normalize-types": "node scripts/normalize-project-types.js"
   },
   "type": "module",
   "author": "",

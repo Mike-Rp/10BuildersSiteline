@@ -158,14 +158,9 @@ export const PROJECT_PHASE_DEFINITIONS: Record<"Residential" | "Commercial" | "M
       },
     ],
   }
-export const PROJECT_TYPES = [
-  "Residential",
-  "Commercial",
-  "Mixed-Use",
-  "Infrastructure",
-  "Industrial",
-  "Renovation",
-]
+// The only project types intake offers. (The database still has the older Infrastructure,
+// Industrial and Renovation rows for foreign keys, but no project uses them.)
+export const PROJECT_TYPES = ["Residential", "Commercial", "Mixed-Use"]
 export const ROLE_NAMES = {
   admin: "Administrator",
   opm: "Office PM",

@@ -741,10 +741,14 @@ export default function ClientPortal({
       return (
         <DocumentRepository
           listKey="client:documents"
+          recentKey={actor.id}
           projects={projects.map((view) => ({
             id: view.id,
             name: view.name,
             subtitle: `${view.type} · ${view.phase}`,
+            type: view.type,
+            phase: view.phase,
+            status: view.status,
             categories: clientDocumentIndex(view).map((category) => ({
               ...category,
               folders: category.folders.map((folder) => ({

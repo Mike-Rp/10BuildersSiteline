@@ -1678,10 +1678,14 @@ function AppInner() {
         <>
           <DocumentRepository
             listKey="admin:documents"
+            recentKey={actor.id}
             projects={state.projects.map((project) => ({
               id: project.id,
               name: project.name,
               subtitle: `${project.type} · ${project.phase}`,
+              type: project.type,
+              phase: project.phase,
+              status: project.status,
               categories: staffRepositoryCategories(
                 projectDocumentIndex(project),
               ),

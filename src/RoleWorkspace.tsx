@@ -1072,6 +1072,9 @@ export default function RoleWorkspace({
       id: p.id,
       name: p.name,
       subtitle: `${p.type} · ${p.phase}`,
+      type: p.type,
+      phase: p.phase,
+      status: p.status,
       categories: staffRepositoryCategories(
         projectDocumentIndexFor(p, actor),
         isOpm ? (doc) => reviewStatusFor(p, doc.id) : undefined,
@@ -1087,6 +1090,7 @@ export default function RoleWorkspace({
     return (
       <DocumentRepository
         listKey={`${actor.role}:documents`}
+        recentKey={actor.id}
         className="role-document-browser"
         {...(!isOpm && {
           rootLabel: "Document repository",

@@ -80,6 +80,8 @@ export type ListView<T> = {
   narrowed: boolean
   status: ListStatus
   pageSize?: number
+  // Page sizes offered by the pager (default 10 / 25 / 50; the project explorer uses 6 / 12 / 24).
+  pageSizes?: readonly number[]
 }
 const READY: ListStatus = { state: "ready" }
 
@@ -88,7 +90,7 @@ export function runList<T>(
   key: string,
   items: T[],
   config: ListConfig<T>,
-  options: { pageSize?: number } = {},
+  options: { pageSize?: number; pageSizes?: readonly number[] } = {},
 ): ListView<T> {
   const query = getListQuery(key, options.pageSize)
   const { matched, view } = applyList(items, query, config)
@@ -102,6 +104,7 @@ export function runList<T>(
     narrowed: hasActiveFilters(query),
     status: READY,
     pageSize: options.pageSize,
+    pageSizes: options.pageSizes,
   }
 }
 
@@ -139,10 +142,13 @@ export function ListToolbar<T>({
   noun = "record",
   showSearch = true,
   debounceMs = 0,
+  extra,
 }: {
   list: ListView<T>
   placeholder?: string
   noun?: string
+  // Extra controls placed with the filters (for example a sort choice).
+  extra?: ReactNode
   // Off when the page already has its own search box (for example the document browser).
   showSearch?: boolean
   // Wait this long after typing stops before searching (server-side lists use 300).
@@ -207,6 +213,7 @@ export function ListToolbar<T>({
             )}
           </label>
         ))}
+        {extra}
         {narrowed && (
           <Button
             variant="text-button"
@@ -270,12 +277,16 @@ export function NoResults<T>({ list }: { list: ListView<T> }) {
 export function ListPager<T>({
   list,
   touch = false,
+  unit = "records",
 }: {
   list: ListView<T>
   touch?: boolean
+  // What is being counted in "Showing X–Y of Z …".
+  unit?: string
 }) {
   const { view } = list
-  if (list.count <= PAGE_SIZES[0]) return null
+  const sizes = list.pageSizes ?? PAGE_SIZES
+  if (list.count <= sizes[0]) return null
   const go = (page: number) => update(list, (q) => withPage(q, page))
   const multiple = view.pageCount > 1
   return (
@@ -284,7 +295,7 @@ export function ListPager<T>({
       aria-label="Pagination"
     >
       <p className="pagination-summary" role="status" aria-live="polite">
-        Showing {view.from}–{view.to} of {list.count} records
+        Showing {view.from}–{view.to} of {list.count} {unit}
         <span className="pagination-page-of">
           {" "}
           · Page {view.page} of {view.pageCount}
@@ -298,7 +309,7 @@ export function ListPager<T>({
             update(list, (q) => withPageSize(q, Number(event.target.value)))
           }
         >
-          {PAGE_SIZES.map((size) => (
+          {sizes.map((size) => (
             <option key={size} value={size}>
               {size}
             </option>
@@ -411,10 +422,15 @@ export function ListSection<T>({
   toolbar = true,
   compact = false,
   debounceMs,
+  unit,
+  toolbarExtra,
 }: {
   list: ListView<T>
   placeholder?: string
   noun?: string
+  unit?: string
+  // Extra control shown in the toolbar (for example a sort choice).
+  toolbarExtra?: ReactNode
   render: (items: T[]) => ReactNode
   // The module's normal empty state. Omit for "No records yet"; null for nothing.
   empty?: ReactNode
@@ -452,6 +468,7 @@ export function ListSection<T>({
           placeholder={placeholder}
           noun={noun}
           debounceMs={debounceMs}
+          extra={toolbarExtra}
         />
       )}
       <div
@@ -463,7 +480,7 @@ export function ListSection<T>({
       {status.state === "error" ? null : compact ? (
         <CompactPager list={list} />
       ) : (
-        <ListPager list={list} touch={touch} />
+        <ListPager list={list} touch={touch} unit={unit} />
       )}
     </>
   )

@@ -11,6 +11,8 @@ import {
   useListMemory,
 } from "./ListControls"
 import { inDateRange, optionsFrom } from "./listing"
+import ProjectExplorer, { type ExplorerItem } from "./ProjectExplorer"
+import { pushRecent, readRecents, writeRecents } from "./explorerHelpers"
 
 // Shared four-level repository browser: Projects → Categories → Subfolders →
 // Files. Callers pass only what the signed-in role may open, so counts always
@@ -42,6 +44,10 @@ export type RepositoryProject = {
   id: string
   name: string
   subtitle: string
+  // Shown on the project card (the explorer falls back to the subtitle).
+  type?: string
+  phase?: string
+  status?: string
   categories: RepositoryCategory[]
 }
 export type RepositoryPath = {
@@ -75,6 +81,10 @@ export default function DocumentRepository({
   renderStatus,
   emptyDetail = "Original uploads appear here when the responsible role submits them.",
   listKey = "documents",
+  recentKey,
+  loading = false,
+  error,
+  onRetry,
 }: {
   projects: RepositoryProject[]
   onOpen: (projectId: string, fileId: string) => void
@@ -109,6 +119,12 @@ export default function DocumentRepository({
   emptyDetail?: string
   // Names this browser's paging/filters in the session memory (one per caller).
   listKey?: string
+  // Account key for "Recently accessed" (defaults to the list key).
+  recentKey?: string
+  // Project-level states. Role scoping is done by the backend before data arrives here.
+  loading?: boolean
+  error?: string
+  onRetry?: () => void
 }) {
   useListMemory()
   const [ownPath, setOwnPath] = useState<RepositoryPath>({})
@@ -129,18 +145,6 @@ export default function DocumentRepository({
       .toLowerCase()
       .includes(term)
   const inProject = searchInProject && !!project && !!term
-  const visibleProjects = projects.filter(
-    (p) =>
-      !term ||
-      p.name.toLowerCase().includes(term) ||
-      p.categories.some((c) =>
-        c.folders.some((f) =>
-          f.files.some((file) =>
-            `${file.label} ${file.name}`.toLowerCase().includes(term),
-          ),
-        ),
-      ),
-  )
   const visibleCategories = (project?.categories || []).filter(
     (c) =>
       !inProject ||
@@ -192,11 +196,37 @@ export default function DocumentRepository({
     },
   )
 
+  const explorerItems: ExplorerItem[] = projects.map((p) => ({
+    project: {
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      phase: p.phase,
+      status: p.status,
+      fileCount: projectFileCount(p),
+      searchText: p.categories
+        .flatMap((c) => c.folders.flatMap((f) => f.files))
+        .map((file) => `${file.label} ${file.name}`)
+        .join(" "),
+    },
+    subtitle: projectSubtitle?.(p.id) ?? p.subtitle,
+    status: projectStatus?.(p.id),
+  }))
+  const recentAccount = recentKey ?? listKey
+  function explore(projectId: string) {
+    writeRecents(recentAccount, pushRecent(readRecents(recentAccount), projectId))
+    setPath({ projectId })
+  }
   function back() {
     if (folder) setPath({ projectId: project?.id, categoryId: path.categoryId })
     else if (category) setPath({ projectId: project?.id })
     else setPath({})
   }
+  const backTarget = folder
+    ? category!.name
+    : category
+      ? project!.name
+      : rootLabel
   const showBack = !!project && !(lockedProjectId && !category)
 
   const title =
@@ -247,6 +277,17 @@ export default function DocumentRepository({
     </Badge>
   )
 
+  // A project that was asked for directly but is not in the caller's (already
+  // role-scoped) list is never shown: say so instead of rendering an empty browser.
+  if (lockedProjectId && !project)
+    return (
+      <section className={`panel document-browser ${className}`}>
+        <Empty title="You don't have access to these documents.">
+          This project is not assigned to your account.
+        </Empty>
+      </section>
+    )
+
   return (
     <section className={`panel document-browser ${className}`}>
       <header className="panel-header">
@@ -254,9 +295,7 @@ export default function DocumentRepository({
           <h2>{title}</h2>
           <p>{subtitle}</p>
         </div>
-        {!project ? (
-          searchField("Find a project")
-        ) : searchInProject ? (
+        {!project ? null : searchInProject ? (
           <div className="button-group">
             {searchField("Search documents")}
             {fileCountBadge}
@@ -269,8 +308,8 @@ export default function DocumentRepository({
         <>
           {showBack && (
             <div className="document-browser-back">
-              <Button variant="text-button" onClick={back}>
-                ← Back
+              <Button className="document-back" onClick={back}>
+                <span aria-hidden="true">←</span> Back to {backTarget}
               </Button>
             </div>
           )}
@@ -296,59 +335,21 @@ export default function DocumentRepository({
         </>
       )}
 
-      {!project &&
-        (!projects.length ? (
-          <Empty title="No projects available.">
-            Projects appear here once you are assigned to them.
-          </Empty>
-        ) : !visibleProjects.length ? (
-          <Empty title="No projects match your search">
-            Try another project name or document title.
-          </Empty>
-        ) : (
-          <>
-          <div className="document-browser-grid">
-            {visibleProjects.map((p) => {
-              const count = projectFileCount(p)
-              const status = projectStatus?.(p.id)
-              return (
-                <Button
-                  variant="document-nav-card"
-                  className={status?.tone === "action" ? "action-required" : ""}
-                  key={p.id}
-                  onClick={() => setPath({ projectId: p.id })}
-                >
-                  <span className="document-nav-icon">
-                    <Icon name="building" size={28} />
-                  </span>
-                  <span className="document-nav-copy">
-                    <strong>{p.name}</strong>
-                    <small>{p.subtitle}</small>
-                    {status?.tone === "action" && (
-                      <Badge tone="amber">Action Required</Badge>
-                    )}
-                    {status && (
-                      <small
-                        className={`document-status-line ${status.tone}`}
-                      >
-                        {status.tone === "success" ? (
-                          <Badge tone="green">{status.label}</Badge>
-                        ) : (
-                          status.label
-                        )}
-                      </small>
-                    )}
-                  </span>
-                  <span className="document-nav-meta">
-                    {plural(count, "original file")}
-                    <Icon name="arrow" size={17} />
-                  </span>
-                </Button>
-              )
-            })}
-          </div>
-          </>
-        ))}
+      {!project && (
+        <ProjectExplorer
+          listKey={listKey}
+          items={explorerItems}
+          recentKey={recentAccount}
+          onExplore={explore}
+          status={
+            error
+              ? { state: "error", message: error, onRetry }
+              : loading
+                ? { state: "loading" }
+                : undefined
+          }
+        />
+      )}
 
       {project && !category && projectIntro?.(project.id)}
       {project &&
