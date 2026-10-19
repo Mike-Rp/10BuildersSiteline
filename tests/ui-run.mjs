@@ -70,6 +70,20 @@ for (const label of navLabels) {
   target.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }))
   await sleep(250)
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
+  if (label === "Active sites") {
+    const details = [...document.querySelectorAll(".as-card button")].find(el => el.textContent.includes("View Project Details"))
+    if (details) {
+      details.click()
+      await sleep(250)
+      const modal = document.querySelector('[role="dialog"]')
+      if (!modal) problems.push("Active Sites details did not open a modal")
+      else {
+        results.pages["Active site details modal"] = "ok"
+        modal.querySelector('[aria-label="Close dialog"]')?.click()
+        await sleep(100)
+      }
+    }
+  }
 }
 results.problems = problems
 console.log("RESULT " + JSON.stringify(results))

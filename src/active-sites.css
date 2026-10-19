@@ -1,0 +1,46 @@
+.active-sites { color: #172d45; }
+.as-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; margin-bottom: 24px; }
+.as-summary > div { padding: 20px; border: 1px solid #dce4ec; border-radius: 14px; background: linear-gradient(135deg,#fff,#f2f6fa); display: grid; gap: 8px; }
+.as-summary span,.as-summary small { color: #62758a; font-size: 12px; }
+.as-summary strong { font-size: 30px; line-height: 1.2; font-weight: 650; }
+.as-toolbar { display: flex; flex-wrap: wrap; gap: 14px; padding: 20px; background: #fff; border: 1px solid #dce4ec; border-radius: 14px; }
+.active-sites label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 600; min-width: 0; }
+.as-toolbar label { flex: 1 1 140px; }
+.as-toolbar .as-search { flex: 2 1 220px; }
+.active-sites input,.active-sites select { width: 100%; min-height: 42px; background: #f8fafc; border: 1px solid #d6e0e9; border-radius: 7px; padding: 9px 11px; color: #243e58; font: inherit; }
+.active-sites :focus-visible { outline: 3px solid #5285af; outline-offset: 3px; }
+.as-results { min-height: 52px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #62758a; }
+.as-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 22px; }
+.as-card { border: 1px solid #dae3ec; border-radius: 15px; background: #fff; overflow: hidden; box-shadow: 0 4px 16px #17345106; transition: transform .2s, box-shadow .2s; min-width: 0; }
+.as-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px #17345114; }
+.as-image { position: relative; aspect-ratio: 1.8; background: #dce6ef; overflow: hidden; }
+.as-image img { width: 100%; height: 100%; object-fit: cover; }
+.as-image .badge { position: absolute; top: 14px; right: 14px; text-transform: capitalize; }
+.as-image-label { position: absolute; bottom: 10px; left: 14px; font-size: 9px; letter-spacing: 1.4px; color: #fff; background: #132d47cc; border-radius: 4px; padding: 4px 7px; }
+.as-card-body { padding: 22px; }
+.as-type { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #527a9c; font-weight: 700; }
+.as-card h2 { font-size: 20px; line-height: 1.35; margin: 8px 0; overflow-wrap: anywhere; }
+.as-phase { color: #6a7c8f; font-size: 13px; margin: 0 0 24px; }
+.as-progress-label { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.as-progress-label strong { color: #315f85; }
+.as-card progress { appearance: none; display: block; width: 100%; height: 7px; margin: 10px 0 22px; border: 0; border-radius: 10px; background: #e8eef4; overflow: hidden; }
+.as-card progress::-webkit-progress-bar { background: #e8eef4; }
+.as-card progress::-webkit-progress-value { background: #4c7fa5; border-radius: 10px; }
+.as-card progress::-moz-progress-bar { background: #4c7fa5; }
+.as-card dl { margin: 0 0 20px; font-size: 12px; display: grid; gap: 12px; }
+.as-card dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.as-card dt { color: #748497; }
+.as-card dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.as-card-body > .button { width: 100%; justify-content: center; margin-top: 6px; }
+.as-review { font-size: 12px; color: #98651f; }
+.as-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding: 24px 0; font-size: 12px; color: #62758a; }
+.as-pagination label { flex-direction: row; align-items: center; }
+.as-pagination select { width: 70px; }
+.as-pagination > div { display: flex; gap: 8px; }
+.as-recent { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; margin-bottom: 20px; }
+.as-recent > span { color: #62758a; }
+.as-recent button { border: 1px solid #d6e0e9; background: #fff; border-radius: 20px; padding: 7px 12px; color: #315f85; cursor: pointer; }
+.as-site-workspace { margin-top: 24px; }
+@media(max-width: 1100px) { .as-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width: 640px) { .as-grid { grid-template-columns: minmax(0,1fr); } .as-summary { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; } .as-summary > div { padding: 14px; } .as-card-body { padding: 18px; } }
+@media(prefers-reduced-motion: reduce) { .as-card { transition: none; } .as-card:hover { transform: none; } }

@@ -27,8 +27,8 @@ const runs = [
   ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Schedule", "Archive", "Activity log", "Preferences"],
   ["karlo.espiritu@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory", "Schedule"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],
-  ["f.uy@aldenheights-hoa.com", "Project Overview", "Phase Timeline", "Schedule Performance", "Project Documents", "Progress History", "Site"],
-  ["maria.santos@rosariabiz.ph", "Project Overview", "Phase Timeline", "Project Documents", "Progress History"],
+  ["f.uy@aldenheights-hoa.com", "Active sites", "Project Overview", "Phase Timeline", "Schedule Performance", "Project Documents", "Progress History", "Site"],
+  ["maria.santos@rosariabiz.ph", "Active sites", "Project Overview", "Phase Timeline", "Project Documents", "Progress History"],
 ]
 let failed = false
 for (const [email, ...labels] of runs.filter(([e]) => !process.argv[2] || e.startsWith(process.argv[2]))) {

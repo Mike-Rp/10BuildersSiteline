@@ -1,3 +1,4 @@
+import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
   useEffect,
@@ -1866,111 +1867,28 @@ export default function RoleWorkspace({
             ? "Read-only monitoring, accountable phase owners and site reminders."
             : "Report progress only while your confirmed phase is active.",
         )}
-        {active
-          .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-          .map((p) => (
-            <Panel
-              key={p.id}
-              title={p.name}
-              subtitle={`${p.type} · ${p.phase} · Office PM: ${actorName(p.opmId)}`}
-              actions={
-                <div className="button-group">
-                  <Badge tone="green">{p.progress}% recorded</Badge>
-                  <Button
-                    onClick={() =>
-                      setDialog({ kind: "project", projectId: p.id })
-                    }
-                  >
-                    View details
-                  </Button>
-                  {isOpm && (
-                    <Button
-                      icon="bell"
-                      onClick={async () =>
-                        await act(
-                          { type: "request_update", projectId: p.id },
-                          "Site PM update reminder recorded.",
-                        )
-                      }
-                    >
-                      Request update
-                    </Button>
-                  )}
-                </div>
-              }
-            >
-              {isOpm ? (
-                <div className="role-card-content">
-                  <div className="site-progress-header">
-                    <div>
-                      <h3>{p.phase}</h3>
-                      <p>Current owner: {actorName(phaseOwner(p))}</p>
-                    </div>
-                    <strong>{p.progress}%</strong>
-                  </div>
-                  <progress
-                    className="role-full-progress"
-                    max={100}
-                    value={p.progress}
-                  />
-                  {workflowFor(p).pendingRework && (
-                    <div className="notice subsection">
-                      <Icon name="alert" />
-                      <p>A site issue is waiting for your rework decision.</p>
-                      <Button
-                        onClick={() => {
-                          navigate("Rework & approvals")
-                          setTab("rework")
-                        }}
-                      >
-                        Review issue
-                      </Button>
-                    </div>
-                  )}
-                  {workflowFor(p).pendingUpdate && (
-                    <div className="notice subsection">
-                      <Icon name="clock" />
-                      <p>A progress note is awaiting review.</p>
-                      <Button
-                        onClick={() => {
-                          navigate("Rework & approvals")
-                          setTab("progress")
-                        }}
-                      >
-                        Review update
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="role-site-tabs">
-                  <button
-                    className="site-expand"
-                    onClick={() => setPickedId(p.id)}
-                  >
-                    <Icon name="activity" size={18} />
-                    {phaseOwner(p) === actor.id
-                      ? "Open current phase workspace"
-                      : "View completed responsibility"}
-                    <Icon
-                      name={picked?.id === p.id ? "down" : "chevron"}
-                      size={17}
-                    />
-                  </button>
-                  {picked?.id === p.id && progressForm(p)}
-                </div>
-              )}
-            </Panel>
-          ))}
-        {!active.length && (
-          <Empty
-            title={isOpm ? "No active sites yet" : "No current active phase"}
-          >
-            {isOpm
-              ? "Intake projects activate only after all documents, acceptances and the signed subcontractor agreement are complete."
-              : "Future-phase responsibilities remain under Assignments until the prior checklist is approved and your phase becomes active."}
-          </Empty>
-        )}
+        <ActiveSites key={actor.id} projects={allActive.map(p => ({
+          ...p,
+          lead: state.accounts.find(a => a.id === leadId(p))?.name,
+          photoId: p.workflow?.photos.find(photo => photo.uploaded)?.id,
+          needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
+        }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
+          renderActions={id => {
+            const p = allActive.find(site => site.id === id)!
+            return isOpm ? <>
+              <Button icon="bell" onClick={async () => {
+                await act({ type: "request_update", projectId: id }, "Site PM update reminder recorded.")
+              }}>Request update</Button>
+              {p.workflow?.pendingRework && <Button onClick={() => { navigate("Rework & approvals"); setTab("rework") }}>Review issue</Button>}
+              {p.workflow?.pendingUpdate && <Button onClick={() => { navigate("Rework & approvals"); setTab("progress") }}>Review update</Button>}
+            </> : active.some(site => site.id === id) ? <Button onClick={() => {
+              setPickedId(id)
+              requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
+            }}>Open phase workspace</Button> : null
+          }} />
+        {!isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
+          <Panel title={`${picked.name} - Phase workspace`} subtitle="Existing phase reporting and approval requirements apply.">{progressForm(picked)}</Panel>
+        </div>}
       </>
     )
   }

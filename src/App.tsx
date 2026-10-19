@@ -1,3 +1,5 @@
+import ActiveSites from "./ActiveSites"
+import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
 import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
 // @refresh reset
@@ -1265,46 +1267,12 @@ function AppInner() {
             "Active sites",
             "Project visibility from mobilization through closeout.",
           )}
-          <div className="summary-pills">
-            <span>
-              <b>{active.length}</b> Active projects
-            </span>
-            <span>
-              <b>
-                {
-                  new Set(active.flatMap((p) => p.team.map((t) => t.accountId)))
-                    .size
-                }
-              </b>{" "}
-              Site leads
-            </span>
-            <span>
-              <b>
-                {active.length
-                  ? Math.round(
-                      active.reduce((n, p) => n + p.progress, 0) /
-                        active.length,
-                    )
-                  : 0}
-                %
-              </b>{" "}
-              Average progress
-            </span>
-          </div>
-          <Panel
-            title="Project monitoring"
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search projects or personnel"
-              />
-            }
-          >
-            {projectTable(
-              filteredProjects.filter((p) => p.status === "active"),
-            )}
-          </Panel>
+          <ActiveSites key={actor.id} projects={active.map(p => ({
+            ...p,
+            lead: state.accounts.find(a => a.id === leadId(p))?.name,
+            photoId: p.workflow?.photos.find(photo => photo.uploaded)?.id,
+            needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
+          }))} onOpen={id => setDialog({ kind: "project", id })} />
         </>
       )
     if (page === "Project intake")

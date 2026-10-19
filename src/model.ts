@@ -158,14 +158,7 @@ export const PROJECT_PHASE_DEFINITIONS: Record<"Residential" | "Commercial" | "M
       },
     ],
   }
-export const PROJECT_TYPES = [
-  "Residential",
-  "Commercial",
-  "Mixed-Use",
-  "Infrastructure",
-  "Industrial",
-  "Renovation",
-]
+export const PROJECT_TYPES = ["Residential", "Commercial", "Mixed-Use"]
 export const ROLE_NAMES = {
   admin: "Administrator",
   opm: "Office PM",

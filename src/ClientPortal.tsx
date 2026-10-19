@@ -1,5 +1,6 @@
+import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Badge, Button, Empty, Field, Icon } from "./ui"
+import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Chart, downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
 import PhaseTimeline from "./PhaseTimeline"
 import { dateLabel, initials, today, type Account, type Doc } from "./model"
@@ -16,6 +17,7 @@ type Viewer = {
   kind: "document" | "photo"
 }
 const NAV = [
+  ["Active sites", "grid"],
   ["Project Overview", "building"],
   ["Phase Timeline", "activity"],
   ["Schedule Performance", "trend"],
@@ -84,6 +86,7 @@ export default function ClientPortal({
   onStayActive: () => void
 }) {
   const [page, setPage] = useState("Project Overview")
+  const [siteDetails, setSiteDetails] = useState(false)
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
@@ -144,6 +147,7 @@ export default function ClientPortal({
     return () => window.removeEventListener("pointerdown", outside)
   }, [])
   function navigate(next: string) {
+    setSiteDetails(false)
     setPage(next)
     setMobileNav(false)
     setBell(false)
@@ -605,6 +609,10 @@ export default function ClientPortal({
           </Panel>
         </>
       )
+    if (page === "Active sites") return <>
+      <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1><p>Approved progress and information shared with you.</p></div></div>
+      <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name, photoId: p.photos[0]?.id }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
+    </>
     if (!project)
       return (
         <div className="client-access-empty">
@@ -916,6 +924,7 @@ export default function ClientPortal({
             </div>
           )}
           {pageContent()}
+          {siteDetails && project && <Modal wide title={project.name} subtitle="Authorized project details" onClose={() => setSiteDetails(false)}>{overview()}</Modal>}
           <div className="workspace-footer">
             <span>
               SITELINE <span>Built for the work ahead.</span>
