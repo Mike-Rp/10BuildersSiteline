@@ -1,8 +1,7 @@
+import { resolveApiBase } from "./base.ts"
+
 // The backend is required. Missing configuration never enables demo data.
-let base = (
-  (import.meta.env?.VITE_API_URL as string | undefined)?.trim() ||
-  (import.meta.env?.PROD ? "/api/v1" : "http://localhost:3000/api/v1")
-).replace(/\/+$/, "")
+let base = resolveApiBase(import.meta.env?.VITE_API_URL, Boolean(import.meta.env?.PROD))
 
 export const apiEnabled = true
 // Allows integration tests to point at their temporary backend.
