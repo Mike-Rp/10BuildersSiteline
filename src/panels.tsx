@@ -442,9 +442,12 @@ export function Preview({
 export function Chart({
   compact = false,
   projects = [],
+  summaryProjects,
 }: {
   compact?: boolean
   projects?: ProgressProject[]
+  // All projects the summary should cover when `projects` is only the current page.
+  summaryProjects?: ProgressProject[]
 }) {
   if (!projects.length)
     return (
@@ -452,10 +455,11 @@ export function Chart({
         Recorded progress will appear when projects are available.
       </Empty>
     )
-  const project = projects.length === 1 ? projects[0] : undefined
+  const summary = summaryProjects ?? projects
+  const project = summary.length === 1 ? projects[0] : undefined
   const series = project ? recordedProgress(project) : []
   const average =
-    projects.reduce((sum, item) => sum + item.progress, 0) / projects.length
+    summary.reduce((sum, item) => sum + item.progress, 0) / summary.length
   const left = 46,
     right = 538
   const start = series[0]?.time ?? 0
@@ -470,7 +474,13 @@ export function Chart({
     <div className={`schedule ${compact ? "compact" : ""}`}>
       <div className="chart-summary">
         <div>
-          <span>{project ? project.name : "Average recorded completion"}</span>
+          <span>
+            {project
+              ? project.name
+              : summary.length > projects.length
+                ? `Average across ${summary.length} projects`
+                : "Average recorded completion"}
+          </span>
           <strong>
             {average.toFixed(1)}
             <small>%</small>

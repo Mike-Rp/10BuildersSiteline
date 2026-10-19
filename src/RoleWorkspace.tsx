@@ -14,6 +14,7 @@ import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
+  CompactPager,
   ListPager,
   ListSection,
   ListToolbar,
@@ -375,6 +376,10 @@ export default function RoleWorkspace({
     searchText: projectText,
     filters: [typeFilterP(active), phaseFilterP(active)],
   })
+  const scheduleList = runList(`${actor.role}:schedule`, allActive, {
+    searchText: projectText,
+    filters: [typeFilterP(allActive), phaseFilterP(allActive)],
+  })
   const activityFeed = runList(`${actor.role}:activity`, events, {
     searchText: (e) => `${e.title} ${e.detail}`,
     filters: [
@@ -677,6 +682,9 @@ export default function RoleWorkspace({
     )
   }
   function dashboard() {
+    // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
+    const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
+    const dashSchedule = runList(`${actor.role}:dash-schedule`, allActive, { searchText: () => "" }, { pageSize: 5 })
     return (
       <>
         {header(
@@ -859,15 +867,37 @@ export default function RoleWorkspace({
           <Panel
             title="Recent activity"
             subtitle="Updates scoped to your assigned work."
+            actions={
+              <Button
+                variant="text-button"
+                onClick={() => navigate("Activity log")}
+              >
+                View all
+              </Button>
+            }
           >
-            {activityList(events.slice(0, 4))}
+            {activityList(dashActivity.view.items)}
+            <CompactPager list={dashActivity} />
           </Panel>
         </div>
         <Panel
           title="Schedule performance"
           subtitle="Recorded completion and project history."
+          actions={
+            <Button
+              variant="text-button"
+              onClick={() => navigate("Schedule performance")}
+            >
+              View report
+            </Button>
+          }
         >
-          <Chart compact projects={allActive} />
+          <Chart
+            compact
+            projects={dashSchedule.view.items}
+            summaryProjects={allActive}
+          />
+          <CompactPager list={dashSchedule} />
         </Panel>
       </>
     )
@@ -2568,12 +2598,22 @@ export default function RoleWorkspace({
       </Empty>
     )
     // Dashboard preview keeps its short list and "View all" link.
-    if (compact)
-      return rows.length ? (
-        <div>{rows.slice(0, 4).map((row) => row.node)}</div>
-      ) : (
-        emptyState
+    if (compact) {
+      const dashDeadlines = runList(
+        `${actor.role}:dash-deadlines`,
+        rows,
+        { searchText: () => "" },
+        { pageSize: 5 },
       )
+      return (
+        <ListSection
+          list={dashDeadlines}
+          compact
+          empty={emptyState}
+          render={(items) => <div>{items.map((row) => row.node)}</div>}
+        />
+      )
+    }
     const KINDS: Record<string, string> = {
       accept: "Confirm intake",
       response: "Assignment response",
@@ -3569,21 +3609,29 @@ export default function RoleWorkspace({
                 planned-versus-actual comparison requires a saved baseline.
               </p>
             </div>
-            {allActive.map((p) => (
-              <Panel
-                key={p.id}
-                title={p.name}
-                subtitle={`${p.phase} · ${p.progress}% recorded completion`}
-              >
-                <div className="schedule-timeline">
-                  <PlannedTimeline project={p} />
-                </div>
-                <Chart projects={[p]} />
-              </Panel>
-            ))}
-            {!allActive.length && (
-              <Empty title="No active-project schedules yet" />
-            )}
+            <ListSection
+              list={scheduleList}
+              placeholder="Search active projects"
+              noun="project"
+              touch={!isOpm}
+              empty={<Empty title="No active-project schedules yet" />}
+              render={(items) => (
+                <>
+                  {items.map((p) => (
+                    <Panel
+                      key={p.id}
+                      title={p.name}
+                      subtitle={`${p.phase} · ${p.progress}% recorded completion`}
+                    >
+                      <div className="schedule-timeline">
+                        <PlannedTimeline project={p} />
+                      </div>
+                      <Chart projects={[p]} />
+                    </Panel>
+                  ))}
+                </>
+              )}
+            />
           </>
         )
       case "Archive":

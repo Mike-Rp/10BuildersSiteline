@@ -202,3 +202,83 @@ test("result counts are pluralised correctly", async () => {
   assert.equal(countLabel(0, "result"), "0 results")
   assert.equal(countLabel(2, "match"), "2 matches")
 })
+
+test("ellipsis: first and last always shown, a window around the current page, gaps elsewhere", async () => {
+  const { pageNumbers } = await import("../src/listing.ts")
+  assert.deepEqual(pageNumbers(1, 20), [1, 2, null, 20])
+  assert.deepEqual(pageNumbers(15, 30), [1, null, 14, 15, 16, null, 30])
+  assert.deepEqual(pageNumbers(5, 20), [1, null, 4, 5, 6, null, 20])
+  assert.deepEqual(pageNumbers(20, 20), [1, null, 19, 20])
+  assert.deepEqual(pageNumbers(3, 7), [1, 2, 3, 4, 5, 6, 7], "few pages are all shown")
+  assert.deepEqual(pageNumbers(1, 1), [1])
+})
+
+test("boundaries: first and last pages, one-record and exact-multiple lists", async () => {
+  const { paginate } = await import("../src/listing.ts")
+  const first = paginate(items, 1, 10)
+  assert.equal(first.page <= 1, true, "Previous / First are disabled on page 1")
+  const last = paginate(items, 99, 10)
+  assert.equal(last.page, last.pageCount, "Next / Last are disabled on the last page")
+  assert.deepEqual([last.from, last.to], [41, 48])
+  const exact = paginate(items.slice(0, 20), 2, 10)
+  assert.deepEqual([exact.pageCount, exact.from, exact.to], [2, 11, 20])
+  const one = paginate(items.slice(0, 1), 1, 10)
+  assert.deepEqual([one.pageCount, one.from, one.to], [1, 1, 1])
+})
+
+test("clamp after records are removed (archive / status change): never an invalid page", async () => {
+  const { paginate } = await import("../src/listing.ts")
+  let list = items.slice(0, 25) // 3 pages of 10
+  assert.equal(paginate(list, 3, 10).items.length, 5)
+  list = list.slice(0, 19) // five records left the list while the user was on page 3
+  const after = paginate(list, 3, 10)
+  assert.equal(after.page, 2)
+  assert.deepEqual([after.from, after.to], [11, 19])
+  assert.equal(paginate(list.slice(0, 10), 2, 10).page, 1)
+  assert.deepEqual(
+    [paginate([], 5, 10).page, paginate([], 5, 10).items.length],
+    [1, 0],
+  )
+})
+
+test("remote pages: the view follows the server's total and clamps too", async () => {
+  const { paginateRemote } = await import("../src/listing.ts")
+  const view = paginateRemote(items.slice(10, 20), 290, 2, 10)
+  assert.deepEqual([view.page, view.pageCount, view.from, view.to, view.total], [2, 29, 11, 20, 290])
+  assert.equal(paginateRemote([], 290, 99, 10).page, 29)
+})
+
+test("stable order: paging through tied records neither repeats nor skips any", async () => {
+  const { stableSort, paginate } = await import("../src/listing.ts")
+  // Every record has the same sort key; only the id tiebreak makes the order deterministic.
+  const tied = Array.from({ length: 137 }, (_, i) => ({ id: `id-${String(i * 7919 % 137).padStart(4, "0")}`, name: "Same Name" }))
+  const compare = (a, b) => a.name.localeCompare(b.name)
+  const ordered = stableSort(tied, compare, (x) => x.id)
+  const shuffled = stableSort([...tied].reverse(), compare, (x) => x.id)
+  assert.deepEqual(shuffled.map((x) => x.id), ordered.map((x) => x.id), "input order never changes the result")
+  for (const size of [10, 25, 50]) {
+    const ids = []
+    for (let page = 1; page <= paginate(ordered, 1, size).pageCount; page++)
+      ids.push(...paginate(ordered, page, size).items.map((x) => x.id))
+    assert.equal(ids.length, 137, `page size ${size}: nothing skipped`)
+    assert.equal(new Set(ids).size, 137, `page size ${size}: nothing repeated`)
+    assert.deepEqual(ids, ordered.map((x) => x.id))
+  }
+})
+
+test("role-scoped counts: the filtered count equals the matches inside the role's own records", () => {
+  const state = initialState()
+  for (const id of ["a2", "a4", "a6"]) {
+    const actor = state.accounts.find((a) => a.id === id)
+    const scoped = ownedProjects(state, actor)
+    const cfg = { searchText: (p) => `${p.name} ${p.type} ${p.status}` }
+    for (const search of ["", "active", "p", "zzz"]) {
+      const { matched, view } = applyList(scoped, withSearch(defaultListQuery(), search), cfg)
+      const expected = scoped.filter((p) => cfg.searchText(p).toLowerCase().includes(search)).length
+      assert.equal(matched.length, expected, `${id} "${search}"`)
+      assert.equal(view.total, expected)
+      assert.ok(view.total <= scoped.length, "a count can never exceed what the role may see")
+    }
+    assert.ok(scoped.length < state.projects.length, `${id} does not see every project`)
+  }
+})

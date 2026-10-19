@@ -199,3 +199,37 @@ export const optionsFrom = (values: string[]) =>
   [...new Set(values.filter(Boolean))]
     .sort((a, b) => a.localeCompare(b))
     .map((value) => ({ value, label: value }))
+
+/** Page slice for a list whose items were fetched one page at a time (server-side paging). */
+export function paginateRemote<T>(
+  items: T[],
+  total: number,
+  page: number,
+  pageSize: number,
+): PageSlice<T> {
+  const size = Math.max(1, Math.floor(pageSize) || DEFAULT_PAGE_SIZE)
+  const pageCount = Math.max(1, Math.ceil(total / size))
+  const current = Math.min(Math.max(1, Math.floor(page) || 1), pageCount)
+  const start = (current - 1) * size
+  return {
+    items,
+    page: current,
+    pageCount,
+    pageSize: size,
+    total,
+    from: items.length ? start + 1 : 0,
+    to: items.length ? start + items.length : 0,
+  }
+}
+
+/**
+ * Deterministic order for paged lists: sort by the caller's comparison, then by id,
+ * so two records can never swap places between page requests (no duplicates, no skips).
+ */
+export function stableSort<T>(
+  items: T[],
+  compare: (a: T, b: T) => number,
+  id: (item: T) => string,
+): T[] {
+  return [...items].sort((a, b) => compare(a, b) || id(a).localeCompare(id(b)))
+}

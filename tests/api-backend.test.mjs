@@ -10,7 +10,7 @@ import test from "node:test"
 import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
-import { login, setApiBase, setToken, api, downloadApiFile } from "../src/api/client.ts"
+import { login, setApiBase, setToken, api, apiEnvelope, downloadApiFile } from "../src/api/client.ts"
 import { saveApiAccount, saveApiProject, createCompany, uploadFile, sendApiWorkflow, persistAdminChanges } from "../src/api/actions.ts"
 import { randomUUID } from "node:crypto"
 import { loadState } from "../src/api/load.ts"
@@ -348,6 +348,38 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       assert.ok(part.photos.every(p=>p.is_client_visible))
       assert.ok(!("suggested_opm_id" in part.list))
     }
+  })
+
+  await t.test("the Engineer Directory pages /accounts with a stable order and exact counts", async () => {
+    await asUser("patricia.domingo@10builders.com")
+    const engineers = "role_ids=1,2,3&sortBy=name"
+    const everything = (await apiEnvelope("/accounts?page=1&pageSize=100&" + engineers)).data
+    assert.ok(everything.length > 3, "the demo data has enough engineers to span several pages")
+    const seen = []
+    let total
+    for (let page = 1; ; page++) {
+      const body = await apiEnvelope("/accounts?page=" + page + "&pageSize=3&" + engineers)
+      total = body.pagination.total
+      assert.equal(body.pagination.page, page)
+      seen.push(...body.data.map((row) => row.id))
+      if (!body.pagination.has_next) break
+      assert.ok(page < 50, "paging must terminate")
+    }
+    // No duplicated and no skipped records between pages, in the same order as one big page.
+    assert.equal(new Set(seen).size, seen.length)
+    assert.deepEqual(seen, everything.map((row) => row.id))
+    assert.equal(total, everything.length)
+    // Filters change the count with the same filter the rows use.
+    const spm = await apiEnvelope("/accounts?page=1&pageSize=2&role_ids=3&sortBy=name")
+    assert.ok(spm.data.every((row) => row.role === "spm"))
+    assert.equal(spm.pagination.total, everything.filter((row) => row.role === "spm").length)
+    // A page past the end is empty but reports the real total, so the UI can clamp.
+    const beyond = await apiEnvelope("/accounts?page=999&pageSize=3&" + engineers)
+    assert.equal(beyond.data.length, 0)
+    assert.equal(beyond.pagination.total, total)
+    // Only the Administrator may list accounts: role scoping is never widened.
+    await asUser("karlo.espiritu@10builders.com")
+    await assert.rejects(apiEnvelope("/accounts?page=1&pageSize=3"), /403|permission|forbidden|allowed|access/i)
   })
 
   await t.test("the API refuses requests without a session", async () => {

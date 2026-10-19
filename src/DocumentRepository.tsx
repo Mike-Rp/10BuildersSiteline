@@ -161,9 +161,6 @@ export default function DocumentRepository({
   )
 
   // Role scoping already happened: callers pass only what this role may open.
-  const projectsList = runList(`${listKey}:projects`, visibleProjects, {
-    searchText: () => "",
-  })
   const filesList = runList(
     `${listKey}:files:${project?.id}:${folder?.id}`,
     visibleFiles,
@@ -311,7 +308,7 @@ export default function DocumentRepository({
         ) : (
           <>
           <div className="document-browser-grid">
-            {projectsList.view.items.map((p) => {
+            {visibleProjects.map((p) => {
               const count = projectFileCount(p)
               const status = projectStatus?.(p.id)
               return (
@@ -350,7 +347,6 @@ export default function DocumentRepository({
               )
             })}
           </div>
-          <ListPager list={projectsList} />
           </>
         ))}
 
@@ -436,12 +432,15 @@ export default function DocumentRepository({
           </Empty>
         ) : (
           <>
-          <ListToolbar
-            list={filesList}
-            showSearch={false}
-            placeholder="Filter files"
-            noun="file"
-          />
+          {/* Filters only appear for long file lists. */}
+          {folder.files.length > 10 && (
+            <ListToolbar
+              list={filesList}
+              showSearch={false}
+              placeholder="Filter files"
+              noun="file"
+            />
+          )}
           {!filesList.matched.length ? (
             <NoResults list={filesList} />
           ) : (

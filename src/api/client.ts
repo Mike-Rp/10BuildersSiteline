@@ -96,6 +96,27 @@ export async function api<T = unknown>(
   return (body?.data ?? body as unknown) as T
 }
 
+// One page of a server-paginated list. Returns the whole envelope, because the
+// total and page count live next to `data`. Pass a signal to cancel stale requests.
+export async function apiEnvelope(
+  path: string,
+  init: RequestInit = {},
+): Promise<unknown> {
+  const response = await request(path, init)
+  let body: { error?: { message?: string }; message?: string } | undefined
+  try {
+    body = await response.json()
+  } catch {
+    body = undefined
+  }
+  if (!response.ok)
+    throw new ApiError(
+      body?.error?.message || body?.message || `Request failed (${response.status}).`,
+      response.status,
+    )
+  return body
+}
+
 // Lists: asks for large pages and follows page numbers until the data repeats.
 export async function apiList<T = Record<string, any>>(
   path: string,

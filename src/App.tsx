@@ -73,15 +73,27 @@ import {
 } from "./model"
 import { projectDocumentIndex } from "./project-document-index"
 import {
+  CompactPager,
   ListPager,
   ListSection,
   ListToolbar,
   NoResults,
+  getListQuery,
+  remoteList,
   resetListMemory,
   runList,
+  updateListQuery,
   useListMemory,
 } from "./ListControls"
-import { inDateRange, optionsFrom, type FilterDef } from "./listing"
+import {
+  inDateRange,
+  optionsFrom,
+  stableSort,
+  withPage,
+  type FilterDef,
+} from "./listing"
+import { engineerQueryString } from "./listSource"
+import { useAccountsPage } from "./useAccountsPage"
 import {
   ADMIN_NAV,
   DIRECTORY_TABS,
@@ -796,6 +808,19 @@ function AppInner() {
       },
     ],
   })
+  const scheduleList = runList("admin:schedule", activeSitesItems, {
+    searchText: (p) => `${projectSearch(p)} ${p.phase}`,
+    filters: [
+      typeFilter(activeSitesItems),
+      {
+        id: "phase",
+        label: "Phase",
+        allLabel: "All phases",
+        options: optionsFrom(activeSitesItems.map((p) => p.phase)),
+        test: (p, value) => p.phase === value,
+      },
+    ],
+  })
   const intakeItems = state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
@@ -816,14 +841,46 @@ function AppInner() {
       typeFilter(intakeItems),
     ],
   })
-  const engineersList = runList("admin:engineers", engineers, {
+  // Engineer Directory: the server filters, counts and pages (/accounts, ordered by
+  // name then id). A license or "deactivated" filter is unknown to the server, so
+  // then the very same list is filtered in the browser instead.
+  const engineersConfig = {
     searchText: accountSearch,
     filters: [
       { ...roleFilter_, options: roleFilter_.options!.filter((o) => o.value !== "client") },
       accountStatusFilter,
       licenseFilter_,
     ],
+  }
+  const engineerPath = engineerQueryString(getListQuery("admin:engineers"))
+  const engineersOnServer = engineerPath !== undefined
+  const serverEngineers = useAccountsPage({
+    queryString: engineerPath,
+    enabled: page === "Directory" && directoryTab === "engineers",
+    refreshKey: state.accounts,
+    onClamp: (last) =>
+      updateListQuery("admin:engineers", (q) => withPage(q, last)),
   })
+  const accountsById = new Map(state.accounts.map((a) => [a.id, a]))
+  const engineersList = engineersOnServer
+    ? remoteList(
+        "admin:engineers",
+        engineersConfig,
+        serverEngineers.ids
+          .map((id) => accountsById.get(id))
+          .filter((a): a is Account => !!a),
+        serverEngineers.total,
+        {
+          state: serverEngineers.status,
+          message: serverEngineers.message,
+          onRetry: serverEngineers.retry,
+        },
+      )
+    : runList(
+        "admin:engineers",
+        stableSort(engineers, (a, b) => a.name.localeCompare(b.name), (a) => a.id),
+        engineersConfig,
+      )
   const engineerDocsList = runList("admin:engineer-docs", engineers, {
     searchText: accountSearch,
     filters: [
@@ -1190,6 +1247,10 @@ function AppInner() {
     )
   }
   function dashboard() {
+    // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
+    const dashActive = runList("dash:admin-active", active, { searchText: () => "" }, { pageSize: 5 })
+    const dashSchedule = runList("dash:admin-schedule", active, { searchText: () => "" }, { pageSize: 5 })
+    const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
     const totalCurrent = state.projects.filter(
       (p) => !["completed", "declined", "expired"].includes(p.status),
     ).length
@@ -1318,7 +1379,12 @@ function AppInner() {
               </Button>
             }
           >
-            {projectTable(active)}
+            <ListSection
+              list={dashActive}
+              compact
+              empty={projectTable([])}
+              render={(items) => projectTable(items)}
+            />
             <div className="panel-foot">
               <span>
                 <i className="status-dot green" />
@@ -1406,7 +1472,12 @@ function AppInner() {
               </Button>
             }
           >
-            <Chart compact projects={active} />
+            <Chart
+              compact
+              projects={dashSchedule.view.items}
+              summaryProjects={active}
+            />
+            <CompactPager list={dashSchedule} />
           </Panel>
           <Panel
             title="Recent activity"
@@ -1421,7 +1492,8 @@ function AppInner() {
               </Button>
             }
           >
-            {activityList(state.events.slice(0, 4), true)}
+            {activityList(dashActivity.view.items, true)}
+            <CompactPager list={dashActivity} />
           </Panel>
         </div>
         <div className="workspace-footer">
@@ -1553,14 +1625,30 @@ function AppInner() {
               schedule baseline is available.
             </p>
           </div>
+          <ListToolbar
+            list={scheduleList}
+            placeholder="Search projects"
+            noun="project"
+          />
+          {!scheduleList.count ? (
+            scheduleList.narrowed ? (
+              <NoResults list={scheduleList} />
+            ) : (
+              <Empty title="No active project schedules yet" />
+            )
+          ) : (
+          <>
           <Panel
             title="Portfolio schedule"
-            subtitle={`${active.length} active projects · recorded completion`}
+            subtitle={`${scheduleList.count} active projects · recorded completion`}
           >
-            <Chart projects={active} />
+            <Chart
+              projects={scheduleList.view.items}
+              summaryProjects={scheduleList.matched}
+            />
           </Panel>
           <div className="schedule-cards">
-            {active.map((p) => (
+            {scheduleList.view.items.map((p) => (
               <Panel
                 key={p.id}
                 title={p.name}
@@ -1581,6 +1669,9 @@ function AppInner() {
               </Panel>
             ))}
           </div>
+          </>
+          )}
+          <ListPager list={scheduleList} />
         </>
       )
     const projectDocumentsTab = () => (
@@ -1648,6 +1739,7 @@ function AppInner() {
               list={engineersList}
               placeholder="Search name, discipline or license"
               noun="person"
+              debounceMs={engineersOnServer ? 300 : 0}
               empty={<Empty title="No matching personnel" />}
               render={(items) => (
                 <div className="engineer-grid">
