@@ -8,13 +8,14 @@ import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
-const backend = here("../../SITELINE Backend/Thesis-Backend/")
+const backend = here("../Thesis-Backend/")
 const free = () => new Promise((r) => { const s = net.createServer().listen(0, "127.0.0.1", () => { const { port } = s.address(); s.close(() => r(port)) }) })
 
 const db = new PGlite({ extensions: { citext } })
 await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
 await db.exec(fs.readFileSync(here("../supabase/migrations/20261017000002_thesis_backend_schema.sql"), "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
 await db.exec(fs.readFileSync(here("../supabase/seed/dummy-data.sql"), "utf8"))
+await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
 const dbPort = await free(), apiPort = await free()
 const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
 await pg.start()
@@ -23,7 +24,7 @@ for (let i = 0; i < 120; i++) { try { if ((await fetch(`http://127.0.0.1:${apiPo
 
 const runs = [
   ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Schedule performance", "Documents", "Directory", "Team", "Archive", "Settings"],
-  ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Schedule", "Subcon directory", "Document repository"],
+  ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Schedule", "Archive", "Activity log", "Preferences"],
   ["karlo.espiritu@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory", "Schedule"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],
   ["f.uy@aldenheights-hoa.com", "Project Overview", "Phase Timeline", "Schedule Performance", "Project Documents", "Progress History", "Site"],

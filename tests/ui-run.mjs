@@ -29,7 +29,7 @@ console.error = (...a) => {
 w.addEventListener("error", (e) => problems.push("window error: " + (e.error?.stack || e.message)))
 process.on("unhandledRejection", (e) => problems.push("unhandled rejection: " + (e?.stack || e)))
 
-const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
+const server = await createServer({ cacheDir: 'node_modules/.vite-tests/' + process.pid, server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const waitFor = async (fn, what, ms = 15000) => {
   const end = Date.now() + ms
@@ -58,7 +58,7 @@ if (document.querySelector("form.login-form")) throw new Error("Sign-in failed: 
 await sleep(500)
 
 const results = { email, signedIn: true, root: document.getElementById("root").innerHTML.length, pages: {} }
-results.banner = text().includes("Live data from the server")
+results.banner = text().includes("Connected to database")
 results.home = text().replace(/\s+/g, " ").slice(0, 160)
 const clickable = () => [...document.querySelectorAll("button, a, [role=button]")]
 for (const label of navLabels) {

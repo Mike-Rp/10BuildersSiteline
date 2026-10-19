@@ -127,7 +127,7 @@ export function AgreementPreviewModal({
 }: {
   project: Project
   actor: Account
-  onAction: (command: WorkflowCommand, message?: string) => boolean
+  onAction: (command: WorkflowCommand, message?: string) => boolean | Promise<boolean>
   onClose: () => void
 }) {
   const [reviewed, setReviewed] = useState(false)
@@ -138,8 +138,8 @@ export function AgreementPreviewModal({
   const review = clientSubconReview(project)
   const open = openClientSubconIssue(project)
   const acknowledged = !!review.acknowledgedAt
-  const send = (command: WorkflowCommand, message: string) =>
-    onAction({ ...command, projectId: project.id }, message)
+  const send = async (command: WorkflowCommand, message: string) =>
+    await onAction({ ...command, projectId: project.id }, message)
   return (
     <Modal
       title="Agreement Preview"
@@ -248,9 +248,9 @@ export function AgreementPreviewModal({
                 variant="primary"
                 icon="check"
                 disabled={!reviewed || !!open || !doc}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    send(
+                    await send(
                       { type: "acknowledge_client_subcon" },
                       "Assignment acknowledged and locked.",
                     )
@@ -281,9 +281,9 @@ export function AgreementPreviewModal({
                   <Button onClick={() => setReporting(false)}>Cancel</Button>
                   <Button
                     variant="primary"
-                    onClick={() => {
+                    onClick={async () => {
                       if (
-                        send(
+                        await send(
                           { type: "report_client_subcon_issue", note: issue },
                           "Issue sent to Admin. Acknowledgment is on hold.",
                         )
@@ -316,7 +316,7 @@ export function ClientSubconAdminCard({
   onPreview,
 }: {
   project: Project
-  onResolve: (issueId: string, resolution: string) => string | undefined
+  onResolve: (issueId: string, resolution: string) => Promise<string | undefined>
   onPreview: (doc: Doc) => void
 }) {
   const [resolution, setResolution] = useState("")
@@ -391,8 +391,8 @@ export function ClientSubconAdminCard({
           )}
           <Button
             variant="primary"
-            onClick={() => {
-              const result = onResolve(open.id, resolution)
+            onClick={async () => {
+              const result = await onResolve(open.id, resolution)
               if (result) setError(result)
               else {
                 setError("")

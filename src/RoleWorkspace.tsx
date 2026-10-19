@@ -147,7 +147,7 @@ export default function RoleWorkspace({
 }: {
   state: State
   actor: Account
-  onCommand: (command: WorkflowCommand) => Result
+  onCommand: (command: WorkflowCommand) => Result | Promise<Result>
   onRead: (ids: string[]) => void
   onMute: (type: string) => void
   paused: boolean
@@ -299,8 +299,8 @@ export default function RoleWorkspace({
     window.addEventListener("pointerdown", close)
     return () => window.removeEventListener("pointerdown", close)
   }, [])
-  function act(command: WorkflowCommand, success?: string) {
-    const result = onCommand(command)
+  async function act(command: WorkflowCommand, success?: string) {
+    const result = await onCommand(command)
     if (!result.ok) {
       setError(result.error || "This action is not available.")
       return false
@@ -326,7 +326,7 @@ export default function RoleWorkspace({
     setPickedId(p.id)
     navigate("Documents")
   }
-  function showDoc(p: Project, doc: Doc) {
+  async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
       setError("Document access is outside your project scope.")
       return
@@ -338,7 +338,7 @@ export default function RoleWorkspace({
       return
     }
     if (
-      act(
+      await act(
         { type: "view_document", projectId: p.id, doc },
         "Watermarked document preview opened.",
       )
@@ -414,8 +414,8 @@ export default function RoleWorkspace({
                 <select
                   aria-label={`Reassign ${p.name} ${t.phase}`}
                   value=""
-                  onChange={(e) =>
-                    act(
+                  onChange={async (e) =>
+                    await act(
                       {
                         type: "reassign_phase",
                         projectId: p.id,
@@ -504,9 +504,9 @@ export default function RoleWorkspace({
               <Button
                 variant="primary"
                 icon="check"
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    act(
+                    await act(
                       { type: "accept_opm", projectId: p.id },
                       "Office PM assignment accepted.",
                     )
@@ -875,8 +875,8 @@ export default function RoleWorkspace({
                         owner={actor.name}
                         disabled={!p.opmAccepted || p.status !== "pending"}
                         buttonLabel={`Upload ${label}`}
-                        onSave={(d) =>
-                          act(
+                        onSave={async (d) =>
+                          await act(
                             {
                               type: "upload_registered",
                               projectId: p.id,
@@ -1120,8 +1120,8 @@ export default function RoleWorkspace({
                   icon="check"
                   disabled={!!block}
                   title={block}
-                  onClick={() =>
-                    act(
+                  onClick={async () =>
+                    await act(
                       { type: "accept_assignment", projectId: p.id },
                       actor.id === leadId(p)
                         ? "Lead Site PM accepted. Remaining Site PMs may now respond."
@@ -1670,8 +1670,8 @@ export default function RoleWorkspace({
                       owner={actor.name}
                       buttonLabel="Upload evidence"
                       ariaLabel={`Upload evidence for ${item.label}`}
-                      onSave={(doc) =>
-                        act(
+                      onSave={async (doc) =>
+                        await act(
                           {
                             type: "submit_checklist",
                             projectId: p.id,
@@ -1744,9 +1744,9 @@ export default function RoleWorkspace({
                 <Button
                   variant="primary"
                   disabled={!!work.pendingUpdate && !issueChoices.length}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      act(
+                      await act(
                         {
                           type: "submit_progress",
                           projectId: p.id,
@@ -1785,9 +1785,9 @@ export default function RoleWorkspace({
               />
             </Field>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  act(
+                  await act(
                     { type: "add_note", projectId: p.id, note: diary },
                     "Site diary updated.",
                   )
@@ -1820,8 +1820,8 @@ export default function RoleWorkspace({
               label="Shared site photo (Client-visible)"
               buttonLabel="Upload site photo"
               owner={actor.name}
-              onSave={(doc) =>
-                act(
+              onSave={async (doc) =>
+                await act(
                   { type: "add_photo", projectId: p.id, doc },
                   "Site photo saved.",
                 )
@@ -1886,8 +1886,8 @@ export default function RoleWorkspace({
                   {isOpm && (
                     <Button
                       icon="bell"
-                      onClick={() =>
-                        act(
+                      onClick={async () =>
+                        await act(
                           { type: "request_update", projectId: p.id },
                           "Site PM update reminder recorded.",
                         )
@@ -2041,8 +2041,8 @@ export default function RoleWorkspace({
                             <Button
                               variant="primary"
                               icon="check"
-                              onClick={() =>
-                                act(
+                              onClick={async () =>
+                                await act(
                                   {
                                     type: "approve_checklist",
                                     projectId: p.id,
@@ -2058,8 +2058,8 @@ export default function RoleWorkspace({
                             </Button>
                             <Button
                               variant="danger-ghost"
-                              onClick={() =>
-                                act(
+                              onClick={async () =>
+                                await act(
                                   {
                                     type: "reject_checklist",
                                     projectId: p.id,
@@ -2186,8 +2186,8 @@ export default function RoleWorkspace({
                         <Button
                           variant="primary"
                           icon="check"
-                          onClick={() =>
-                            act(
+                          onClick={async () =>
+                            await act(
                               {
                                 type: "approve_update",
                                 projectId: p.id,
@@ -2914,8 +2914,8 @@ export default function RoleWorkspace({
           {isOpm && p.status === "active" && (
             <Button
               icon="bell"
-              onClick={() =>
-                act(
+              onClick={async () =>
+                await act(
                   { type: "request_update", projectId: p.id },
                   "Site update reminder recorded.",
                 )
@@ -3102,9 +3102,9 @@ export default function RoleWorkspace({
             <div className="modal-actions">
               <Button
                 variant="danger-ghost"
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    act(
+                    await act(
                       {
                         type: "archive_company_request",
                         projectId: c.projectId,
@@ -3538,9 +3538,9 @@ export default function RoleWorkspace({
             <Button onClick={() => setDialog(undefined)}>Cancel</Button>
             <Button
               variant="primary"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  act(
+                  await act(
                     {
                       type: "request_changes",
                       projectId: detail.id,
@@ -3585,9 +3585,9 @@ export default function RoleWorkspace({
             <Button onClick={() => setDialog(undefined)}>Cancel</Button>
             <Button
               variant="danger"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  act(
+                  await act(
                     {
                       type: "decline_assignment",
                       projectId: detail.id,
@@ -3652,9 +3652,9 @@ export default function RoleWorkspace({
             }
             projects={requestProjects}
             onClose={() => setDialog(undefined)}
-            onSave={(c, projectId) => {
+            onSave={async (c, projectId) => {
               if (
-                act(
+                await act(
                   { type: "request_company", projectId, company: c },
                   "Company suggestion sent for Administrator verification.",
                 )
@@ -3712,8 +3712,8 @@ export default function RoleWorkspace({
             <Button onClick={() => setReviewAction(undefined)}>Cancel</Button>
             <Button
               variant="primary"
-              onClick={() => {
-                if (act(reviewAction, "Rework decision recorded."))
+              onClick={async () => {
+                if (await act(reviewAction, "Rework decision recorded."))
                   setReviewAction(undefined)
               }}
             >

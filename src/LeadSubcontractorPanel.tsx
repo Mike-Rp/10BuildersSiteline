@@ -162,7 +162,7 @@ export default function LeadSubcontractorPanel({
   state: State
   project: Project
   actor: Account
-  onAction: (command: WorkflowCommand, message?: string) => boolean
+  onAction: (command: WorkflowCommand, message?: string) => boolean | Promise<boolean>
   onCrew: (companyId: string) => void
   onNewCompany: () => void
   onPreview: (doc: Doc) => void
@@ -254,8 +254,8 @@ export default function LeadSubcontractorPanel({
       </div>
     )
   }
-  function command(action: WorkflowCommand, message: string) {
-    return onAction({ ...action, projectId: project.id }, message)
+  async function command(action: WorkflowCommand, message: string) {
+    return await onAction({ ...action, projectId: project.id }, message)
   }
   function availabilityDetails(candidate: Recommendation) {
     return <CompanyAvailability candidate={candidate} />
@@ -441,8 +441,8 @@ export default function LeadSubcontractorPanel({
                       <div className="subcon-contact-actions">
                         <Button
                           icon="clock"
-                          onClick={() =>
-                            command(
+                          onClick={async () =>
+                            await command(
                               {
                                 type: "contact_company",
                                 companyId: currentCompany.id,
@@ -460,8 +460,8 @@ export default function LeadSubcontractorPanel({
                           <Button
                             variant="primary"
                             icon="check"
-                            onClick={() =>
-                              command(
+                            onClick={async () =>
+                              await command(
                                 {
                                   type: "respond_company",
                                   companyId: currentCompany.id,
@@ -475,8 +475,8 @@ export default function LeadSubcontractorPanel({
                           </Button>
                           <Button
                             variant="danger-ghost"
-                            onClick={() =>
-                              command(
+                            onClick={async () =>
+                              await command(
                                 {
                                   type: "respond_company",
                                   companyId: currentCompany.id,
@@ -560,8 +560,8 @@ export default function LeadSubcontractorPanel({
                   <Button
                     variant="primary"
                     icon="clock"
-                    onClick={() =>
-                      command(
+                    onClick={async () =>
+                      await command(
                         {
                           type: "contact_company",
                           companyId: featured.company.id,
@@ -665,8 +665,8 @@ export default function LeadSubcontractorPanel({
                         className="full-width"
                         icon="clock"
                         disabled={declined}
-                        onClick={() =>
-                          command(
+                        onClick={async () =>
+                          await command(
                             {
                               type: "contact_company",
                               companyId: candidate.company.id,
@@ -769,8 +769,8 @@ export default function LeadSubcontractorPanel({
                         variant="primary"
                         icon="clock"
                         disabled={declined || !!current}
-                        onClick={() =>
-                          command(
+                        onClick={async () =>
+                          await command(
                             {
                               type: "contact_company",
                               companyId: candidate.company.id,
@@ -969,9 +969,9 @@ export default function LeadSubcontractorPanel({
                 owner={actor.name}
                 disabled={!responsesComplete}
                 buttonLabel="Upload signed subcontractor agreement"
-                onSave={(doc) => {
+                onSave={async (doc) => {
                   if (
-                    command(
+                    await command(
                       { type: "upload_agreement", doc },
                       "All final checks passed. Project and client access activated.",
                     )
@@ -1029,9 +1029,9 @@ export default function LeadSubcontractorPanel({
             <Button
               variant="primary"
               icon="check"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  command(
+                  await command(
                     { type: "activate_project" },
                     "Project activated. Mobilization starts at 0%.",
                   )

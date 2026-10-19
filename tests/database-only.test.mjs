@@ -57,7 +57,7 @@ test("loading an empty database returns only the authenticated database account"
   assert.deepEqual(state.projects, [])
   assert.deepEqual(state.companies, [])
   assert.deepEqual(state.events, [])
-  assert.ok(requested.includes("/api/v1/projects"))
+  assert.ok(requested.includes("/api/v1/workspace/project-data"))
   assert.ok(requested.includes("/api/v1/accounts"))
 })
 

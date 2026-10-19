@@ -1,3 +1,4 @@
+import { uploadFile } from "./api/actions"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
@@ -65,40 +66,8 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-// With the API, files are fetched from the server (see src/api/client.ts);
-// otherwise they stay in this browser's IndexedDB (not secure cloud storage).
-function fileDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("siteline-files", 1)
-    req.onupgradeneeded = () => req.result.createObjectStore("files")
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () =>
-      reject(new Error("Local document storage is unavailable."))
-  })
-}
-async function saveFile(id: string, file: File) {
-  if (apiEnabled)
-    throw new Error("Uploading files is not available yet in view-only mode.")
-  const db = await fileDB()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("files", "readwrite")
-    tx.objectStore("files").put(file, id)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(new Error("Unable to save file."))
-  })
-  db.close()
-}
-export async function fileFor(id: string): Promise<Blob | undefined> {
-  if (apiEnabled) return downloadApiFile(id)
-  const db = await fileDB()
-  const file = await new Promise<Blob | undefined>((resolve, reject) => {
-    const req = db.transaction("files").objectStore("files").get(id)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-  db.close()
-  return file
-}
+async function saveFile(id:string,file:File) { await uploadFile(id,file) }
+export async function fileFor(id:string) { return downloadApiFile(id) }
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
@@ -132,7 +101,7 @@ export function Upload({
   spreadsheet = false,
 }: {
   label: string
-  onSave: (doc: Doc) => void
+  onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
   owner?: string
   disabled?: boolean
   buttonLabel?: string
@@ -178,7 +147,7 @@ export function Upload({
     try {
       const id = uid()
       await saveFile(id, file)
-      onSave({
+      const saved=await onSave({
         id,
         label,
         name: file.name,
@@ -189,6 +158,7 @@ export function Upload({
         size: file.size,
         mime: file.type,
       })
+      if(saved===false)throw new Error("The server could not save this change. Review the workspace message and try again.")
       clear()
     } catch (e) {
       setError((e as Error).message)
@@ -234,8 +204,7 @@ export function Upload({
             <div>
               <strong>{file.name}</strong>
               <p>
-                {(file.size / 1024 / 1024).toFixed(2)} MB · Stored in this
-                browser
+                {(file.size / 1024 / 1024).toFixed(2)} MB · Ready to upload
               </p>
             </div>
           </div>
@@ -606,7 +575,7 @@ export function AccountForm({
   state: State
   account?: Account
   clientOnly?: boolean
-  onSave: (a: Account, pass?: string) => void
+  onSave: (a: Account, pass?: string) => void | Promise<void>
   onUseExisting?: (a: Account) => void
   onClose: () => void
 }) {
@@ -632,7 +601,7 @@ export function AccountForm({
   const existingClient = clientOnly
     ? clientForEmail(state, draft.email, draft.id)
     : undefined
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault()
     const err = clientOnly
       ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
@@ -646,8 +615,8 @@ export function AccountForm({
           : ""
       : accountError(draft, state)
     setError(err)
-    if (!err)
-      onSave(
+    if (!err) try {
+      await onSave(
         {
           ...draft,
           name: draft.name.trim(),
@@ -656,6 +625,7 @@ export function AccountForm({
         },
         account ? undefined : pass,
       )
+    } catch(reason) { setError((reason as Error).message) }
   }
   function chips(
     values: string[],
@@ -756,7 +726,7 @@ export function AccountForm({
           <h3>
             Discipline scope <span>Choose 1–3</span>
           </h3>
-          {chips(DISCIPLINES, draft.scope, "scope", 3)}
+          {chips(state.referenceDisciplines || DISCIPLINES, draft.scope, "scope", 3)}
         </section>
       )}
       {draft.role === "opm" && (
@@ -861,7 +831,7 @@ export function AccountDeactivationForm({
   account: Account
   activeProjects: Project[]
   admin: Account
-  onConfirm: (letter: Doc, noticeDays: number) => string | undefined
+  onConfirm: (letter: Doc, noticeDays: number) => Promise<string | undefined>
   onClose: () => void
 }) {
   const [noticeDays, setNoticeDays] = useState(30)
@@ -874,7 +844,7 @@ export function AccountDeactivationForm({
   ).toISOString()
   return (
     <form
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
         if (blocked) {
           setError(
@@ -898,7 +868,7 @@ export function AccountDeactivationForm({
           setError("Administrator confirmation is required.")
           return
         }
-        const message = onConfirm(letter, noticeDays)
+        const message = await onConfirm(letter, noticeDays)
         if (message) setError(message)
       }}
     >
@@ -1023,8 +993,8 @@ export function IntakeForm({
 }: {
   state: State
   project?: Project
-  onSubmit: (p: Project) => void
-  onClient: (a: Account) => void
+  onSubmit: (p: Project) => void | Promise<void>
+  onClient: (a: Account) => Account | Promise<Account>
   onClose: () => void
 }) {
   const [step, setStep] = useState(project ? 2 : 1)
@@ -1070,7 +1040,7 @@ export function IntakeForm({
         name,
         disciplines: projectPhaseDisciplines(project, name),
       }))
-    : phaseDefinitions(draft.type)
+    : (state.backendPhases?.[draft.type] || phaseDefinitions(draft.type))
   function recommend(version = 0) {
     const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
     const team = allocationPhases.map((phase, sequence) => {
@@ -1164,7 +1134,7 @@ export function IntakeForm({
     recommend()
     setStep(2)
   }
-  function submit() {
+  async function submit() {
     let err = validDetails()
     if (
       !draft.docs.some(
@@ -1207,8 +1177,8 @@ export function IntakeForm({
       err =
         "Every phase needs an eligible Site PM. Review team capacity and qualifications."
     setError(err)
-    if (!err)
-      onSubmit({
+    if (!err) try {
+      await onSubmit({
         ...draft,
         status: "pending",
         opmAccepted: false,
@@ -1218,6 +1188,7 @@ export function IntakeForm({
           : undefined,
         team: draft.team.map((t) => ({ ...t, status: "pending" })),
       })
+    } catch(reason) { setError((reason as Error).message) }
   }
   const count = headcount(draft.type, draft.area, draft.floors)
   const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
@@ -1738,9 +1709,9 @@ export function IntakeForm({
               setNewClient(false)
               setError("")
             }}
-            onSave={(a) => {
-              onClient(a)
-              patch({ clientId: a.id })
+            onSave={async (a) => {
+              const saved=await onClient(a)
+              patch({ clientId: saved.id })
               setNewClient(false)
             }}
           />
@@ -1774,7 +1745,7 @@ export function LicenseForm({
   const [error, setError] = useState("")
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault()
         if (!number.trim() || !expiry || !doc) {
           setError(
@@ -1782,7 +1753,7 @@ export function LicenseForm({
           )
           return
         }
-        onSave({
+        await onSave({
           ...account,
           license: number,
           expiry,
@@ -1880,13 +1851,13 @@ export function CompanyForm({
     setDraft((company) => ({ ...company, ...values }))
   return (
     <form
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
         if (!draft.name.trim()) {
           setError("Company name is required.")
           return
         }
-        onSave({ ...draft, name: draft.name.trim() })
+        try {await onSave({ ...draft, name: draft.name.trim() })}catch(error){setError((error as Error).message)}
       }}
     >
       <div className="form-grid">
@@ -2092,8 +2063,8 @@ export function SettingsForm({
             <Button onClick={() => setConfirm(undefined)}>Cancel</Button>
             <Button
               variant="primary"
-              onClick={() => {
-                onSave(
+              onClick={async () => {
+                await onSave(
                   { ...rules, [confirm]: draft[confirm] },
                   labels[confirm][0],
                 )

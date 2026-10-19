@@ -1,3 +1,5 @@
+import PasswordReset from "./PasswordReset"
+import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
@@ -192,8 +194,6 @@ function Search({
     </div>
   )
 }
-const API_READ_ONLY_MESSAGE =
-  "Connected to the server in view-only mode. Saving changes is not available yet."
 const ACCOUNT_UNAVAILABLE_MESSAGE =
   "This account is not active. Contact your Administrator."
 const INVALID_CREDENTIALS_MESSAGE =
@@ -237,6 +237,7 @@ function AppInner() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [mustResetPassword,setMustResetPassword]=useState(false)
   const [idleWarning, setIdleWarning] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
@@ -372,23 +373,21 @@ function AppInner() {
       ],
     }
   }
-  function commit(
-    change: (s: State) => State,
-    title: string,
-    detail = "",
-    type = "account",
-    target = page,
-  ) {
-    if (signedOut || actor.role !== "admin") {
-      setToast("Sign in again to continue.")
-      return
-    }
-    if (apiEnabled) {
-      setToast(API_READ_ONLY_MESSAGE)
-      return
-    }
-    setState((s) => log(change(s), title, detail, type, target))
-    setToast(title)
+  async function reloadWorkspace() {
+    const loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email})
+    stateRef.current=loaded
+    setState(loaded)
+    return loaded
+  }
+  async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
+    if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}
+    try {
+      const current=stateRef.current
+      await persistAdminChanges(current,change(current))
+      await reloadWorkspace()
+      setToast(title)
+      return true
+    } catch(error) { setToast((error as Error).message);return false }
   }
   function resetListState() {
     setQuery("")
@@ -437,6 +436,7 @@ function AppInner() {
     full_name?: string
     email?: string
   }): Promise<Account> {
+    setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
     const loaded = await loadApiState(user)
     const account = loaded.accounts.find((a) => a.id === user.id)
     try {
@@ -493,78 +493,42 @@ function AppInner() {
     stateRef.current = empty
     setState(empty)
   }
-  function sendWorkflow(command: WorkflowCommand) {
-    if (signedOut)
-      return {
-        ok: false,
-        error: "Your session has ended. Sign in again to continue.",
-      }
-    if (apiEnabled) return { ok: false, error: API_READ_ONLY_MESSAGE }
+  async function sendWorkflow(command:WorkflowCommand) {
+    if(signedOut)return {ok:false,error:"Your session has ended. Sign in again to continue."}
+    try{
+      await sendApiWorkflow(stateRef.current,actor,command)
+      await reloadWorkspace()
+      return {ok:true}
+    }catch(error){return {ok:false,error:(error as Error).message}}
+  }
+  async function updateAccount(account:Account) {
+    try{await saveApiAccount(account,true);await reloadWorkspace();setToast("Account details updated");setDialog({kind:"account",id:account.id});return true}
+    catch(error){setToast((error as Error).message);return false}
+  }
+  async function saveAccount(account:Account,password?:string) {
+    try{
+      const exists=stateRef.current.accounts.some(a=>a.id===account.id)
+      const saved=await saveApiAccount(account,exists,password)
+      await reloadWorkspace();setDialog(undefined)
+      if(!exists&&saved.password)setCredentials({name:account.name,password:saved.password})
+      setToast(exists?"Account updated":"Account created")
+    }catch(error){setToast((error as Error).message);throw error}
+  }
+  async function saveClient(account:Account) {
+    const saved=await saveApiAccount(account,false)
+    const loaded=await reloadWorkspace()
+    return loaded.accounts.find(a=>a.id===saved.id)!
+  }
+  async function addProject(project:Project) {
     try {
-      const next = applyWorkflow(stateRef.current, actor.id, command)
-      stateRef.current = next
-      setState(next)
-      return { ok: true }
-    } catch (error) {
-      return { ok: false, error: (error as Error).message }
-    }
-  }
-  function updateAccount(a: Account) {
-    if (state.accounts.find((x) => x.id === a.id)?.status === "deactivated") {
-      setToast("Deactivated personnel records are read-only until reactivated.")
-      return
-    }
-    commit(
-      (s) => ({
-        ...s,
-        accounts: s.accounts.map((x) => (x.id === a.id ? a : x)),
-      }),
-      "Account details updated",
-      a.name,
-    )
-    setDialog({ kind: "account", id: a.id })
-  }
-  function saveAccount(a: Account, pass?: string) {
-    const exists = state.accounts.some((x) => x.id === a.id)
-    commit(
-      (s) => ({
-        ...s,
-        accounts: exists
-          ? s.accounts.map((x) => (x.id === a.id ? a : x))
-          : [...s.accounts, a],
-      }),
-      exists ? "Account details updated" : "New account created",
-      `${a.name} · ${ROLE_NAMES[a.role]}`,
-      "account",
-      "Team",
-    )
-    setDialog(undefined)
-    if (pass) setCredentials({ name: a.name, password: pass })
-  }
-  function addProject(p: Project) {
-    // Backstop for the intake form: new projects need realistic dates based on today.
-    const isNew = !state.projects.some((x) => x.id === p.id)
-    if (isNew) {
-      const dateErrs = projectDateErrors(p.start, p.end || "")
-      if (dateErrs.start || dateErrs.end || !p.start || !p.end) return
-    }
-    commit(
-      (s) => ({
-        ...s,
-        projects: s.projects.some((x) => x.id === p.id)
-          ? s.projects.map((x) => (x.id === p.id ? p : x))
-          : [...s.projects, p],
-      }),
-      "Project sent to Office PM",
-      `${p.name} · ${nameFor(p.opmId)}`,
-      "request",
-      "Project intake",
-    )
-    navigate("Project intake")
-    setDialog({ kind: "sent", id: p.id })
+      const exists=stateRef.current.projects.some(p=>p.id===project.id)
+      const id=await saveApiProject(project,exists)
+      await reloadWorkspace()
+      navigate("Project intake");setDialog({kind:"sent",id})
+    }catch(error){setToast((error as Error).message);throw error}
   }
   function updateCompany(c: Company, message: string) {
-    commit(
+    return commit(
       (s) => ({
         ...s,
         companies: s.companies.map((x) =>
@@ -652,61 +616,30 @@ function AppInner() {
         ),
     })
   }
-  function startResignation(a: Account, letter: Doc, noticeDays: number) {
-    if (signedOut || actor.role !== "admin")
-      return "Reopen the Administrator session to continue."
-    if (apiEnabled) return API_READ_ONLY_MESSAGE
+  async function startResignation(a: Account, letter: Doc, noticeDays: number) {
     try {
-      const next = beginAccountResignation(
-        stateRef.current,
-        actor.id,
-        a.id,
-        letter,
-        noticeDays,
-      )
-      stateRef.current = next
-      setState(next)
-      setToast(
-        noticeDays === 0
-          ? "Employee account deactivated"
-          : "Assignment Hold activated",
-      )
-      setDialog({ kind: "account", id: a.id })
-    } catch (reason) {
-      return (reason as Error).message
-    }
+      await api("/accounts/"+a.id+"/resignation",{method:"POST",json:{letter,noticeDays}})
+      await reloadWorkspace()
+      setToast(noticeDays===0?"Employee account deactivated":"Assignment Hold activated")
+      setDialog({kind:"account",id:a.id})
+    } catch(error){return (error as Error).message}
   }
-  function resolveSubconIssue(
-    projectId: string,
-    issueId: string,
-    text: string,
-  ) {
-    if (signedOut || actor.role !== "admin") return "Sign in again to continue."
-    if (apiEnabled) return API_READ_ONLY_MESSAGE
+  async function resolveSubconIssue(projectId:string,issueId:string,text:string) {
     try {
-      const next = resolveClientSubconIssue(
-        stateRef.current,
-        actor.id,
-        projectId,
-        issueId,
-        text,
-      )
-      stateRef.current = next
-      setState(next)
+      await api("/projects/"+projectId+"/workspace-command",{method:"POST",json:{type:"resolve_client_subcon_issue",issueId,note:text}})
+      await reloadWorkspace()
       setToast("Issue resolved. Lead Site PM can continue.")
-    } catch (error) {
-      return (error as Error).message
-    }
+    } catch(error){return (error as Error).message}
   }
   function previewDoc(d: Doc) {
     setPreview(d)
     commit((s) => s, "Document viewed", d.label, "view")
   }
   function addAccountDoc(a: Account, d: Doc) {
-    updateAccount({ ...a, docs: [...a.docs, d] })
+    return updateAccount({ ...a, docs: [...a.docs, d] })
   }
   function addEngagement(p: Project, a: Account, d: Doc) {
-    commit(
+    return commit(
       (s) => ({
         ...s,
         projects: s.projects.map((x) =>
@@ -2146,7 +2079,7 @@ function AppInner() {
             <div className="notice neutral">
               <Icon name="doc" />
               <p>
-                Accounts and records are stored in this browser. Account access
+                Accounts and records are saved to the database. Account access
                 and password changes are managed by the Administrator. No public
                 sharing is enabled.
               </p>
@@ -2805,6 +2738,7 @@ function AppInner() {
   )
   if (signedOut || checkingSession || !actor.id)
     return <LoginPage checkingSession={checkingSession} onSignIn={signIn} />
+  if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (
@@ -3022,7 +2956,7 @@ function AppInner() {
                 setConfirmation({
                   title: "Sign out?",
                   message:
-                    "Your local workspace records are retained in this browser.",
+                    "Your records will be available when you sign in again.",
                   action: endSession,
                 })
               }
@@ -3164,15 +3098,7 @@ function AppInner() {
             project={selectedProject}
             onClose={() => setDialog(undefined)}
             onSubmit={addProject}
-            onClient={(a) =>
-              commit(
-                (s) => ({ ...s, accounts: [...s.accounts, a] }),
-                "Client details saved",
-                `${a.name} · Access remains inactive`,
-                "account",
-                "Team",
-              )
-            }
+            onClient={saveClient}
           />
         </Modal>
       )}
@@ -3311,18 +3237,9 @@ function AppInner() {
           <CompanyForm
             owner={admin.name}
             onClose={() => setDialog(undefined)}
-            onSave={(company) => {
-              commit(
-                (current) => ({
-                  ...current,
-                  companies: [...current.companies, company],
-                }),
-                "Subcontractor company added",
-                company.name,
-                "account",
-                "Subcon directory",
-              )
-              setDialog({ kind: "company", id: company.id })
+            onSave={async(company)=>{
+              try{const saved=await createCompany(company);await reloadWorkspace();setDialog({kind:"company",id:saved.id});setToast("Company added")}
+              catch(error){setToast((error as Error).message)}
             }}
           />
         </Modal>
@@ -3439,9 +3356,8 @@ function AppInner() {
             </p>
             <h4>Records and access</h4>
             <p>
-              Records are saved in this browser, and uploaded files are stored
-              with them. Older document records may not include an attached
-              original file.
+              Records and uploads are saved through the server to the database.
+              Access follows your account role and project assignments.
             </p>
             <p>
               Other roles cannot be impersonated or accepted on behalf of from
@@ -3508,9 +3424,8 @@ function AppInner() {
             </Button>
           </div>
           <p>
-            Shown once in this session. This is a local account record;
-            credential delivery and authentication need a backend. No invitation
-            email was sent.
+            Shown once in this session. Share this temporary password with the
+            account owner. They must choose a new password after signing in.
           </p>
           <div className="modal-actions">
             <Button variant="primary" onClick={() => setCredentials(undefined)}>
@@ -3550,7 +3465,7 @@ export default function App() {
       <AppInner />
       {apiEnabled && (
         <div className="api-mode-banner" role="status">
-          Database workspace · view only
+          Connected to database
         </div>
       )}
     </>

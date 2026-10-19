@@ -9,6 +9,7 @@ import {
   peopleFromProjects,
   stubAccount,
   type Dto,
+  type ProjectParts,
 } from "./adapter.ts"
 
 const optional = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
@@ -38,23 +39,27 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
 
 // Everything the signed-in role may see, as the app's State.
 export async function loadState(me: { id: string; role: Role; full_name?: string; email?: string }): Promise<State> {
-  const [projectList, subcontractors, notifications] = await Promise.all([
-    apiList<Dto>("/projects"),
+  const [projectData, subcontractors, notifications, workspace] = await Promise.all([
+    api<Omit<ProjectParts,"clientId"|"register">[]>("/workspace/project-data"),
     optional(apiList<Dto>("/subcontractors"), []),
     optional(apiList<Dto>("/notifications"), []),
+    optional(api<Dto>("/workspace"), {}),
   ])
 
+  const projectList=projectData.map(p=>p.list)
   // Accounts: the admin lists everyone; other roles only know their own record.
   let accounts: Account[] = []
   const projectIdsByName = new Map(projectList.map((p) => [String(p.name).toLowerCase(), p.id as string]))
   if (me.role === "admin") {
     const list = await apiList<Dto>("/accounts")
     accounts = await pool(list, 6, async (a) => {
-      const detail = await optional(api<Dto>(`/accounts/${a.id}`), undefined as unknown as Dto)
-      return mapAccount(a, detail, projectIdsByName)
+      const detail = workspace.accountDetails?.[a.id] || await optional(api<Dto>(`/accounts/${a.id}`), undefined as unknown as Dto)
+      const mapped=mapAccount(a,detail,projectIdsByName)
+      const metadata=workspace.accounts?.[a.id]||{}
+      return {...mapped,...metadata,status:metadata.status==="deactivated"&&mapped.status==="suspended"?"deactivated":mapped.status} as Account
     })
   }
-  const selfDetail = await optional(api<Dto>(`/accounts/${me.id}`), undefined as unknown as Dto)
+  const selfDetail = accounts.some(a=>a.id===me.id)?undefined:await optional(api<Dto>(`/accounts/${me.id}`), undefined as unknown as Dto)
   const self =
     accounts.find((a) => a.id === me.id) ||
     mapAccount(
@@ -63,27 +68,16 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
       projectIdsByName,
     )
 
-  // Per-project detail.
-  const parts = await pool(projectList, 4, async (list) => {
-    const id = list.id as string
-    const [detail, documents, history, photos, notes, overview, assignments, contracts, pending] = await Promise.all([
-      api<Dto>(`/projects/${id}`),
-      optional(api<Dto[]>(`/projects/${id}/documents`), []),
-      optional(api<Dto[]>(`/projects/${id}/history`), []),
-      optional(api<Dto[]>(`/projects/${id}/photos`), []),
-      optional(api<Dto[]>(`/projects/${id}/notes`), []),
-      optional(api<Dto>(`/projects/${id}/phase-overview`), undefined as unknown as Dto),
-      optional(api<Dto[]>(`/projects/${id}/subcontractor-assignments`), []),
-      optional(api<Dto[]>(`/projects/${id}/contracts`), []),
-      optional(api<Dto | null>(`/projects/${id}/progress-updates/pending`), null),
-    ])
-    return { list, detail, documents, history, photos, notes, overview, assignments, contracts, pending }
-  })
+  const selfStatus=self.status
+  Object.assign(self,workspace.accounts?.[me.id]||{})
+  if(!(self.status==="deactivated"&&selfStatus==="suspended"))self.status=selfStatus
+  // All permitted project data arrives in one request.
+  const parts = projectData
 
   const details = new Map(parts.map((p) => [p.list.id as string, p.detail]))
   const people = peopleFromProjects(self, projectList, details, accounts)
   const projects = parts.map((p) =>
-    mapProject({ ...p, clientId: people.clientIds.get(p.list.id) || "", register: registerFileUrl }),
+    mapProject({ ...p, list:{...p.list,...(workspace.projects?.[p.list.id]||{})}, detail:{...p.detail,workspace:workspace.projects?.[p.list.id]||{},selections:(workspace.selections||[]).filter((s:Dto)=>s.project_id===p.list.id)}, clientId: people.clientIds.get(p.list.id) || "", register: registerFileUrl }),
   )
   // Client accounts see only their own projects.
   const finalAccounts = people.accounts.map((a) =>
@@ -91,11 +85,18 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   )
   if (!finalAccounts.some((a) => a.id === me.id)) finalAccounts.push(stubAccount(me.id, me.full_name ?? "", me.role))
 
-  return buildState({
+  const loaded = buildState({
     me,
     accounts: finalAccounts,
     projects,
-    companies: subcontractors.map((s) => mapCompany(s, projectIdsByName)),
+    companies: subcontractors.map((s) => ({...mapCompany(s, projectIdsByName),...(workspace.companies?.[s.id]||{})})),
     events: notifications.map((n) => mapEvent(n, me.role === "admin" ? undefined : me.id)),
   })
+  if(workspace.rules)loaded.rules=workspace.rules
+  if(workspace.preferences?.muted)loaded.muted=workspace.preferences.muted
+  loaded.backendPhases=workspace.backendPhases
+  loaded.referenceDisciplines=workspace.referenceDisciplines
+  for(const account of loaded.accounts)for(const doc of account.docs)if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")
+  for(const company of loaded.companies)for(const doc of [...company.documents,...company.manpowerDocuments])if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")
+  return loaded
 }

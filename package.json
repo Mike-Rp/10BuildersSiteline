@@ -4,12 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "test:ui": "node --experimental-strip-types tests/ui-smoke.mjs"
+    "test:ui": "node --experimental-strip-types tests/ui-smoke.mjs",
+    "dev:web": "vite",
+    "dev:api": "npm --prefix Thesis-Backend run serve"
   },
   "dependencies": {
     "pdfjs-dist": "^6.4.299",

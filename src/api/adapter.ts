@@ -98,7 +98,9 @@ export function mapAccount(
     license: license?.license_number ?? "",
     expiry: day(license?.license_expiry),
     docs: [],
+    eligibleForNewAssignment:["opm","spm"].includes(role)?Boolean(license?.upload_status==="uploaded"&&license?.upload_file_ref&&day(license.license_expiry)>=new Date().toISOString().slice(0,10)):undefined,
   }
+  if(detail?.license?.upload_file_ref?.startsWith("db:")){const fileId=detail.license.upload_file_ref.replace(/^db:(\/\/)?/,"");account.docs.push({id:fileId,label:"PRC License",name:"PRC License.pdf",uploaded:true,owner:account.name,date:account.added,clientVisible:false})}
   if (detail?.certifications?.length)
     account.certifications = detail.certifications
   return account
@@ -135,12 +137,12 @@ export function mapDocs(
     return {
       id,
       label: DOC_LABELS[i],
-      name: uploaded ? `${DOC_LABELS[i]}.pdf` : "",
+      name: uploaded ? (row?.original_name || `${DOC_LABELS[i]}.pdf`) : "",
       uploaded,
       clientVisible: row ? Boolean(row.client_visible) : CLIENT_VISIBLE.has(i),
       owner: i === 6 ? "Lead Site PM" : "Office PM",
       date: uploaded ? day(row?.uploaded_at) : "",
-      mime: uploaded ? "application/pdf" : undefined,
+      mime: uploaded ? row?.content_type || "application/pdf" : undefined,
     }
   })
 }
@@ -155,7 +157,7 @@ export function mapPhoto(
     label: row.caption || "Site photo",
     name: `${row.caption || "site-photo"}.png`,
     uploaded: true,
-    clientVisible: true,
+    clientVisible: row.client_visible !== false,
     owner: "Site PM",
     date: day(row.taken_date || row.created_at),
     mime: "image/png",
@@ -227,6 +229,7 @@ export function mapProject(parts: ProjectParts): Project {
         reviewedAt: i.reviewed_at ? iso(i.reviewed_at) : undefined,
         note: i.submission_note || undefined,
         submittedBy: i.submitted_by || undefined,
+        doc:i.file_id?{id:i.file_id,label:i.title,name:i.original_name||"Checklist evidence.pdf",uploaded:true,clientVisible:false,owner:"Site PM",date:day(i.submitted_at),mime:i.content_type}:undefined,
       }),
     )
 
@@ -240,27 +243,32 @@ export function mapProject(parts: ProjectParts): Project {
     checklist,
     notes: parts.notes.map((n) => ({
       id: n.id,
-      authorId: "",
+      authorId: n.author_id || "",
       text: n.note_text,
       date: iso(n.noted_at),
     })),
     photos: parts.photos.map((p) => mapPhoto(p, register)),
   }
-  const pending = parts.pending
+  for(const item of items)if(item.file_id)register(item.file_id,"/api/v1/projects/"+id+"/phase-files/"+item.file_id+"")
+  const pending = parts.overview && "pending_update" in parts.overview ? parts.overview.pending_update : parts.pending
   if (pending?.id)
     workflow.pendingUpdate = {
       id: String(pending.id),
       version: 1,
-      authorId: "",
+      authorId: pending.submitted_by || "",
       submittedAt: iso(pending.submitted_at),
       note: pending.note || "",
-      issues: [],
+      issues: pending.issue_categories || [],
       priorPhase: pending.prior_stage || list.current_stage,
       priorProgress: Number(pending.prior_pct ?? 0),
-      requestedPhase: pending.requested_stage || list.current_stage,
+      requestedPhase: pending.requested_stage || parts.overview?.stages?.find((s:Dto)=>s.id===pending.selected_stage_id)?.code || list.current_stage,
       requestedProgress: Number(pending.requested_pct ?? 0),
     }
 
+  const rework=parts.overview?.issues?.find((i:Dto)=>i.status==="pending")
+  if(rework)workflow.pendingRework={id:rework.id,version:1,authorId:rework.submitted_by||"",submittedAt:iso(rework.submitted_at),
+    note:rework.reason,issues:rework.issue_categories||[],priorPhase:list.current_stage,priorProgress:Number(list.current_pct||0),
+    requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0)}
   const project: Project = {
     id,
     name: list.name,
@@ -271,6 +279,7 @@ export function mapProject(parts: ProjectParts): Project {
         ? ""
         : String(list.floor_count),
     start: day(list.target_start_date),
+    end: day(list.target_end_date) || undefined,
     clientId: parts.clientId,
     status,
     opmId: list.suggested_opm_id || "",
@@ -286,12 +295,16 @@ export function mapProject(parts: ProjectParts): Project {
     ),
     docs,
     created: day(list.created_at),
-    location: "",
+    location: list.location || "",
     note: "",
     excludedOpms: [],
     history,
     workflow,
   }
+  Object.assign(project,detail.workspace||{})
+  if(detail.workspace?.activation)workflow.activation=detail.workspace.activation
+  for(const d of detail.workspace?.extraDocs||[]){project.docs.push(d);register(d.id,"/api/v1/files/"+d.id+"/content")}
+  if(detail.selections?.length)workflow.selections=detail.selections.map((s:Dto)=>({companyId:s.subcontractor_id,status:s.status,contactAt:s.contacted_at,responseAt:s.responded_at}))
   if (clientAgreement?.subcontractor_name)
     project.clientSubcon = clientAgreement.subcontractor_name
   if (list.lifecycle_status === "archived")
@@ -322,7 +335,9 @@ export function mapCompany(
     phone: s.contact_phone || "",
     email: s.contact_email || "",
     status:
-      s.directory_status === "declined"
+      s.directory_status === "archived"
+        ? "archived"
+        : s.directory_status === "declined"
         ? "rejected"
         : s.directory_status === "pending"
           ? "pending"

@@ -106,7 +106,7 @@ export async function apiList<T = Record<string, any>>(
   const out: T[] = []
   let firstOfPrevious: unknown
   for (let page = 1; page <= 20; page++) {
-    const rows = await api<T[]>(`${path}${sep}page=${page}&pageSize=${size}`)
+    const rows = await api<T[]>(`${path}${sep}page=${page}&pageSize=${size}&limit=${size}&offset=${(page-1)*size}`)
     if (!Array.isArray(rows) || !rows.length) break
     const first = JSON.stringify(rows[0])
     if (first === firstOfPrevious) break

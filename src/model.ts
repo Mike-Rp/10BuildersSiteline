@@ -203,6 +203,7 @@ export type Account = {
   renewed?: boolean
   cooldown?: number
   suspendedAt?: string
+  eligibleForNewAssignment?: boolean
   assignmentHold?: boolean
   resignation?: ResignationRecord
   resignationHistory?: ResignationRecord[]
@@ -412,6 +413,8 @@ export type Rules = {
   idle: number
 }
 export type State = {
+  backendPhases?: Record<string,PhaseDefinition[]>
+  referenceDisciplines?: string[]
   accounts: Account[]
   projects: Project[]
   companies: Company[]
@@ -650,6 +653,7 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     a.role === role &&
     a.status === "active" &&
     !a.assignmentHold &&
+    a.eligibleForNewAssignment !== false &&
     licenseState(a, state.rules.grace) !== "Grace expired" &&
     workload(state, a.id, excluding) < state.rules.cap &&
     !(a.cooldown && a.cooldown > Date.now())
@@ -679,7 +683,7 @@ export function spmCandidates(
   phase: string,
   excluding = "",
 ) {
-  const tags = requiredTags(type, phase)
+  const tags = state.backendPhases?.[type]?.find(p=>p.name===phase)?.disciplines || requiredTags(type, phase)
   const activeLeads = state.projects
     .filter((p) => p.id !== excluding && p.status === "active")
     .map((p) => p.team.find((row) => row.phase === "Mobilization")?.accountId)
@@ -735,7 +739,7 @@ export function accountError(
     a.role === "spm" &&
     (!a.scope.length ||
       a.scope.length > 3 ||
-      a.scope.some((t) => !DISCIPLINES.includes(t)))
+      a.scope.some((t) => !(state.referenceDisciplines || DISCIPLINES).includes(t)))
   )
     return "Choose one to three valid discipline tags."
   if (

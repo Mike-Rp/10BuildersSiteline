@@ -94,7 +94,7 @@ test(
       })
       return Response.json({ message: "Invalid credentials" }, { status: 401 })
     })
-    const server = await createServer({
+    const server = await createServer({ cacheDir: 'node_modules/.vite-tests/' + process.pid,
       server: { middlewareMode: true, hmr: false, watch: null },
       appType: "custom",
       logLevel: "silent",

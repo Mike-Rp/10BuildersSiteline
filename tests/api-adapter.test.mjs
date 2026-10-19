@@ -148,3 +148,8 @@ test("companies and notifications map their key fields", () => {
   assert.equal(formatArea(null), "")
   assert.equal(formatArea("18400.00"), "18,400")
 })
+
+test("an empty current review queue does not revive retired manual-percentage requests",()=>{
+ const p=mapProject(parts({overview:{pending_update:null,checklist:{items:[]}}}))
+ assert.equal(p.workflow.pendingUpdate,undefined)
+})
