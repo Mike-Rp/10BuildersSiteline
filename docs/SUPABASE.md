@@ -49,3 +49,15 @@ Integration tests do not write to the configured live database. Archive maintena
 The frontend reads project data through one role-scoped `GET /workspace/project-data` request. The backend batches team, document, history, photo, note, checklist and review queries across the permitted project IDs. It returns metadata only; original file bytes remain behind the authenticated download endpoints. Administrators also reuse the account details already returned by the workspace endpoint.
 
 A local measurement against the configured Supabase dataset (57 projects, 326 accounts and 11 companies) reduced login plus initial loading from 52.0 seconds and 523 HTTP requests to 4.6 seconds and 9 requests. Timing varies with database/network conditions. No user data is cached across accounts.
+
+## Deploy the frontend and API together on Vercel
+
+Deploy this repository's `main` branch with the repository root as Vercel's Root Directory. `vercel.json` installs both sets of dependencies, builds the frontend, and routes `/api/*` to the Express function in `api/index.js`. The function imports the shared app without opening a port or starting background timers. Local development still uses `npm run dev`.
+
+In Vercel Project Settings ? Environment Variables, configure the backend's `DB_SERVER`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `PGSSLMODE`, and a strong `JWT_SECRET` for the deployment environment. Use your Supabase session pooler connection details. Keep `API_URL=/api/v1` and `ARCHIVE_MAINTENANCE_ENABLED=false`. Credentials are server-side variables and must never use a `VITE_` prefix. No local `.env` file is uploaded.
+
+Remove any `VITE_API_URL` pointing at localhost from Vercel, or set it to `/api/v1`, then redeploy. Production defaults to `/api/v1` on the website's own HTTPS domain. Apply the integration database migration from a trusted local environment as described above; deployment does not migrate or seed the database.
+
+After deployment, open `https://10builderssiteline.vercel.app/api/v1/health`. A 200 response with `{"ok":true,"database":true}` confirms that both the function and database work. A JSON 503 response means the function is running but database configuration or connectivity needs attention. A Vercel 404 means the API function was not deployed.
+
+Vercel Functions limit request and response payloads to 4.5 MB, below this app's existing 10–15 MB upload limits. Larger files require a separate API host or a direct storage upload design. Legacy disk-backed upload endpoints also require adapting storage before using them on serverless hosting; the integrated workspace endpoints store file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
