@@ -1,4 +1,0 @@
-[submodule "Thesis-Backend"]
-	path = Thesis-Backend
-	url = https://github.com/PransQT/Thesis-Backend.git
-	branch = integration/siteline-ui-20261019

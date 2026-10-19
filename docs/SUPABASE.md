@@ -4,7 +4,7 @@ The React frontend uses the Express backend in `Thesis-Backend/`. Express owns l
 
 ## Download the frontend and backend
 
-The Express backend is a Git submodule pinned to the tested integration commit. After cloning, run `git submodule update --init --recursive` from the frontend repository. For a new clone, `git clone --recurse-submodules https://github.com/Mike-Rp/10BuildersSiteline.git` downloads both repositories. The backend integration branch is `integration/siteline-ui-20261019`; its upstream main branch has additional work that is not part of this tested integration. Database credentials stay in the ignored local `Thesis-Backend/.env` file; copy `.env.example` for a fresh checkout.
+The Express backend is included directly in this repository under `Thesis-Backend/`. A normal `git clone https://github.com/Mike-Rp/10BuildersSiteline.git` downloads both the frontend and backend; no submodule initialization or separate branch is needed. The imported backend source is the tested integration commit `5ada3cb66271055e6e7833b5af9fcc0c68b4ef7c` from `https://github.com/PransQT/Thesis-Backend.git`. Database credentials stay in the ignored local `Thesis-Backend/.env` file; copy `Thesis-Backend/.env.example` for a fresh checkout.
 
 ## Connect your database
 
