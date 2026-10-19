@@ -10,10 +10,12 @@ import test from "node:test"
 import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
-import { login, setApiBase, setToken, api, downloadApiFile } from "../src/api/client.ts"
+import { login, setApiBase, setToken, api, apiEnvelope, downloadApiFile } from "../src/api/client.ts"
 import { saveApiAccount, saveApiProject, createCompany, uploadFile, sendApiWorkflow, persistAdminChanges } from "../src/api/actions.ts"
 import { randomUUID } from "node:crypto"
 import { loadState } from "../src/api/load.ts"
+import { projectDocumentIndex, projectDocumentIndexFor } from "../src/project-document-index.ts"
+import { clientDocumentIndex, clientProjectViews } from "../src/client-access.ts"
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
 const backend = here("../Thesis-Backend/")
@@ -115,7 +117,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("each role sees only its own projects", async () => {
     assert.deepEqual(names((await asUser("lea.fernandez@10builders.com")).state), ["Meralco Ave. Fit-out", "Rosaria Business Park"])
     assert.deepEqual(names((await asUser("renz.villaverde@10builders.com")).state), [
-      "Alden Heights Residences — Tower B", "Brookfield Warehouse Ext.", "Cavite Cold Storage Facility", "Sto. Niño Bridge Widening",
+      "Alden Heights Residences — Tower B", "Brookfield Warehouse Ext.", "Cavite Cold Storage Facility", "Sto. Niño Townhomes — Phase 2",
     ])
     assert.deepEqual(names((await asUser("karlo.espiritu@10builders.com")).state), ["Alden Heights Residences — Tower B", "Brookfield Warehouse Ext."])
     assert.deepEqual(names((await asUser("f.uy@aldenheights-hoa.com")).state), ["Meralco Ave. Fit-out"])
@@ -348,6 +350,86 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       assert.ok(part.photos.every(p=>p.is_client_visible))
       assert.ok(!("suggested_opm_id" in part.list))
     }
+  })
+
+  await t.test("the document repository shows each role only its own projects and files", async () => {
+    const admin = await asUser("patricia.domingo@10builders.com")
+    const adminProjects = new Map(admin.state.projects.map((p) => [p.id, p]))
+    const fileIds = (index) =>
+      new Set(index.flatMap((c) => c.folders.flatMap((f) => f.files.map((x) => x.doc.id))))
+    const count = (index) => index.reduce((n, c) => n + c.fileCount, 0)
+    const roles = {
+      opm: await asUser("renz.villaverde@10builders.com"),
+      karlo: await asUser("karlo.espiritu@10builders.com"),
+      rafael: await asUser("rafael.mercado@10builders.com"),
+    }
+    for (const [name, { user, state }] of Object.entries(roles)) {
+      assert.ok(state.projects.length > 0, name + " has projects")
+      for (const p of state.projects) {
+        assert.ok(adminProjects.has(p.id), name + ": a project outside the database list")
+        const mine = fileIds(projectDocumentIndexFor(p, user))
+        const everything = fileIds(projectDocumentIndex(adminProjects.get(p.id)))
+        for (const id of mine) assert.ok(everything.has(id), name + ": file " + id + " is not an original file of " + p.name)
+        assert.equal(count(projectDocumentIndexFor(p, user)), mine.size, "counts equal the files shown (no file is listed twice)")
+      }
+    }
+    // Karlo and Rafael keep independent assignments and document visibility.
+    const karloIds = new Set(roles.karlo.state.projects.map((p) => p.id))
+    const rafaelIds = new Set(roles.rafael.state.projects.map((p) => p.id))
+    for (const p of roles.karlo.state.projects.filter((x) => !rafaelIds.has(x.id)))
+      assert.equal(count(projectDocumentIndexFor(p, roles.rafael.user)), 0, "Rafael sees nothing of Karlo-only " + p.name)
+    for (const p of roles.rafael.state.projects.filter((x) => !karloIds.has(x.id)))
+      assert.equal(count(projectDocumentIndexFor(p, roles.karlo.user)), 0, "Karlo sees nothing of Rafael-only " + p.name)
+    // The Office PM index never lists a project the Office PM does not manage.
+    for (const p of admin.state.projects.filter((x) => x.opmId !== roles.opm.user.id))
+      assert.equal(count(projectDocumentIndexFor(p, roles.opm.user)), 0)
+    // Clients: only their projects, and only explicitly client-visible, uploaded originals.
+    const client = await asUser("f.uy@aldenheights-hoa.com")
+    const views = clientProjectViews(client.state, client.user.id)
+    assert.ok(views.length > 0 && views.length < admin.state.projects.length)
+    for (const view of views) {
+      const source = adminProjects.get(view.id)
+      assert.ok(source, "a client project exists in the database list")
+      const originals = [...source.docs, ...source.workflow.photos]
+      for (const category of clientDocumentIndex(view))
+        for (const folder of category.folders)
+          for (const file of folder.files) {
+            const doc = originals.find((d) => d.id === file.id)
+            assert.ok(doc && doc.uploaded && doc.clientVisible, "client file " + file.id + " is an original, client-visible upload")
+          }
+    }
+  })
+
+  await t.test("the Engineer Directory pages /accounts with a stable order and exact counts", async () => {
+    await asUser("patricia.domingo@10builders.com")
+    const engineers = "role_ids=1,2,3&sortBy=name"
+    const everything = (await apiEnvelope("/accounts?page=1&pageSize=100&" + engineers)).data
+    assert.ok(everything.length > 3, "the demo data has enough engineers to span several pages")
+    const seen = []
+    let total
+    for (let page = 1; ; page++) {
+      const body = await apiEnvelope("/accounts?page=" + page + "&pageSize=3&" + engineers)
+      total = body.pagination.total
+      assert.equal(body.pagination.page, page)
+      seen.push(...body.data.map((row) => row.id))
+      if (!body.pagination.has_next) break
+      assert.ok(page < 50, "paging must terminate")
+    }
+    // No duplicated and no skipped records between pages, in the same order as one big page.
+    assert.equal(new Set(seen).size, seen.length)
+    assert.deepEqual(seen, everything.map((row) => row.id))
+    assert.equal(total, everything.length)
+    // Filters change the count with the same filter the rows use.
+    const spm = await apiEnvelope("/accounts?page=1&pageSize=2&role_ids=3&sortBy=name")
+    assert.ok(spm.data.every((row) => row.role === "spm"))
+    assert.equal(spm.pagination.total, everything.filter((row) => row.role === "spm").length)
+    // A page past the end is empty but reports the real total, so the UI can clamp.
+    const beyond = await apiEnvelope("/accounts?page=999&pageSize=3&" + engineers)
+    assert.equal(beyond.data.length, 0)
+    assert.equal(beyond.pagination.total, total)
+    // Only the Administrator may list accounts: role scoping is never widened.
+    await asUser("karlo.espiritu@10builders.com")
+    await assert.rejects(apiEnvelope("/accounts?page=1&pageSize=3"), /403|permission|forbidden|allowed|access/i)
   })
 
   await t.test("the API refuses requests without a session", async () => {

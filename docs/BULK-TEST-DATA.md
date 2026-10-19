@@ -60,8 +60,8 @@ Examples:
 - **Cedar Heights Residential 001:** `admin001`, `opm001`, `spm001` + `spm002`, `client001`. Five companies and 100 actual worker records link to this project. A phase submission and evidence await review.
 - **Harbor Point Commercial 002:** `opm002`, `spm003` + `spm004`, `client002`.
 - **Cedar Heights Residential 031:** `opm031` can be used for an intake confirmation scenario.
-- **Orchard Place Renovation 036:** `opm036` has accepted; `spm071` and `spm072` have pending assignments.
-- **Orchard Place Infrastructure 046:** completed, 100% progress, linked to `client021`.
+- **Orchard Place Residential 036:** `opm036` has accepted; `spm071` and `spm072` have pending assignments.
+- **Orchard Place Residential 046:** completed, 100% progress, linked to `client021`.
 
 Each company has 600 assigned workers, 380 available active workers, and 20 inactive workers. Active assignment headcounts match the worker records' `current_project_id`; completed crews are released. Every worker has certification and past employment records.
 

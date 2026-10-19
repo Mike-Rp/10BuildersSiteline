@@ -158,6 +158,7 @@ export const PROJECT_PHASE_DEFINITIONS: Record<"Residential" | "Commercial" | "M
       },
     ],
   }
+// Selectable project types; legacy database rows may still exist.
 export const PROJECT_TYPES = ["Residential", "Commercial", "Mixed-Use"]
 export const ROLE_NAMES = {
   admin: "Administrator",

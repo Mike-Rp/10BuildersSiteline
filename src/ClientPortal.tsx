@@ -10,6 +10,8 @@ import {
   type ClientProjectView,
 } from "./client-access"
 import DocumentRepository from "./DocumentRepository"
+import { ListSection, runList, useListMemory } from "./ListControls"
+import { inDateRange, optionsFrom } from "./listing"
 
 type Viewer = {
   projectId: string
@@ -94,6 +96,7 @@ export default function ClientPortal({
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [documentQuery, setDocumentQuery] = useState("")
+  useListMemory()
   const project = projects.find((p) => p.id === projectId) || projects[0]
   const uploaded = project?.documents.filter((doc) => doc.uploaded).length || 0
   const history = project?.history.slice().reverse() || []
@@ -280,29 +283,68 @@ export default function ClientPortal({
     )
   }
   function historyList(compact = false) {
+    const emptyHistory = (
+      <Empty title="No approved progress updates yet">
+        Submissions awaiting review are not included in your project history.
+      </Empty>
+    )
+    const row = (item: (typeof history)[number]) => (
+      <article key={item.id}>
+        <span className="client-history-mark">
+          <Icon name="check" size={16} />
+        </span>
+        <div>
+          <span className="client-history-date">
+            {dateLabel(item.date)} · {item.phase}
+          </span>
+          <p>{item.text}</p>
+          <Badge tone="green">Approved / recorded</Badge>
+        </div>
+        <strong>{item.progress}%</strong>
+      </article>
+    )
+    if (compact)
+      return (
+        <div className="client-history-list">
+          {history.slice(0, 3).map(row)}
+          {!history.length && emptyHistory}
+        </div>
+      )
+    // The client's own project history only: scoping already happened.
+    const historyView = runList(`client:history:${project?.id}`, history, {
+      searchText: (item) => `${item.text} ${item.phase}`,
+      filters: [
+        {
+          id: "phase",
+          label: "Phase",
+          allLabel: "All phases",
+          options: optionsFrom(history.map((item) => item.phase)),
+          test: (item, value) => item.phase === value,
+        },
+        {
+          id: "from",
+          label: "From",
+          kind: "date",
+          test: (item, value) => inDateRange(item.date, value),
+        },
+        {
+          id: "to",
+          label: "To",
+          kind: "date",
+          test: (item, value) => inDateRange(item.date, undefined, value),
+        },
+      ],
+    })
     return (
       <div className="client-history-list">
-        {(compact ? history.slice(0, 3) : history).map((item) => (
-          <article key={item.id}>
-            <span className="client-history-mark">
-              <Icon name="check" size={16} />
-            </span>
-            <div>
-              <span className="client-history-date">
-                {dateLabel(item.date)} · {item.phase}
-              </span>
-              <p>{item.text}</p>
-              <Badge tone="green">Approved / recorded</Badge>
-            </div>
-            <strong>{item.progress}%</strong>
-          </article>
-        ))}
-        {!history.length && (
-          <Empty title="No approved progress updates yet">
-            Submissions awaiting review are not included in your project
-            history.
-          </Empty>
-        )}
+        <ListSection
+          list={historyView}
+          placeholder="Search progress history"
+          noun="update"
+          touch
+          render={(items) => <>{items.map(row)}</>}
+          empty={emptyHistory}
+        />
       </div>
     )
   }
@@ -345,33 +387,60 @@ export default function ClientPortal({
   }
   function photos(compact = false) {
     if (!project) return null
-    return project.photos.length ? (
-      <div className="client-photos-grid">
-        {(compact ? project.photos.slice(0, 3) : project.photos).map(
-          (photo) => (
-            <ClientPhoto
-              key={photo.id}
-              projectId={project.id}
-              photo={photo}
-              onResolve={onResolve}
-              onOpen={() => openDocument(photo.id, "photo")}
-            />
-          ),
-        )}
-      </div>
-    ) : (
-      <div className="client-photo-empty">
-        <span>
-          <Icon name="building" size={34} />
-        </span>
-        <div>
-          <h3>Site photographs will appear here</h3>
-          <p>
-            Only photographs explicitly shared by your project team are shown.
-            Internal inspection evidence is not part of this gallery.
-          </p>
+    if (!project.photos.length)
+      return (
+        <div className="client-photo-empty">
+          <span>
+            <Icon name="building" size={34} />
+          </span>
+          <div>
+            <h3>Site photographs will appear here</h3>
+            <p>
+              Only photographs explicitly shared by your project team are shown.
+              Internal inspection evidence is not part of this gallery.
+            </p>
+          </div>
         </div>
+      )
+    const grid = (items: typeof project.photos) => (
+      <div className="client-photos-grid">
+        {items.map((photo) => (
+          <ClientPhoto
+            key={photo.id}
+            projectId={project.id}
+            photo={photo}
+            onResolve={onResolve}
+            onOpen={() => openDocument(photo.id, "photo")}
+          />
+        ))}
       </div>
+    )
+    if (compact) return grid(project.photos.slice(0, 3))
+    const photoView = runList(`client:photos:${project.id}`, project.photos, {
+      searchText: (photo) => `${photo.label} ${photo.name}`,
+      filters: [
+        {
+          id: "from",
+          label: "Taken from",
+          kind: "date",
+          test: (photo, value) => inDateRange(photo.date, value),
+        },
+        {
+          id: "to",
+          label: "Taken to",
+          kind: "date",
+          test: (photo, value) => inDateRange(photo.date, undefined, value),
+        },
+      ],
+    })
+    return (
+      <ListSection
+        list={photoView}
+        placeholder="Search photographs"
+        noun="photograph"
+        touch
+        render={grid}
+      />
     )
   }
   function overview() {
@@ -679,10 +748,15 @@ export default function ClientPortal({
     if (page === "Project Documents")
       return (
         <DocumentRepository
+          listKey="client:documents"
+          recentKey={actor.id}
           projects={projects.map((view) => ({
             id: view.id,
             name: view.name,
             subtitle: `${view.type} · ${view.phase}`,
+            type: view.type,
+            phase: view.phase,
+            status: view.status,
             categories: clientDocumentIndex(view).map((category) => ({
               ...category,
               folders: category.folders.map((folder) => ({

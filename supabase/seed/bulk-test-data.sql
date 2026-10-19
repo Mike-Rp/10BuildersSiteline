@@ -61,10 +61,25 @@ select b.id,b.full_name,b.email,'09' || lpad((700000000+b.n+
 from _bulk_users b join public.roles r on r.code=b.role
 on conflict (id) do nothing;
 
--- Every OPM has two specializations. Filter existing rows before the cap trigger.
+-- Projects use only the three intake types: Residential (1), Commercial (2), Mixed-Use (3).
+-- Number n cycles Residential, Commercial, Mixed-Use, then four more slots that are
+-- Commercial / Commercial (alternating with Residential) / Commercial / Residential.
+-- Project n and OPM n share a type, so each OPM manages a type they specialize in.
+create temp table _bulk_type_map on commit drop as
+select n,
+       case (n-1)%6
+         when 0 then 1 when 1 then 2 when 2 then 3
+         when 3 then case when ((n-4)/6)%2=0 then 2 else 1 end
+         when 4 then 2
+         else 1 end as type_id
+from generate_series(1,120) n;
+
+-- Every OPM has two specializations: their project's type and the next intake type.
+-- Filter existing rows before the cap trigger.
 insert into public.user_project_type_specializations(user_id,project_type_id)
 select u.id,t.id from _bulk_users u
-join public.project_types t on t.id in (1+(u.n-1)%6,1+u.n%6)
+join _bulk_type_map m on m.n=u.n
+join public.project_types t on t.id in (m.type_id,1+m.type_id%3)
 where u.role='opm' and not exists (
   select 1 from public.user_project_type_specializations x
   where x.user_id=u.id and x.project_type_id=t.id
@@ -102,7 +117,8 @@ select md5('siteline-bulk-v1/project/' || series.n)::uuid as id,series.n,
        o.id as opm_id,l.id as lead_id,s.id as other_id,c.id as client_id,
        c.full_name as client_name,a.id as admin_id
 from generate_series(1,50) series(n)
-join public.project_types t on t.id=1+(series.n-1)%6
+join _bulk_type_map m on m.n=series.n
+join public.project_types t on t.id=m.type_id
 join _bulk_users o on o.role='opm' and o.n=series.n
 join _bulk_users l on l.role='spm' and l.n=2*series.n-1
 join _bulk_users s on s.role='spm' and s.n=2*series.n

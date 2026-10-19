@@ -147,7 +147,7 @@ export function initialState(): State {
     seedProject(
       "p2",
       "Meralco Ave. Fit-out",
-      "Renovation",
+      "Commercial",
       "Finishes",
       91,
       "a3",
@@ -174,8 +174,8 @@ export function initialState(): State {
     ),
     seedProject(
       "p5",
-      "Sto. Niño Bridge Widening",
-      "Infrastructure",
+      "Sto. Niño Townhomes — Phase 2",
+      "Residential",
       "Mobilization",
       0,
       "a2",
@@ -185,7 +185,7 @@ export function initialState(): State {
     seedProject(
       "p6",
       "Cavite Cold Storage Facility",
-      "Industrial",
+      "Commercial",
       "Closeout",
       100,
       "a2",
@@ -194,8 +194,8 @@ export function initialState(): State {
     ),
     seedProject(
       "p7",
-      "Biñan Elevated Walkway",
-      "Infrastructure",
+      "Biñan Retail Arcade Link",
+      "Commercial",
       "Mobilization",
       0,
       "a3",
