@@ -13,6 +13,24 @@ import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import {
+  ListPager,
+  ListSection,
+  ListToolbar,
+  NoResults,
+  runList,
+  useListMemory,
+} from "./ListControls"
+import { inDateRange, optionsFrom, type FilterDef } from "./listing"
+
+type DeadlineEntry = {
+  key: string
+  projectId: string
+  projectName: string
+  kind: string
+  due?: number
+  node: ReactNode
+}
 import DocumentRepository, {
   findIndexedDoc,
   staffRepositoryCategories,
@@ -33,6 +51,7 @@ import {
   type Account,
   type Company,
   type Doc,
+  type Event as WorkspaceEvent,
   type Project,
   type State,
 } from "./model"
@@ -157,6 +176,7 @@ export default function RoleWorkspace({
   onPause: () => void
 }) {
   const isOpm = actor.role === "opm"
+  useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
   const [page, setPage] = useState("Dashboard")
@@ -299,6 +319,77 @@ export default function RoleWorkspace({
     window.addEventListener("pointerdown", close)
     return () => window.removeEventListener("pointerdown", close)
   }, [])
+  // Search, filters and paging. Every list starts from role-scoped data
+  // (ownedProjects / visibleEvents), so filters can only narrow what this role
+  // is already allowed to see.
+  const projectText = (p: Project) => `${p.name} ${p.type} ${p.phase}`
+  const typeFilterP = (items: Project[]): FilterDef<Project> => ({
+    id: "type",
+    label: "Project type",
+    allLabel: "All types",
+    options: optionsFrom(items.map((p) => p.type)),
+    test: (p, value) => p.type === value,
+  })
+  const phaseFilterP = (items: Project[]): FilterDef<Project> => ({
+    id: "phase",
+    label: "Phase",
+    allLabel: "All phases",
+    options: optionsFrom(items.map((p) => p.phase)),
+    test: (p, value) => p.phase === value,
+  })
+  const dateFilters = <T,>(
+    pick: (item: T) => string | undefined,
+    noun: string,
+  ): FilterDef<T>[] => [
+    {
+      id: "from",
+      label: `${noun} from`,
+      kind: "date",
+      test: (item, value) => inDateRange(pick(item), value),
+    },
+    {
+      id: "to",
+      label: `${noun} to`,
+      kind: "date",
+      test: (item, value) => inDateRange(pick(item), undefined, value),
+    },
+  ]
+  const intakesList = runList(`${actor.role}:confirmations`, intakes, {
+    searchText: projectText,
+    filters: [
+      {
+        id: "status",
+        label: "Status",
+        allLabel: "All statuses",
+        options: [
+          { value: "pending", label: "Awaiting confirmation" },
+          { value: "changes_requested", label: "Changes requested" },
+          { value: "draft", label: "Drafts" },
+        ],
+        test: (p, value) => p.status === value,
+      },
+      typeFilterP(intakes),
+    ],
+  })
+  const activeSitesList = runList(`${actor.role}:active-sites`, active, {
+    searchText: projectText,
+    filters: [typeFilterP(active), phaseFilterP(active)],
+  })
+  const activityFeed = runList(`${actor.role}:activity`, events, {
+    searchText: (e) => `${e.title} ${e.detail}`,
+    filters: [
+      {
+        id: "type",
+        label: "Event type",
+        allLabel: "All activity",
+        options: ["request", "approval", "progress", "notice", "account"].map(
+          (value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }),
+        ),
+        test: (e, value) => e.type === value,
+      },
+      ...dateFilters<WorkspaceEvent>((e) => e.date, "Date"),
+    ],
+  })
   async function act(command: WorkflowCommand, success?: string) {
     const result = await onCommand(command)
     if (!result.ok) {
@@ -965,6 +1056,7 @@ export default function RoleWorkspace({
   function repositoryBrowser(scoped: Project[]) {
     return (
       <DocumentRepository
+        listKey={`${actor.role}:documents`}
         className="role-document-browser"
         {...(!isOpm && {
           rootLabel: "Document repository",
@@ -1427,6 +1519,25 @@ export default function RoleWorkspace({
               ? p.status === "declined" || p.status === "expired"
               : info.group === assignmentFilter,
     )
+    const assignmentList = runList(`${actor.role}:assignments`, visible, {
+      searchText: ({ p }) => `${p.name} ${p.type} ${p.phase}`,
+      filters: [
+        {
+          id: "type",
+          label: "Project type",
+          allLabel: "All types",
+          options: optionsFrom(rows.map(({ p }) => p.type)),
+          test: ({ p }, value) => p.type === value,
+        },
+        {
+          id: "phase",
+          label: "Phase",
+          allLabel: "All phases",
+          options: optionsFrom(rows.map(({ p }) => p.phase)),
+          test: ({ p }, value) => p.phase === value,
+        },
+      ],
+    })
     const sections = [
       {
         id: "current",
@@ -1481,10 +1592,23 @@ export default function RoleWorkspace({
             </select>
           </label>
         </div>
+        <ListToolbar
+          list={assignmentList}
+          placeholder="Search assignments"
+          noun="assignment"
+        />
+        {assignmentList.narrowed && !assignmentList.matched.length && (
+          <NoResults list={assignmentList} />
+        )}
         {sections.map((section) => {
-          const list = visible
+          const list = assignmentList.matched
             .filter(({ info }) => info.group === section.id)
             .sort((a, b) => order(section.id, a, b))
+          const sectionPaging = runList(
+            `${actor.role}:assignments-${section.id}`,
+            list,
+            { searchText: () => "" },
+          )
           return (
             <section
               key={section.id}
@@ -1499,9 +1623,14 @@ export default function RoleWorkspace({
                 <p>{section.note}</p>
               </div>
               {list.length ? (
-                <div className="assignment-grid">
-                  {list.map(({ p, info }) => assignmentCard(p, info))}
-                </div>
+                <>
+                  <div className="assignment-grid">
+                    {sectionPaging.view.items.map(({ p, info }) =>
+                      assignmentCard(p, info),
+                    )}
+                  </div>
+                  <ListPager list={sectionPaging} touch={!isOpm} />
+                </>
               ) : (
                 <p className="assignment-empty">{section.empty}</p>
               )}
@@ -1866,9 +1995,15 @@ export default function RoleWorkspace({
             ? "Read-only monitoring, accountable phase owners and site reminders."
             : "Report progress only while your confirmed phase is active.",
         )}
-        {active
-          .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-          .map((p) => (
+        <ListSection
+          list={activeSitesList}
+          placeholder="Search active sites"
+          noun="site"
+          touch={!isOpm}
+          empty={null}
+          render={(items) => (
+            <>
+              {items.map((p) => (
             <Panel
               key={p.id}
               title={p.name}
@@ -1961,7 +2096,10 @@ export default function RoleWorkspace({
                 </div>
               )}
             </Panel>
-          ))}
+              ))}
+            </>
+          )}
+        />
         {!active.length && (
           <Empty
             title={isOpm ? "No active sites yet" : "No current active phase"}
@@ -1975,6 +2113,33 @@ export default function RoleWorkspace({
     )
   }
   function reviews() {
+    const qaItems = allActive.filter((p) =>
+      checklistFor(p).some((i) => i.status === "submitted"),
+    )
+    const qaList = runList(`${actor.role}:review-qa`, qaItems, {
+      searchText: projectText,
+      filters: [phaseFilterP(qaItems)],
+    })
+    const submissionItems = tab === "rework" ? pendingRework : pendingUpdates
+    const submitter = (p: Project) => {
+      const author = (
+        tab === "rework" ? workflowFor(p).pendingRework : workflowFor(p).pendingUpdate
+      )?.authorId
+      return author ? actorName(author) : ""
+    }
+    const submissionList = runList(`${actor.role}:review-${tab}`, submissionItems, {
+      searchText: (p) => `${projectText(p)} ${submitter(p)}`,
+      filters: [
+        phaseFilterP(submissionItems),
+        {
+          id: "by",
+          label: "Submitted by",
+          allLabel: "Anyone",
+          options: optionsFrom(submissionItems.map(submitter)),
+          test: (p, value) => submitter(p) === value,
+        },
+      ],
+    })
     return (
       <>
         {header(
@@ -1998,11 +2163,15 @@ export default function RoleWorkspace({
         </div>
         {tab === "qa" ? (
           <>
-            {allActive
-              .filter((p) =>
-                checklistFor(p).some((i) => i.status === "submitted"),
-              )
-              .map((p) => (
+            <ListSection
+              list={qaList}
+              placeholder="Search QA/QC reviews"
+              noun="project"
+              touch={!isOpm}
+              empty={null}
+              render={(items) => (
+                <>
+                  {items.map((p) => (
                 <Panel
                   key={p.id}
                   title={p.name}
@@ -2078,14 +2247,25 @@ export default function RoleWorkspace({
                       ))}
                   </div>
                 </Panel>
-              ))}
+                  ))}
+                </>
+              )}
+            />
             {qaCount === 0 && (
               <Empty title="No QA/QC evidence awaiting review" />
             )}
           </>
         ) : (
           <>
-            {(tab === "rework" ? pendingRework : pendingUpdates).map((p) => {
+            <ListSection
+              list={submissionList}
+              placeholder="Search submissions"
+              noun="project"
+              touch={!isOpm}
+              empty={null}
+              render={(items) => (
+                <>
+                  {items.map((p) => {
               const submission =
                 tab === "rework"
                   ? workflowFor(p).pendingRework!
@@ -2205,6 +2385,9 @@ export default function RoleWorkspace({
                 </Panel>
               )
             })}
+                </>
+              )}
+            />
             {(tab === "rework" ? pendingRework : pendingUpdates).length ===
               0 && (
               <Empty
@@ -2221,11 +2404,32 @@ export default function RoleWorkspace({
     )
   }
   function deadlineList(compact = false) {
-    const rows: ReactNode[] = []
+    const rows: DeadlineEntry[] = []
+    const entry = (
+      p: Project,
+      kind: string,
+      due: number | undefined,
+      node: ReactNode,
+    ): DeadlineEntry => ({
+      key: `${p.id}-${kind}`,
+      projectId: p.id,
+      projectName: p.name,
+      kind,
+      due,
+      node,
+    })
+    const qaDue = (p: Project) => {
+      const times = checklistFor(p)
+        .filter((i) => i.status === "submitted" && i.submittedAt)
+        .map((i) => Date.parse(i.submittedAt!) + REVIEW_MS)
+        .filter((t) => !Number.isNaN(t))
+      return times.length ? Math.min(...times) : undefined
+    }
     projects.forEach((p) => {
       const work = workflowFor(p)
       if (isOpm && p.status === "pending" && !p.opmAccepted)
         rows.push(
+          entry(p, "accept", undefined,
           <button
             key={`${p.id}-accept`}
             className="deadline-list-item"
@@ -2246,9 +2450,11 @@ export default function RoleWorkspace({
             </div>
             <Icon name="arrow" size={17} />
           </button>,
+          ),
         )
       if (work.deadline && (isOpm || work.deadline.accountId === actor.id))
         rows.push(
+          entry(p, "response", Date.parse(work.deadline.soft),
           <button
             key={`${p.id}-response`}
             className="deadline-list-item"
@@ -2283,9 +2489,11 @@ export default function RoleWorkspace({
                 : "Response pending"}
             </Badge>
           </button>,
+          ),
         )
       if (isOpm && work.pendingRework)
         rows.push(
+          entry(p, "rework", undefined,
           <button
             key={`${p.id}-rework`}
             className="deadline-list-item"
@@ -2303,9 +2511,11 @@ export default function RoleWorkspace({
               </p>
             </div>
           </button>,
+          ),
         )
       if (isOpm && work.pendingUpdate)
         rows.push(
+          entry(p, "update", Date.parse(work.pendingUpdate.submittedAt) + REVIEW_MS,
           <button
             key={`${p.id}-update`}
             className="deadline-list-item"
@@ -2326,9 +2536,11 @@ export default function RoleWorkspace({
               </p>
             </div>
           </button>,
+          ),
         )
       if (isOpm && checklistFor(p).some((i) => i.status === "submitted"))
         rows.push(
+          entry(p, "qa", qaDue(p),
           <button
             key={`${p.id}-qa`}
             className="deadline-list-item"
@@ -2347,14 +2559,65 @@ export default function RoleWorkspace({
               </p>
             </div>
           </button>,
+          ),
         )
     })
-    return rows.length ? (
-      <div>{compact ? rows.slice(0, 4) : rows}</div>
-    ) : (
+    const emptyState = (
       <Empty title="No actionable deadlines">
         Items needing your action will appear here.
       </Empty>
+    )
+    // Dashboard preview keeps its short list and "View all" link.
+    if (compact)
+      return rows.length ? (
+        <div>{rows.slice(0, 4).map((row) => row.node)}</div>
+      ) : (
+        emptyState
+      )
+    const KINDS: Record<string, string> = {
+      accept: "Confirm intake",
+      response: "Assignment response",
+      rework: "Rework review",
+      update: "Progress review",
+      qa: "QA/QC review",
+    }
+    const urgency = (row: DeadlineEntry) => {
+      if (row.due === undefined) return "upcoming"
+      const left = row.due - Date.now()
+      return left < 0 ? "overdue" : left <= 86_400_000 ? "soon" : "upcoming"
+    }
+    const deadlinesList = runList(`${actor.role}:deadlines`, rows, {
+      searchText: (row) => `${row.projectName} ${KINDS[row.kind]}`,
+      filters: [
+        {
+          id: "urgency",
+          label: "Due",
+          allLabel: "All deadlines",
+          options: [
+            { value: "overdue", label: "Overdue" },
+            { value: "soon", label: "Due soon (24h)" },
+            { value: "upcoming", label: "Upcoming" },
+          ],
+          test: (row, value) => urgency(row) === value,
+        },
+        {
+          id: "project",
+          label: "Project",
+          allLabel: "All projects",
+          options: optionsFrom(rows.map((row) => row.projectName)),
+          test: (row, value) => row.projectName === value,
+        },
+      ],
+    })
+    return (
+      <ListSection
+        list={deadlinesList}
+        placeholder="Search deadlines"
+        noun="item"
+        touch={!isOpm}
+        empty={emptyState}
+        render={(items) => <div>{items.map((row) => row.node)}</div>}
+      />
     )
   }
   function activityList(list = events) {
@@ -2471,35 +2734,64 @@ export default function RoleWorkspace({
     const completed = responseProjects.filter((p) =>
       p.team.every((t) => t.status === "confirmed"),
     )
+    const actionList = runList(
+      `${actor.role}:responses`,
+      responsesNeedingAction,
+      {
+        searchText: (p) => `${p.name} ${p.type}`,
+        filters: [typeFilterP(responsesNeedingAction)],
+      },
+    )
+    const doneList = runList(`${actor.role}:responses-done`, completed, {
+      searchText: () => "",
+    })
     return (
       <>
-        {responsesNeedingAction.map(responseCard)}
-        {!responsesNeedingAction.length && (
-          <Empty title="No Site PM responses need action">
-            Every phase assignment on your projects is confirmed.
-          </Empty>
-        )}
+        <ListSection
+          list={actionList}
+          placeholder="Search Site PM responses"
+          noun="project"
+          touch={!isOpm}
+          empty={
+            <Empty title="No Site PM responses need action">
+              Every phase assignment on your projects is confirmed.
+            </Empty>
+          }
+          render={(items) => <>{items.map(responseCard)}</>}
+        />
         {completed.length > 0 && (
           <details className="role-details">
             <summary>Completed ({completed.length})</summary>
-            {completed.map(responseCard)}
+            {doneList.view.items.map(responseCard)}
+            <ListPager list={doneList} touch={!isOpm} />
           </details>
         )}
       </>
     )
   }
   function directory() {
-    const list = state.companies.filter(
+    const directoryItems = state.companies.filter(
       (company) =>
-        (company.status === "approved" ||
-          company.submittedById === actor.id ||
-          company.submittedBy === actor.name) &&
-        `${company.name} ${company.contact} ${company.email}`
-          .toLowerCase()
-          .includes(query.toLowerCase()) &&
-        (companyAvailabilityFilter === "all" ||
-          company.availability === companyAvailabilityFilter),
+        company.status === "approved" ||
+        company.submittedById === actor.id ||
+        company.submittedBy === actor.name,
     )
+    const directoryList = runList(`${actor.role}:directory`, directoryItems, {
+      searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
+      filters: [
+        {
+          id: "availability",
+          label: "Company availability",
+          allLabel: "All companies",
+          options: [
+            { value: "available", label: "Available" },
+            { value: "limited", label: "Limited availability" },
+            { value: "committed", label: "Fully committed" },
+          ],
+          test: (c, value) => c.availability === value,
+        },
+      ],
+    })
     return (
       <>
         {header(
@@ -2516,30 +2808,15 @@ export default function RoleWorkspace({
             Suggest Company
           </Button>,
         )}
-        <div className="role-directory-filters">
-          <Field label="Search company">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search the directory"
-            />
-          </Field>
-          <Field label="Company availability">
-            <select
-              value={companyAvailabilityFilter}
-              onChange={(event) =>
-                setCompanyAvailabilityFilter(event.target.value)
-              }
-            >
-              <option value="all">All companies</option>
-              <option value="available">Available</option>
-              <option value="limited">Limited availability</option>
-              <option value="committed">Fully committed</option>
-            </select>
-          </Field>
-        </div>
+        <ListSection
+          list={directoryList}
+          placeholder="Search the directory"
+          noun="company"
+          touch={!isOpm}
+          empty={<Empty title="No companies match your search" />}
+          render={(items) => (
         <div className="company-grid role-directory-grid">
-          {list.map((company) => (
+          {items.map((company) => (
             <button
               className="company-card"
               key={company.id}
@@ -2580,7 +2857,8 @@ export default function RoleWorkspace({
             </button>
           ))}
         </div>
-        {!list.length && <Empty title="No companies match your search" />}
+          )}
+        />
       </>
     )
   }
@@ -2619,6 +2897,75 @@ export default function RoleWorkspace({
                 ).length,
               0,
             )
+    const completedItems = historical.filter(
+      (p) =>
+        p.status === "completed" ||
+        (isOpm && registeredComplete(p) && teamConfirmed(p)),
+    )
+    const completedArchive = runList(
+      `${actor.role}:archive-completed`,
+      completedItems,
+      {
+        searchText: (p) => `${p.name} ${p.type}`,
+        filters: [
+          typeFilterP(completedItems),
+          ...dateFilters<Project>(
+            (p) =>
+              workflowFor(p).completedAt ||
+              p.history[p.history.length - 1]?.date ||
+              p.created,
+            "Closed",
+          ),
+        ],
+      },
+    )
+    const changesItems = historical.flatMap((p) =>
+      (workflowFor(p).changesHistory || [])
+        .filter((h) => h.opmId === actor.id)
+        .map((h, i) => ({ p, h, i })),
+    )
+    const changesArchive = runList(`${actor.role}:archive-changes`, changesItems, {
+      searchText: ({ p, h }) => `${p.name} ${h.note}`,
+      filters: dateFilters<(typeof changesItems)[number]>(({ h }) => h.date, "Date"),
+    })
+    const companyItems = state.companies.filter(
+      (c) =>
+        (c.submittedById === actor.id || c.submittedBy === actor.name) &&
+        c.status !== "pending",
+    )
+    const companiesArchive = runList(`${actor.role}:archive-companies`, companyItems, {
+      searchText: (c) => `${c.name} ${selectedProjectName(c.projectId)}`,
+      filters: [
+        {
+          id: "status",
+          label: "Status",
+          allLabel: "All statuses",
+          options: optionsFrom(companyItems.map((c) => c.status)),
+          test: (c, value) => c.status === value,
+        },
+      ],
+    })
+    const responseItems = historical.flatMap((p) =>
+      workflowFor(p)
+        .responses.filter(
+          (r) =>
+            isOpm || (r.accountId === actor.id && r.status !== "accepted"),
+        )
+        .map((r) => ({ p, r })),
+    )
+    const responsesArchive = runList(`${actor.role}:archive-responses`, responseItems, {
+      searchText: ({ p, r }) => `${p.name} ${r.phase} ${actorName(r.accountId)} ${r.note}`,
+      filters: [
+        {
+          id: "status",
+          label: "Response",
+          allLabel: "All responses",
+          options: optionsFrom(responseItems.map(({ r }) => r.status)),
+          test: ({ r }, value) => r.status === value,
+        },
+        ...dateFilters<(typeof responseItems)[number]>(({ r }) => r.date, "Date"),
+      ],
+    })
     return (
       <>
         {header(
@@ -2660,104 +3007,118 @@ export default function RoleWorkspace({
             )}
             {archiveTab === "completed" ? (
               <>
-                {historical
-                  .filter(
-                    (p) =>
-                      p.status === "completed" ||
-                      (isOpm && registeredComplete(p) && teamConfirmed(p)),
-                  )
-                  .map((p) => (
-                    <div className="archive-record" key={p.id}>
-                      <span className="file-icon">
-                        <Icon name="archive" />
-                      </span>
-                      <div>
-                        <h3>{p.name}</h3>
-                        <p>
-                          {p.type} ·{" "}
-                          {p.status === "completed"
-                            ? "Construction closeout record"
-                            : "Intake paperwork and team acceptance complete — not necessarily construction complete"}
-                        </p>
-                      </div>
-                      {projects.some((x) => x.id === p.id) && (
-                        <Button
-                          onClick={() =>
-                            setDialog({ kind: "project", projectId: p.id })
-                          }
-                        >
-                          View read-only record
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                {!historical.some(
-                  (p) =>
-                    p.status === "completed" ||
-                    (isOpm && registeredComplete(p) && teamConfirmed(p)),
-                ) && <Empty title="No completed records yet" />}
+                <ListSection
+                  list={completedArchive}
+                  placeholder="Search completed projects"
+                  noun="record"
+                  touch={!isOpm}
+                  empty={<Empty title="No completed records yet" />}
+                  render={(items) => (
+                    <>
+                      {items.map((p) => (
+                        <div className="archive-record" key={p.id}>
+                          <span className="file-icon">
+                            <Icon name="archive" />
+                          </span>
+                          <div>
+                            <h3>{p.name}</h3>
+                            <p>
+                              {p.type} ·{" "}
+                              {p.status === "completed"
+                                ? "Construction closeout record"
+                                : "Intake paperwork and team acceptance complete — not necessarily construction complete"}
+                            </p>
+                          </div>
+                          {projects.some((x) => x.id === p.id) && (
+                            <Button
+                              onClick={() =>
+                                setDialog({ kind: "project", projectId: p.id })
+                              }
+                            >
+                              View read-only record
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                />
               </>
             ) : archiveTab === "changes" ? (
               <>
-                {historical.flatMap((p) =>
-                  (workflowFor(p).changesHistory || [])
-                    .filter((h) => h.opmId === actor.id)
-                    .map((h, i) => (
-                      <div className="history-row" key={`${p.id}-${i}`}>
-                        <Icon name="doc" />
-                        <div>
-                          <strong>{p.name}</strong>
-                          <p>
-                            {h.note} · {dateLabel(h.date)}
-                          </p>
+                <ListSection
+                  list={changesArchive}
+                  placeholder="Search changes history"
+                  noun="record"
+                  touch={!isOpm}
+                  empty={null}
+                  render={(items) => (
+                    <>
+                      {items.map(({ p, h, i }) => (
+                        <div className="history-row" key={`${p.id}-${i}`}>
+                          <Icon name="doc" />
+                          <div>
+                            <strong>{p.name}</strong>
+                            <p>
+                              {h.note} · {dateLabel(h.date)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )),
-                )}
+                      ))}
+                    </>
+                  )}
+                />
               </>
             ) : archiveTab === "companies" ? (
               <>
-                {state.companies
-                  .filter(
-                    (c) =>
-                      (c.submittedById === actor.id ||
-                        c.submittedBy === actor.name) &&
-                      c.status !== "pending",
-                  )
-                  .map((c) => (
-                    <div className="archive-record" key={c.id}>
-                      <div>
-                        <h3>{c.name}</h3>
-                        <p>{selectedProjectName(c.projectId)}</p>
-                      </div>
-                      <Status value={c.status} />
-                    </div>
-                  ))}
+                <ListSection
+                  list={companiesArchive}
+                  placeholder="Search company requests"
+                  noun="request"
+                  touch={!isOpm}
+                  empty={null}
+                  render={(items) => (
+                    <>
+                      {items.map((c) => (
+                        <div className="archive-record" key={c.id}>
+                          <div>
+                            <h3>{c.name}</h3>
+                            <p>{selectedProjectName(c.projectId)}</p>
+                          </div>
+                          <Status value={c.status} />
+                        </div>
+                      ))}
+                    </>
+                  )}
+                />
               </>
             ) : (
               <>
-                {historical.flatMap((p) =>
-                  workflowFor(p)
-                    .responses.filter(
-                      (r) =>
-                        isOpm ||
-                        (r.accountId === actor.id && r.status !== "accepted"),
-                    )
-                    .map((r) => (
-                      <div className="archive-record" key={r.id}>
-                        <div>
-                          <h3>
-                            {p.name} · {r.phase}
-                          </h3>
-                          <p>
-                            {actorName(r.accountId)} · {r.note} ·{" "}
-                            {dateLabel(r.date)}
-                          </p>
+                <ListSection
+                  list={responsesArchive}
+                  placeholder="Search responses"
+                  noun="response"
+                  touch={!isOpm}
+                  empty={null}
+                  render={(items) => (
+                    <>
+                      {items.map(({ p, r }) => (
+                        <div className="archive-record" key={r.id}>
+                          <div>
+                            <h3>
+                              {p.name} · {r.phase}
+                            </h3>
+                            <p>
+                              {actorName(r.accountId)} · {r.note} ·{" "}
+                              {dateLabel(r.date)}
+                            </p>
+                          </div>
+                          <Status value={r.status} />
                         </div>
-                        <Status value={r.status} />
-                      </div>
-                    )),
-                )}
+                      ))}
+                    </>
+                  )}
+                />
               </>
             )}
           </div>
@@ -3009,6 +3370,7 @@ export default function RoleWorkspace({
           </Button>
         </div>
         <DocumentRepository
+          listKey={`${actor.role}:monitor-documents`}
           className="role-document-browser"
           projects={[repositoryProject(p)]}
           lockedProjectId={p.id}
@@ -3153,10 +3515,17 @@ export default function RoleWorkspace({
             </div>
             {confirmTab === "responses" ? (
               responseTracking()
-            ) : intakes.length ? (
-              intakes.map(confirmationCard)
             ) : (
-              <Empty title="No intake assignments awaiting confirmation" />
+              <ListSection
+                list={intakesList}
+                placeholder="Search confirmations"
+                noun="project"
+                touch={!isOpm}
+                empty={
+                  <Empty title="No intake assignments awaiting confirmation" />
+                }
+                render={(items) => <>{items.map(confirmationCard)}</>}
+              />
             )}
           </>
         )
@@ -3226,30 +3595,15 @@ export default function RoleWorkspace({
               "Activity log",
               "Your project requests, approvals, progress and document history.",
             )}
-            <div className="tabs standalone">
-              {[
-                "all",
-                "request",
-                "approval",
-                "progress",
-                "notice",
-                "account",
-              ].map((type) => (
-                <button
-                  key={type}
-                  className={activityFilter === type ? "active" : ""}
-                  onClick={() => setActivityFilter(type)}
-                >
-                  {type === "all" ? "All activity" : type}
-                </button>
-              ))}
-            </div>
             <Panel title="Project activity">
-              {activityList(
-                events.filter(
-                  (e) => activityFilter === "all" || e.type === activityFilter,
-                ),
-              )}
+              <ListSection
+                list={activityFeed}
+                placeholder="Search activity"
+                noun="event"
+                touch={!isOpm}
+                render={(items) => activityList(items)}
+                empty={activityList([])}
+              />
             </Panel>
           </>
         )

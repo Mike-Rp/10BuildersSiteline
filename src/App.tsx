@@ -32,6 +32,7 @@ import {
   resolveClientSubconIssue,
   registeredComplete,
   teamConfirmed,
+  workflowFor,
   type WorkflowCommand,
 } from "./workflows"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -71,6 +72,16 @@ import {
   type State,
 } from "./model"
 import { projectDocumentIndex } from "./project-document-index"
+import {
+  ListPager,
+  ListSection,
+  ListToolbar,
+  NoResults,
+  resetListMemory,
+  runList,
+  useListMemory,
+} from "./ListControls"
+import { inDateRange, optionsFrom, type FilterDef } from "./listing"
 import {
   ADMIN_NAV,
   DIRECTORY_TABS,
@@ -200,6 +211,7 @@ const INVALID_CREDENTIALS_MESSAGE = SIGN_IN_MESSAGES.mismatch
 const signInAttempts = localAttemptStore()
 function AppInner() {
   const [state, setState] = useState<State>(emptyState)
+  useListMemory()
   const [sessionId, setSessionId] = useState(() => {
     try {
       return sessionStorage.getItem(SESSION_KEY) || ""
@@ -423,6 +435,7 @@ function AppInner() {
     else navigate(target)
   }
   function clearSession() {
+    resetListMemory()
     try {
       sessionStorage.removeItem(SESSION_KEY)
     } catch {
@@ -701,28 +714,199 @@ function AppInner() {
   }
   const matches = (value: string) =>
     value.toLowerCase().includes(query.toLowerCase())
-  const filteredProjects = state.projects.filter(
-    (p) =>
-      matches(`${p.name} ${p.type} ${nameFor(p.opmId)}`) &&
-      (filter === "all" || p.status === filter),
+  // Search, filters and paging for the Admin lists. The Administrator sees every
+  // record, so there is nothing to scope here; other roles scope first.
+  const projectSearch = (p: Project) =>
+    `${p.name} ${p.type} ${nameFor(p.opmId)}`
+  const typeFilter = (items: Project[]): FilterDef<Project> => ({
+    id: "type",
+    label: "Project type",
+    allLabel: "All types",
+    options: optionsFrom(items.map((p) => p.type)),
+    test: (p, value) => p.type === value,
+  })
+  const closedDate = (p: Project) =>
+    workflowFor(p).completedAt ||
+    p.history[p.history.length - 1]?.date ||
+    p.created
+  const dateFilters = <T,>(
+    pick: (item: T) => string | undefined,
+    noun: string,
+  ): FilterDef<T>[] => [
+    {
+      id: "from",
+      label: `${noun} from`,
+      kind: "date",
+      test: (item, value) => inDateRange(pick(item), value),
+    },
+    {
+      id: "to",
+      label: `${noun} to`,
+      kind: "date",
+      test: (item, value) => inDateRange(pick(item), undefined, value),
+    },
+  ]
+  const LICENSE_OPTIONS = [
+    "Valid",
+    "Renewed",
+    "Expiring soon",
+    "Expired",
+    "Grace expired",
+    "Not on file",
+  ].map((value) => ({ value, label: value }))
+  const roleFilter_: FilterDef<Account> = {
+    id: "role",
+    label: "Role",
+    allLabel: "All roles",
+    options: Object.entries(ROLE_NAMES).map(([value, label]) => ({
+      value,
+      label,
+    })),
+    test: (a, value) => a.role === value,
+  }
+  const accountStatusFilter: FilterDef<Account> = {
+    id: "status",
+    label: "Account status",
+    allLabel: "All account statuses",
+    options: ["active", "invited", "suspended", "pending-setup", "deactivated"].map(
+      (value) => ({ value, label: STATUS[value] || value }),
+    ),
+    test: (a, value) => a.status === value,
+  }
+  const licenseFilter_: FilterDef<Account> = {
+    id: "license",
+    label: "License status",
+    allLabel: "All license statuses",
+    options: LICENSE_OPTIONS,
+    test: (a, value) => licenseState(a, state.rules.grace) === value,
+  }
+  const accountSearch = (a: Account) =>
+    `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
+  const activeSitesItems = state.projects.filter((p) => p.status === "active")
+  const activeSitesList = runList("admin:active-sites", activeSitesItems, {
+    searchText: (p) => `${projectSearch(p)} ${p.phase}`,
+    filters: [
+      typeFilter(activeSitesItems),
+      {
+        id: "phase",
+        label: "Phase",
+        allLabel: "All phases",
+        options: optionsFrom(activeSitesItems.map((p) => p.phase)),
+        test: (p, value) => p.phase === value,
+      },
+    ],
+  })
+  const intakeItems = state.projects.filter((p) =>
+    ["pending", "changes_requested", "draft"].includes(p.status),
   )
-  const visibleEngineers = engineers.filter(
-    (a) =>
-      matches(`${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`) &&
-      (roleFilter === "all" || a.role === roleFilter) &&
-      (filter === "all" || a.status === filter) &&
-      (licenseFilter === "all" ||
-        licenseState(a, state.rules.grace) === licenseFilter),
+  const intakeList = runList("admin:intake", intakeItems, {
+    searchText: projectSearch,
+    filters: [
+      {
+        id: "status",
+        label: "Status",
+        allLabel: "All intake",
+        options: [
+          { value: "pending", label: "Awaiting confirmation" },
+          { value: "changes_requested", label: "Changes requested" },
+          { value: "draft", label: "Drafts" },
+        ],
+        test: (p, value) => p.status === value,
+      },
+      typeFilter(intakeItems),
+    ],
+  })
+  const engineersList = runList("admin:engineers", engineers, {
+    searchText: accountSearch,
+    filters: [
+      { ...roleFilter_, options: roleFilter_.options!.filter((o) => o.value !== "client") },
+      accountStatusFilter,
+      licenseFilter_,
+    ],
+  })
+  const engineerDocsList = runList("admin:engineer-docs", engineers, {
+    searchText: accountSearch,
+    filters: [
+      { ...roleFilter_, options: roleFilter_.options!.filter((o) => o.value !== "client") },
+      licenseFilter_,
+    ],
+  })
+  const activeCommitments = (c: Company) =>
+    c.activeProjectIds.filter((id) =>
+      state.projects.some((p) => p.id === id && p.status === "active"),
+    ).length
+  const companiesList = runList(
+    "admin:companies",
+    state.companies.filter((c) => c.status === "approved"),
+    {
+      searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
+      filters: [
+        {
+          id: "availability",
+          label: "Availability",
+          allLabel: "All availability",
+          options: [
+            { value: "available", label: "Available" },
+            { value: "limited", label: "Limited availability" },
+            { value: "committed", label: "Fully committed" },
+          ],
+          test: (c, value) => c.availability === value,
+        },
+        {
+          id: "commitments",
+          label: "Active commitments",
+          allLabel: "Any",
+          options: [
+            { value: "has", label: "Has active commitments" },
+            { value: "none", label: "No active commitments" },
+          ],
+          test: (c, value) =>
+            value === "has" ? activeCommitments(c) > 0 : activeCommitments(c) === 0,
+        },
+      ],
+    },
   )
-  const visibleCompanies = state.companies.filter(
-    (c) =>
-      c.status === "approved" &&
-      matches(`${c.name} ${c.contact} ${c.email}`) &&
-      (filter === "all" ||
-        (filter === "busy"
-          ? c.availability === "committed"
-          : c.availability === "available")),
+  const teamList = runList(
+    "admin:team",
+    state.accounts.filter((a) => a.status !== "deactivated"),
+    {
+      searchText: (a) =>
+        `${a.name} ${a.email} ${a.scope.join(" ")} ${a.status}`,
+      filters: [roleFilter_, accountStatusFilter],
+    },
   )
+  const activityLogList = runList("admin:activity", state.events, {
+    searchText: (e) => `${e.title} ${e.detail}`,
+    filters: [
+      {
+        id: "type",
+        label: "Event type",
+        allLabel: "All activity",
+        options: [
+          "request",
+          "approval",
+          "progress",
+          "account",
+          "view",
+          "system",
+        ].map((value) => ({
+          value,
+          label: value[0].toUpperCase() + value.slice(1),
+        })),
+        test: (e, value) => e.type === value,
+      },
+      {
+        id: "person",
+        label: "Person",
+        allLabel: "Everyone",
+        options: optionsFrom(
+          state.events.map((e) => (e.actorId ? nameFor(e.actorId) : "")),
+        ),
+        test: (e, value) => !!e.actorId && nameFor(e.actorId) === value,
+      },
+      ...dateFilters<Event>((e) => e.date, "Date"),
+    ],
+  })
 
   function projectTable(projects: Project[], intakeTable = false) {
     return projects.length ? (
@@ -862,11 +1046,27 @@ function AppInner() {
     )
   }
   function subconRequests(status: string) {
+    const requestList = runList(
+      `admin:subcon-${status}`,
+      state.companies.filter((c) => c.status === status),
+      {
+        searchText: (c) =>
+          `${c.name} ${c.contact} ${c.submittedBy || ""} ${projectFor(c.projectId)}`,
+      },
+    )
     return (
+      <ListSection
+        list={requestList}
+        placeholder="Search requests"
+        noun="request"
+        empty={
+          <div className="approvals-grid">
+            <Empty title="No requests in this category" />
+          </div>
+        }
+        render={(items) => (
       <div className="approvals-grid">
-        {state.companies
-          .filter((c) => c.status === status)
-          .map((c) => (
+        {items.map((c) => (
             <Panel
               key={c.id}
               title={c.name}
@@ -920,10 +1120,9 @@ function AppInner() {
               </div>
             </Panel>
           ))}
-        {!state.companies.some((c) => c.status === status) && (
-          <Empty title="No requests in this category" />
-        )}
       </div>
+        )}
+      />
     )
   }
   function activityList(events: Event[], compact = false) {
@@ -1291,19 +1490,14 @@ function AppInner() {
               Average progress
             </span>
           </div>
-          <Panel
-            title="Project monitoring"
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search projects or personnel"
-              />
-            }
-          >
-            {projectTable(
-              filteredProjects.filter((p) => p.status === "active"),
-            )}
+          <Panel title="Project monitoring">
+            <ListSection
+              list={activeSitesList}
+              placeholder="Search projects or personnel"
+              noun="project"
+              render={(items) => projectTable(items)}
+              empty={projectTable([])}
+            />
           </Panel>
         </>
       )
@@ -1333,36 +1527,14 @@ function AppInner() {
           <Panel
             title="Project intake log"
             subtitle={`${intake.length} current intake records`}
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search intake records"
-              />
-            }
           >
-            <div className="tabs">
-              {[
-                ["all", "All intake"],
-                ["pending", "Awaiting confirmation"],
-                ["changes_requested", "Changes requested"],
-                ["draft", "Drafts"],
-              ].map(([value, label]) => (
-                <button
-                  className={filter === value ? "active" : ""}
-                  key={value}
-                  onClick={() => setFilter(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {projectTable(
-              filteredProjects.filter((p) =>
-                ["pending", "changes_requested", "draft"].includes(p.status),
-              ),
-              true,
-            )}
+            <ListSection
+              list={intakeList}
+              placeholder="Search intake records"
+              noun="record"
+              render={(items) => projectTable(items, true)}
+              empty={projectTable([], true)}
+            />
           </Panel>
         </>
       )
@@ -1414,6 +1586,7 @@ function AppInner() {
     const projectDocumentsTab = () => (
         <>
           <DocumentRepository
+            listKey="admin:documents"
             projects={state.projects.map((project) => ({
               id: project.id,
               name: project.name,
@@ -1433,37 +1606,35 @@ function AppInner() {
       )
     const engineerDocumentsTab = () => (
         <>
-          <Panel
-            title="Personnel document repository"
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search engineer name or license"
-              />
-            }
-          >
-            <div className="folder-grid">
-              {visibleEngineers.map((a) => (
-                <button
-                  className="folder-card"
-                  key={a.id}
-                  onClick={() => setDialog({ kind: "engineer-docs", id: a.id })}
-                >
-                  <span className="avatar large">{initials(a.name)}</span>
-                  <Status status={licenseState(a, state.rules.grace)} />
-                  <h3>{a.name}</h3>
-                  <p>{ROLE_NAMES[a.role]}</p>
-                  <div>
-                    <span>{a.docs.length} documents on file</span>
-                    <Icon name="arrow" size={17} />
-                  </div>
-                </button>
-              ))}
-            </div>
-            {!visibleEngineers.length && (
-              <Empty title="No personnel match your search" />
-            )}
+          <Panel title="Personnel document repository">
+            <ListSection
+              list={engineerDocsList}
+              placeholder="Search engineer name or license"
+              noun="person"
+              empty={<Empty title="No personnel match your search" />}
+              render={(items) => (
+                <div className="folder-grid">
+                  {items.map((a) => (
+                    <button
+                      className="folder-card"
+                      key={a.id}
+                      onClick={() =>
+                        setDialog({ kind: "engineer-docs", id: a.id })
+                      }
+                    >
+                      <span className="avatar large">{initials(a.name)}</span>
+                      <Status status={licenseState(a, state.rules.grace)} />
+                      <h3>{a.name}</h3>
+                      <p>{ROLE_NAMES[a.role]}</p>
+                      <div>
+                        <span>{a.docs.length} documents on file</span>
+                        <Icon name="arrow" size={17} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
           </Panel>
         </>
       )
@@ -1472,90 +1643,48 @@ function AppInner() {
           <Panel
             title="In-house personnel"
             subtitle={`${engineers.length} engineers and administrators`}
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search name, discipline or license"
-              />
-            }
           >
-            <div className="filter-bar">
-              <select
-                aria-label="Filter engineer role"
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-              >
-                <option value="all">All roles</option>
-                <option value="admin">Administrator</option>
-                <option value="opm">Office PM</option>
-                <option value="spm">Site PM</option>
-              </select>
-              <select
-                aria-label="Filter account status"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              >
-                <option value="all">All account statuses</option>
-                <option value="active">Active</option>
-                <option value="invited">Invited</option>
-                <option value="suspended">Suspended</option>
-                <option value="deactivated">Deactivated</option>
-              </select>
-              <select
-                aria-label="Filter license status"
-                value={licenseFilter}
-                onChange={(e) => setLicenseFilter(e.target.value)}
-              >
-                <option value="all">All license statuses</option>
-                {[
-                  "Valid",
-                  "Renewed",
-                  "Expiring soon",
-                  "Expired",
-                  "Grace expired",
-                  "Not on file",
-                ].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="engineer-grid">
-              {visibleEngineers.map((a) => (
-                <button
-                  className="engineer-card"
-                  key={a.id}
-                  onClick={() => setDialog({ kind: "account", id: a.id })}
-                >
-                  <div className="engineer-top">
-                    <span className="avatar large">{initials(a.name)}</span>
-                    <Status status={a.status} />
-                  </div>
-                  <h3>{a.name}</h3>
-                  <p>{ROLE_NAMES[a.role]}</p>
-                  <div className="tag-list">
-                    {(a.scope.length && a.role === "spm"
-                      ? a.scope
-                      : a.projectTypes.length
-                        ? a.projectTypes
-                        : ["Organization"]
-                    ).map((t) => (
-                      <span key={t}>{t}</span>
-                    ))}
-                  </div>
-                  <div className="engineer-footer">
-                    <span>
-                      {workload(state, a.id)} / {state.rules.cap} active
-                      projects
-                    </span>
-                    <Status status={licenseState(a, state.rules.grace)} />
-                  </div>
-                </button>
-              ))}
-            </div>
-            {!visibleEngineers.length && (
-              <Empty title="No matching personnel" />
-            )}
+            <ListSection
+              list={engineersList}
+              placeholder="Search name, discipline or license"
+              noun="person"
+              empty={<Empty title="No matching personnel" />}
+              render={(items) => (
+                <div className="engineer-grid">
+                  {items.map((a) => (
+                    <button
+                      className="engineer-card"
+                      key={a.id}
+                      onClick={() => setDialog({ kind: "account", id: a.id })}
+                    >
+                      <div className="engineer-top">
+                        <span className="avatar large">{initials(a.name)}</span>
+                        <Status status={a.status} />
+                      </div>
+                      <h3>{a.name}</h3>
+                      <p>{ROLE_NAMES[a.role]}</p>
+                      <div className="tag-list">
+                        {(a.scope.length && a.role === "spm"
+                          ? a.scope
+                          : a.projectTypes.length
+                            ? a.projectTypes
+                            : ["Organization"]
+                        ).map((t) => (
+                          <span key={t}>{t}</span>
+                        ))}
+                      </div>
+                      <div className="engineer-footer">
+                        <span>
+                          {workload(state, a.id)} / {state.rules.cap} active
+                          projects
+                        </span>
+                        <Status status={licenseState(a, state.rules.grace)} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
           </Panel>
         </>
       )
@@ -1579,87 +1708,74 @@ function AppInner() {
           </div>
           {subconTab !== "registered" && subconRequests(subconTab)}
           {subconTab === "registered" && (
-            <Panel
-              title="Registered companies"
-              subtitle={`${state.companies.filter((c) => c.status === "approved").length} approved subcontractors`}
-              actions={
-                <Search
-                  value={query}
-                  onChange={setQuery}
-                  placeholder="Search company"
-                />
-              }
-            >
-              <div className="filter-bar">
-                <select
-                  aria-label="Company availability"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="all">All availability</option>
-                  <option value="available">Available</option>
-                  <option value="busy">Fully committed</option>
-                </select>
-                <span>
-                  Assignments remain project-level and are not managed here.
-                </span>
-              </div>
-              <div className="company-grid">
-                {visibleCompanies.map((c) => {
-                  const projects = c.activeProjectIds.filter((projectId) =>
-                    state.projects.some(
-                      (project) =>
-                        project.id === projectId && project.status === "active",
-                    ),
-                  )
-                  return (
-                    <button
-                      key={c.id}
-                      className="company-card"
-                      onClick={() => setDialog({ kind: "company", id: c.id })}
-                    >
-                      <div className="company-top">
-                        <span className="company-monogram">
-                          {initials(c.name)}
-                        </span>
-                        <Badge
-                          tone={
-                            c.availability === "available" ? "green" : "amber"
-                          }
-                        >
-                          {c.availability}
-                        </Badge>
-                      </div>
-                      <h3>{c.name}</h3>
-                      <p>{c.email || "Company email not supplied"}</p>
-                      <div className="company-meta">
-                        <span>
-                          <Icon name="users" size={16} />
-                          {c.manpowerCount} available manpower
-                        </span>
-                        <span>
-                          <Icon name="building" size={16} />
-                          {projects.length} active project commitments
-                        </span>
-                      </div>
-                      <div className="coverage">
-                        <span>
-                          Manpower list documents
-                          <strong>{c.manpowerDocuments.length}</strong>
-                        </span>
-                      </div>
-                      <div className="card-bottom">
-                        <span>View company details</span>
-                        <Icon name="arrow" size={17} />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-              {!visibleCompanies.length && (
-                <Empty title="No companies match these filters" />
+          <Panel
+            title="Registered companies"
+            subtitle={`${state.companies.filter((c) => c.status === "approved").length} approved subcontractors`}
+          >
+            <ListSection
+              list={companiesList}
+              placeholder="Search company"
+              noun="company"
+              empty={<Empty title="No companies match these filters" />}
+              render={(items) => (
+                <div className="company-grid">
+                  {items.map((c) => {
+                    const projects = c.activeProjectIds.filter((projectId) =>
+                      state.projects.some(
+                        (project) =>
+                          project.id === projectId && project.status === "active",
+                      ),
+                    )
+                    return (
+                      <button
+                        key={c.id}
+                        className="company-card"
+                        onClick={() => setDialog({ kind: "company", id: c.id })}
+                      >
+                        <div className="company-top">
+                          <span className="company-monogram">
+                            {initials(c.name)}
+                          </span>
+                          <Badge
+                            tone={
+                              c.availability === "available" ? "green" : "amber"
+                            }
+                          >
+                            {c.availability}
+                          </Badge>
+                        </div>
+                        <h3>{c.name}</h3>
+                        <p>{c.email || "Company email not supplied"}</p>
+                        <div className="company-meta">
+                          <span>
+                            <Icon name="users" size={16} />
+                            {c.manpowerCount} available manpower
+                          </span>
+                          <span>
+                            <Icon name="building" size={16} />
+                            {projects.length} active project commitments
+                          </span>
+                        </div>
+                        <div className="coverage">
+                          <span>
+                            Manpower list documents
+                            <strong>{c.manpowerDocuments.length}</strong>
+                          </span>
+                        </div>
+                        <div className="card-bottom">
+                          <span>View company details</span>
+                          <Icon name="arrow" size={17} />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               )}
-            </Panel>
+            />
+            <p className="role-muted">
+              Assignments remain project-level and are not managed here.
+            </p>
+          </Panel>
           )}
         </>
       )
@@ -1766,27 +1882,12 @@ function AppInner() {
           <Panel
             title="Organization accounts"
             subtitle={`${state.accounts.filter((a) => a.status !== "deactivated").length} accounts · Admin-provisioned access`}
-            actions={
-              <Search
-                value={query}
-                onChange={setQuery}
-                placeholder="Search name, scope or status"
-              />
-            }
           >
-            <div className="tabs">
-              {[["all", "All accounts"], ...Object.entries(ROLE_NAMES)].map(
-                ([role, name]) => (
-                  <button
-                    key={role}
-                    className={roleFilter === role ? "active" : ""}
-                    onClick={() => setRoleFilter(role)}
-                  >
-                    {name}
-                  </button>
-                ),
-              )}
-            </div>
+            <ListToolbar
+              list={teamList}
+              placeholder="Search name, scope or status"
+              noun="account"
+            />
             <div className="table-scroll">
               <table>
                 <thead>
@@ -1800,16 +1901,7 @@ function AppInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {state.accounts
-                    .filter(
-                      (a) =>
-                        a.status !== "deactivated" &&
-                        (roleFilter === "all" || a.role === roleFilter) &&
-                        matches(
-                          `${a.name} ${a.email} ${a.scope.join(" ")} ${a.status}`,
-                        ),
-                    )
-                    .map((a) => (
+                  {teamList.view.items.map((a) => (
                       <tr key={a.id}>
                         <td>
                           <button
@@ -1866,6 +1958,13 @@ function AppInner() {
                 </tbody>
               </table>
             </div>
+            {!teamList.matched.length &&
+              (teamList.narrowed ? (
+                <NoResults list={teamList} />
+              ) : (
+                <Empty title="No accounts yet" />
+              ))}
+            <ListPager list={teamList} />
           </Panel>
         </>
       )
@@ -1887,6 +1986,17 @@ function AppInner() {
       const deactivated = state.accounts.filter(
         (a) => a.status === "deactivated",
       )
+      const archiveList = runList(`admin:archive-${tab}`, archived, {
+        searchText: projectSearch,
+        filters: [typeFilter(archived), ...dateFilters<Project>(closedDate, "Closed")],
+      })
+      const accountArchive = (key: string, items: Account[]) =>
+        runList(key, items, {
+          searchText: (a) => `${a.name} ${a.email} ${ROLE_NAMES[a.role]}`,
+          filters: [roleFilter_],
+        })
+      const suspendedList = accountArchive("admin:archive-flagged", suspended)
+      const deactivatedList = accountArchive("admin:archive-deactivated", deactivated)
       return (
         <>
           {pageHeading(
@@ -1934,7 +2044,14 @@ function AppInner() {
                     ))}
                   </select>
                 </div>
-                {suspended.map((a) => (
+                <ListSection
+                  list={suspendedList}
+                  placeholder="Search flagged accounts"
+                  noun="account"
+                  empty={null}
+                  render={(items) => (
+                <>
+                {items.map((a) => (
                   <div key={a.id} className="archive-account">
                     <span className="avatar">{initials(a.name)}</span>
                     <div>
@@ -1976,8 +2093,18 @@ function AppInner() {
                     </Button>
                   </div>
                 ))}
+                </>
+                  )}
+                />
                 <h3>Deactivated accounts</h3>
-                {deactivated.map((a) => (
+                <ListSection
+                  list={deactivatedList}
+                  placeholder="Search deactivated accounts"
+                  noun="account"
+                  empty={null}
+                  render={(items) => (
+                <>
+                {items.map((a) => (
                   <div className="archive-account" key={a.id}>
                     <strong>{a.name}</strong>
                     <span>{ROLE_NAMES[a.role]}</span>
@@ -1989,12 +2116,21 @@ function AppInner() {
                     </Button>
                   </div>
                 ))}
+                </>
+                  )}
+                />
                 {!suspended.length && !deactivated.length && (
                   <Empty title="No accounts require review" />
                 )}
               </div>
             ) : (
-              projectTable(archived)
+              <ListSection
+                list={archiveList}
+                placeholder="Search archived projects"
+                noun="record"
+                render={(items) => projectTable(items)}
+                empty={projectTable([])}
+              />
             )}
           </Panel>
         </>
@@ -3254,30 +3390,13 @@ function AppInner() {
           wide
           onClose={() => setDialog(undefined)}
         >
-          <div className="tabs">
-            {[
-              "all",
-              "request",
-              "approval",
-              "progress",
-              "account",
-              "view",
-              "system",
-            ].map((f) => (
-              <button
-                key={f}
-                className={activityFilter === f ? "active" : ""}
-                onClick={() => setActivityFilter(f)}
-              >
-                {f === "all" ? "All activity" : f[0].toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-          {activityList(
-            state.events.filter(
-              (e) => activityFilter === "all" || e.type === activityFilter,
-            ),
-          )}
+          <ListSection
+            list={activityLogList}
+            placeholder="Search activity"
+            noun="event"
+            render={(items) => activityList(items)}
+            empty={activityList([])}
+          />
         </Modal>
       )}
       {dialog?.kind === "search" && (

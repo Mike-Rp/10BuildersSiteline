@@ -3,6 +3,14 @@ import { dateLabel } from "./model"
 import { Badge, Button, Empty, Icon } from "./ui"
 import type { Doc } from "./model"
 import type { ProjectDocumentCategory } from "./project-document-index"
+import {
+  ListPager,
+  ListToolbar,
+  NoResults,
+  runList,
+  useListMemory,
+} from "./ListControls"
+import { inDateRange, optionsFrom } from "./listing"
 
 // Shared four-level repository browser: Projects → Categories → Subfolders →
 // Files. Callers pass only what the signed-in role may open, so counts always
@@ -66,6 +74,7 @@ export default function DocumentRepository({
   fileDetails = false,
   renderStatus,
   emptyDetail = "Original uploads appear here when the responsible role submits them.",
+  listKey = "documents",
 }: {
   projects: RepositoryProject[]
   onOpen: (projectId: string, fileId: string) => void
@@ -98,7 +107,10 @@ export default function DocumentRepository({
   fileDetails?: boolean
   renderStatus?: (value: string) => ReactNode
   emptyDetail?: string
+  // Names this browser's paging/filters in the session memory (one per caller).
+  listKey?: string
 }) {
+  useListMemory()
   const [ownPath, setOwnPath] = useState<RepositoryPath>({})
   const [ownQuery, setOwnQuery] = useState("")
   const path = controlledPath ?? ownPath
@@ -146,6 +158,41 @@ export default function DocumentRepository({
   const visibleFiles = (folder?.files || []).filter(
     (file) =>
       !inProject || folder?.name.toLowerCase().includes(term) || fileMatches(file),
+  )
+
+  // Role scoping already happened: callers pass only what this role may open.
+  const projectsList = runList(`${listKey}:projects`, visibleProjects, {
+    searchText: () => "",
+  })
+  const filesList = runList(
+    `${listKey}:files:${project?.id}:${folder?.id}`,
+    visibleFiles,
+    {
+      searchText: () => "",
+      filters: [
+        {
+          id: "review",
+          label: "Review status",
+          allLabel: "All review statuses",
+          options: optionsFrom(
+            (folder?.files || []).map((file) => file.reviewStatus || ""),
+          ),
+          test: (file, value) => file.reviewStatus === value,
+        },
+        {
+          id: "from",
+          label: "Uploaded from",
+          kind: "date",
+          test: (file, value) => inDateRange(file.date, value),
+        },
+        {
+          id: "to",
+          label: "Uploaded to",
+          kind: "date",
+          test: (file, value) => inDateRange(file.date, undefined, value),
+        },
+      ],
+    },
   )
 
   function back() {
@@ -262,8 +309,9 @@ export default function DocumentRepository({
             Try another project name or document title.
           </Empty>
         ) : (
+          <>
           <div className="document-browser-grid">
-            {visibleProjects.map((p) => {
+            {projectsList.view.items.map((p) => {
               const count = projectFileCount(p)
               const status = projectStatus?.(p.id)
               return (
@@ -302,6 +350,8 @@ export default function DocumentRepository({
               )
             })}
           </div>
+          <ListPager list={projectsList} />
+          </>
         ))}
 
       {project && !category && projectIntro?.(project.id)}
@@ -385,8 +435,18 @@ export default function DocumentRepository({
             Try another file name.
           </Empty>
         ) : (
+          <>
+          <ListToolbar
+            list={filesList}
+            showSearch={false}
+            placeholder="Filter files"
+            noun="file"
+          />
+          {!filesList.matched.length ? (
+            <NoResults list={filesList} />
+          ) : (
           <div className="document-reference-list">
-            {visibleFiles.map((file) => (
+            {filesList.view.items.map((file) => (
               <div className="document-reference-row" key={file.id}>
                 <span className="file-icon">
                   <Icon name="doc" />
@@ -450,6 +510,9 @@ export default function DocumentRepository({
               </div>
             ))}
           </div>
+          )}
+          <ListPager list={filesList} />
+          </>
         ))}
     </section>
   )
