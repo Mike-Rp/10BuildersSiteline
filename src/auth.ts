@@ -1,9 +1,8 @@
 import { licenseState, type Account, type State } from "./model.ts"
+import { SIGN_IN_MESSAGES } from "./signInPolicy.ts"
 
-export const INVALID_CREDENTIALS =
-  "The email or password you entered is incorrect."
-export const ACCOUNT_UNAVAILABLE =
-  "This account is not active. Contact your Administrator."
+export const INVALID_CREDENTIALS = SIGN_IN_MESSAGES.mismatch
+export const ACCOUNT_UNAVAILABLE = SIGN_IN_MESSAGES.inactive
 export const LICENSE_EXPIRED =
   "Your professional license grace period has ended. Contact your Administrator."
 

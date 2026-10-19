@@ -24,6 +24,7 @@
   --success-border: #BED6C4;
   --warning-border: #E8CFAD;
   --danger-border: #E7C0B9;
+  --login-headline: #B9CFEA;
   --space-unit: 4px;
   --text-caption: 14px;
   --text-body: 16px;
@@ -644,6 +645,12 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .chart-actual-point, #root .chart-actual-area { fill: var(--color-steel); }
 #root .chart-planned-line { stroke: var(--color-slate); stroke-dasharray: 6 5; }
 #root .login-highlights svg { color: #BFD0E3; }
+/* The global "#root h2" rules above would otherwise paint the login headline dark grey on navy. */
+#root .login-info h2 { color: var(--login-headline); font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; }
+#root .login-info-desc { color: #fff; font-size: 16px; line-height: 1.6; }
+@media (max-width: 900px) {
+  #root .login-info h2 { font-size: 24px; }
+}
 #root :is(button, a, summary, input, select, textarea):focus-visible { outline: 3px solid var(--color-steel); outline-offset: 3px; }
 
 #root .field-error { color: var(--color-danger); font-weight: 600; }

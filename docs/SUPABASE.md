@@ -2,6 +2,10 @@
 
 The React frontend uses the Express backend in `Thesis-Backend/`. Express owns login, permissions and workflows, and connects directly to Supabase Postgres. Supabase Auth and Storage are not used. Runtime accounts, projects, companies, files, notifications and settings come from the API. Test fixtures stay under `tests/fixtures/`.
 
+## Download the frontend and backend
+
+The Express backend is a Git submodule pinned to the tested integration commit. After cloning, run `git submodule update --init --recursive` from the frontend repository. For a new clone, `git clone --recurse-submodules https://github.com/Mike-Rp/10BuildersSiteline.git` downloads both repositories. The backend integration branch is `integration/siteline-ui-20261019`; its upstream main branch has additional work that is not part of this tested integration. Database credentials stay in the ignored local `Thesis-Backend/.env` file; copy `.env.example` for a fresh checkout.
+
 ## Connect your database
 
 1. Keep the existing database and records. For a brand new database only, first run `supabase/migrations/20261017000002_thesis_backend_schema.sql` in the Supabase SQL Editor. Do not rerun that initial schema over an existing database.

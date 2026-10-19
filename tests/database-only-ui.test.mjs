@@ -1,3 +1,4 @@
+import { SIGN_IN_MESSAGES } from "../src/signInPolicy.ts"
 import assert from "node:assert/strict"
 import test from "node:test"
 import { JSDOM } from "jsdom"
@@ -153,7 +154,7 @@ test(
       .dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }))
     await until(() =>
       w.document.body.textContent.includes(
-        "The email or password you entered is incorrect.",
+        SIGN_IN_MESSAGES.mismatch,
       ),
     )
     assert.equal(calls.length, 1)

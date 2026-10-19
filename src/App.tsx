@@ -4,6 +4,7 @@ import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, c
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
 import {
@@ -194,10 +195,9 @@ function Search({
     </div>
   )
 }
-const ACCOUNT_UNAVAILABLE_MESSAGE =
-  "This account is not active. Contact your Administrator."
-const INVALID_CREDENTIALS_MESSAGE =
-  "The email or password you entered is incorrect."
+const ACCOUNT_UNAVAILABLE_MESSAGE = SIGN_IN_MESSAGES.inactive
+const INVALID_CREDENTIALS_MESSAGE = SIGN_IN_MESSAGES.mismatch
+const signInAttempts = localAttemptStore()
 function AppInner() {
   const [state, setState] = useState<State>(emptyState)
   const [sessionId, setSessionId] = useState(() => {
@@ -451,6 +451,7 @@ function AppInner() {
     return account
   }
   async function signIn(email: string, password: string) {
+    const account: Account = await guardedSignIn(signInAttempts,email,async()=>{
     let user: Awaited<ReturnType<typeof apiLogin>>
     try {
       user = await apiLogin(email, password)
@@ -470,6 +471,8 @@ function AppInner() {
       await apiLogout()
       throw error
     }
+      return account
+    })
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
