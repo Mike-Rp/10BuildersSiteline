@@ -72,6 +72,21 @@ for (const label of navLabels) {
   await sleep(250)
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
   if (label === "Dashboard" && document.querySelector('.project-progress, .chart-summary')) problems.push('Retired dashboard schedule chart remains')
+  if (label === "Dashboard" && document.querySelector('.admin-overview')) {
+    if (document.querySelectorAll('.ao-metric').length !== 3) problems.push('Administrator dashboard totals are duplicated')
+    if (document.querySelector('.admin-overview table, .admin-overview .attention-strip, .admin-overview .pipeline-panel')) problems.push('Duplicate dashboard project or pipeline content remains')
+    const item = document.querySelector('.ao-task')
+    if (item) {
+      item.click()
+      await sleep(150)
+      const modal = document.querySelector('[role="dialog"]')
+      if (!modal) problems.push('Dashboard attention item did not open its existing workflow')
+      else {
+        modal.querySelector('[aria-label="Close dialog"]')?.click()
+        await sleep(100)
+      }
+    }
+  }
   if (label === "Active sites") {
     const tabs = [...document.querySelectorAll('.as-tabs [role="tab"]')]
     const isClient = !!document.querySelector('.client-portal')

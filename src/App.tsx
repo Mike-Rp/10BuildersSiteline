@@ -1,3 +1,5 @@
+import AdminDashboard from "./AdminDashboard"
+import { adminDashboardOverview } from "./admin-dashboard"
 import ProjectProgress from "./ProjectProgress"
 import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
@@ -277,12 +279,6 @@ function AppInner() {
   )
   const pending = state.companies.filter((c) => c.status === "pending")
   const engineers = state.accounts.filter((a) => a.role !== "client")
-  const licenseAlerts = engineers.filter(
-    (a) =>
-      ["Expired", "Grace expired", "Expiring soon"].includes(
-        licenseState(a, state.rules.grace),
-      ) && a.status === "active",
-  )
   const unread = state.events.filter(
     (e) =>
       !e.read &&
@@ -445,10 +441,6 @@ function AppInner() {
   }
   function openPendingRequests() {
     navigate("Approvals")
-  }
-  function openTarget(target: string) {
-    if (target === "Approvals") openPendingRequests()
-    else navigate(target)
   }
   function clearSession() {
     resetListMemory()
@@ -1224,245 +1216,15 @@ function AppInner() {
     )
   }
   function dashboard() {
-    // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
-    const dashActive = runList("dash:admin-active", active, { searchText: () => "" }, { pageSize: 5 })
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
-    const totalCurrent = state.projects.filter(
-      (p) => !["completed", "declined", "expired"].includes(p.status),
-    ).length
-    return (
-      <>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">YOUR OPERATIONS, AT A GLANCE</div>
-            <h1>
-              Workspace overview<span className="heading-dot">.</span>
-            </h1>
-            <p>
-              A clear view of your projects, people, and what needs your
-              attention.
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            icon="plus"
-            onClick={() => setDialog({ kind: "intake" })}
-          >
-            New project intake
-          </Button>
-        </div>
-        <div className="metrics-grid">
-          {[
-            {
-              title: "Active projects",
-              value: active.length,
-              note: `${totalCurrent} projects in your pipeline`,
-              icon: "building",
-              target: "Active sites",
-              label: "View projects",
-            },
-            {
-              title: "Pending confirmations",
-              value: intake.filter((p) => !p.opmAccepted).length,
-              note: "Awaiting Office PM response",
-              icon: "clock",
-              target: "Project intake",
-              label: "Review intake",
-            },
-            {
-              title: "Team members",
-              value: state.accounts.filter((a) =>
-                ["active", "invited"].includes(a.status),
-              ).length,
-              note: `${engineers.filter((a) => a.status === "active").length} active in-house personnel`,
-              icon: "users",
-              target: "Team",
-              label: "Manage team",
-            },
-            {
-              title: "Pending approvals",
-              value: pending.length,
-              note: "New subcontractor requests",
-              icon: "shield",
-              target: "Approvals",
-              label: "Review requests",
-            },
-          ].map((m) => (
-            <button
-              className="metric-card"
-              key={m.title}
-              onClick={() => openTarget(m.target)}
-            >
-              <div className="metric-top">
-                <span>{m.title}</span>
-                <span className="metric-icon">
-                  <Icon name={m.icon} />
-                </span>
-              </div>
-              <div className="metric-value">
-                {m.value.toString().padStart(2, "0")}
-              </div>
-              <div className="metric-bottom">
-                <span>{m.note}</span>
-                <Icon name="arrow" size={16} />
-              </div>
-            </button>
-          ))}
-        </div>
-        {(pending.length > 0 || licenseAlerts.length > 0) && (
-          <div className="attention-strip">
-            <span className="attention-icon">
-              <Icon name="alert" size={20} />
-            </span>
-            <div>
-              <strong>A little attention goes a long way.</strong>
-              <span>
-                {pending.length} subcontractor{" "}
-                {pending.length === 1 ? "request needs" : "requests need"}{" "}
-                approval
-                {licenseAlerts.length > 0
-                  ? ` and ${licenseAlerts.length} engineer license${
-                      licenseAlerts.length > 1 ? "s need" : " needs"
-                    } review`
-                  : ""}
-                .
-              </span>
-            </div>
-            <Button
-              variant="text-button"
-              onClick={() =>
-                pending.length
-                  ? openPendingRequests()
-                  : navigate("Engineer directory")
-              }
-            >
-              Review items
-              <Icon name="arrow" size={16} />
-            </Button>
-          </div>
-        )}
-        <div className="dashboard-main-grid">
-          <Panel
-            title="Active sites"
-            subtitle="Keep every project moving in the right direction."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => navigate("Active sites")}
-              >
-                View all projects
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            <ListSection
-              list={dashActive}
-              compact
-              empty={projectTable([])}
-              render={(items) => projectTable(items)}
-            />
-            <div className="panel-foot">
-              <span>
-                <i className="status-dot green" />
-                Live workspace data
-              </span>
-              <span>{active.length} active projects</span>
-            </div>
-          </Panel>
-          <Panel
-            title="Intake pipeline"
-            subtitle="From first details to ready for site."
-            actions={<Icon name="activity" size={18} />}
-            className="pipeline-panel"
-          >
-            <div className="pipeline-total">
-              <strong>{intake.length.toString().padStart(2, "0")}</strong>
-              <span>projects in intake</span>
-              <span className="pipeline-badge">In progress</span>
-            </div>
-            <div className="pipeline-stages">
-              {[
-                {
-                  label: "Awaiting Office PM",
-                  count: intake.filter(
-                    (p) => p.status === "pending" && !p.opmAccepted,
-                  ).length,
-                  tone: "green",
-                },
-                {
-                  label: "Site PM confirmation",
-                  count: intake.filter(
-                    (p) =>
-                      p.opmAccepted &&
-                      p.team.some((t) => t.status !== "confirmed"),
-                  ).length,
-                  tone: "sage",
-                },
-                {
-                  label: "Changes requested",
-                  count: intake.filter((p) => p.status === "changes_requested")
-                    .length,
-                  tone: "amber",
-                },
-                {
-                  label: "Draft projects",
-                  count: intake.filter((p) => p.status === "draft").length,
-                  tone: "gray",
-                },
-              ].map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => {
-                    navigate("Project intake")
-                    if (s.tone === "amber") setFilter("changes_requested")
-                  }}
-                >
-                  <span>
-                    <i className={`status-dot ${s.tone}`} />
-                    {s.label}
-                  </span>
-                  <b>{s.count.toString().padStart(2, "0")}</b>
-                </button>
-              ))}
-            </div>
-            <Button
-              className="full-width"
-              onClick={() => navigate("Project intake")}
-            >
-              Open intake log
-              <Icon name="arrow" size={16} />
-            </Button>
-          </Panel>
-        </div>
-        <div className="dashboard-bottom-grid" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
-          <Panel
-            title="Recent activity"
-            subtitle="The latest across your workspace."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => setDialog({ kind: "activity" })}
-              >
-                View all
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            {activityList(dashActivity.view.items, true)}
-            <CompactPager list={dashActivity} />
-          </Panel>
-        </div>
-        <div className="workspace-footer">
-          <span>
-            SITELINE <span>Built for the work ahead.</span>
-          </span>
-          <span>
-            <i className="status-dot green" />
-            Administrator workspace
-          </span>
-        </div>
-      </>
-    )
+    return <AdminDashboard
+      overview={adminDashboardOverview(state)}
+      onNavigate={navigate}
+      onNewIntake={() => setDialog({ kind: "intake" })}
+      onActivity={() => setDialog({ kind: "activity" })}
+      onOpen={item => setDialog({ kind: item.kind, id: item.id })}
+      activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
+    />
   }
   function pageHeading(title: string, subtitle: string, action?: ReactNode) {
     return (
