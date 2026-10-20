@@ -20,7 +20,6 @@ import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
 import {
   api,
-  apiEnabled,
   ApiError,
   login as apiLogin,
   logout as apiLogout,
@@ -3337,14 +3336,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return (
-    <>
-      <AppInner />
-      {apiEnabled && (
-        <div className="api-mode-banner" role="status">
-          Connected to database
-        </div>
-      )}
-    </>
-  )
+  return <AppInner />
 }

@@ -1287,7 +1287,6 @@ tbody tr:hover { background: var(--surface-subtle); }
   .app-shell:not(.role-workspace) .demo-session-picker select { max-width: 100%; }
   .app-shell:not(.role-workspace) .topbar-divider { display: none; }
 }
-.api-mode-banner { position: fixed; left: 12px; bottom: 12px; z-index: 60; padding: 8px 12px; border-radius: 7px; background: var(--color-navy, #172b4d); color: #fff; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(23, 43, 77, 0.25); pointer-events: none; }
 .list-toolbar { display: grid; gap: 10px; margin-bottom: 16px; }
 .list-toolbar-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .list-filter { display: grid; gap: 4px; font-size: 14px; color: var(--color-muted); }
