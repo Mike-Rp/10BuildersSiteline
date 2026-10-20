@@ -2609,9 +2609,7 @@ function AppInner() {
   if (signedOut && (checkingSession || restoreError))
     return (
       <main className="session-restore" aria-busy={checkingSession}>
-        {checkingSession ? (
-          <p role="status">Loading your workspace…</p>
-        ) : (
+        {checkingSession ? null : (
           <div role="alert">
             <p>{restoreError}</p>
             <div className="session-restore-actions">
