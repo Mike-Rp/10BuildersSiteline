@@ -6,6 +6,7 @@ import {
   DOCUMENT_TABS,
   adminBreadcrumb,
   resolveAdminTarget,
+  normalizeWorkspacePage,
 } from "../src/adminNav.ts"
 
 const labels = ADMIN_NAV.map((n) => n.label)
@@ -82,4 +83,11 @@ test("breadcrumb shows the tab", () => {
     "Engineer documents",
   ])
   assert.deepEqual(adminBreadcrumb("Team", "project", "engineers"), ["Team"])
+})
+
+test("standalone schedule navigation is retired and old targets open Active Sites", () => {
+  assert.ok(!labels.includes("Schedule performance"))
+  assert.equal(normalizeWorkspacePage("Schedule performance"), "Active sites")
+  assert.equal(normalizeWorkspacePage("Schedule Performance"), "Active sites")
+  assert.equal(normalizeWorkspacePage("Documents"), "Documents")
 })

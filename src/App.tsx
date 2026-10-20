@@ -102,6 +102,7 @@ import {
   DOCUMENT_TABS,
   adminBreadcrumb,
   resolveAdminTarget,
+  normalizeWorkspacePage,
   type DirectoryTab,
   type DocumentsTab,
 } from "./adminNav"
@@ -425,7 +426,7 @@ function AppInner() {
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
     const target = resolveAdminTarget(next)
-    setPage(target ? target.page : next)
+    setPage(target ? target.page : normalizeWorkspacePage(next))
     resetListState()
     if (target?.documentsTab) setDocumentsTab(target.documentsTab)
     if (target?.directoryTab) setDirectoryTab(target.directoryTab)
@@ -796,20 +797,6 @@ function AppInner() {
   }
   const accountSearch = (a: Account) =>
     `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
-  const activeSitesItems = state.projects.filter((p) => p.status === "active")
-  const scheduleList = runList("admin:schedule", activeSitesItems, {
-    searchText: (p) => `${projectSearch(p)} ${p.phase}`,
-    filters: [
-      typeFilter(activeSitesItems),
-      {
-        id: "phase",
-        label: "Phase",
-        allLabel: "All phases",
-        options: optionsFrom(activeSitesItems.map((p) => p.phase)),
-        test: (p, value) => p.phase === value,
-      },
-    ],
-  })
   const intakeItems = state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
@@ -1454,9 +1441,9 @@ function AppInner() {
             actions={
               <Button
                 variant="text-button"
-                onClick={() => navigate("Schedule performance")}
+                onClick={() => navigate("Active sites")}
               >
-                View report
+                View projects
                 <Icon name="arrow" size={16} />
               </Button>
             }
@@ -1567,70 +1554,6 @@ function AppInner() {
               empty={projectTable([], true)}
             />
           </Panel>
-        </>
-      )
-    if (page === "Schedule performance")
-      return (
-        <>
-          {pageHeading(
-            "Schedule performance",
-            "Recorded completion and progress history across projects.",
-          )}
-          <div className="notice">
-            <Icon name="activity" />
-            <p>
-              Completion percentages and history come from project records.
-              Planned-versus-actual comparisons will appear when a saved
-              schedule baseline is available.
-            </p>
-          </div>
-          <ListToolbar
-            list={scheduleList}
-            placeholder="Search projects"
-            noun="project"
-          />
-          {!scheduleList.count ? (
-            scheduleList.narrowed ? (
-              <NoResults list={scheduleList} />
-            ) : (
-              <Empty title="No active project schedules yet" />
-            )
-          ) : (
-          <>
-          <Panel
-            title="Portfolio schedule"
-            subtitle={`${scheduleList.count} active projects · recorded completion`}
-          >
-            <Chart
-              projects={scheduleList.view.items}
-              summaryProjects={scheduleList.matched}
-            />
-          </Panel>
-          <div className="schedule-cards">
-            {scheduleList.view.items.map((p) => (
-              <Panel
-                key={p.id}
-                title={p.name}
-                subtitle={`${p.phase} · ${p.progress}% actual recorded completion`}
-                actions={
-                  <Button
-                    variant="icon-button"
-                    aria-label={`View ${p.name}`}
-                    icon="arrow"
-                    onClick={() => setDialog({ kind: "project", id: p.id })}
-                  />
-                }
-              >
-                <div className="schedule-timeline">
-                  <PlannedTimeline project={p} />
-                </div>
-                <Chart compact projects={[p]} />
-              </Panel>
-            ))}
-          </div>
-          </>
-          )}
-          <ListPager list={scheduleList} />
         </>
       )
     const projectDocumentsTab = () => (

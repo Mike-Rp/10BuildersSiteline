@@ -1,3 +1,4 @@
+import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -22,7 +23,6 @@ const NAV = [
   ["Active sites", "grid"],
   ["Project Overview", "building"],
   ["Phase Timeline", "activity"],
-  ["Schedule Performance", "trend"],
   ["Project Documents", "folder"],
   ["Progress History", "clock"],
   ["Site Photographs", "doc"],
@@ -151,7 +151,7 @@ export default function ClientPortal({
   }, [])
   function navigate(next: string) {
     setSiteDetails(false)
-    setPage(next)
+    setPage(normalizeWorkspacePage(next))
     setMobileNav(false)
     setBell(false)
     setError("")
@@ -724,24 +724,6 @@ export default function ClientPortal({
             subtitle="Approval status only. No internal QA/QC files or rejection notes."
           >
             {checklist()}
-          </Panel>
-        </>
-      )
-    if (page === "Schedule Performance")
-      return (
-        <>
-          <div className="notice">
-            <Icon name="activity" />
-            <p>
-              Recorded project completion is {project.progress}%. The history
-              below shows the progress entries available for this project.
-            </p>
-          </div>
-          <Panel
-            title={project.name}
-            subtitle={`Current phase: ${project.phase} · Recorded completion: ${project.progress}%`}
-          >
-            <Chart projects={[project]} />
           </Panel>
         </>
       )

@@ -1,3 +1,4 @@
+import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
@@ -127,7 +128,6 @@ const OPM_NAV = [
   ["Active sites", "building"],
   ["Deadlines", "clock"],
   ["Rework & approvals", "shield"],
-  ["Schedule performance", "trend"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
@@ -139,7 +139,6 @@ const SPM_NAV = [
   ["Deadlines", "clock"],
   ["Document repository", "folder"],
   ["Subcon directory", "users"],
-  ["Schedule performance", "trend"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
@@ -373,10 +372,6 @@ export default function RoleWorkspace({
       typeFilterP(intakes),
     ],
   })
-  const scheduleList = runList(`${actor.role}:schedule`, allActive, {
-    searchText: projectText,
-    filters: [typeFilterP(allActive), phaseFilterP(allActive)],
-  })
   const activityFeed = runList(`${actor.role}:activity`, events, {
     searchText: (e) => `${e.title} ${e.detail}`,
     filters: [
@@ -403,7 +398,7 @@ export default function RoleWorkspace({
     return true
   }
   function navigate(next: string) {
-    setPage(next)
+    setPage(normalizeWorkspacePage(next))
     setConfirmTab("mine")
     setQuery("")
     setError("")
@@ -883,9 +878,9 @@ export default function RoleWorkspace({
           actions={
             <Button
               variant="text-button"
-              onClick={() => navigate("Schedule performance")}
+              onClick={() => navigate("Active sites")}
             >
-              View report
+              View projects
             </Button>
           }
         >
@@ -3503,45 +3498,6 @@ export default function RoleWorkspace({
         return reviews()
       case "Subcon directory":
         return directory()
-      case "Schedule performance":
-        return (
-          <>
-            {header(
-              "Schedule performance",
-              "Planned versus actual curves, clearly separated from approved progress.",
-            )}
-            <div className="notice">
-              <Icon name="activity" />
-              <p>
-                Recorded percentages and history come from project records. A
-                planned-versus-actual comparison requires a saved baseline.
-              </p>
-            </div>
-            <ListSection
-              list={scheduleList}
-              placeholder="Search active projects"
-              noun="project"
-              touch={!isOpm}
-              empty={<Empty title="No active-project schedules yet" />}
-              render={(items) => (
-                <>
-                  {items.map((p) => (
-                    <Panel
-                      key={p.id}
-                      title={p.name}
-                      subtitle={`${p.phase} · ${p.progress}% recorded completion`}
-                    >
-                      <div className="schedule-timeline">
-                        <PlannedTimeline project={p} />
-                      </div>
-                      <Chart projects={[p]} />
-                    </Panel>
-                  ))}
-                </>
-              )}
-            />
-          </>
-        )
       case "Archive":
         return archives()
       case "Activity log":

@@ -57,6 +57,7 @@ await waitFor(() => !document.querySelector("form.login-form") || document.query
 if (document.querySelector("form.login-form")) throw new Error("Sign-in failed: " + (document.querySelector("form.login-form .error, form.login-form [role=alert]")?.textContent || text().slice(0, 200)))
 await sleep(500)
 
+if ([...document.querySelectorAll('.sidebar .nav-item')].some(el => el.textContent.trim().toLowerCase() === 'schedule performance')) problems.push('Retired Schedule Performance module remains in sidebar')
 const results = { email, signedIn: true, root: document.getElementById("root").innerHTML.length, pages: {} }
 results.banner = text().includes("Connected to database")
 results.home = text().replace(/\s+/g, " ").slice(0, 160)
