@@ -98,19 +98,7 @@
   z-index: -1;
   background: linear-gradient(180deg, #0d213844 0%, #0d213800 34%, #0d2138dd 100%);
 }
-#root .login-redesign .login-photo-label {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 8px;
-  padding: 9px 12px;
-  border: 1px solid #ffffff55;
-  border-radius: 8px;
-  background: #172b4dcc;
-  color: #fff;
-  font-size: 14px;
-}
-#root .login-redesign .login-photo-caption { margin-top: 260px; }
+#root .login-redesign .login-photo-caption { margin-top: auto; padding-top: 260px; }
 #root .login-redesign .login-info h2 { margin: 10px 0 0; color: #fff; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.25; letter-spacing: -.6px; font-weight: 600; }
 #root .login-redesign .login-banner-image { opacity: 0; transition: opacity 600ms ease; }
 #root .login-redesign .login-banner-image.is-active { opacity: 1; }

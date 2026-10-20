@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react"
-import { Icon } from "./ui"
 
 const slides = [
-  { image: "construction", icon: "building", label: "Project monitoring", title: "Follow progress across every phase", description: "View active sites, approved activity progress, and project timelines." },
-  { image: "teams", icon: "users", label: "Team coordination", title: "Keep project responsibilities clear", description: "Review phase assignments, confirmations, and updates with your project team." },
-  { image: "documents", icon: "doc", label: "Document management", title: "Keep project records within reach", description: "Access the plans, reports, and documents available to your account." },
+  { image: "construction", label: "Project monitoring", description: "View active sites, approved activity progress, and project timelines." },
+  { image: "teams", label: "Team coordination", description: "Review phase assignments, confirmations, and updates with your project team." },
+  { image: "documents", label: "Document management", description: "Access the plans, reports, and documents available to your account." },
 ]
 
 export default function LoginBanner() {
@@ -57,11 +56,10 @@ export default function LoginBanner() {
           />
         </picture>
       ))}
-      <div className="login-photo-label"><Icon name={slide.icon} size={18} /> {slide.label}</div>
       <div className="login-photo-caption">
         <p className="login-banner-brand">SITELINE · 10 Builders</p>
         <div role="group" aria-roledescription="slide" aria-label={`${active + 1} of ${slides.length}`} aria-live="off">
-          <h2>{slide.title}</h2>
+          <h2>{slide.label}</h2>
           <p className="login-banner-description">{slide.description}</p>
         </div>
         <div className="login-banner-controls">
