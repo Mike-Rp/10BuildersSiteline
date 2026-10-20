@@ -9,9 +9,6 @@ const slides = [
 
 export default function LoginBanner() {
   const [active, setActive] = useState(0)
-  const [paused, setPaused] = useState(false)
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
   const [visible, setVisible] = useState(true)
   const [desktop, setDesktop] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -37,10 +34,10 @@ export default function LoginBanner() {
   }, [])
 
   useEffect(() => {
-    if (!desktop || reducedMotion || !visible || paused || hovered || focused) return
+    if (!desktop || reducedMotion || !visible) return
     const timer = window.setInterval(() => setActive(index => (index + 1) % slides.length), 6000)
     return () => window.clearInterval(timer)
-  }, [active, desktop, reducedMotion, visible, paused, hovered, focused])
+  }, [active, desktop, reducedMotion, visible])
 
   const slide = slides[active]
   return (
@@ -48,12 +45,6 @@ export default function LoginBanner() {
       className="login-info login-banner"
       aria-label="Explore SITELINE"
       aria-roledescription="carousel"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocusCapture={() => setFocused(true)}
-      onBlurCapture={event => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
-      }}
     >
       {slides.map((item, index) => (
         <picture key={item.image} className={`login-photo login-banner-image${index === active ? " is-active" : ""}`} aria-hidden="true">
@@ -81,10 +72,6 @@ export default function LoginBanner() {
               </button>
             ))}
           </div>
-          <span className="login-banner-count" aria-hidden="true">{active + 1} / {slides.length}</span>
-          <button type="button" className="login-banner-pause" aria-label={reducedMotion ? "Automatic rotation disabled for reduced motion" : paused ? "Resume banner rotation" : "Pause banner rotation"} disabled={reducedMotion} onClick={() => setPaused(value => !value)}>
-            {reducedMotion ? "Paused" : paused ? "Play" : "Pause"}
-          </button>
         </div>
       </div>
     </aside>
