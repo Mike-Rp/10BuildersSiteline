@@ -68,7 +68,6 @@ export default function LoginPage({
 
           <div className="login-content">
             <div className="login-heading">
-              <span className="login-eyebrow">PROJECT OPERATIONS</span>
               <h1>Welcome to SITELINE</h1>
               <p>Enter the credentials issued by your administrator.</p>
             </div>
