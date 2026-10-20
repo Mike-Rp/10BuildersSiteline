@@ -1,4 +1,6 @@
 import ProjectProgress from "./ProjectProgress"
+import NavigationCount from "./NavigationCount"
+import { navigationAttention } from "./navigation-attention"
 import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
@@ -182,6 +184,7 @@ export default function RoleWorkspace({
   useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
+  const navigationCounts = navigationAttention(state, actor)
   const [page, setPage] = useState("Dashboard")
   const [pickedId, setPickedId] = useState(
     () =>
@@ -3587,27 +3590,12 @@ export default function RoleWorkspace({
               <button
                 className={`nav-item ${page === label ? "active" : ""}`}
                 aria-label={label}
+                aria-description={navigationCounts[label]?.count ? `${navigationCounts[label].count} ${navigationCounts[label].description}` : undefined}
                 onClick={() => navigate(label)}
               >
                 <Icon name={icon} size={19} />
                 <span>{label}</span>
-                {label === "Rework & approvals" &&
-                  pendingUpdates.length + pendingRework.length + qaCount >
-                    0 && (
-                    <b className="nav-count">
-                      {pendingUpdates.length + pendingRework.length + qaCount}
-                    </b>
-                  )}
-                {label === "Assignments" && tasks.length > 0 && (
-                  <b className="nav-count">{tasks.length}</b>
-                )}
-                {isOpm &&
-                  label === "Confirmation queue" &&
-                  tasks.length + responsesNeedingAction.length > 0 && (
-                    <b className="nav-count">
-                      {tasks.length + responsesNeedingAction.length}
-                    </b>
-                  )}
+                <NavigationCount item={navigationCounts[label]} />
               </button>
             </div>
           ))}

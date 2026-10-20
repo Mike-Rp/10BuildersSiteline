@@ -1,4 +1,6 @@
 import AdminDashboard from "./AdminDashboard"
+import NavigationCount from "./NavigationCount"
+import { navigationAttention } from "./navigation-attention"
 import { adminDashboardOverview } from "./admin-dashboard"
 import ProjectProgress from "./ProjectProgress"
 import { hasPendingSiteReview } from "./active-sites-review"
@@ -2776,6 +2778,7 @@ function AppInner() {
         onPause={endSession}
       />
     )
+  const navigationCounts = navigationAttention(state, actor)
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
@@ -2809,14 +2812,13 @@ function AppInner() {
               {n.group && <div className="nav-group-label">{n.group}</div>}
               <button
                 aria-label={n.label}
+                aria-description={navigationCounts[n.label]?.count ? `${navigationCounts[n.label].count} ${navigationCounts[n.label].description}` : undefined}
                 className={`nav-item ${page === n.label ? "active" : ""}`}
                 onClick={() => navigate(n.label)}
               >
                 <Icon name={n.icon} size={19} />
                 <span>{n.label}</span>
-                {n.label === "Directory" && pending.length > 0 && (
-                  <b className="nav-count">{pending.length}</b>
-                )}
+                <NavigationCount item={navigationCounts[n.label]} />
                 {n.label === "Dashboard" && page === n.label && <i />}
               </button>
             </div>

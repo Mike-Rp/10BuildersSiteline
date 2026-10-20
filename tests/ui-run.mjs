@@ -62,6 +62,8 @@ const results = { email, signedIn: true, root: document.getElementById("root").i
 results.banner = text().includes("Connected to database")
 results.home = text().replace(/\s+/g, " ").slice(0, 160)
 const clickable = () => [...document.querySelectorAll("button, a, [role=button]")]
+const sidebarCounts = () => [...document.querySelectorAll('.sidebar .nav-item')].map(el => [el.getAttribute('aria-label'),el.querySelector('.nav-count')?.textContent || '0'])
+const initialSidebarCounts = JSON.stringify(sidebarCounts())
 for (const label of navLabels) {
   const target = clickable().find((el) => el.textContent.trim().replace(/\s+/g, " ").startsWith(label))
   if (!target) {
@@ -70,6 +72,11 @@ for (const label of navLabels) {
   }
   target.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }))
   await sleep(250)
+  if (JSON.stringify(sidebarCounts()) !== initialSidebarCounts) problems.push('Pending-work sidebar counts changed solely from module navigation')
+  for (const badge of document.querySelectorAll('.sidebar .nav-count')) {
+    if (!badge.title || !badge.getAttribute('aria-label') || Number(badge.textContent) <= 0) problems.push('Sidebar work badge lacks its count or accessible explanation')
+  }
+  if (document.querySelector('.client-portal .nav-count')) problems.push('Client sidebar exposes a staff review count')
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
   if (label === "Dashboard" && document.querySelector('.project-progress, .chart-summary')) problems.push('Retired dashboard schedule chart remains')
   if (label === "Dashboard" && document.querySelector('.admin-overview')) {
