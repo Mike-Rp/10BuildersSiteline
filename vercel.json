@@ -4,6 +4,7 @@
   "installCommand": "npm ci && npm --prefix Thesis-Backend ci --omit=dev",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "regions": ["bom1"],
   "functions": {
     "api/index.js": { "maxDuration": 60 }
   },
