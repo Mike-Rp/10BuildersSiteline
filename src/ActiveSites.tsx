@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, timelineStatus } from "./model"
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./listing"
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
 export type SiteCard = {
@@ -39,7 +40,7 @@ export default function ActiveSites({
   const activeProjects = useMemo(() => projects.filter(p => p.status === "active"), [projects])
   const reviewProjects = activeProjects.filter(p => p.needsReview === true)
   const [sort, setSort] = useState("name")
-  const [size, setSize] = useState(6)
+  const [size, setSize] = useState<number>(DEFAULT_PAGE_SIZE)
   const [page, setPage] = useState(1)
   const [recent, setRecent] = useState<string[]>([])
   const phases = [...new Set(activeProjects.map((p) => p.phase))].sort()
@@ -318,7 +319,7 @@ export default function ActiveSites({
               setPage(1)
             }}
           >
-            {[6, 12, 24].map((n) => (
+            {PAGE_SIZES.map((n) => (
               <option key={n}>{n}</option>
             ))}
           </select>

@@ -84,7 +84,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
         field.dispatchEvent(new dom.window.Event("change", { bubbles: true }))
       })
 
-    assert.equal(cards().length, 6)
+    assert.equal(cards().length, 10)
     assert.equal(document.querySelector(".as-card img"), null)
 
     assert.equal(document.querySelector(".as-summary strong").textContent, "15")
@@ -98,26 +98,23 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
 
     await act(() => button("Next").click())
 
-    assert.match(cards()[0].textContent, /Building 07/)
+    assert.match(cards()[0].textContent, /Building 11/)
+    assert.equal(cards().length, 5)
 
     await select(0, "Commercial")
 
     assert.match(
       document.querySelector(".as-pagination").textContent,
-      /Page 1 of 2/,
+      /Page 1 of 1/,
     )
 
-    assert.equal(cards().length, 6)
+    assert.equal(cards().length, 7)
 
     assert.ok(
       cards().every(
         (card) => card.querySelector(".as-type").textContent === "Commercial",
       ),
     )
-
-    await act(() => button("Next").click())
-
-    assert.equal(cards().length, 1)
 
     await select(2, "progress")
 
@@ -221,14 +218,13 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     await act(() => button("Next").click())
     await act(() => tab("Awaiting review").click())
     firstPage()
-    assert.equal(cards().length, 6)
+    assert.equal(cards().length, 8)
     assert.ok(cards().every(card => card.querySelector(".as-review")))
     await act(() => cards()[0].querySelector(".as-workflow-actions button").click())
     assert.deepEqual(workflowActions, ["authorized-0"])
     await act(() => cards()[0].querySelector(".as-details").click())
     assert.equal(opened.at(-1), "authorized-0")
-    await act(() => button("Next").click())
-    assert.equal(cards().length, 2)
+    assert.match(document.querySelector(".as-pagination").textContent, /Page 1 of 1/)
     await select(0, "Commercial")
     firstPage()
     assert.equal(cards().length, 4)
@@ -243,12 +239,12 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     firstPage()
     assert.match(cards()[0].textContent, /Building 08/)
     await act(() => button("Next").click())
-    await selectSize(12)
+    await selectSize(25)
     firstPage()
     assert.equal(cards().length, 8)
-    await selectSize(24)
+    await selectSize(50)
     firstPage()
-    await selectSize(6)
+    await selectSize(10)
     await act(() => button("Next").click())
     await act(() => {
       const input = document.querySelector('input[type="search"]')
@@ -271,7 +267,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     await act(() => tab("All active projects").click())
     firstPage()
     assert.equal(count("All active projects"), "15")
-    await selectSize(24)
+    await selectSize(25)
     assert.ok(cards().some(card => card.textContent.includes("Building 08")))
     await act(() => tab("All active projects").dispatchEvent(new dom.window.KeyboardEvent("keydown", {key: "ArrowRight", bubbles: true})))
     assert.equal(tab("Awaiting review").getAttribute("aria-selected"), "true")
