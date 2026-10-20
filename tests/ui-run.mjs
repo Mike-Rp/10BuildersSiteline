@@ -78,6 +78,23 @@ for (const label of navLabels) {
   }
   if (document.querySelector('.client-portal .nav-count')) problems.push('Client sidebar exposes a staff review count')
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
+  if (["Project intake","Confirmation queue","Assignments"].includes(label)) {
+    const group=document.querySelector('.intake-tabs')
+    if (!group) problems.push('Intake responsibility grouping is missing')
+    else {
+      const tabs=[...group.querySelectorAll(':scope > button')]
+      for (const tab of tabs) { tab.click();await sleep(50);if(tab.getAttribute('aria-pressed')!=="true")problems.push('Intake responsibility tab did not change') }
+      tabs[0].click();await sleep(50)
+      group.querySelector('.intake-info-trigger').click();await sleep(50)
+      if(!document.querySelector('.intake-info-panel'))problems.push('Compact intake guidance did not open')
+      document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(50)
+    }
+    if (label==="Project intake") {
+      const details=document.querySelector('.intake-project-link')
+      if(details){details.click();await sleep(100);const modal=document.querySelector('[aria-modal="true"]');if(!modal)problems.push('Intake record did not open existing project details');else{const help=modal.querySelector('.intake-info-trigger');if(help){help.click();await sleep(50);document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(50);if(!modal.isConnected)problems.push('Help Escape closed the existing intake details');}modal.querySelector('[aria-label="Close dialog"]')?.click();await sleep(50)}}
+    }
+  }
+  if(document.querySelector('.client-portal .intake-tabs, .client-portal .intake-next')) problems.push('Client received internal intake guidance')
   if (label === "Dashboard" && document.querySelector('.project-progress, .chart-summary')) problems.push('Retired dashboard schedule chart remains')
   if (label === "Dashboard" && document.querySelector('.admin-overview')) {
     if (document.querySelectorAll('.ao-metric').length !== 3) problems.push('Administrator dashboard totals are duplicated')

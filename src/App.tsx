@@ -1,4 +1,6 @@
 import AdminDashboard from "./AdminDashboard"
+import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
+import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
@@ -72,6 +74,7 @@ import {
   uid,
   workload,
   projectDateErrors,
+  PROJECT_TYPES,
   type Account,
   type Company,
   type Doc,
@@ -246,6 +249,7 @@ function AppInner() {
     state.accounts.find((a) => a.id === sessionId) ||
     stubAccount("", "", "client")
   const [page, setPage] = useState("Dashboard")
+  const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
   const [toast, setToast] = useState("")
@@ -816,7 +820,8 @@ function AppInner() {
   const intakeItems = state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
-  const intakeList = runList("admin:intake", intakeItems, {
+  const intakeCounts = intakeViewCounts(intakeItems, p => intakeGuidance(state, p, actor))
+  const intakeList = runList("admin:intake", intakeItems.filter(p => intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
     searchText: projectSearch,
     filters: [
       {
@@ -830,7 +835,7 @@ function AppInner() {
         ],
         test: (p, value) => p.status === value,
       },
-      typeFilter(intakeItems),
+      { ...typeFilter(intakeItems), options: PROJECT_TYPES.map(value => ({ value, label: value })) },
     ],
   })
   // Engineer Directory: the server filters, counts and pages (/accounts, ordered by
@@ -1298,25 +1303,17 @@ function AppInner() {
               New project intake
             </Button>,
           )}
-          <div className="notice">
-            <Icon name="shield" />
-            <p>
-              Intake handoff: Administrator → Office PM acceptance → six
-              required documents → Lead and Site PM acceptance → subcontractor
-              coordination → activation. Admin cannot accept on behalf of
-              another role.
-            </p>
-          </div>
           <Panel
             title="Project intake log"
             subtitle={`${intake.length} current intake records`}
           >
+            <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />
             <ListSection
               list={intakeList}
               placeholder="Search intake records"
               noun="record"
-              render={(items) => projectTable(items, true)}
-              empty={projectTable([], true)}
+              render={(items) => <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "project", id: p.id })} />}
+              empty={<Empty title={!intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>Existing intake records appear here as projects move through setup.</Empty>}
             />
           </Panel>
         </>
@@ -1992,6 +1989,7 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
+        {!docsOnly && <IntakeGuidance state={state} project={p} actor={actor} />}
         {!docsOnly && (
           <>
             <div className="detail-stats">

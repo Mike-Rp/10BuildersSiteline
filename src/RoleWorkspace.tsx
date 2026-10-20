@@ -1,4 +1,7 @@
 import ProjectProgress from "./ProjectProgress"
+import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
+import InfoPopover from "./InfoPopover"
+import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
 import { hasPendingSiteReview } from "./active-sites-review"
@@ -26,9 +29,11 @@ import {
   ListToolbar,
   NoResults,
   runList,
+  getListQuery,
+  updateListQuery,
   useListMemory,
 } from "./ListControls"
-import { inDateRange, optionsFrom, type FilterDef } from "./listing"
+import { inDateRange, optionsFrom, withPage, type FilterDef } from "./listing"
 
 type DeadlineEntry = {
   key: string
@@ -52,6 +57,7 @@ import {
   projectPhaseDisciplines,
   projectPhaseNames,
   ROLE_NAMES,
+  PROJECT_TYPES,
   spmCandidates,
   uid,
   today,
@@ -221,6 +227,8 @@ export default function RoleWorkspace({
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
   const [confirmTab, setConfirmTab] = useState("mine")
+  const [intakeView, setIntakeView] = useState<IntakeView>("all")
+  const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
@@ -360,7 +368,8 @@ export default function RoleWorkspace({
       test: (item, value) => inDateRange(pick(item), undefined, value),
     },
   ]
-  const intakesList = runList(`${actor.role}:confirmations`, intakes, {
+  const intakeCounts = intakeViewCounts(intakes, p => intakeGuidance(state, p, actor))
+  const intakesList = runList(`${actor.role}:confirmations`, intakes.filter(p => intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
     searchText: projectText,
     filters: [
       {
@@ -374,9 +383,16 @@ export default function RoleWorkspace({
         ],
         test: (p, value) => p.status === value,
       },
-      typeFilterP(intakes),
+      { ...typeFilterP(intakes), options: PROJECT_TYPES.map(value => ({ value, label: value })) },
     ],
   })
+  const assignmentQuery = getListQuery(`${actor.role}:assignments`)
+  useEffect(() => {
+    for (const section of ["current", "upcoming", "previous"]) {
+      const key = `${actor.role}:assignments-${section}`
+      if (getListQuery(key).page !== 1) updateListQuery(key, q => withPage(q, 1))
+    }
+  }, [actor.role, assignmentQuery, assignmentFilter, assignmentSort, assignmentIntakeView])
   const activityFeed = runList(`${actor.role}:activity`, events, {
     searchText: (e) => `${e.title} ${e.detail}`,
     filters: [
@@ -534,21 +550,23 @@ export default function RoleWorkspace({
   }
   function confirmationCard(p: Project) {
     const work = workflowFor(p)
-    const stage = officePmStage(p)
+    const guidance = intakeGuidance(state, p, actor)
     return (
       <Panel
         key={p.id}
-        className={stage.kind === "action" ? "action-required" : ""}
+        className={guidance?.kind === "action" ? "action-required" : ""}
         title={p.name}
         subtitle={`${p.type} · ${p.area} sqm · ${p.floors} floors`}
         actions={
           <div className="button-group">
-            {stage.kind === "action" && (
+            {guidance?.kind === "action" && (
               <Badge tone="amber">Action Required</Badge>
             )}
             <Status
               value={
-                p.status === "changes_requested"
+                p.status === "draft"
+                  ? "draft"
+                  : p.status === "changes_requested"
                   ? "changes requested"
                   : p.opmAccepted
                     ? "Office PM accepted"
@@ -559,15 +577,7 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
-          {stage.message && (
-            <p className={`stage-message ${stage.kind}`}>
-              <Icon
-                name={stage.kind === "action" ? "alert" : "clock"}
-                size={16}
-              />
-              {stage.message}
-            </p>
-          )}
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
           <div className="role-project-facts">
             <span>
@@ -584,12 +594,11 @@ export default function RoleWorkspace({
               {registeredCount(p)}/6 documents
             </span>
           </div>
-          {p.status === "changes_requested" ? (
+          {p.status === "changes_requested" || p.status === "draft" ? (
             <div className="notice">
               <Icon name="clock" />
               <p>
-                {p.note} Administrator resubmission is required; the same Office
-                PM is excluded from this intake.
+                {p.status === "draft" ? "Administrator must complete and submit this draft before Office PM acceptance." : `${p.note} Administrator resubmission is required; the same Office PM is excluded from this intake.`}
               </p>
             </div>
           ) : !p.opmAccepted ? (
@@ -597,6 +606,7 @@ export default function RoleWorkspace({
               <Button
                 variant="primary"
                 icon="check"
+                disabled={guidance?.action !== "confirm"}
                 onClick={async () => {
                   if (
                     await act(
@@ -612,6 +622,7 @@ export default function RoleWorkspace({
                 Accept Office PM assignment
               </Button>
               <Button
+                disabled={guidance?.action !== "confirm"}
                 onClick={() => {
                   setDeclineReason("")
                   setDialog({ kind: "changes", projectId: p.id })
@@ -629,15 +640,14 @@ export default function RoleWorkspace({
             </div>
           ) : (
             <>
-              <div className="notice">
-                <Icon name={registeredComplete(p) ? "check" : "upload"} />
-                <p>
+              <div className="intake-supplement">
+                <InfoPopover title="Document and acceptance order">
                   {registeredComplete(p)
                     ? "All six documents are on file. The Lead Site PM accepts first, followed by the remaining Site PMs. Subcontractor allocation stays locked until all responses are accepted."
                     : `Upload the ${6 - registeredCount(p)} remaining required document${
                         registeredCount(p) === 5 ? "" : "s"
                       }. Site PM acceptance remains locked.`}
-                </p>
+                </InfoPopover>
               </div>
               <div className="role-actions">
                 <Button
@@ -647,10 +657,10 @@ export default function RoleWorkspace({
                 >
                   {registeredComplete(p)
                     ? "View project documents"
-                    : "Resume Document Upload"}
+                    : "Open required documents"}
                 </Button>
                 <Button onClick={openSiteResponses}>
-                  Track Site PM responses
+                  {guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
                 </Button>
               </div>
             </>
@@ -896,6 +906,7 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           <div className="document-completion">
             <progress max={6} value={registeredCount(p)} />
             <strong>{registeredCount(p)} / 6</strong>
@@ -1206,6 +1217,7 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
           {pending.length > 0 && (
             <>
@@ -1369,13 +1381,14 @@ export default function RoleWorkspace({
     }
   }
   function assignmentCard(p: Project, info: ReturnType<typeof assignmentInfo>) {
+    const guidance = intakeGuidance(state, p, actor)
     const statusLabel =
       info.group === "current"
         ? "Current Project"
         : info.group === "upcoming"
-          ? info.pending.length
+          ? guidance?.kind === "action"
             ? "Action needed"
-            : "Upcoming"
+            : guidance ? "Waiting / prerequisites" : "Upcoming"
           : p.status === "completed"
             ? "Completed"
             : p.status === "declined"
@@ -1399,7 +1412,7 @@ export default function RoleWorkspace({
             tone={
               info.group === "current"
                 ? "green"
-                : info.pending.length
+                : guidance?.kind === "action"
                   ? "amber"
                   : ""
             }
@@ -1438,6 +1451,7 @@ export default function RoleWorkspace({
             <dd>{p.status === "pending" ? "Not started" : p.phase}</dd>
           </div>
         </dl>
+        <IntakeGuidance state={state} project={p} actor={actor} />
         {p.status !== "pending" && (
           <div className="assignment-progress">
             <div
@@ -1476,7 +1490,7 @@ export default function RoleWorkspace({
         )}
         <div className="assignment-card-footer">
           <Button
-            variant={info.pending.length ? "primary" : ""}
+            variant={guidance?.kind === "action" ? "primary" : ""}
             icon="chevron"
             onClick={() => {
               setAssignmentId(p.id)
@@ -1484,7 +1498,7 @@ export default function RoleWorkspace({
             }}
             aria-label={`View assignment for ${p.name}`}
           >
-            View Assignment
+            {guidance?.kind === "action" ? guidance.label : "View Assignment"}
           </Button>
         </div>
       </article>
@@ -1520,11 +1534,12 @@ export default function RoleWorkspace({
       if (group === "upcoming") return time(a.p.start) - time(b.p.start)
       return time(b.info.sortDate) - time(a.info.sortDate)
     }
-    const visible = rows.filter(({ p, info }) =>
+    const counts = intakeViewCounts(projects, p => intakeGuidance(state, p, actor))
+    const visible = rows.filter(({ p }) => assignmentIntakeView === "all" || intakeGuidance(state, p, actor)?.kind === assignmentIntakeView).filter(({ p, info }) =>
       assignmentFilter === "all"
         ? true
         : assignmentFilter === "action"
-          ? info.pending.length > 0
+          ? isIntake(p) ? intakeGuidance(state, p, actor)?.kind === "action" : info.pending.length > 0
           : assignmentFilter === "completed"
             ? p.status === "completed"
             : assignmentFilter === "closed"
@@ -1538,7 +1553,7 @@ export default function RoleWorkspace({
           id: "type",
           label: "Project type",
           allLabel: "All types",
-          options: optionsFrom(rows.map(({ p }) => p.type)),
+          options: PROJECT_TYPES.map(value => ({ value, label: value })),
           test: ({ p }, value) => p.type === value,
         },
         {
@@ -1576,6 +1591,8 @@ export default function RoleWorkspace({
           "Assignments",
           "Your projects by status. Open an assignment to accept, decline or coordinate it.",
         )}
+        <IntakeTabs value={assignmentIntakeView} counts={counts} allLabel="All assignments" onChange={setAssignmentIntakeView} />
+        {assignmentIntakeView !== "all" && !visible.length && <Empty title={assignmentIntakeView === "action" ? "No available intake actions" : "No intake assignments waiting for others"}>Current and previous construction assignments remain under All assignments. Check any selected status filter.</Empty>}
         <div className="assignment-toolbar">
           <label>
             <span>Status</span>
@@ -2610,6 +2627,7 @@ export default function RoleWorkspace({
         subtitle={`${p.team.filter((t) => t.status === "confirmed").length}/${p.team.length} phase assignments confirmed`}
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {workflowFor(p).deadline && (
             <div className="notice">
               <Icon name="clock" />
@@ -3073,6 +3091,7 @@ export default function RoleWorkspace({
           </div>
           <Status value={p.status} />
         </div>
+        <IntakeGuidance state={state} project={p} actor={actor} />
         <div className="detail-stats">
           <div>
             <small>RECORDED PROGRESS</small>
@@ -3424,7 +3443,7 @@ export default function RoleWorkspace({
             )}
             <div className="tabs standalone">
               {[
-                ["mine", `My confirmations (${intakes.length})`],
+                ["mine", `Intake overview (${intakes.length})`],
                 [
                   "responses",
                   `Site PM responses (${responsesNeedingAction.length})`,
@@ -3433,7 +3452,7 @@ export default function RoleWorkspace({
                 <button
                   key={value}
                   className={confirmTab === value ? "active" : ""}
-                  onClick={() => setConfirmTab(value)}
+                  onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
                   {label}
                 </button>
@@ -3442,16 +3461,16 @@ export default function RoleWorkspace({
             {confirmTab === "responses" ? (
               responseTracking()
             ) : (
-              <ListSection
+              <><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /><ListSection
                 list={intakesList}
                 placeholder="Search confirmations"
                 noun="project"
                 touch={!isOpm}
                 empty={
-                  <Empty title="No intake assignments awaiting confirmation" />
+                  <Empty title={!intakes.length ? "No intake assignments" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"} />
                 }
                 render={(items) => <>{items.map(confirmationCard)}</>}
-              />
+              /></>
             )}
           </>
         )
