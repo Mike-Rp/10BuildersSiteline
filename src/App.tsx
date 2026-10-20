@@ -297,12 +297,19 @@ function AppInner() {
   const selectedAccount = state.accounts.find((a) => a.id === dialog?.id)
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
+  // Restores the signed-in session after a refresh. Only a rejected token or an
+  // account that may no longer sign in ends the session; a server or network
+  // hiccup keeps the token and offers a retry instead of the login page.
+  const [restoreError, setRestoreError] = useState("")
+  const [restoreAttempt, setRestoreAttempt] = useState(0)
   useEffect(() => {
     if (!tokenUser()) {
       setCheckingSession(false)
       return
     }
     let cancelled = false
+    setCheckingSession(true)
+    setRestoreError("")
     api<Parameters<typeof startApiSession>[0]>("/auth/me")
       .then(startApiSession)
       .then((account) => {
@@ -310,8 +317,15 @@ function AppInner() {
         setSessionId(account.id)
         setSignedOut(false)
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return
+        const transient =
+          error instanceof TypeError ||
+          (error instanceof ApiError && (error.status === 0 || error.status >= 500))
+        if (transient && tokenUser()) {
+          setRestoreError("Your session is still active, but the workspace could not be loaded.")
+          return
+        }
         clearSession()
         apiLogout()
       })
@@ -321,7 +335,7 @@ function AppInner() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [restoreAttempt])
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(""), 5000)
@@ -2592,8 +2606,26 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signedOut || checkingSession || !actor.id)
-    return <LoginPage checkingSession={checkingSession} onSignIn={signIn} />
+  if (signedOut && (checkingSession || restoreError))
+    return (
+      <main className="session-restore" aria-busy={checkingSession}>
+        {checkingSession ? (
+          <p role="status">Loading your workspace…</p>
+        ) : (
+          <div role="alert">
+            <p>{restoreError}</p>
+            <div className="session-restore-actions">
+              <Button variant="primary" onClick={() => setRestoreAttempt((n) => n + 1)}>
+                Retry
+              </Button>
+              <Button onClick={() => { setRestoreError(""); endSession() }}>Sign out</Button>
+            </div>
+          </div>
+        )}
+      </main>
+    )
+  if (signedOut || !actor.id)
+    return <LoginPage onSignIn={signIn} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
