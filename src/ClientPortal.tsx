@@ -1,8 +1,9 @@
+import ProjectProgress from "./ProjectProgress"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
-import { Chart, downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
+import { downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
 import PhaseTimeline from "./PhaseTimeline"
 import { dateLabel, initials, today, type Account, type Doc } from "./model"
 import {
@@ -545,16 +546,9 @@ export default function ClientPortal({
           />
         </Panel>
         <div className="client-two-column">
-          <Panel
-            title="Schedule performance"
-            subtitle="Recorded project completion and history."
-          >
-            <Chart compact projects={[project]} />
-            <p className="client-chart-disclaimer">
-              This chart shows recorded project progress. A schedule comparison
-              requires a saved planned baseline.
-            </p>
-          </Panel>
+          <section className="panel pp-client-panel" aria-label="Project progress">
+            <ProjectProgress key={project.id} project={project} />
+          </section>
           <Panel
             title={`Activity status · ${project.phase}`}
             subtitle="Read-only checklist status. No internal review notes or evidence files."

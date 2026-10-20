@@ -232,6 +232,7 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  checklistProgress?: PhaseProgress[]
   id: string
   name: string
   type: string
@@ -271,6 +272,13 @@ export type Project = {
     authorId?: string
     evidence?: Doc
   }[]
+}
+export type PhaseProgress = {
+  id: string
+  name: string
+  configured: boolean
+  approved: number
+  required: number
 }
 export type Company = {
   id: string

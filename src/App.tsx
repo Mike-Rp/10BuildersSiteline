@@ -1,3 +1,4 @@
+import ProjectProgress from "./ProjectProgress"
 import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
@@ -42,7 +43,6 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import {
   AccountDeactivationForm,
   AccountForm,
-  Chart,
   CompanyForm,
   DocumentList,
   downloadBlob,
@@ -1226,7 +1226,6 @@ function AppInner() {
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
     const dashActive = runList("dash:admin-active", active, { searchText: () => "" }, { pageSize: 5 })
-    const dashSchedule = runList("dash:admin-schedule", active, { searchText: () => "" }, { pageSize: 5 })
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
     const totalCurrent = state.projects.filter(
       (p) => !["completed", "declined", "expired"].includes(p.status),
@@ -1435,27 +1434,7 @@ function AppInner() {
             </Button>
           </Panel>
         </div>
-        <div className="dashboard-bottom-grid">
-          <Panel
-            title="Schedule performance"
-            subtitle="Recorded project completion and progress history."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => navigate("Active sites")}
-              >
-                View projects
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            <Chart
-              compact
-              projects={dashSchedule.view.items}
-              summaryProjects={active}
-            />
-            <CompactPager list={dashSchedule} />
-          </Panel>
+        <div className="dashboard-bottom-grid" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
           <Panel
             title="Recent activity"
             subtitle="The latest across your workspace."
@@ -2379,10 +2358,7 @@ function AppInner() {
             </section>
             {p.status === "active" && (
               <section className="detail-section">
-                <h3>
-                  Schedule performance <Badge>Recorded</Badge>
-                </h3>
-                <Chart compact projects={[p]} />
+                <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
               </section>
             )}
           </>

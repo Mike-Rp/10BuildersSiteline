@@ -86,13 +86,30 @@ export async function getProjectData(req,res) {
     join subcontractors s on s.id=a.subcontractor_id left join trades t on t.id=a.trade_id
     where a.project_id=any($1::uuid[]) and a.status='active' order by a.assigned_at desc`,[ids])).rows;
    const contracts=staff?(await db.query("select * from contracts where project_id=any($1::uuid[])",[ids])).rows:[];
-   const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts].map(group);
+   // Read only: never create future phase checklists or substitute mutable templates.
+   // One latest evidence row per activity prevents repeated approvals from double counting.
+   const progress=staff?(await db.query(`with phases as (
+     select project_id,project_stage_id from project_phase_team where project_id=any($1::uuid[])
+     union select project_id,project_stage_id from project_phase_checklists where project_id=any($1::uuid[])
+     union select id,current_stage_id from projects where id=any($1::uuid[]) and current_stage_id is not null
+   ) select ph.project_id,s.id::text as id,s.code as name,s.sort_order,
+     (c.project_id is not null and count(i.id) filter(where i.required)>0) as configured,
+     count(i.id) filter(where i.required)::int as required,
+     count(i.id) filter(where i.required and e.status='approved')::int as approved
+     from phases ph join project_stages s on s.id=ph.project_stage_id
+     left join project_phase_checklists c on c.project_id=ph.project_id and c.project_stage_id=ph.project_stage_id
+     left join project_phase_checklist_items i on i.project_id=ph.project_id and i.project_stage_id=ph.project_stage_id
+     left join lateral(select status from project_phase_evidence
+       where checklist_item_id=i.id and project_id=i.project_id and project_stage_id=i.project_stage_id
+       order by id desc limit 1)e on true
+     group by ph.project_id,s.id,s.code,s.sort_order,c.project_id order by s.sort_order,s.id`,[ids])).rows:[];
+   const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
    return projects.map(p=>{
-    const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
+    const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
-     assignments:assigned,contracts:contractRows,pending:null};
+     assignments:assigned,contracts:contractRows,pending:null,...(staff?{checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
    });
   });
   res.set("Cache-Control","private, no-store");

@@ -71,6 +71,7 @@ for (const label of navLabels) {
   target.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }))
   await sleep(250)
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
+  if (label === "Dashboard" && document.querySelector('.project-progress, .chart-summary')) problems.push('Retired dashboard schedule chart remains')
   if (label === "Active sites") {
     const tabs = [...document.querySelectorAll('.as-tabs [role="tab"]')]
     const isClient = !!document.querySelector('.client-portal')
@@ -94,6 +95,22 @@ for (const label of navLabels) {
       if (!modal) problems.push("Active Sites details did not open a modal")
       else {
         results.pages["Active site details modal"] = "ok"
+        const breakdown = [...modal.querySelectorAll("button")].find(el => el.textContent.includes("View phase breakdown"))
+        if (!breakdown) problems.push("Project progress comparison is missing")
+        else {
+          breakdown.focus()
+          const body = modal.querySelector('.modal-body')
+          const scroll = body.scrollTop
+          breakdown.click()
+          await sleep(100)
+          const panel = document.querySelector('[aria-label="Progress by construction phase"]')
+          if (!panel) problems.push("Phase breakdown panel did not open")
+          document.dispatchEvent(new w.KeyboardEvent('keydown', {key:'Escape',bubbles:true}))
+          await sleep(100)
+          if (!modal.isConnected || document.querySelectorAll('[role="dialog"]').length !== 1) problems.push("Closing phase panel lost project details")
+          if (body.scrollTop !== scroll) problems.push("Closing phase panel lost details scroll")
+          if (document.activeElement !== breakdown) problems.push("Closing phase panel lost trigger focus")
+        }
         modal.querySelector('[aria-label="Close dialog"]')?.click()
         await sleep(100)
       }

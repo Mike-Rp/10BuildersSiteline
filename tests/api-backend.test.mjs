@@ -1,3 +1,5 @@
+import { overallChecklistProgress } from "../src/project-progress.ts"
+import { projectPhaseNames } from "../src/model.ts"
 // End to end: the Supabase schema + demo data in an in-process Postgres, the real
 // Thesis-Backend (Express) in front of it, and the frontend's own login/loader.
 // Uses the backend bundled in this repository; all writes stay in the test database.
@@ -430,6 +432,44 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     // Only the Administrator may list accounts: role scoping is never widened.
     await asUser("karlo.espiritu@10builders.com")
     await assert.rejects(apiEnvelope("/accounts?page=1&pageSize=3"), /403|permission|forbidden|allowed|access/i)
+  })
+
+  await t.test("project-wide checklist aggregates require complete stored scope, count latest approvals once, and stay staff-only", async () => {
+    const admin = await asUser("patricia.domingo@10builders.com")
+    const project = admin.state.projects.find(p => p.status === "active" && p.team.length > 1)
+    assert.ok(project)
+    const before = overallChecklistProgress(projectPhaseNames(project), project.checklistProgress)
+    assert.equal(before.percentage, null, "uninitialized future scope cannot be treated as zero")
+    await db.query(`insert into project_phase_checklists(project_id,project_stage_id)
+      select project_id,project_stage_id from project_phase_team where project_id=$1 on conflict do nothing`, [project.id])
+    await db.query(`insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order)
+      select t.project_id,t.project_stage_id,c.code,c.title,c.required,c.sort_order from project_phase_team t
+      join phase_checklist_templates c on c.project_stage_id=t.project_stage_id where t.project_id=$1 on conflict do nothing`, [project.id])
+    const reload = async () => {
+      const state = await loadState(admin.user)
+      const p = state.projects.find(p => p.id === project.id)
+      return overallChecklistProgress(projectPhaseNames(p), p.checklistProgress)
+    }
+    const complete = await reload()
+    assert.ok(complete.required > 0)
+    const expected = await db.query(`select count(*)::int as total from project_phase_checklist_items where project_id=$1 and required`, [project.id])
+    assert.equal(complete.required, expected.rows[0].total)
+    const item = (await db.query(`select i.* from project_phase_checklist_items i where i.project_id=$1 and i.required
+      and not exists(select 1 from project_phase_evidence e where e.checklist_item_id=i.id) order by i.id limit 1`, [project.id])).rows[0]
+    assert.ok(item)
+    const insert = async status => db.query(`insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at)
+      values($1,$2,$3,$4,$5,$5,now())`, [project.id,item.project_stage_id,item.id,status,admin.user.id])
+    await insert("approved")
+    await insert("approved")
+    assert.equal((await reload()).approved, complete.approved + 1, "repeated evidence versions count one activity")
+    await insert("rejected")
+    assert.equal((await reload()).approved, complete.approved, "latest rejected state does not count an older approval")
+    const stored = (await db.query("select current_pct from projects where id=$1", [project.id])).rows[0]
+    assert.equal(Number(stored.current_pct), project.progress, "read aggregates never change workflow progress")
+    const client = await asUser("f.uy@aldenheights-hoa.com")
+    const raw = await api("/workspace/project-data")
+    assert.ok(raw.every(p => !("checklistProgress" in p)))
+    assert.ok(clientProjectViews(client.state,client.user.id).every(p => !("checklistProgress" in p)))
   })
 
   await t.test("the API refuses requests without a session", async () => {

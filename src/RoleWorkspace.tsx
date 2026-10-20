@@ -1,3 +1,4 @@
+import ProjectProgress from "./ProjectProgress"
 import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
@@ -15,7 +16,7 @@ import LeadSubcontractorPanel, {
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
-import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
   ListPager,
@@ -677,7 +678,6 @@ export default function RoleWorkspace({
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
-    const dashSchedule = runList(`${actor.role}:dash-schedule`, allActive, { searchText: () => "" }, { pageSize: 5 })
     return (
       <>
         {header(
@@ -873,25 +873,7 @@ export default function RoleWorkspace({
             <CompactPager list={dashActivity} />
           </Panel>
         </div>
-        <Panel
-          title="Schedule performance"
-          subtitle="Recorded completion and project history."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Active sites")}
-            >
-              View projects
-            </Button>
-          }
-        >
-          <Chart
-            compact
-            projects={dashSchedule.view.items}
-            summaryProjects={allActive}
-          />
-          <CompactPager list={dashSchedule} />
-        </Panel>
+
       </>
     )
   }
@@ -3203,10 +3185,7 @@ export default function RoleWorkspace({
           )}
         </section>
         <section className="detail-section">
-          <h3>
-            Schedule performance <Badge>Recorded</Badge>
-          </h3>
-          <Chart compact projects={[p]} />
+          <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
