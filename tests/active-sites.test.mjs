@@ -7,6 +7,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
 import React, { act } from "react"
+import { hasPendingSiteReview } from "../src/active-sites-review.ts"
 
 test("Active Sites filters before pagination, resets pages, sorts, and opens only supplied projects", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" })
@@ -118,7 +119,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
 
     assert.equal(cards().length, 1)
 
-    await select(3, "progress")
+    await select(2, "progress")
 
     assert.match(cards()[0].textContent, /Building 14/)
 
@@ -173,6 +174,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     assert.equal(document.querySelector(".as-summary strong").textContent, "0")
     await act(() => root.render(React.createElement(ActiveSites, {
       key: "missing-records",
+      reviewAvailable: true,
       projects: [{ ...projects[0], progress: NaN, start: "", end: undefined, needsReview: true }],
       onOpen: id => opened.push(id),
     })))
@@ -181,6 +183,114 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     assert.equal(summaries.some(el => el.textContent.includes("On schedule")), false)
     assert.equal(summaries.find(el => el.textContent.includes("Requiring attention")).querySelector("strong").textContent, "1")
     assert.match(cards()[0].textContent, /Not recorded/)
+
+    // Exercise review membership through the same pending-workflow projection used by staff.
+    const source = projects.map((project, i) => ({
+      ...project,
+      workflow: i < 6 ? { pendingUpdate: { id: `update-${i}` } }
+        : i === 6 ? { pendingRework: { id: "issue-6" } }
+        : i === 7 ? { pendingUpdate: { id: "update-7" }, pendingRework: { id: "issue-7" } }
+        : undefined,
+    }))
+    const pendingIntake = { ...source[0], id: "pending-intake", status: "pending" }
+    const late = { ...source[14], start: "2020-01-01", end: "2020-12-31", history: [{ issue: true }] }
+    source[14] = late
+    assert.equal(hasPendingSiteReview(pendingIntake), false)
+    assert.equal(hasPendingSiteReview(late), false)
+    const workflowActions = []
+    const staffProps = () => ({
+      key: "staff-reviews", reviewAvailable: true,
+      projects: [...source, pendingIntake].map(p => ({ ...p, needsReview: hasPendingSiteReview(p) })),
+      onOpen: id => opened.push(id),
+      renderActions: id => React.createElement("button", { onClick: () => workflowActions.push(id) }, "Existing review action"),
+    })
+    const tab = name => [...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.startsWith(name))
+    const count = name => tab(name).querySelector("span").textContent
+    const firstPage = () => assert.match(document.querySelector(".as-pagination").textContent, /Page 1 of/)
+    const selectSize = value => act(() => {
+      const field = document.querySelector(".as-pagination select")
+      field.value = String(value)
+      field.dispatchEvent(new dom.window.Event("change", { bubbles: true }))
+    })
+    await act(() => root.render(React.createElement(ActiveSites, staffProps())))
+    assert.equal(count("All active projects"), "15")
+    assert.equal(count("Awaiting review"), "8") // Both pending objects still count as one project.
+    assert.equal(document.querySelectorAll(".as-toolbar select").length, 3)
+    assert.ok(![...document.querySelectorAll(".as-toolbar label")].some(el => el.textContent.trim().startsWith("Status")))
+    assert.equal(document.querySelector(".as-card .badge"), null)
+    await act(() => button("Next").click())
+    await act(() => tab("Awaiting review").click())
+    firstPage()
+    assert.equal(cards().length, 6)
+    assert.ok(cards().every(card => card.querySelector(".as-review")))
+    await act(() => cards()[0].querySelector(".as-workflow-actions button").click())
+    assert.deepEqual(workflowActions, ["authorized-0"])
+    await act(() => cards()[0].querySelector(".as-details").click())
+    assert.equal(opened.at(-1), "authorized-0")
+    await act(() => button("Next").click())
+    assert.equal(cards().length, 2)
+    await select(0, "Commercial")
+    firstPage()
+    assert.equal(cards().length, 4)
+    assert.equal(count("Awaiting review"), "8") // Counts ignore dropdown narrowing.
+    await select(1, "Foundation")
+    assert.equal(cards().length, 0)
+    assert.match(document.body.textContent, /No matching projects/)
+    await act(() => button("Clear filters").click())
+    assert.equal(tab("Awaiting review").getAttribute("aria-selected"), "true")
+    await act(() => button("Next").click())
+    await select(2, "progress")
+    firstPage()
+    assert.match(cards()[0].textContent, /Building 08/)
+    await act(() => button("Next").click())
+    await selectSize(12)
+    firstPage()
+    assert.equal(cards().length, 8)
+    await selectSize(24)
+    firstPage()
+    await selectSize(6)
+    await act(() => button("Next").click())
+    await act(() => {
+      const input = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value").set.call(input, "Building 07")
+      input.dispatchEvent(new dom.window.Event("input", { bubbles: true }))
+    })
+    firstPage()
+    assert.equal(cards().length, 1)
+    assert.equal(count("Awaiting review"), "8")
+    await act(() => button("Clear filters").click())
+
+    // A refreshed project remains in the review tab until its last pending review is resolved.
+    source[7] = { ...source[7], workflow: { pendingRework: { id: "issue-7" } } }
+    await act(() => root.render(React.createElement(ActiveSites, staffProps())))
+    assert.equal(count("Awaiting review"), "8")
+    source[7] = { ...source[7], workflow: { notes: [{ text: "Previously reviewed" }] } }
+    await act(() => root.render(React.createElement(ActiveSites, staffProps())))
+    assert.equal(count("Awaiting review"), "7")
+    assert.ok(!cards().some(card => card.textContent.includes("Building 08")))
+    await act(() => tab("All active projects").click())
+    firstPage()
+    assert.equal(count("All active projects"), "15")
+    await selectSize(24)
+    assert.ok(cards().some(card => card.textContent.includes("Building 08")))
+    await act(() => tab("All active projects").dispatchEvent(new dom.window.KeyboardEvent("keydown", {key: "ArrowRight", bubbles: true})))
+    assert.equal(tab("Awaiting review").getAttribute("aria-selected"), "true")
+    for (let i = 0; i < source.length; i++) source[i] = { ...source[i], workflow: undefined }
+    await act(() => root.render(React.createElement(ActiveSites, staffProps())))
+    assert.equal(count("Awaiting review"), "0")
+    assert.match(document.body.textContent, /No projects awaiting review/)
+    assert.equal(cards().length, 0)
+
+    // Revoked records disappear from Recently Viewed; no review UI without explicit authorization.
+    await act(() => root.render(React.createElement(ActiveSites, {
+      key: "staff-reviews", projects: [{...projects[2], needsReview: true}], onOpen: () => {},
+    })))
+    assert.equal(document.querySelector(".as-recent"), null)
+    assert.equal(document.querySelectorAll('[role="tab"]').length, 1)
+    assert.equal(tab("Awaiting review"), undefined)
+    assert.equal(document.querySelector(".as-review"), null)
+    assert.equal(cards().length, 1)
+
   } finally {
     await act(() => root.unmount())
 

@@ -1,3 +1,4 @@
+import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
 // @refresh reset
@@ -2021,10 +2022,10 @@ export default function RoleWorkspace({
             ? "Read-only monitoring, accountable phase owners and site reminders."
             : "Report progress only while your confirmed phase is active.",
         )}
-        <ActiveSites key={actor.id} projects={allActive.map(p => ({
+        <ActiveSites key={actor.id} reviewAvailable projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
-          needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
+          needsReview: hasPendingSiteReview(p),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
           renderActions={id => {
             const p = allActive.find(site => site.id === id)!

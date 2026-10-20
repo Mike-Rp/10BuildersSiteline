@@ -1,3 +1,4 @@
+import { hasPendingSiteReview } from "../src/active-sites-review.ts"
 import assert from "node:assert/strict"
 import test from "node:test"
 import { DOC_LABELS } from "../src/model.ts"
@@ -152,4 +153,24 @@ test("companies and notifications map their key fields", () => {
 test("an empty current review queue does not revive retired manual-percentage requests",()=>{
  const p=mapProject(parts({overview:{pending_update:null,checklist:{items:[]}}}))
  assert.equal(p.workflow.pendingUpdate,undefined)
+})
+
+
+test("Active Sites review membership follows current backend queues and ignores resolved issues and retired updates", () => {
+  const mapped = (pending_update, issues = []) => mapProject(parts({ overview: { pending_update, issues } }))
+  const update = { id: "pending-update", prior_pct: 60, requested_pct: 60 }
+  const issue = { id: "pending-issue", status: "pending" }
+  assert.equal(hasPendingSiteReview(mapped(update)), true)
+  assert.equal(hasPendingSiteReview(mapped(null, [issue])), true)
+  const both = mapped(update, [issue])
+  assert.ok(both.workflow.pendingUpdate)
+  assert.ok(both.workflow.pendingRework)
+  assert.equal(hasPendingSiteReview(both), true)
+  // A retired legacy pending-update response must not restore a resolved review.
+  const resolved = mapped(null, [{ ...issue, status: "resolved" }])
+  assert.equal(hasPendingSiteReview(resolved), false)
+  assert.equal(resolved.workflow.pendingUpdate, undefined)
+  assert.equal(resolved.workflow.pendingRework, undefined)
+  assert.equal(hasPendingSiteReview({ ...both, status: "pending" }), false)
+  assert.equal(hasPendingSiteReview({ ...both, status: "completed" }), false)
 })

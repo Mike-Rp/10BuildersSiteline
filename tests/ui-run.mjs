@@ -72,6 +72,20 @@ for (const label of navLabels) {
   await sleep(250)
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
   if (label === "Active sites") {
+    const tabs = [...document.querySelectorAll('.as-tabs [role="tab"]')]
+    const isClient = !!document.querySelector('.client-portal')
+    const reviewTab = tabs.find(el => el.textContent.startsWith('Awaiting review'))
+    if (isClient && reviewTab) problems.push('Client received staff review navigation')
+    if (!isClient && !reviewTab) problems.push('Staff review navigation is missing')
+    if (document.querySelector('.as-card .badge')) problems.push('Redundant Active badge remains on a project card')
+    if ([...document.querySelectorAll('.as-toolbar label')].some(el => el.textContent.trim().startsWith('Status'))) problems.push('Redundant status filter remains')
+    if (reviewTab) {
+      reviewTab.click()
+      await sleep(100)
+      if ([...document.querySelectorAll('.as-card')].some(el => !el.querySelector('.as-review'))) problems.push('Review tab includes a project without a pending review')
+      tabs[0].click()
+      await sleep(100)
+    }
     const details = [...document.querySelectorAll(".as-card button")].find(el => el.textContent.includes("View Project Details"))
     if (details) {
       details.click()

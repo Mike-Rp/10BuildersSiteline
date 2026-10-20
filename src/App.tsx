@@ -1,3 +1,4 @@
+import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
@@ -1512,10 +1513,10 @@ function AppInner() {
             "Active sites",
             "Project visibility from mobilization through closeout.",
           )}
-          <ActiveSites key={actor.id} projects={active.map(p => ({
+          <ActiveSites key={actor.id} reviewAvailable projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
-            needsReview: !!(p.workflow?.pendingUpdate || p.workflow?.pendingRework),
+            needsReview: hasPendingSiteReview(p),
           }))} onOpen={id => setDialog({ kind: "project", id })} />
         </>
       )
