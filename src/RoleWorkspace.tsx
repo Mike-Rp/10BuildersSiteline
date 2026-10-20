@@ -1,6 +1,5 @@
 import ProjectProgress from "./ProjectProgress"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
-import InfoPopover from "./InfoPopover"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
@@ -640,15 +639,6 @@ export default function RoleWorkspace({
             </div>
           ) : (
             <>
-              <div className="intake-supplement">
-                <InfoPopover title="Document and acceptance order">
-                  {registeredComplete(p)
-                    ? "All six documents are on file. The Lead Site PM accepts first, followed by the remaining Site PMs. Subcontractor allocation stays locked until all responses are accepted."
-                    : `Upload the ${6 - registeredCount(p)} remaining required document${
-                        registeredCount(p) === 5 ? "" : "s"
-                      }. Site PM acceptance remains locked.`}
-                </InfoPopover>
-              </div>
               <div className="role-actions">
                 <Button
                   variant="primary"
@@ -1221,15 +1211,10 @@ export default function RoleWorkspace({
           {timeline(p)}
           {pending.length > 0 && (
             <>
-              <div className="notice">
-                <Icon name={block ? "shield" : "check"} />
-                <p>
-                  {block ||
-                    `Your ${pending.length} pending phase responsibilit${
-                      pending.length === 1 ? "y is" : "ies are"
-                    } ready. One acceptance confirms all phases assigned to you on this project.`}
-                </p>
-              </div>
+              {isIntake(p)
+                ? block ? <div className="notice"><Icon name="shield" /><p>{block}</p></div>
+                  : pending.length > 1 && <p>One acceptance confirms all {pending.length} pending phases assigned to you.</p>
+                : <div className="notice"><Icon name={block ? "shield" : "check"} /><p>{block || `Your ${pending.length} pending phase responsibilit${pending.length === 1 ? "y is" : "ies are"} ready. One acceptance confirms all phases assigned to you on this project.`}</p></div>}
               <div className="role-actions">
                 <Button
                   variant="primary"
@@ -1382,6 +1367,8 @@ export default function RoleWorkspace({
   }
   function assignmentCard(p: Project, info: ReturnType<typeof assignmentInfo>) {
     const guidance = intakeGuidance(state, p, actor)
+    const blocker = guidance && info.pending.length ? assignmentBlock(p, actor.id) : ""
+    const actionNotes = guidance ? (blocker ? [blocker] : []) : info.actions
     const statusLabel =
       info.group === "current"
         ? "Current Project"
@@ -1467,9 +1454,9 @@ export default function RoleWorkspace({
             <strong>{p.progress}%</strong>
           </div>
         )}
-        {(info.actions.length > 0 || info.deadline) && (
+        {(actionNotes.length > 0 || info.deadline) && (
           <ul className="assignment-actions-list">
-            {info.actions.map((text) => (
+            {actionNotes.map((text) => (
               <li key={text}>
                 <Icon name="clock" size={16} />
                 {text}

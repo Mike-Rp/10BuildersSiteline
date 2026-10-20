@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import "./intake-guidance.css"
 
-export default function InfoPopover({ title, children }: { title: string; children: ReactNode }) {
+export default function InfoPopover({ title, label, children }: { title: string; label?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -44,7 +44,7 @@ export default function InfoPopover({ title, children }: { title: string; childr
     return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("focusin", focus); document.removeEventListener("keydown", escape, true) }
   }, [open])
   return <span className="intake-info">
-    <button type="button" ref={trigger} className="intake-info-trigger" aria-label={`Help: ${title}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
+    <button type="button" ref={trigger} className="intake-info-trigger" aria-label={label || `Help: ${title}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 10.5v6M12 7v1" /></svg>
     </button>
     {open && <div id={id} ref={panel} popover="manual" className="intake-info-panel" role="dialog" aria-modal="false" aria-labelledby={`${id}-title`}>

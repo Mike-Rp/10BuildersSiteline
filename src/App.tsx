@@ -1989,7 +1989,7 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
-        {!docsOnly && <IntakeGuidance state={state} project={p} actor={actor} />}
+        {!docsOnly && <IntakeGuidance state={state} project={p} actor={actor} details />}
         {!docsOnly && (
           <>
             <div className="detail-stats">
