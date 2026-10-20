@@ -1,4 +1,5 @@
 import AdminDashboard from "./AdminDashboard"
+import WorkspaceSkeleton from "./LoadingSkeleton"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
 import { adminDashboardOverview } from "./admin-dashboard"
@@ -269,6 +270,7 @@ function AppInner() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
   const [mustResetPassword,setMustResetPassword]=useState(false)
   const [idleWarning, setIdleWarning] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
@@ -473,19 +475,24 @@ function AppInner() {
     full_name?: string
     email?: string
   }): Promise<Account> {
-    setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
-    const loaded = await loadApiState(user)
-    const account = loaded.accounts.find((a) => a.id === user.id)
+    setLoadingWorkspaceRole(user.role)
     try {
-      if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
-      assertCanSignIn(loaded, account)
-    } catch (error) {
-      await apiLogout()
-      throw error
+      setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
+      const loaded = await loadApiState(user)
+      const account = loaded.accounts.find((a) => a.id === user.id)
+      try {
+        if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
+        assertCanSignIn(loaded, account)
+      } catch (error) {
+        await apiLogout()
+        throw error
+      }
+      stateRef.current = loaded
+      setState(loaded)
+      return account
+    } finally {
+      setLoadingWorkspaceRole(undefined)
     }
-    stateRef.current = loaded
-    setState(loaded)
-    return account
   }
   async function signIn(email: string, password: string) {
     const account: Account = await guardedSignIn(signInAttempts,email,async()=>{
@@ -2608,7 +2615,8 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signedOut && (checkingSession || restoreError))
+  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole} />
+  if (signedOut && restoreError)
     return (
       <main className="session-restore" aria-busy={checkingSession}>
         {checkingSession ? null : (
@@ -2625,7 +2633,7 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage onSignIn={signIn} />
+    return <LoginPage onSignIn={signIn} workspaceRole={loadingWorkspaceRole} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)

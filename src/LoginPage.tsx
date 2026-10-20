@@ -1,12 +1,16 @@
 import { useState, type FormEvent } from "react"
+import WorkspaceSkeleton from "./LoadingSkeleton"
+import type { Role } from "./model"
 import { Button, Field, Icon } from "./ui"
 import { SIGN_IN_MESSAGES, validateSignInFields } from "./signInPolicy"
 
 export default function LoginPage({
   checkingSession = false,
+  workspaceRole,
   onSignIn,
 }: {
   checkingSession?: boolean
+  workspaceRole?: Role
   onSignIn: (email: string, password: string) => Promise<void>
 }) {
   const [email, setEmail] = useState("")
@@ -45,6 +49,7 @@ export default function LoginPage({
     }
   }
 
+  if (workspaceRole) return <WorkspaceSkeleton role={workspaceRole} />
   return (
     <main className="login-page">
       <div className="login-card">

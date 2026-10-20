@@ -53,7 +53,7 @@ setValue(inputs[0], email)
 setValue(inputs[1], "Password@123")
 await sleep(50)
 document.querySelector("form.login-form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }))
-await waitFor(() => !document.querySelector("form.login-form") || document.querySelector(".login-form .error, [role=alert]"), "sign-in to finish", 30000)
+await waitFor(() => (!document.querySelector("form.login-form") && !document.querySelector(".workspace-skeleton")) || document.querySelector(".login-form .error, [role=alert]"), "sign-in and workspace loading to finish", 30000)
 if (document.querySelector("form.login-form")) throw new Error("Sign-in failed: " + (document.querySelector("form.login-form .error, form.login-form [role=alert]")?.textContent || text().slice(0, 200)))
 await sleep(500)
 

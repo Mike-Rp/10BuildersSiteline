@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react"
 import { Button, Empty, Icon } from "./ui"
+import { SkeletonRows } from "./LoadingSkeleton"
 import {
   PAGE_SIZES,
   activeChips,
@@ -453,9 +454,7 @@ export function ListSection<T>({
     )
   else if (status.state === "loading" && !items.length)
     body = (
-      <div className="list-status" role="status">
-        Loading…
-      </div>
+      <SkeletonRows rows={compact ? 3 : Math.min(list.query.pageSize, 6)} />
     )
   else if (list.count > 0 || items.length) body = render(items)
   else if (list.narrowed) body = <NoResults list={list} />
@@ -477,7 +476,7 @@ export function ListSection<T>({
       >
         {body}
       </div>
-      {status.state === "error" ? null : compact ? (
+      {status.state === "error" || (status.state === "loading" && !items.length) ? null : compact ? (
         <CompactPager list={list} />
       ) : (
         <ListPager list={list} touch={touch} unit={unit} />
