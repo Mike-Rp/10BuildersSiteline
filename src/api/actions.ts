@@ -2,6 +2,7 @@ import { api, apiList, downloadApiFile, registerFileUrl } from "./client.ts";
 import { headcount, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
 import type { WorkflowCommand } from "../workflows.ts";
 import { DOC_CODES, type Dto } from "./adapter.ts";
+import { phaseHandoff } from "../phase-handoff.ts";
 const post = (path: string, json: unknown = {}) => api<Dto>(path, { method: "POST", json });
 const issueCodes: Record<string, string> = {
     "Failed inspection": "failed_inspection", "Material defect / damage": "material_defect",
@@ -33,6 +34,12 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         throw new Error("Project not found.");
     const base = "/projects/" + id;
     switch (command.type) {
+        case "advance_phase": {
+            const handoff = phaseHandoff(project, actor);
+            if (!handoff.authorized || !handoff.complete || !handoff.next || handoff.final)
+                throw new Error("Refresh the project and verify phase completion and Office PM ownership before handoff.");
+            return await post(base + "/advance-phase");
+        }
         case "view_document": {
             if (!command.doc || !await downloadApiFile(command.doc.id))
                 throw new Error("The document is unavailable.");
@@ -98,11 +105,10 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             if (!evidenceId)
                 throw new Error("No submitted evidence was found.");
             const rejected = command.type === "reject_checklist";
-            await post(base + "/evidence/" + evidenceId + (rejected ? "/reject" : "/approve"), {
+            return await post(base + "/evidence/" + evidenceId + (rejected ? "/reject" : "/approve"), {
                 review_note: command.note,
                 ...(command.expectedReviewToken ? {expected_review_token:command.expectedReviewToken} : {}),
             });
-            return;
         }
         case "approve_update":
         case "request_update": {

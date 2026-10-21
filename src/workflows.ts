@@ -92,7 +92,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 }
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
-  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
+  type: "advance_phase" | "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
   projectId?: string
   phase?: string
   doc?: Doc

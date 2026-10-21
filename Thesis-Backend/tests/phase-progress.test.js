@@ -112,7 +112,7 @@ function setup(options = {}) {
         state.p.current_stage_id = params[1]; state.p.current_pct = params[2]; return result([state.p]);
       }
       if (sql.startsWith("SELECT id FROM project_phase_files")) return result(state.fileRows.filter(file => params[0].includes(file.id)));
-      if (sql.startsWith("SELECT s.id AS project_stage_id")) return result(state.next ? [state.next] : []);
+      if (sql.startsWith("SELECT s.id AS project_stage_id")) return result(state.next ? [{ spm_user_id: spm.id, ...state.next }] : []);
       if (sql.startsWith("INSERT INTO project_phase_files")) { state.fileRows.push({ id: params[0] }); return result([{ id: params[0] }]); }
       if (sql.startsWith("INSERT INTO project_phase_evidence")) {
         state.evidence = { ...state.evidence, status: "pending", id: "8", file_id: params[3], phase_update_id: params[6] };
@@ -417,6 +417,43 @@ test("a completed checklist advances to the next confirmed phase and resets prog
   assert.equal(res.statusCode, 200);
   assert.equal(state.p.current_stage_id, 5);
   assert.equal(res.body.data.current_pct, 0);
+});
+
+test("final OPM activity approval automatically hands off once, retaining approvals", async () => {
+  const state = setup({ next: { project_stage_id: 5, status: "confirmed", code: "MEP Rough-in" },
+    nextItems: [{ id: "6", required: true, status: "missing" }] });
+  state.items.forEach(item => item.status = "approved");
+  const res = response();
+  await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.data.handoff.advanced, true);
+  assert.equal(state.p.current_stage_id, 5);
+  assert.equal(state.p.current_pct, 0);
+  assert.equal(state.evidence.status, "approved");
+  assert.equal(state.history.length, 2);
+  const duplicate = response();
+  await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), duplicate);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(state.history.length, 2);
+});
+
+test("automatic handoff blockers preserve a successful activity approval", async () => {
+  for (const options of [
+    { next: { project_stage_id: 5, status: "pending", code: "MEP Rough-in" } },
+    { next: { project_stage_id: 5, status: "confirmed", code: "MEP Rough-in" }, nextItems: [] },
+    { update: { id: "42", status: "pending" } },
+    { currentUnconfirmed: true },
+  ]) {
+    const state = setup(options);
+    state.items.forEach(item => item.status = "approved");
+    const res = response();
+    await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.data.handoff.advanced, false);
+    assert.ok(res.body.data.handoff.reason);
+    assert.equal(state.evidence.status, "approved");
+    assert.equal(state.p.current_stage_id, 4);
+  }
 });
 
 test("a completed phase cannot advance into an unconfigured checklist", async () => {

@@ -1,7 +1,8 @@
 import { maybeCloseProject } from "../archive/policy.js";
 import { createHash } from "node:crypto";
 import { readVerifiedProgress } from "./verified.utility.js";
-import { blockingReviews, verifiedComplete } from "./lifecycle.utility.js";
+import { verifiedComplete } from "./lifecycle.utility.js";
+import { transitionPhase } from "./handoff.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
@@ -234,7 +235,10 @@ const reviewEvidence = decision => async (req, res) => {
         {entryType:"checklist_review",updateProject:decision==="approved",isIssue:decision==="rejected"});
       const projectArchived=decision==="approved" && Number(p.current_stage_id)===Number(selected.current_stage_id)
         ? await maybeCloseProject(client,p,user.id) : false;
-      return { evidence_id: evidence.id, status: decision,project_archived:projectArchived, stage_pct: checklist.pct, current_pct: Number(p.current_stage_id) === Number(selected.current_stage_id) ? checklist.pct : p.current_pct,
+      const handoff = decision === "approved" && user.role === "opm" && !projectArchived &&
+        Number(p.current_stage_id) === Number(evidence.project_stage_id) && verifiedComplete(checklist.verified)
+        ? await transitionPhase(client, p, user.id) : undefined;
+      return { evidence_id: evidence.id, status: decision,project_archived:projectArchived, handoff, stage_pct: checklist.pct, current_pct: handoff?.advanced ? handoff.current_pct : Number(p.current_stage_id) === Number(selected.current_stage_id) ? checklist.pct : p.current_pct,
         approved_count: checklist.approved_count, required_count: checklist.required_count, verified_phase:checklist.verified };
     });
     return sendOk(res, `Evidence ${decision}.`, 1, data);
@@ -298,33 +302,9 @@ export const advancePhase = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
-      if(await blockingReviews(client,p.id))throw new HttpError(409,"Resolve pending rework, progress and subcontractor reviews before advancing this phase.");
-      const owner = await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2 AND status='confirmed' AND spm_user_id IS NOT NULL",[p.id,p.current_stage_id]);
-      if (!owner.rowCount) throw new HttpError(422,"The current phase SPM must confirm their assignment before handoff.");
-      const checklist = await readChecklist(client, p.id, p.current_stage_id);
-      if (!verifiedComplete(checklist.verified)) {
-        throw new HttpError(422, "All required checklist items must be approved before advancing.");
-      }
-      const next = await client.query(
-        `SELECT s.id AS project_stage_id, t.status, s.code
-           FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
-           JOIN project_stages s ON s.id=w.project_stage_id
-           LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=s.id
-          WHERE p.id=$1 AND w.sort_order >
-            (SELECT sort_order FROM project_type_stages WHERE project_type_id=p.project_type_id AND project_stage_id=$2)
-          ORDER BY w.sort_order LIMIT 1`, [p.id, p.current_stage_id]);
-      if (!next.rowCount) throw new HttpError(409, "This is the project's final assigned phase.");
-      const phase = next.rows[0];
-      if (phase.status !== "confirmed") throw new HttpError(422, "The next phase SPM must confirm their assignment.");
-      const nextChecklist = await readChecklist(client, p.id, phase.project_stage_id);
-      if (nextChecklist.verified.percentage === null) throw new HttpError(422, "Configure valid required scope for the next phase before advancing.");
-      await client.query(
-        `UPDATE projects SET current_stage_id = $2, current_pct = $3, updated_by = $4, updated_at = now() WHERE id = $1`,
-        [p.id, phase.project_stage_id, nextChecklist.pct, user.id]);
-      await recordPhaseHistory(client, { ...p, current_stage_id: phase.project_stage_id },
-        nextChecklist.pct, "Office PM activated the next phase.", user.id);
-      return { project_id: p.id, current_stage_id: phase.project_stage_id,
-        current_stage: phase.code, current_pct: nextChecklist.pct };
+      const handoff = await transitionPhase(client, p, user.id);
+      if (!handoff.advanced) throw new HttpError(handoff.code, handoff.reason);
+      return handoff;
     });
     return sendOk(res, "Next phase activated.", 1, data);
   } catch (error) { return handleError(res, error); }

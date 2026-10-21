@@ -424,6 +424,26 @@ function AppInner() {
     setState(loaded)
     return loaded
   }
+  // Let the next Site PM see an OPM handoff without a manual page reload.
+  useEffect(() => {
+    if (signedOut || actor.role !== "spm" || !tokenUser()) return
+    let active = true, loading = false
+    const refresh = async () => {
+      if (!active || loading || document.visibilityState === "hidden") return
+      loading = true
+      const snapshot = stateRef.current
+      try {
+        const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
+        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded) }
+      } catch { /* A transient background failure leaves the current workspace usable. */ }
+      finally { loading = false }
+    }
+    const timer = window.setInterval(() => { void refresh() }, 15000)
+    const onFocus = () => { void refresh() }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onFocus)
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
+  }, [actor.id, actor.role, signedOut])
   async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
     if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}
     try {
@@ -546,10 +566,18 @@ function AppInner() {
   async function sendWorkflow(command:WorkflowCommand) {
     if(signedOut)return {ok:false,error:"Your session has ended. Sign in again to continue."}
     try{
-      await sendApiWorkflow(stateRef.current,actor,command)
+      const response = await sendApiWorkflow(stateRef.current,actor,command)
       await reloadWorkspace()
-      return {ok:true}
-    }catch(error){return {ok:false,error:(error as Error).message}}
+      const message = response?.handoff?.advanced ? `Activity approved. ${response.handoff.current_stage} automatically activated for its assigned Site PM.`
+        : response?.handoff?.reason ? `Activity approved. Phase remains open: ${response.handoff.reason}`
+        : command.type === "advance_phase" && response?.current_stage ? `${response.current_stage} activated.` : undefined
+      return {ok:true, message}
+    }catch(error){
+      if(command.type === "advance_phase") {
+        try { await reloadWorkspace() } catch { /* Preserve the original handoff error. */ }
+      }
+      return {ok:false,error:(error as Error).message}
+    }
   }
   async function updateAccount(account:Account) {
     try{await saveApiAccount(account,true);await reloadWorkspace();setToast("Account details updated");setDialog({kind:"account",id:account.id});return true}

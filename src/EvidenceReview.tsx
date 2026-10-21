@@ -38,6 +38,7 @@ export default function EvidenceReview({projectId,evidenceId,reject,onClose,onCo
     {preview && <>
       <h3>{preview.activity}</h3>
       <p>{preview.phase_name} · This decision applies to this activity only.</p>
+      {!reject && preview.after.phase.percentage === 100 && <p>The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass.</p>}
       <div className="notice subsection">
         <div>
           <strong>{reject ? "Progress remains unchanged" : "Impact if approved"}</strong>

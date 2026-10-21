@@ -1,4 +1,5 @@
 import ProjectProgress from "./ProjectProgress"
+import PhaseHandoff from "./PhaseHandoff"
 import EvidenceReview from "./EvidenceReview"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
@@ -156,6 +157,7 @@ const SPM_NAV = [
 type Result = {
   ok: boolean
   error?: string
+  message?: string
 }
 type RoleDialog = {
   kind: string
@@ -418,7 +420,7 @@ export default function RoleWorkspace({
       return false
     }
     setError("")
-    setMessage(success || "Workspace updated.")
+    setMessage(result.message || success || "Workspace updated.")
     return true
   }
   function navigate(next: string) {
@@ -3187,6 +3189,7 @@ export default function RoleWorkspace({
         <section className="detail-section">
           <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
+        <PhaseHandoff key={p.id} project={p} actor={actor} onCommand={async command => await onCommand(command)} />
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>
