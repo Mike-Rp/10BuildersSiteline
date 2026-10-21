@@ -20,6 +20,11 @@ test("local migration, trusted aggregates, evidence versions and stable snapshot
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(read("../supabase/migrations/20261017000002_thesis_backend_schema.sql").replace(/^create extension if not exists pgcrypto.*$/m,""))
   await db.exec(read("../supabase/seed/dummy-data.sql"))
+  // Preserve this fixture's legacy seven-phase scope before testing the separate
+  // project-type migration in the real API integration suite.
+  await db.exec(`create table project_type_stages(project_type_id smallint,project_stage_id smallint,sort_order smallint,
+    primary key(project_type_id,project_stage_id));
+    insert into project_type_stages select t.id,s.id,s.sort_order from project_types t cross join project_stages s;`)
   const client={query:(sql,args)=>sql.includes("ALTER TABLE")?db.exec(sql).then(results=>results.at(-1)):db.query(sql,args)}
   const original=(await db.query("select id,current_pct from projects order by id")).rows
   const dryRun=await migrateVerifiedProgress(client)

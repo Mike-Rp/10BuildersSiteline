@@ -1,5 +1,5 @@
 import { useId, useMemo, useState, type ReactNode } from "react"
-import { PROJECT_TYPES, dateLabel, timelineStatus } from "./model"
+import { PROJECT_TYPES, dateLabel, phaseDefinitions, timelineStatus, type PhaseDefinition } from "./model"
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./listing"
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
@@ -23,6 +23,7 @@ export default function ActiveSites({
   onOpen,
   renderActions,
   reviewAvailable = false,
+  phaseDefinitionsByType,
 }: {
   projects: SiteCard[]
 
@@ -30,6 +31,7 @@ export default function ActiveSites({
 
   renderActions?: (id: string) => ReactNode
   reviewAvailable?: boolean
+  phaseDefinitionsByType?: Record<string, PhaseDefinition[]>
 }) {
   const [query, setQuery] = useState("")
   const [type, setType] = useState("")
@@ -43,7 +45,9 @@ export default function ActiveSites({
   const [size, setSize] = useState<number>(DEFAULT_PAGE_SIZE)
   const [page, setPage] = useState(1)
   const [recent, setRecent] = useState<string[]>([])
-  const phases = [...new Set(activeProjects.map((p) => p.phase))].sort()
+  const definitionsFor = (projectType: string) => phaseDefinitionsByType?.[projectType] ?? phaseDefinitions(projectType)
+  const allPhases = definitionsFor("Mixed-Use").map(p => p.name)
+  const phases = type ? definitionsFor(type).map(p => p.name) : allPhases
 
 
   const filtered = useMemo(
@@ -56,7 +60,7 @@ export default function ActiveSites({
               .toLocaleLowerCase()
               .includes(query.trim().toLocaleLowerCase()) &&
             (!type || p.type === type) &&
-            (!phase || p.phase === phase),
+            (!phase || p.phase.toLowerCase() === phase.toLowerCase()),
         )
         .sort((a, b) => {
           if (sort === "progress")
@@ -169,7 +173,12 @@ export default function ActiveSites({
           <select
             value={type}
             onChange={(e) => {
-              setType(e.target.value)
+              const nextType = e.target.value
+              setType(nextType)
+              const nextPhases = nextType ? definitionsFor(nextType).map(p => p.name) : allPhases
+              if (!nextPhases.some(name => name.toLowerCase() === phase.toLowerCase())) {
+                setPhase("")
+              }
               setPage(1)
             }}
           >

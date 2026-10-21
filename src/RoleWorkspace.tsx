@@ -516,8 +516,8 @@ export default function RoleWorkspace({
                     "Phase responsibility"}
               </small>
             </div>
-            <span>{actorName(t.accountId)}</span>
-            <Status value={t.status} />
+            <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>
+            <Status value={t.accountId ? t.status : "unassigned"} />
             {allowReassign &&
               t.status !== "confirmed" &&
               p.status !== "completed" && (
@@ -2013,7 +2013,7 @@ export default function RoleWorkspace({
             ? "Read-only monitoring, accountable phase owners and site reminders."
             : "Report progress only while your confirmed phase is active.",
         )}
-        <ActiveSites key={actor.id} reviewAvailable projects={allActive.map(p => ({
+        <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),

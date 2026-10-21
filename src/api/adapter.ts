@@ -192,7 +192,7 @@ export function mapProject(parts: ProjectParts): Project {
   const status = projectStatus(list)
   const team: Project["team"] = (detail.phase_team || []).map((t: Dto) => ({
     phase: t.stage,
-    accountId: t.spm_user_id,
+    accountId: t.spm_user_id || "",
     status: teamStatus(t.status),
     requiredDisciplines: t.required_disciplines,
     sequence: t.sort_order,
@@ -425,7 +425,7 @@ export function peopleFromProjects(
   add(me)
   for (const p of list) {
     const detail = details.get(p.id) || {}
-    for (const t of detail.phase_team || [])
+    for (const t of (detail.phase_team || []).filter((t: Dto) => t.spm_user_id))
       add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
     if (detail.opm_assignment?.target_user_id)
       add(

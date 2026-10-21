@@ -1,5 +1,6 @@
 import { HttpError, isUuid, isBigintId, isSmallintId } from "../../common/utilities/access.utility.js";
 
+// Legacy public export retained for older consumers; selection and ordering use project_type_stages.
 export const STAGES = ["Mobilization", "Design", "Foundation", "Structure", "MEP Rough-in", "Finishes", "Closeout"];
 export const ISSUE_CATEGORIES = [
   { code: "failed_inspection", label: "Failed inspection" },
@@ -66,26 +67,21 @@ export function updateBody(body = {}) {
     })),
   };
 }
-export async function resolveStage(client, body, fallback) {
-  const id = body.stage_id ?? (body.stage === undefined ? fallback : null);
-  if (id != null && !isSmallintId(id)) throw new HttpError(400, "Invalid stage_id.");
-  if (body.stage !== undefined && (typeof body.stage !== "string" || !STAGES.some(s => s.toLowerCase() === body.stage.trim().toLowerCase()))) {
-    throw new HttpError(400, "Unknown stage.");
-  }
-  if (id == null && body.stage === undefined) throw new HttpError(400, "Select a stage.");
-  const stage = await client.query(
-    `SELECT id, code, sort_order FROM project_stages
-      WHERE lower(code) = ANY($1::text[]) AND ($2::smallint IS NULL OR id = $2)
-        AND ($3::text IS NULL OR lower(code) = lower($3))`,
-    [STAGES.map(s => s.toLowerCase()), id == null ? null : Number(id), body.stage?.trim() ?? null]);
-  if (!stage.rowCount) throw new HttpError(400, "Unknown or conflicting stage selection.");
-  return stage.rows[0];
+export async function resolveStage(client, body, fallback, projectTypeId) {
+ const id=body.stage_id ?? (body.stage===undefined ? fallback : null);
+ if(id!=null && !isSmallintId(id))throw new HttpError(400,"Invalid stage_id.");
+ if(body.stage!==undefined && (typeof body.stage!=="string" || !body.stage.trim()))throw new HttpError(400,"Unknown stage.");
+ if(id==null && body.stage===undefined)throw new HttpError(400,"Select a stage.");
+ const result=await client.query(`SELECT s.id,s.code,w.sort_order FROM project_type_stages w
+ JOIN project_stages s ON s.id=w.project_stage_id
+ WHERE w.project_type_id=$1 AND ($2::smallint IS NULL OR s.id=$2)
+ AND ($3::text IS NULL OR lower(s.code)=lower($3))`,[projectTypeId,id==null?null:Number(id),body.stage?.trim()??null]);
+ if(!result.rowCount)throw new HttpError(400,"Unknown or conflicting stage selection for this project type.");
+ return result.rows[0];
 }
-export async function stageOptions(client) {
-  const result = await client.query(
-    `SELECT id, code, sort_order FROM project_stages WHERE lower(code) = ANY($1::text[])
-      ORDER BY array_position($1::text[], lower(code))`, [STAGES.map(s => s.toLowerCase())]);
-  return result.rows;
+export async function stageOptions(client, projectTypeId) {
+ return (await client.query(`SELECT s.id,s.code,w.sort_order FROM project_type_stages w
+ JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_type_id=$1 ORDER BY w.sort_order`,[projectTypeId])).rows;
 }
 export async function validateFiles(client, project, userId, fileIds) {
   if (!fileIds.length) return;
