@@ -65,7 +65,7 @@ const clickable = () => [...document.querySelectorAll("button, a, [role=button]"
 const sidebarCounts = () => [...document.querySelectorAll('.sidebar .nav-item')].map(el => [el.getAttribute('aria-label'),el.querySelector('.nav-count')?.textContent || '0'])
 const initialSidebarCounts = JSON.stringify(sidebarCounts())
 for (const label of navLabels) {
-  const target = clickable().find((el) => el.textContent.trim().replace(/\s+/g, " ").startsWith(label))
+  const target = clickable().find((el) => el.getAttribute("aria-label") === label || el.textContent.trim().replace(/\s+/g, " ").startsWith(label))
   if (!target) {
     results.pages[label] = "no such button"
     continue
@@ -135,8 +135,10 @@ for (const label of navLabels) {
       else {
         results.pages["Active site details modal"] = "ok"
         const breakdown = [...modal.querySelectorAll("button")].find(el => el.textContent.includes("View phase breakdown"))
-        if (!breakdown) problems.push("Project progress comparison is missing")
-        else {
+        if (isClient && !modal.querySelector('.client-project-facts')) problems.push("Client project facts are missing")
+        if (isClient && modal.querySelector('.project-progress')) problems.push("Client received an unsupported staff progress comparison")
+        if (!breakdown && !isClient) problems.push("Project progress comparison is missing")
+        else if (breakdown) {
           breakdown.focus()
           const body = modal.querySelector('.modal-body')
           const scroll = body.scrollTop

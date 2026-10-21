@@ -6,23 +6,25 @@ export default function PhaseTimeline({
   phases,
   completed = false,
   detailed = false,
+  compact = false,
 }: {
   phase: string
   phases?: string[]
   completed?: boolean
   detailed?: boolean
+  compact?: boolean
 }) {
   return (
     <ol
-      className={`construction-phase-timeline ${detailed ? "detailed" : ""}`}
+      className={`construction-phase-timeline ${detailed ? "detailed" : ""} ${compact ? "compact" : ""}`}
       aria-label="Read-only construction phase timeline"
     >
       {phaseTimeline(phase, completed, phases).map((item, index) => (
-        <li key={item.name} className={item.state}>
-          <span>
+        <li key={item.name} className={item.state} aria-current={item.state === "current" ? "step" : undefined}>
+          <span aria-hidden={compact || undefined}>
             {item.state === "completed" ? (
-              <Icon name="check" size={17} />
-            ) : item.state === "current" ? (
+              <Icon name="check" size={compact ? 12 : 17} />
+            ) : compact ? null : item.state === "current" ? (
               index + 1
             ) : (
               <Icon name="shield" size={16} />
