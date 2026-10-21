@@ -4,6 +4,7 @@ import test from "node:test"
 import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { migrateVerifiedProgress, assertLocalDatabase } from "../Thesis-Backend/scripts/migrate-verified-progress.js"
+import { migrateTargetedRework } from "../Thesis-Backend/scripts/migrate-targeted-rework.js"
 import { readVerifiedProgress, snapshotProjectChecklists } from "../Thesis-Backend/src/services/progress/verified.utility.js"
 
 const read = path => fs.readFileSync(new URL(path,import.meta.url),"utf8")
@@ -33,6 +34,12 @@ test("local migration, trusted aggregates, evidence versions and stable snapshot
   assert.equal((await db.query("select column_name from information_schema.columns where table_name='project_phase_checklist_items' and column_name='weight'")).rows.length,0)
   console.log("Disposable database migration dry-run:",JSON.stringify(dryRun))
   const applied=await migrateVerifiedProgress(client,{apply:true})
+  const reworkDry=await migrateTargetedRework(client)
+  assert.equal(reworkDry.rework_links,0)
+  assert.equal((await db.query("select column_name from information_schema.columns where table_name='project_phase_evidence' and column_name='rework_request_id'")).rows.length,0)
+  console.log("Targeted rework migration dry-run:",JSON.stringify(reworkDry))
+  const reworkApplied=await migrateTargetedRework(client,{apply:true})
+  assert.deepEqual(await migrateTargetedRework(client,{apply:true}),reworkApplied)
   assert.deepEqual({...applied,mode:dryRun.mode},dryRun)
   assert.deepEqual(await migrateVerifiedProgress(client,{apply:true}),applied)
   assert.deepEqual((await db.query("select id,current_pct from projects order by id")).rows,original)

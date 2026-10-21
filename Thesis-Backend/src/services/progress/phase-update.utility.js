@@ -46,6 +46,10 @@ export function updateBody(body = {}) {
     throw new HttpError(400, "Unknown issue category.");
   }
   const files = arrayField(body.file_ids, "file_ids");
+  const affected=arrayField(body.affected_activity_ids,"affected_activity_ids");
+  if(affected.length>100 || affected.some(id=>!isBigintId(id)||BigInt(id)<=0n) || new Set(affected.map(String)).size!==affected.length) {
+    throw new HttpError(400,"Affected activities must contain unique positive checklist IDs.");
+  }
   if (files.length > 20 || files.some(id => !isUuid(id))) throw new HttpError(400, "file_ids must contain up to 20 file UUIDs.");
   if (body.submitted_item_ids !== undefined && body.checklist_submissions !== undefined) {
     throw new HttpError(400, "Use submitted_item_ids or checklist_submissions, not both.");
@@ -61,6 +65,7 @@ export function updateBody(body = {}) {
   }
   return {
     ...body, note: optionalNote(body.note), issue_reason: optionalNote(body.issue_reason),
+    affected_activity_ids:affected.map(String),
     issue_categories: [...new Set(categories)], file_ids: [...new Set(files)],
     checklist_submissions: submissions.map(i => ({
       item_id: String(i.item_id), file_id: i.file_id ?? null, submission_note: optionalNote(i.submission_note, "submission_note"),
@@ -96,11 +101,21 @@ export function issueReason(body) {
     body.issue_categories.map(code => ISSUE_CATEGORIES.find(i => i.code === code).label).join("; ");
 }
 export async function insertIssue(client, project, userId, body, updateId = null, historyId = null) {
+  const affected=body.affected_activity_ids||[];
+  if(affected.length){
+    const current=await client.query("SELECT current_stage_id FROM projects WHERE id=$1",[project.id]);
+    if(Number(current.rows[0]?.current_stage_id)!==Number(project.current_stage_id))throw new HttpError(422,"Targeted issues must concern the current phase.");
+    if(!body.issue_reason?.trim()&&!body.note?.trim())throw new HttpError(400,"Explain why the selected activities need rework.");
+    const items=await client.query("SELECT id FROM project_phase_checklist_items WHERE project_id=$1 AND project_stage_id=$2 AND id=ANY($3::bigint[])",[project.id,project.current_stage_id,affected]);
+    if(items.rowCount!==affected.length)throw new HttpError(422,"Affected activities must belong to this project's current phase.");
+  }
   const result = await client.query(
     `INSERT INTO pending_rework_requests
        (project_id, project_stage_id, reason, issue_categories, phase_update_id, resulting_history_id,
         submitted_by, submitted_at, status, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, now(), 'pending', $7, $7) RETURNING id, status, submitted_at`,
     [project.id, project.current_stage_id, issueReason(body), body.issue_categories, updateId, historyId, userId]);
+  if(affected.length)await client.query(`INSERT INTO project_rework_activities(request_id,project_id,project_stage_id,checklist_item_id)
+    SELECT $1,$2,$3,unnest($4::bigint[])`,[result.rows[0].id,project.id,project.current_stage_id,affected]);
   return result.rows[0];
 }

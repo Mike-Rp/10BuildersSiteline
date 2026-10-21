@@ -70,6 +70,7 @@ function setup(options = {}) {
       }
       if (sql.startsWith("SELECT project_stage_id FROM project_phase_checklist_items")) return result([{ project_stage_id: 4 }]);
       if (sql.startsWith("SELECT id FROM project_phase_updates")) return result(state.update?.status === "pending" ? [state.update] : []);
+      if(sql.startsWith("SELECT 1 FROM pending_rework_requests"))return result(state.issues.filter(issue=>issue.status==="pending"));
       if (sql.startsWith("SELECT * FROM project_phase_updates")) return result(state.update ? [state.update] : []);
       if (sql.startsWith("INSERT INTO project_phase_updates")) {
         state.update = { id: "42", project_id: params[0], selected_stage_id: params[1], prior_stage_id: params[2],

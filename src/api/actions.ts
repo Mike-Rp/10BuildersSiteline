@@ -75,6 +75,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "submit_progress": {
             const file_ids = command.evidence ? [await phaseFile(id, command.evidence)] : [];
+            if(command.issues?.length){
+                await post(base+"/rework-requests",{stage:project.phase,reason:command.note,
+                    issue_categories:command.issues.map(v=>issueCodes[v]||v),affected_activity_ids:command.affectedActivityIds||[],file_ids});
+                return;
+            }
             await post(base + "/phase-updates", { stage: command.phase || project.phase, note: command.note,
                 issue_categories: (command.issues || []).map(v => issueCodes[v] || v), file_ids });
             return;
@@ -113,11 +118,13 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "approve_rework":
         case "decline_rework": {
-            const overview = await api<Dto>(base + "/phase-overview");
-            const issue = overview.issues?.find((i: Dto) => i.status === "pending");
-            if (!issue)
+            const requestId=command.requestId||project.workflow?.pendingRework?.id;
+            if (!requestId)
                 throw new Error("No pending rework request was found.");
-            await post("/rework-requests/" + issue.id + (command.type === "approve_rework" ? "/approve" : "/reject"), { resolution_note: command.note || "Reviewed." });
+            await post("/rework-requests/" + requestId + (command.type === "approve_rework" ? "/approve" : "/reject"), {
+                resolution_note:command.note,selected_activity_ids:command.selectedActivityIds,
+                expected_review_token:command.expectedReviewToken,
+            });
             return;
         }
         case "add_note":

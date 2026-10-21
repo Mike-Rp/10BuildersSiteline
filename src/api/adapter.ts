@@ -220,11 +220,12 @@ export function mapProject(parts: ProjectParts): Project {
       (i): ChecklistItem => ({
         id: String(i.id),
         evidenceId: i.evidence_id == null ? undefined : String(i.evidence_id),
+        reworkReason:i.rework_reason||undefined,
         label: i.title,
         required: i.required,
         weight: i.weight,
         status:
-          i.status === "approved"
+          i.status === "rework_required" ? "rework_required" : i.status === "approved"
             ? "approved"
             : i.status === "pending" || i.status === "submitted"
               ? "submitted"

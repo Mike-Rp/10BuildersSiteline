@@ -1,11 +1,8 @@
-import { phaseProject } from "./phase.utility.js";
-import { maybeCloseProject } from "../archive/policy.js";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
-import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import {
-  HttpError, handleError, sendOk, sendError, requireUser,
-  hasProjectAccess, isProjectOpmOrAdmin, isUuid, paging,
+  handleError, sendOk, sendError, requireUser,
+  hasProjectAccess, isUuid, paging,
 } from "../../common/utilities/access.utility.js";
  
 import { submitPhaseUpdate } from "./phase.controller.js";
@@ -83,53 +80,8 @@ export const getReworkRequests = async (req, res) => {
   }
 };
  
-const resolveRework = (decision) => async (req, res) => {
-  try {
-    const user = await requireUser(req, res, ["admin", "opm"]);
-    if (!user) return;
-    const { id } = req.params;
-    const { resolution_note } = req.body || {};
-    if (!isUuid(id)) return sendError(res, "Invalid rework request id.", 400);
- 
-    const newStatus = decision === "approve" ? "approved" : "rejected";
-    const data = await withTransaction(async (client) => {
-      const lookup=await client.query("SELECT project_id FROM pending_rework_requests WHERE id=$1",[id]);
-      if(!lookup.rowCount) throw new HttpError(404,"Rework request not found.");
-      const project=await phaseProject(client,user,lookup.rows[0].project_id);
-      if(project.lifecycle_status==="archived") throw new HttpError(409,"Archived projects are read-only.");
+export { approveRework, rejectRework, getReworkPreview } from "./rework.controller.js";
 
-      const found = await client.query(
-        `SELECT id, project_id, status FROM pending_rework_requests WHERE id = $1 FOR UPDATE`,
-        [id]
-      );
-      if (found.rowCount === 0) throw new HttpError(404, "Rework request not found.");
-      const rw = found.rows[0];
-      if (!(await isProjectOpmOrAdmin(user, rw.project_id, client))) {
-        throw new HttpError(404, "Rework request not found.");
-      }
-      if (rw.status !== "pending") throw new HttpError(409, `Rework request is already ${rw.status}.`);
- 
-      const updated = await client.query(
-        `UPDATE pending_rework_requests
-            SET status = $2, resolved_by = $3, resolved_at = now(), resolution_note = $4,
-                updated_by = $3, updated_at = now()
-          WHERE id = $1
-          RETURNING id, status, resolved_at`,
-        [id, newStatus, user.id, resolution_note ?? null]
-      );
-      await maybeCloseProject(client,project,user.id);
-      return updated.rows[0];
-    });
- 
-    return sendOk(res, `Rework request ${newStatus}.`, 1, data);
-  } catch (error) {
-    return handleError(res, error);
-  }
-};
- 
-export const approveRework = resolveRework("approve");
-export const rejectRework = resolveRework("reject");
- 
 export const getProjectHistory = async (req, res) => {
   try {
     const user = await requireUser(req, res);

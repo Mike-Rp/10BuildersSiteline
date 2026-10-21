@@ -1,5 +1,6 @@
 import ProjectProgress from "./ProjectProgress"
 import EvidenceReview from "./EvidenceReview"
+import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
@@ -83,7 +84,6 @@ import {
   registeredComplete,
   registeredCount,
   REVIEW_MS,
-  projectStageFloor,
   teamConfirmed,
   visibleEvents,
   workflowFor,
@@ -234,6 +234,8 @@ export default function RoleWorkspace({
   const [acceptedId, setAcceptedId] = useState("")
   const [note, setNote] = useState("")
   const [issueChoices, setIssueChoices] = useState<string[]>([])
+  const [affectedActivities,setAffectedActivities]=useState<string[]>([])
+  useEffect(()=>setAffectedActivities([]),[pickedId])
   const [evidence, setEvidence] = useState<Doc>()
   const [evidenceReview,setEvidenceReview]=useState<WorkflowCommand>()
   const [diary, setDiary] = useState("")
@@ -1716,7 +1718,7 @@ export default function RoleWorkspace({
               {checklistFor(p, t.phase).map((item) => (
                 <div key={item.id} className="repository-check">
                   <span>{item.label}</span>
-                  <Status value={item.status} />
+                  <Status value={item.status.replace(/_/g," ")} />
                 </div>
               ))}
             </details>
@@ -1759,8 +1761,8 @@ export default function RoleWorkspace({
           <div className="notice">
             <Icon name="shield" />
             <p>
-              A site issue is awaiting Office PM review. Current progress is
-              held at {p.progress}%. Rework is never auto-approved.
+              A site issue is awaiting Office PM review. Reporting an issue
+              does not deduct progress. Rework requires a manual decision.
             </p>
           </div>
         ) : (
@@ -1795,6 +1797,7 @@ export default function RoleWorkspace({
                   <div>
                     <h4>{item.label}</h4>
                     {item.note && <p className="error">{item.note}</p>}
+                    {item.reworkReason&&<p className="error">Rework: {item.reworkReason}</p>}
                     {item.doc && (
                       <button
                         className="inline-link"
@@ -1810,12 +1813,12 @@ export default function RoleWorkspace({
                       </p>
                     )}
                   </div>
-                  <Status value={item.status} />
-                  {item.status === "missing" && (
+                  <Status value={item.status.replace(/_/g," ")} />
+                  {["missing","rework_required"].includes(item.status) && (
                     <Upload
                       label={item.label}
                       owner={actor.name}
-                      buttonLabel="Upload evidence"
+                      buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
                       onSave={async (doc) =>
                         await act(
@@ -1873,10 +1876,17 @@ export default function RoleWorkspace({
                   </button>
                 ))}
               </div>
+              {issueChoices.length>0&&<fieldset className="subsection"><legend>Affected activities — {p.phase}</legend>
+                {checklistFor(p).map(item=><label className="qa-checklist-row" key={item.id}>
+                  <input type="checkbox" checked={affectedActivities.includes(item.id)} onChange={()=>setAffectedActivities(ids=>ids.includes(item.id)?ids.filter(id=>id!==item.id):[...ids,item.id])}/>
+                  <span>{item.label}</span>
+                </label>)}
+                <p className="role-muted">Reporting an issue does not deduct progress. Office PM must review it first.</p>
+              </fieldset>}
               <Field
                 label={
-                  issueChoices.includes("Other")
-                    ? "Explain the Other issue *"
+                  issueChoices.length>0
+                    ? "Explain the issue *"
                     : "Field notes (optional)"
                 }
               >
@@ -1890,7 +1900,7 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={!!work.pendingUpdate && !issueChoices.length}
+                  disabled={(!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
                   onClick={async () => {
                     if (
                       await act(
@@ -1899,6 +1909,7 @@ export default function RoleWorkspace({
                           projectId: p.id,
                           note,
                           issues: issueChoices,
+                          affectedActivityIds:affectedActivities,
                           evidence,
                         },
                         issueChoices.length
@@ -1907,6 +1918,7 @@ export default function RoleWorkspace({
                       )
                     ) {
                       setNote("")
+                      setAffectedActivities([])
                       setIssueChoices([])
                       setEvidence(undefined)
                     }
@@ -2231,7 +2243,7 @@ export default function RoleWorkspace({
                       <Icon name="shield" />
                       <p>
                         {tab === "rework"
-                          ? `Rework always requires a manual decision. Approval rolls progress back to at most the ${p.phase} stage floor of ${projectStageFloor(p)}%; declining leaves progress unchanged.`
+                          ? "Only the selected affected activities require correction. Review the phase and project impact before confirming; dismissing the request leaves approvals unchanged."
                           : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving this report grants no activity credit and does not change the project phase."}
                       </p>
                     </div>
@@ -2244,18 +2256,19 @@ export default function RoleWorkspace({
                               setReviewAction({
                                 type: "approve_rework",
                                 projectId: p.id,
+                                requestId:submission.id,
                                 expectedVersion: submission.version,
                               })
                             }
                           >
-                            Approve rework — adjust to{" "}
-                            {Math.min(p.progress, projectStageFloor(p))}%
+                            Review rework impact
                           </Button>
                           <Button
                             onClick={() =>
                               setReviewAction({
                                 type: "decline_rework",
                                 projectId: p.id,
+                                requestId:submission.id,
                                 expectedVersion: submission.version,
                               })
                             }
@@ -3921,31 +3934,9 @@ export default function RoleWorkspace({
             evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
       )}
       {reviewAction && (
-        <Modal
-          title={
-            reviewAction.type === "approve_rework"
-              ? "Approve rework and adjust progress?"
-              : "Decline rework without changing progress?"
-          }
-          onClose={() => setReviewAction(undefined)}
-        >
-          <p>
-            Rework decisions are manual, recorded, and applied to the current
-            project version. Review the issue and evidence before confirming.
-          </p>
-          <div className="modal-actions">
-            <Button onClick={() => setReviewAction(undefined)}>Cancel</Button>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                if (await act(reviewAction, "Rework decision recorded."))
-                  setReviewAction(undefined)
-              }}
-            >
-              Confirm decision
-            </Button>
-          </div>
-        </Modal>
+        <ReworkReview key={`${reviewAction.requestId}-${reviewAction.type}`} requestId={reviewAction.requestId!}
+          confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
+          onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
       {preview && (
         <Preview

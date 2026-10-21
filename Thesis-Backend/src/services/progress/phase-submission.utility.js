@@ -16,12 +16,15 @@ export async function submitChecklist(client, project, user, submission, updateI
     }
     throw new HttpError(409, "This item is already awaiting review.");
   }
+  if(item.rework_request_id&&(!submission.file_id||submission.file_id===item.file_id)) {
+    throw new HttpError(400,"Upload fresh corrected evidence for this rework activity.");
+  }
   await validateFiles(client, project, user.id, submission.file_id ? [submission.file_id] : []);
   const result = await client.query(
     `INSERT INTO project_phase_evidence
-       (project_id, project_stage_id, checklist_item_id, file_id, submitted_by, submission_note, phase_update_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, status, submitted_at`,
+       (project_id, project_stage_id, checklist_item_id, file_id, submitted_by, submission_note, phase_update_id,rework_request_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7,$8) RETURNING id, status, submitted_at`,
     [project.id, project.current_stage_id, item.id, submission.file_id ?? null, user.id,
-      submission.submission_note ?? null, updateId]);
+      submission.submission_note ?? null, updateId,item.rework_request_id||null]);
   return { ...result.rows[0], checklist_item_id: item.id, file_id: submission.file_id ?? null };
 }

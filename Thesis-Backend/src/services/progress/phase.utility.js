@@ -63,11 +63,12 @@ export async function readChecklist(client, projectId, stageId) {
     `SELECT i.id, i.code, i.title, i.required, i.sort_order, i.weight,
             COALESCE(e.status, 'missing') AS status,
             e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note, e.reviewed_by,
-            e.submitted_by, e.submission_note, e.phase_update_id, f.original_name, f.content_type
+            e.submitted_by, e.submission_note, e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason, f.original_name, f.content_type
        FROM project_phase_checklist_items i
        LEFT JOIN LATERAL (
          SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1
        ) e ON true
+       LEFT JOIN pending_rework_requests r ON r.id=e.rework_request_id
        LEFT JOIN project_phase_files f ON f.id=e.file_id
       WHERE i.project_id = $1 AND i.project_stage_id = $2 ORDER BY i.sort_order, i.id`, [projectId, stageId]);
   const required = result.rows.filter(i => i.required);

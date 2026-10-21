@@ -8,7 +8,7 @@ import {
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
-import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput } from "./phase-update.utility.js";
+import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
 export { submitPhaseUpdate } from "./phase-update.controller.js";
 import {
   phaseProject, assertProjectSpm, isProjectSpm, readChecklist, recordPhaseHistory,
@@ -148,10 +148,13 @@ export const reportProjectIssue = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
       const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
+      if(Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
+      await validateFiles(client,selected,user.id,body.file_ids);
       const checklist = await readChecklist(client, p.id, stage.id);
       const history = await recordPhaseHistory(client, selected, checklist.pct, body.issue_reason ?? body.note, user.id,
         { isIssue: true, issueCategories: body.issue_categories, entryType: "issue", updateProject: false });
+      if(body.file_ids.length)await client.query("INSERT INTO project_phase_update_files(history_id,file_id) SELECT $1,unnest($2::uuid[])",[history.id,body.file_ids]);
       return insertIssue(client, selected, user.id, body, null, history.id);
     });
     return sendOk(res, "Issue reported.", 1, data, 201);
@@ -294,6 +297,8 @@ export const advancePhase = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
+      const issues=await client.query("SELECT 1 FROM pending_rework_requests WHERE project_id=$1 AND project_stage_id=$2 AND status='pending' LIMIT 1",[p.id,p.current_stage_id]);
+      if(issues.rowCount)throw new HttpError(409,"Resolve pending rework issues before advancing this phase.");
       const checklist = await readChecklist(client, p.id, p.current_stage_id);
       if (!checklist.configured || checklist.approved_count !== checklist.required_count) {
         throw new HttpError(422, "All required checklist items must be approved before advancing.");

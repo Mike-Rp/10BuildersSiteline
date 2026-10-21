@@ -69,9 +69,10 @@ export async function getProjectData(req,res) {
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
    const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,i.weight,
     coalesce(e.status,'missing') as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
-    e.review_note,e.submitted_by,e.submission_note,e.phase_update_id,f.original_name,f.content_type
+    e.review_note,e.submitted_by,e.submission_note,e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason,f.original_name,f.content_type
     from project_phase_checklist_items i join projects p on p.id=i.project_id and p.current_stage_id=i.project_stage_id
     left join lateral(select * from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
+    left join pending_rework_requests r on r.id=e.rework_request_id
     left join project_phase_files f on f.id=e.file_id
     where i.project_id=any($1::uuid[]) order by i.sort_order,i.id`,[ids])).rows:[];
    const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage

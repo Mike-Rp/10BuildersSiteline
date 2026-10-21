@@ -308,7 +308,8 @@ export type ChecklistItem = {
   label: string
   required?: boolean
   weight?: number
-  status: "missing" | "submitted" | "approved"
+  status: "missing" | "submitted" | "approved" | "rework_required"
+  reworkReason?: string
   version: number
   doc?: Doc
   note?: string

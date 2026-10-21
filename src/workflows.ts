@@ -106,6 +106,9 @@ export type WorkflowCommand = {
   itemId?: string
   evidenceId?: string
   expectedReviewToken?: string
+  requestId?: string
+  affectedActivityIds?: string[]
+  selectedActivityIds?: string[]
   expectedVersion?: number
   company?: Company
 }

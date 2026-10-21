@@ -42,6 +42,7 @@ export const submitPhaseUpdate = async (req, res) => {
         submissions.push(await submitChecklist(client, selected, user, item, id, checklist));
       }
       const isIssue = body.issue_categories.length > 0 || body.issue_reason !== null;
+      if(isIssue&&Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const issue = isIssue ? await insertIssue(client, selected, user.id, body, id) : null;
       return {
         ...update.rows[0], project_id: p.id, selected_stage_id: stage.id, selected_stage: stage.code,

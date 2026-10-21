@@ -51,6 +51,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-verified-activity-values.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/005-targeted-rework.sql"),"utf8"))
   const dummySql = fs.readFileSync(dummy, "utf8")
   await db.exec(dummySql)
   await db.exec(dummySql) // the demo data can be loaded again
@@ -597,6 +598,85 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await db.query("select count(*)::int as n from project_phase_evidence where checklist_item_id=$1",[item.id])).rows[0].n>=2,true)
   })
 
+
+  await t.test("targeted rework withdraws only selected credit, preserves history, and needs fresh evidence approval",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const project=session.state.projects.find(p=>p.name==="Rosaria Business Park"),base="/projects/"+project.id
+    const spmEmail=session.state.accounts.find(a=>a.id===project.team.find(t=>t.phase===project.phase).accountId).email
+    const opmEmail=session.state.accounts.find(a=>a.id===project.opmId).email
+    const before=project.verifiedProgress
+    const items=project.workflow.checklist[project.phase].filter(i=>i.status==="approved")
+    assert.ok(items.length>=2)
+    const target=items[0],unaffected=items[1]
+    const issue=async ids=>api(base+"/rework-requests",{method:"POST",json:{reason:"Inspection requires correction",affected_activity_ids:ids}})
+    const review=async(id,selected)=>api(`/rework-requests/${id}/preview`,{method:"POST",json:selected===undefined?{}:{selected_activity_ids:selected}})
+    await asUser(spmEmail)
+    const dismissed=await issue([target.id]),first=await issue([target.id]),overlap=await issue([target.id])
+    await assert.rejects(api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{resolution_note:"Attempt"}}),error=>error.status===403)
+    const other=(await db.query("select id::text from project_phase_checklist_items where project_id=$1 and id<>$2 and project_stage_id<>(select current_stage_id from projects where id=$1) limit 1",[project.id,target.id])).rows[0]
+    await assert.rejects(issue([other.id]),error=>error.status===422)
+    await assert.rejects(issue([target.id,target.id]),error=>error.status===400)
+    session=await asUser(opmEmail)
+    assert.deepEqual((await loadState(session.user)).projects.find(p=>p.id===project.id).verifiedProgress,before,"flagging never deducts")
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),/pending rework/)
+    await assert.rejects(api(`/rework-requests/${dismissed.id}/reject`,{method:"POST",json:{}}),/reason/)
+    await api(`/rework-requests/${dismissed.id}/reject`,{method:"POST",json:{resolution_note:"No correction needed for this report"}})
+    assert.deepEqual((await loadState(session.user)).projects.find(p=>p.id===project.id).verifiedProgress,before)
+    const impact=await review(first.id),staleOverlap=await review(overlap.id)
+    assert.equal(impact.before.phase.earned-impact.after.phase.earned,target.weight)
+    assert.equal(impact.before.project.earned-impact.after.project.earned,target.weight)
+    await assert.rejects(api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{expected_review_token:impact.review_token,selected_activity_ids:[target.id]}}),/reason/)
+    await db.exec(`create function test_fail_rework_audit() returns trigger language plpgsql as $$
+      begin raise exception 'Deliberate rework audit failure'; end $$;
+      create trigger test_fail_rework_audit before insert on project_progress_history for each row execute function test_fail_rework_audit();`)
+    try {
+      await assert.rejects(api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{resolution_note:"Must roll back",selected_activity_ids:[target.id],expected_review_token:impact.review_token}}),error=>error.status===500)
+      assert.equal((await db.query("select status from pending_rework_requests where id=$1",[first.id])).rows[0].status,"pending")
+      assert.equal((await db.query("select id::text from project_phase_evidence where checklist_item_id=$1 order by id desc limit 1",[target.id])).rows[0].id,target.evidenceId)
+      assert.deepEqual((await loadState(session.user)).projects.find(p=>p.id===project.id).verifiedProgress,before)
+    } finally {await db.exec("drop trigger test_fail_rework_audit on project_progress_history;drop function test_fail_rework_audit();")}
+    await api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{resolution_note:"Replace the failed inspection evidence",selected_activity_ids:[target.id],expected_review_token:impact.review_token}})
+    let after=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(after.verifiedProgress.project.earned,before.project.earned-target.weight)
+    assert.equal(after.verifiedProgress.project.total,before.project.total)
+    assert.equal(after.workflow.checklist[project.phase].find(i=>i.id===unaffected.id).status,"approved")
+    assert.equal(after.workflow.checklist[project.phase].find(i=>i.id===target.id).status,"rework_required")
+    assert.equal((await db.query("select status from project_phase_evidence where id=$1",[target.evidenceId])).rows[0].status,"approved","original review is preserved")
+    await assert.rejects(api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{resolution_note:"Repeat"}}),error=>error.status===409)
+    await assert.rejects(api(`/rework-requests/${overlap.id}/approve`,{method:"POST",json:{resolution_note:"Stale duplicate",selected_activity_ids:[target.id],expected_review_token:staleOverlap.review_token}}),error=>error.status===409)
+    const zero=await review(overlap.id)
+    assert.equal(zero.loss.project,0)
+    assert.equal(zero.loss.phase,0)
+    await api(`/rework-requests/${overlap.id}/approve`,{method:"POST",json:{resolution_note:"Continue the same correction; no additional deduction",selected_activity_ids:[target.id],expected_review_token:zero.review_token}})
+    after=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(after.verifiedProgress.project.earned,before.project.earned-target.weight)
+    await asUser(spmEmail)
+    await assert.rejects(api(base+`/checklist-items/${target.id}/submit`,{method:"POST",json:{}}),/fresh corrected/)
+    const phaseFile=await api(base+"/phase-files",{method:"POST",body:(()=>{const f=new FormData();f.set("file",new File(["%PDF-1.4\nCorrected inspection"],"corrected.pdf",{type:"application/pdf"}));return f})()})
+    const corrected=await api(base+`/checklist-items/${target.id}/submit`,{method:"POST",json:{file_id:phaseFile.id}})
+    session=await asUser(opmEmail)
+    after=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(after.workflow.checklist[project.phase].find(i=>i.id===target.id).status,"submitted")
+    assert.equal(after.verifiedProgress.project.earned,before.project.earned-target.weight,"upload alone restores no credit")
+    const approval=await api(base+`/evidence/${corrected.id}/review-preview`)
+    await api(base+`/evidence/${corrected.id}/approve`,{method:"POST",json:{expected_review_token:approval.review_token}})
+    await assert.rejects(api(base+`/evidence/${corrected.id}/approve`,{method:"POST",json:{}}),error=>error.status===409)
+    assert.equal((await loadState(session.user)).projects.find(p=>p.id===project.id).verifiedProgress.project.earned,before.project.earned)
+    await asUser(spmEmail)
+    const protectedRequest=await issue([target.id])
+    session=await asUser(opmEmail)
+    const saved=(await db.query("select current_stage_id,lifecycle_status from projects where id=$1",[project.id])).rows[0]
+    await db.query("update projects set lifecycle_status='archived' where id=$1",[project.id])
+    await assert.rejects(review(protectedRequest.id),error=>error.status===422)
+    await db.query("update projects set lifecycle_status=$2,current_stage_id=(select project_stage_id from project_phase_team where project_id=$1 and project_stage_id<>$3 limit 1) where id=$1",[project.id,saved.lifecycle_status,saved.current_stage_id])
+    await assert.rejects(review(protectedRequest.id),error=>error.status===409)
+    await db.query("update projects set current_stage_id=$2 where id=$1",[project.id,saved.current_stage_id])
+    await api(`/rework-requests/${protectedRequest.id}/reject`,{method:"POST",json:{resolution_note:"Protection checks complete; leave activity approval intact"}})
+    await asUser("patricia.domingo@10builders.com")
+    await assert.rejects(api(`/rework-requests/${first.id}/approve`,{method:"POST",json:{resolution_note:"Admin withdrawal"}}),error=>error.status===403)
+    await asUser("f.uy@aldenheights-hoa.com")
+    assert.ok((await api("/workspace/project-data")).every(p=>!p.overview&&!("verifiedProgress" in p)))
+  })
 
   await t.test("migrated workflows drive details, filters, validation and unassigned phases",async()=>{
     const migration=fs.readFileSync(here("../Thesis-Backend/migrations/004-project-type-workflows.sql"),"utf8");
