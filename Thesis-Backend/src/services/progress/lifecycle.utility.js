@@ -5,7 +5,7 @@ export async function blockingReviews(db, projectId) {
      UNION ALL SELECT 1 FROM pending_rework_requests WHERE project_id=$1 AND status='pending'
      UNION ALL SELECT 1 FROM pending_subcontractor_requests WHERE project_id=$1 AND status='pending'
      UNION ALL SELECT 1 FROM project_phase_evidence e WHERE e.project_id=$1
-       AND e.status IN ('pending','rework_required') AND NOT EXISTS (
+       AND (e.status IN ('pending','rework_required') OR (e.status='rejected' AND e.rework_request_id IS NOT NULL)) AND NOT EXISTS (
          SELECT 1 FROM project_phase_evidence newer WHERE newer.checklist_item_id=e.checklist_item_id AND newer.id>e.id)
      LIMIT 1`, [projectId]);
   return pending.rowCount > 0;

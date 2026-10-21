@@ -208,7 +208,7 @@ const getSpm = async (project_type, is_random = false) => {
   const matrix_result = await execute(
     `
     SELECT
-      project_stage_id,
+      pstdl.project_stage_id,
       ps.code,
       jsonb_agg(discipline_id ORDER BY discipline_id ASC) AS disciplines
     FROM project_stage_discipline_links pstdl

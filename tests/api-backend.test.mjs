@@ -49,19 +49,14 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
-  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
-  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-verified-activity-values.sql"),"utf8"))
-  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/005-targeted-rework.sql"),"utf8"))
-  const dummySql = fs.readFileSync(dummy, "utf8")
+  for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql"]) {
+    await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/"+migration),"utf8"))
+  }
+  // Re-running the recovery migration is safe on the original strict status CHECK.
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-verified-activity-progress.sql"),"utf8"))
+  const dummySql=fs.readFileSync(dummy,"utf8")
   await db.exec(dummySql)
-  await db.exec(dummySql) // the demo data can be loaded again
-
-  // Before migration the existing projects still use the legacy seven-stage workflow.
-  await db.exec(`create table project_type_stages(
-   project_type_id smallint not null references project_types(id),
-   project_stage_id smallint not null references project_stages(id),sort_order smallint not null,
-   primary key(project_type_id,project_stage_id),unique(project_type_id,sort_order));
-   insert into project_type_stages select t.id,s.id,s.sort_order from project_types t cross join project_stages s;`)
+  await db.exec(dummySql)
 
   const dbPort = await freePort()
   const apiPort = await freePort()
@@ -724,7 +719,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       await asUser(opmEmail)
       return api(base+"/phase-updates/"+note.id+"/approve",{method:"POST",json:{}})
     }
-    await evidence(first,"rework_required")
+    await db.query("update project_phase_checklist_items set required=false where id=$1",[first.id])
+    await evidence(first,"pending",null)
+    await db.query("update project_phase_checklist_items set required=true where id=$1",[first.id])
     await assert.rejects(api("/archive/projects/"+id+"/close",{method:"POST",json:{}}),error=>error.status===422)
     assert.equal((await resolveNote()).project_archived,false,"Closeout cannot compensate for withdrawn earlier credit")
     await evidence(first,"approved")

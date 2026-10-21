@@ -76,7 +76,7 @@ const resolve=confirm=>async(req,res)=>{
           // Append a zero-credit state. The original evidence/reviewer remain unchanged.
           const marker=await db.query(`INSERT INTO project_phase_evidence(project_id,project_stage_id,checklist_item_id,file_id,
             status,submitted_by,reviewed_by,reviewed_at,review_note,rework_request_id)
-            VALUES($1,$2,$3,$4,'rework_required',$5,$6,now(),$7,$8) RETURNING id`,
+            VALUES($1,$2,$3,$4,'rejected',$5,$6,now(),$7,$8) RETURNING id`,
             [project.id,project.current_stage_id,id,item.file_id||null,item.submitted_by||request.submitted_by,user.id,note,request.id]);
           await db.query(`UPDATE project_rework_activities SET withdrawn_evidence_id=$3,correction_evidence_id=$4
             WHERE request_id=$1 AND checklist_item_id=$2`,[request.id,id,item.status==="approved"?item.evidence_id:null,marker.rows[0].id]);

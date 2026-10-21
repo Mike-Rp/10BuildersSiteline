@@ -68,7 +68,7 @@ export async function getProjectData(req,res) {
     from project_notes n left join users u on u.id=n.author_id where n.project_id=any($1::uuid[])
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
    const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,i.weight,
-    coalesce(e.status,'missing') as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
+    case when e.status='rejected' and e.rework_request_id is not null then 'rework_required' else coalesce(e.status,'missing') end as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
     e.review_note,e.submitted_by,e.submission_note,e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason,f.original_name,f.content_type
     from project_phase_checklist_items i join projects p on p.id=i.project_id and p.current_stage_id=i.project_stage_id
     left join lateral(select * from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
