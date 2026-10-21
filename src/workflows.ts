@@ -104,6 +104,8 @@ export type WorkflowCommand = {
   accepted?: boolean
   accountId?: string
   itemId?: string
+  evidenceId?: string
+  expectedReviewToken?: string
   expectedVersion?: number
   company?: Company
 }
@@ -395,6 +397,8 @@ export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
     (CHECKLISTS[templatePhase] || []).map((label, i) => ({
       id: `${phase}-${i}`,
       label,
+      required: true,
+      weight: 10,
       status: "missing",
       version: 0,
     }))

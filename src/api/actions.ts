@@ -88,15 +88,15 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "approve_checklist":
         case "reject_checklist": {
-            const overview = await api<Dto>(base + "/phase-overview");
-            const item = overview.checklist?.items?.find((i: Dto) => String(i.id) === String(command.itemId));
-            if (!item?.evidence_id)
+            const item = project.workflow?.checklist[command.phase || project.phase]?.find(i => i.id === command.itemId);
+            const evidenceId = command.evidenceId || item?.evidenceId;
+            if (!evidenceId)
                 throw new Error("No submitted evidence was found.");
             const rejected = command.type === "reject_checklist";
-            if (item.phase_update_id)
-                await post(base + "/phase-updates/" + item.phase_update_id + (rejected ? "/reject" : "/approve"), { resolution_note: command.note || "Please revise and resubmit the evidence." });
-            else
-                await post(base + "/evidence/" + item.evidence_id + (rejected ? "/reject" : "/approve"), { review_note: command.note || "Please revise and resubmit the evidence." });
+            await post(base + "/evidence/" + evidenceId + (rejected ? "/reject" : "/approve"), {
+                review_note: command.note,
+                ...(command.expectedReviewToken ? {expected_review_token:command.expectedReviewToken} : {}),
+            });
             return;
         }
         case "approve_update":

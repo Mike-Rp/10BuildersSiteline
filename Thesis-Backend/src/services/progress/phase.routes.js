@@ -3,7 +3,7 @@ import { phaseUpload, optionalPhaseUpload } from "./phase-upload.utility.js";
 import {
   getPhaseOverview, authorizePhaseUpload, uploadEvidence, approveEvidence, rejectEvidence,
   uploadPhaseFile, downloadPhaseFile, getProjectIssues, advancePhase, configurePhaseTemplate,
-  getProjectStages, markChecklistSubmitted, reportProjectIssue,
+  getProjectStages, markChecklistSubmitted, reportProjectIssue, getEvidenceReviewPreview,
 } from "./phase.controller.js";
 import {
   submitPhaseUpdate, approvePhaseUpdate, rejectPhaseUpdate, getPhaseUpdates, getPendingPhaseUpdates,
@@ -20,6 +20,7 @@ router.post("/projects/:id/phase-updates/:updateId/reject", rejectPhaseUpdate);
 router.post("/projects/:id/checklist-items/:itemId/submit", markChecklistSubmitted);
 router.post("/projects/:id/checklist-items/:itemId/evidence", authorizePhaseUpload, phaseUpload, uploadEvidence);
 router.post("/projects/:id/evidence/:evidenceId/approve", approveEvidence);
+router.get("/projects/:id/evidence/:evidenceId/review-preview", getEvidenceReviewPreview);
 router.post("/projects/:id/evidence/:evidenceId/reject", rejectEvidence);
 router.post("/projects/:id/phase-files", authorizePhaseUpload, phaseUpload, uploadPhaseFile);
 router.get("/projects/:id/phase-files/:fileId", downloadPhaseFile);

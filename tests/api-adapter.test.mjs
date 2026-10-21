@@ -30,6 +30,18 @@ const base = {
   suggested_opm_id: "opm-1",
   created_at: "2026-10-17T09:31:05.711Z",
 }
+
+test("trusted verified totals remain separate from current-phase and historical percentages", () => {
+  const verifiedProgress = {
+    project: { earned: 80, total: 270, percentage: 80/270*100, reason: null },
+    phases: [{ id: "4", name: "Structure", earned: 20, total: 30, percentage: 20/30*100, reason: null }],
+  }
+  const project = mapProject(parts({verifiedProgress}))
+  assert.deepEqual(project.verifiedProgress,verifiedProgress)
+  assert.equal(project.progress,60)
+  assert.ok(project.history.some(h=>h.progress===62))
+  assert.equal(mapProject(parts()).verifiedProgress,undefined,"legacy progress is never converted into verified credit")
+})
 const parts = (over = {}) => ({
   list: base,
   detail: {

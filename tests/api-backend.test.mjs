@@ -50,6 +50,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-verified-activity-values.sql"),"utf8"))
   const dummySql = fs.readFileSync(dummy, "utf8")
   await db.exec(dummySql)
   await db.exec(dummySql) // the demo data can be loaded again
@@ -470,6 +471,123 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const raw = await api("/workspace/project-data")
     assert.ok(raw.every(p => !("checklistProgress" in p)))
     assert.ok(clientProjectViews(client.state,client.user.id).every(p => !("checklistProgress" in p)))
+  })
+
+  await t.test("trusted weighted phase/project totals remain separate and staff-only",async()=>{
+    const {user,state}=await asUser("patricia.domingo@10builders.com")
+    const project=state.projects.find(p=>p.status==="active" && p.verifiedProgress?.project.total>0)
+    assert.ok(project)
+    const trusted=project.verifiedProgress
+    const expected=(await db.query(`select coalesce(sum(i.weight) filter(where i.required),0) as total,
+      coalesce(sum(i.weight) filter(where i.required and e.status='approved' and e.reviewed_by is not null and e.reviewed_at is not null),0) as earned
+      from project_phase_checklist_items i left join lateral(select status,reviewed_by,reviewed_at from project_phase_evidence
+        where checklist_item_id=i.id order by id desc limit 1)e on true where i.project_id=$1`,[project.id])).rows[0]
+    assert.equal(trusted.project.total,expected.total)
+    assert.equal(trusted.project.earned,expected.earned)
+    assert.equal(trusted.project.percentage,expected.earned/expected.total*100)
+    assert.equal(trusted.phases.length,project.team.length)
+    assert.ok(trusted.phases.every(p=>p.total>0))
+    const loaded=await loadState(user)
+    assert.deepEqual(loaded.projects.find(p=>p.id===project.id).verifiedProgress,trusted)
+    await asUser("f.uy@aldenheights-hoa.com")
+    assert.ok((await api("/workspace/project-data")).every(p=>!("verifiedProgress" in p)))
+    const clientUser=await login("f.uy@aldenheights-hoa.com","Password@123")
+    assert.ok((await loadState(clientUser)).projects.every(p=>!("verifiedProgress" in p)))
+  })
+
+  await t.test("individual bundled activity review previews impact, rejects stale requests, and never approves siblings",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const project=session.state.projects.find(p=>p.name==="Rosaria Business Park")
+    // Explicitly prepare complete scope only in this disposable integration fixture.
+    await db.query(`insert into project_phase_checklists(project_id,project_stage_id)
+      select project_id,project_stage_id from project_phase_team where project_id=$1 on conflict do nothing`,[project.id])
+    await db.query(`insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order,weight)
+      select t.project_id,t.project_stage_id,c.code,c.title,c.required,c.sort_order,c.weight from project_phase_team t
+      join phase_checklist_templates c on c.project_stage_id=t.project_stage_id where t.project_id=$1 on conflict do nothing`,[project.id])
+    const owner=project.team.find(t=>t.phase===project.phase).accountId
+    const spmEmail=session.state.accounts.find(a=>a.id===owner).email
+    const opmEmail=session.state.accounts.find(a=>a.id===project.opmId).email
+    const base="/projects/"+project.id
+    const selected=(await db.query(`select i.id from project_phase_checklist_items i
+      left join lateral(select status from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
+      where i.project_id=$1 and i.project_stage_id=(select current_stage_id from projects where id=$1)
+      and coalesce(e.status,'missing') not in ('approved','pending') order by i.id limit 2`,[project.id])).rows
+    assert.equal(selected.length,2)
+    await asUser(spmEmail)
+    const submitted=await api(base+"/phase-updates",{method:"POST",json:{note:"Independent activity review test",submitted_item_ids:selected.map(i=>String(i.id))}})
+    const [first,second]=submitted.checklist_submissions.map(e=>String(e.id))
+    await assert.rejects(api(base+`/evidence/${first}/review-preview`),error=>error.status===403)
+    await assert.rejects(api(base+`/evidence/${first}/approve`,{method:"POST",json:{}}),error=>error.status===403)
+    session=await asUser(opmEmail)
+    const before=(await loadState(session.user)).projects.find(p=>p.id===project.id).verifiedProgress
+    const preview=await api(base+`/evidence/${first}/review-preview`)
+    const secondOldPreview=await api(base+`/evidence/${second}/review-preview`)
+    assert.equal(preview.after.phase.earned-preview.before.phase.earned,10,JSON.stringify(preview))
+    assert.equal(preview.after.project.earned-preview.before.project.earned,10,JSON.stringify(preview))
+    await sendApiWorkflow(session.state,session.state.accounts.find(a=>a.id===session.user.id),{
+      type:"approve_checklist",projectId:project.id,phase:project.phase,itemId:String(selected[0].id),
+      evidenceId:first,expectedReviewToken:preview.review_token,note:"First activity checked separately"})
+    const statuses=()=>db.query("select id::text,status,review_note from project_phase_evidence where id=any($1::bigint[]) order by id",[[first,second]])
+    assert.deepEqual((await statuses()).rows.map(e=>e.status),["approved","pending"])
+    assert.equal((await api(base+"/phase-updates")).find(u=>String(u.id)===String(submitted.id)).status,"pending")
+    await assert.rejects(api(base+`/evidence/${first}/approve`,{method:"POST",json:{}}),/already reviewed|superseded/)
+    await assert.rejects(api(base+`/evidence/${second}/approve`,{method:"POST",json:{expected_review_token:secondOldPreview.review_token}}),/changed/)
+    assert.equal((await statuses()).rows[1].status,"pending")
+    await assert.rejects(api(base+`/evidence/${second}/reject`,{method:"POST",json:{}}),/required/)
+    const fresh=await api(base+`/evidence/${second}/review-preview`)
+    await api(base+`/evidence/${second}/reject`,{method:"POST",json:{expected_review_token:fresh.review_token,review_note:"Provide a complete test report"}})
+    const afterReview=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(afterReview.verifiedProgress.project.earned,before.project.earned+10)
+    const stageBefore=afterReview.phase,pctBefore=afterReview.progress
+    await api(base+`/phase-updates/${submitted.id}/approve`,{method:"POST",json:{resolution_note:"Report recorded; activities reviewed independently"}})
+    const afterNote=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(afterNote.phase,stageBefore)
+    assert.equal(afterNote.progress,pctBefore)
+    assert.deepEqual(afterNote.verifiedProgress,afterReview.verifiedProgress)
+    assert.deepEqual((await statuses()).rows.map(e=>e.status),["approved","rejected"])
+    assert.match((await statuses()).rows[1].review_note,/complete test report/)
+    const foreignProject=session.state.projects.find(p=>p.id!==project.id && p.status==="active")
+    await assert.rejects(api(`/projects/${foreignProject.id}/evidence/${second}/review-preview`),error=>[403,404].includes(error.status))
+    const unrelated="renz.villaverde@10builders.com"
+    if(unrelated!==opmEmail){await asUser(unrelated);await assert.rejects(api(base+`/evidence/${second}/review-preview`),error=>[403,404].includes(error.status))}
+    await asUser("f.uy@aldenheights-hoa.com")
+    await assert.rejects(api(base+`/evidence/${second}/review-preview`),error=>error.status===403)
+    assert.ok((await api("/workspace/project-data")).every(p=>!p.overview && !("verifiedProgress" in p)))
+  })
+
+  await t.test("activity review rolls back approval and cached progress if audit recording fails",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const project=session.state.projects.find(p=>p.name==="Rosaria Business Park")
+    const spmEmail=session.state.accounts.find(a=>a.id===project.team.find(t=>t.phase===project.phase).accountId).email
+    const opmEmail=session.state.accounts.find(a=>a.id===project.opmId).email
+    const item=(await db.query(`select i.id from project_phase_checklist_items i
+      join lateral(select status from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
+      where i.project_id=$1 and e.status='rejected' order by i.id limit 1`,[project.id])).rows[0]
+    assert.ok(item)
+    const base="/projects/"+project.id
+    await asUser(spmEmail)
+    await assert.rejects(api(base+`/checklist-items/${item.id}/submit`,{method:"POST",json:{pct:100}}),error=>error.status===422)
+    const submitted=await api(base+`/checklist-items/${item.id}/submit`,{method:"POST",json:{submission_note:"Corrected activity evidence"}})
+    await assert.rejects(api(base+`/evidence/${submitted.id}/approve`,{method:"POST",json:{}}),error=>error.status===403)
+    session=await asUser(opmEmail)
+    const before=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    const preview=await api(base+`/evidence/${submitted.id}/review-preview`)
+    await db.exec(`create function test_fail_review_history() returns trigger language plpgsql as $$
+      begin raise exception 'Deliberate test-only audit failure'; end $$;
+      create trigger test_fail_review_history before insert on project_progress_history
+      for each row execute function test_fail_review_history();`)
+    try {
+      await assert.rejects(api(base+`/evidence/${submitted.id}/approve`,{method:"POST",json:{expected_review_token:preview.review_token}}),error=>error.status===500)
+      assert.equal((await db.query("select status from project_phase_evidence where id=$1",[submitted.id])).rows[0].status,"pending")
+      const after=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+      assert.equal(after.progress,before.progress)
+      assert.deepEqual(after.verifiedProgress,before.verifiedProgress)
+    } finally {await db.exec("drop trigger test_fail_review_history on project_progress_history; drop function test_fail_review_history();")}
+    await api(base+`/evidence/${submitted.id}/approve`,{method:"POST",json:{expected_review_token:preview.review_token}})
+    const after=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(after.phase,before.phase,"finishing checklist review does not move to a different phase")
+    assert.equal(after.verifiedProgress.project.earned,before.verifiedProgress.project.earned+10)
+    assert.equal((await db.query("select count(*)::int as n from project_phase_evidence where checklist_item_id=$1",[item.id])).rows[0].n>=2,true)
   })
 
   await t.test("the API refuses requests without a session", async () => {

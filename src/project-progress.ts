@@ -1,4 +1,6 @@
 import type { PhaseProgress } from "./model.ts"
+export { activityEarned, phaseProgress, projectProgress, reworkImpact } from "../Thesis-Backend/src/domain/verified-progress.js"
+export type { ProgressTotals, VerifiedActivity, VerifiedPhase, VerifiedProgress } from "../Thesis-Backend/src/domain/verified-progress.js"
 
 const DAY = 86_400_000
 // Parse calendar dates without local-time/DST offsets; reject rollover dates.

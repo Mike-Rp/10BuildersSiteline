@@ -1,4 +1,5 @@
 import ProjectProgress from "./ProjectProgress"
+import EvidenceReview from "./EvidenceReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
@@ -234,6 +235,7 @@ export default function RoleWorkspace({
   const [note, setNote] = useState("")
   const [issueChoices, setIssueChoices] = useState<string[]>([])
   const [evidence, setEvidence] = useState<Doc>()
+  const [evidenceReview,setEvidenceReview]=useState<WorkflowCommand>()
   const [diary, setDiary] = useState("")
   const [declineReason, setDeclineReason] = useState("")
   const [assignmentSort, setAssignmentSort] = useState("recommended")
@@ -2133,35 +2135,27 @@ export default function RoleWorkspace({
                             <Button
                               variant="primary"
                               icon="check"
-                              onClick={async () =>
-                                await act(
-                                  {
+                              onClick={() => setEvidenceReview({
                                     type: "approve_checklist",
                                     projectId: p.id,
                                     phase: p.phase,
                                     itemId: item.id,
+                                    evidenceId:item.evidenceId,
                                     expectedVersion: item.version,
-                                  },
-                                  "QA/QC evidence approved; project progress recalculated.",
-                                )
-                              }
+                                  })}
                             >
                               Approve evidence
                             </Button>
                             <Button
                               variant="danger-ghost"
-                              onClick={async () =>
-                                await act(
-                                  {
+                              onClick={() => setEvidenceReview({
                                     type: "reject_checklist",
                                     projectId: p.id,
                                     phase: p.phase,
                                     itemId: item.id,
+                                    evidenceId:item.evidenceId,
                                     expectedVersion: item.version,
-                                  },
-                                  "Evidence rejected. Site PM can resubmit corrections.",
-                                )
-                              }
+                                  })}
                             >
                               Reject evidence
                             </Button>
@@ -2193,18 +2187,6 @@ export default function RoleWorkspace({
                 tab === "rework"
                   ? workflowFor(p).pendingRework!
                   : workflowFor(p).pendingUpdate!
-              const remaining = Math.max(
-                0,
-                Math.ceil(
-                  (Date.parse(submission.submittedAt) +
-                    REVIEW_MS -
-                    Date.now()) /
-                    86400000,
-                ),
-              )
-              const material =
-                submission.priorPhase !== submission.requestedPhase ||
-                submission.priorProgress !== submission.requestedProgress
               return (
                 <Panel
                   key={p.id}
@@ -2250,11 +2232,7 @@ export default function RoleWorkspace({
                       <p>
                         {tab === "rework"
                           ? `Rework always requires a manual decision. Approval rolls progress back to at most the ${p.phase} stage floor of ${projectStageFloor(p)}%; declining leaves progress unchanged.`
-                          : material
-                            ? "This submission changes stage or percentage. It must be manually reviewed and is escalated after three days; no silent numeric change is applied."
-                            : `Informational update only; stage and percentage are unchanged. Auto-approval in ${remaining} day${
-                                remaining === 1 ? "" : "s"
-                              } if left unreviewed. Checklist evidence and rework are never auto-approved.`}
+                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving this report grants no activity credit and does not change the project phase."}
                       </p>
                     </div>
                     <div className="role-actions">
@@ -2300,7 +2278,7 @@ export default function RoleWorkspace({
                             )
                           }
                         >
-                          Approve progress update
+                          Approve progress note
                         </Button>
                       )}
                     </div>
@@ -3934,6 +3912,13 @@ export default function RoleWorkspace({
             </Button>
           </div>
         </Modal>
+      )}
+      {evidenceReview && (
+        <EvidenceReview key={`${evidenceReview.projectId}-${evidenceReview.evidenceId}-${evidenceReview.type}`}
+          projectId={evidenceReview.projectId!} evidenceId={evidenceReview.evidenceId || ""}
+          reject={evidenceReview.type==="reject_checklist"} onClose={()=>setEvidenceReview(undefined)}
+          onConfirm={(expectedReviewToken,note)=>act({...evidenceReview,expectedReviewToken,note},
+            evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
       )}
       {reviewAction && (
         <Modal

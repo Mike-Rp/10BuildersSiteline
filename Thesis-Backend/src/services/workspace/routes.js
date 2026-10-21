@@ -1,4 +1,5 @@
 import { getProjectData } from "./project-data.controller.js";
+import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { fileType } from "../progress/phase-upload.utility.js";
 import { Router } from "express";
 import multer from "multer";
@@ -382,6 +383,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 await db.query("update subcontractor_workers set availability_status='assigned',current_project_id=$2 where id=any($1::uuid[])", [workers.rows.map(w => w.id), p.id]);
                 await db.query("insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count) values($1,$2,$3,$4)", [p.id, selected.subcontractor_id, selected.trade_id, workers.rowCount]);
             }
+            await snapshotProjectChecklists(db,p.id);
             await db.query("update projects set lifecycle_status='active',current_stage_id=(select id from project_stages order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1", [p.id, assigned]);
             meta.activation = { byId: user.id, by: user.full_name, at: new Date().toISOString() };
             break;

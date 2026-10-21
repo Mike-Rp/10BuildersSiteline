@@ -2,6 +2,7 @@
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
 import { LIST_SELECT, LIST_FROM, stripInternal } from "../projects/read.controller.js";
+import { readVerifiedProgress } from "../progress/verified.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
 const scope = `p.id in (
@@ -39,8 +40,8 @@ export async function getProjectData(req,res) {
      and p.current_stage_id is not null and exists(
       select 1 from phase_checklist_templates t where t.project_stage_id=p.current_stage_id and t.required)
     on conflict do nothing returning project_id,project_stage_id)
-    insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order)
-    select c.project_id,c.project_stage_id,t.code,t.title,t.required,t.sort_order from created c
+    insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order,weight)
+    select c.project_id,c.project_stage_id,t.code,t.title,t.required,t.sort_order,t.weight from created c
     join phase_checklist_templates t on t.project_stage_id=c.project_stage_id`,[ids]);
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,s.sort_order,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,t.response_deadline_at,t.responded_at
@@ -66,7 +67,7 @@ export async function getProjectData(req,res) {
      row_number() over(partition by n.project_id order by n.noted_at desc) as position
     from project_notes n left join users u on u.id=n.author_id where n.project_id=any($1::uuid[])
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
-   const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,
+   const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,i.weight,
     coalesce(e.status,'missing') as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
     e.review_note,e.submitted_by,e.submission_note,e.phase_update_id,f.original_name,f.content_type
     from project_phase_checklist_items i join projects p on p.id=i.project_id and p.current_stage_id=i.project_stage_id
@@ -103,13 +104,14 @@ export async function getProjectData(req,res) {
        where checklist_item_id=i.id and project_id=i.project_id and project_stage_id=i.project_stage_id
        order by id desc limit 1)e on true
      group by ph.project_id,s.id,s.code,s.sort_order,c.project_id order by s.sort_order,s.id`,[ids])).rows:[];
+   const verified = staff ? await readVerifiedProgress(db,ids) : new Map();
    const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
    return projects.map(p=>{
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
-     assignments:assigned,contracts:contractRows,pending:null,...(staff?{checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
+     assignments:assigned,contracts:contractRows,pending:null,...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
    });
   });
   res.set("Cache-Control","private, no-store");

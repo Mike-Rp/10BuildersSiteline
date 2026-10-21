@@ -1,6 +1,7 @@
 import {
   HttpError, hasProjectAccess, isUuid, isSmallintId,
 } from "../../common/utilities/access.utility.js";
+import { phaseProgress } from "../../domain/verified-progress.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -50,8 +51,8 @@ export async function ensureChecklist(client, projectId, stageId) {
   if (initialized.rowCount) {
     await client.query(
       `INSERT INTO project_phase_checklist_items
-         (project_id, project_stage_id, code, title, required, sort_order)
-       SELECT $1, project_stage_id, code, title, required, sort_order
+         (project_id, project_stage_id, code, title, required, sort_order, weight)
+       SELECT $1, project_stage_id, code, title, required, sort_order, weight
          FROM phase_checklist_templates WHERE project_stage_id = $2`, [projectId, stageId]);
   }
 }
@@ -59,9 +60,9 @@ export async function ensureChecklist(client, projectId, stageId) {
 export async function readChecklist(client, projectId, stageId) {
   await ensureChecklist(client, projectId, stageId);
   const result = await client.query(
-    `SELECT i.id, i.code, i.title, i.required, i.sort_order,
+    `SELECT i.id, i.code, i.title, i.required, i.sort_order, i.weight,
             COALESCE(e.status, 'missing') AS status,
-            e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note,
+            e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note, e.reviewed_by,
             e.submitted_by, e.submission_note, e.phase_update_id, f.original_name, f.content_type
        FROM project_phase_checklist_items i
        LEFT JOIN LATERAL (
@@ -72,6 +73,9 @@ export async function readChecklist(client, projectId, stageId) {
   const required = result.rows.filter(i => i.required);
   const approved = required.filter(i => i.status === "approved").length;
   return { configured: required.length > 0, approved_count: approved, required_count: required.length,
+    verified: phaseProgress({ id: String(stageId), configured: required.length > 0,
+      activities: result.rows.map(item => ({ id: String(item.id), required: item.required, weight: item.weight,
+        status: item.status, approvalValid: !!item.reviewed_by && !!item.reviewed_at })) }),
     pct: checklistPct(approved, required.length), items: result.rows };
 }
 

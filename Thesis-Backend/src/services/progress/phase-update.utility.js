@@ -23,13 +23,23 @@ const arrayField = (value, field) => {
   if (!Array.isArray(value)) throw new HttpError(400, `${field} must be an array.`);
   return value;
 };
+export function rejectProgressInput(body) {
+  if (!body || typeof body !== "object") return;
+  const unsupported = ["pct", "progress", "percentage", "current_pct", "requested_pct", "requestedProgress",
+    "phase_pct", "progress_pct", "requested_progress", "weight", "earned", "earned_total", "earned_value",
+    "total", "total_required", "deduction", "rework_deduction", "verifiedProgress"];
+  if (unsupported.some(field => Object.hasOwn(body,field))) {
+    throw new HttpError(422, "Progress and activity values are calculated from trusted checklist records; omit progress values.");
+  }
+}
 export function updateBody(body = {}) {
+  rejectProgressInput(body);
   if (body && body.payload !== undefined) {
     try { body = JSON.parse(body.payload); }
     catch { throw new HttpError(400, "payload must be a JSON object."); }
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new HttpError(400, "An update object is required.");
-  if (body.pct !== undefined) throw new HttpError(422, "Progress is calculated from approved required checklist items; omit pct.");
+  rejectProgressInput(body);
   const categories = arrayField(body.issue_categories, "issue_categories");
   if (categories.length > ISSUE_CATEGORIES.length || categories.some(code => !ISSUE_CATEGORIES.some(i => i.code === code))) {
     throw new HttpError(400, "Unknown issue category.");
@@ -42,6 +52,7 @@ export function updateBody(body = {}) {
   const submissions = body.checklist_submissions !== undefined
     ? arrayField(body.checklist_submissions, "checklist_submissions")
     : arrayField(body.submitted_item_ids, "submitted_item_ids").map(item_id => ({ item_id }));
+  submissions.forEach(rejectProgressInput);
   if (submissions.length > 100 || submissions.some(i => !i || !isBigintId(i.item_id) || BigInt(i.item_id) <= 0n ||
       (i.file_id != null && !isUuid(i.file_id))) ||
       new Set(submissions.map(i => String(i.item_id))).size !== submissions.length) {

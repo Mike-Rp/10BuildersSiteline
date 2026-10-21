@@ -93,7 +93,7 @@ function setup(options = {}) {
           evidence_id: state.evidence.id, file_id: state.evidence.file_id, submitted_by: state.evidence.submitted_by, phase_update_id: state.evidence.phase_update_id }));
         return result(rows);
       }
-      if (sql.startsWith("SELECT * FROM project_phase_evidence")) return result([state.evidence]);
+      if (sql.startsWith("SELECT * FROM project_phase_evidence") || sql.startsWith("SELECT e.*")) return result([state.evidence]);
       if (sql.startsWith("SELECT id FROM project_phase_evidence")) return result([{ id: state.evidence.id }]);
       if (sql.startsWith("UPDATE project_phase_evidence")) {
         if (sql.includes("SET phase_update_id")) state.evidence.phase_update_id = params[1];
@@ -218,7 +218,9 @@ test("rejected evidence requires a reason and contributes no progress", async ()
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.current_pct, 0);
   assert.equal(state.evidence.status, "rejected");
-  assert.equal(state.history.length, 0);
+  assert.equal(state.history.length, 1);
+  assert.equal(state.history[0][3], "Missing test results.");
+  assert.equal(state.history[0][4], true, "rejection audit must not become a client-visible progress approval");
 });
 
 test("reviewing a previous stage does not overwrite the current stage percentage", async () => {
@@ -466,7 +468,7 @@ test("one update saves notes, a site report, issue chips, and file-free checklis
   assert.equal(res.body.data.file_ids.length, 1);
 });
 
-test("OPM confirmation approves the marked items and creates one combined history entry", async () => {
+test("OPM confirmation records the report without approving its activities", async () => {
   const state = setup();
   state.evidence.status = "missing";
   await controller.submitPhaseUpdate(request(spm, { note: "Rain and unsafe conditions.",
@@ -475,21 +477,21 @@ test("OPM confirmation approves the marked items and creates one combined histor
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.update.status, "approved");
-  assert.equal(state.evidence.status, "approved");
-  assert.equal(state.p.current_pct, 20);
+  assert.equal(state.evidence.status, "pending");
+  assert.equal(state.p.current_pct, 0);
   assert.equal(state.history.length, 1);
   assert.equal(state.history[0][4], true);
   assert.deepEqual(state.history[0][7], ["weather_delay", "safety_incident"]);
 });
 
-test("selected stage changes only when OPM confirms the update", async () => {
+test("confirming a report from another stage cannot change workflow position", async () => {
   const state = setup();
   await controller.submitPhaseUpdate(request(spm, { stage: "Finishes" }), response());
   assert.equal(state.p.current_stage_id, 4);
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
-  assert.equal(state.p.current_stage_id, 6);
+  assert.equal(state.p.current_stage_id, 4);
 });
 
 test("SPMs cannot confirm their own updates", async () => {
@@ -511,7 +513,7 @@ test("a second OPM confirmation cannot duplicate history", async () => {
   assert.equal(state.history.length, 1);
 });
 
-test("OPM rejection keeps stage and progress unchanged and rejects submitted items", async () => {
+test("OPM report rejection keeps activity review decisions independent", async () => {
   const state = setup();
   state.evidence.status = "missing";
   await controller.submitPhaseUpdate(request(spm, { submitted_item_ids: ["1"] }), response());
@@ -519,7 +521,7 @@ test("OPM rejection keeps stage and progress unchanged and rejects submitted ite
   await updateController.rejectPhaseUpdate(request(opm, { resolution_note: "Inspection is incomplete." }, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.update.status, "rejected");
-  assert.equal(state.evidence.status, "rejected");
+  assert.equal(state.evidence.status, "pending");
   assert.equal(state.p.current_stage_id, 4);
   assert.equal(state.p.current_pct, 0);
   assert.equal(state.history.length, 0);
@@ -573,13 +575,22 @@ test("a separately marked item can join the final update without another evidenc
   assert.equal(state.queries.some(q => q.sql.startsWith("INSERT INTO project_phase_evidence")), false);
 });
 
-test("individual evidence approval cannot bypass combined update confirmation", async () => {
+test("individual evidence can be reviewed without approving its parent report", async () => {
   const state = setup();
   await controller.submitPhaseUpdate(request(spm, { submitted_item_ids: ["1"] }), response());
   const res = response();
   await controller.approveEvidence(request(opm), res);
-  assert.equal(res.statusCode, 409);
-  assert.equal(state.evidence.status, "pending");
+  assert.equal(res.statusCode, 200);
+  assert.equal(state.evidence.status, "approved");
+  assert.equal(state.update.status, "pending");
+});
+
+test("manual totals, weights, and deductions are rejected at the submission boundary",()=>{
+  for(const field of ["pct","progress","percentage","current_pct","requested_pct","requestedProgress","weight","earned","total","deduction"]) {
+    assert.throws(()=>updateUtility.updateBody({[field]:10}),/calculated/);
+    assert.throws(()=>updateUtility.updateBody({payload:JSON.stringify({[field]:10})}),/calculated/);
+    assert.throws(()=>updateUtility.updateBody({checklist_submissions:[{item_id:"1",[field]:10}]}),/calculated/);
+  }
 });
 
 test("multipart payload accepts issue chips and submitted item arrays", () => {

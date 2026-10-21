@@ -233,6 +233,7 @@ export type ClientSubconReview = {
 }
 export type Project = {
   checklistProgress?: PhaseProgress[]
+  verifiedProgress?: import("./project-progress").VerifiedProgress
   id: string
   name: string
   type: string
@@ -303,7 +304,10 @@ export type Company = {
 }
 export type ChecklistItem = {
   id: string
+  evidenceId?: string
   label: string
+  required?: boolean
+  weight?: number
   status: "missing" | "submitted" | "approved"
   version: number
   doc?: Doc
