@@ -61,7 +61,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         case "reassign_phase": {
             const assignments = await api<Dto[]>("/confirmations/projects/" + id + "/phase-team");
             const assignment = assignments.find(t => t.stage_code === command.phase);
-            if (assignment && ["declined", "auto_expired"].includes(assignment.status)) {
+            if (assignment && (!assignment.spm_user_id || ["declined", "auto_expired"].includes(assignment.status))) {
                 await post("/archive/phase-assignments/" + assignment.assignment_id + "/reassign", { new_user_id: command.accountId, note: command.note || "Phase assignment replaced." });
                 return;
             }

@@ -63,7 +63,7 @@ function setup(options = {}) {
         return result(params[1] === state.phaseOwner ? [{}] : []);
       }
       
-      if (sql.startsWith("SELECT id, code, sort_order FROM project_stages")) {
+      if (sql.startsWith("SELECT s.id,s.code,w.sort_order FROM project_type_stages")) {
         const all = updateUtility.STAGES.map((code, i) => ({ id: i + 1, code, sort_order: i + 1 }));
         return result(all.filter(stage => (params[1] == null || stage.id === Number(params[1])) &&
           (params[2] == null || stage.code.toLowerCase() === params[2].toLowerCase())));
@@ -109,7 +109,7 @@ function setup(options = {}) {
         state.p.current_stage_id = params[1]; state.p.current_pct = params[2]; return result([state.p]);
       }
       if (sql.startsWith("SELECT id FROM project_phase_files")) return result(state.fileRows.filter(file => params[0].includes(file.id)));
-      if (sql.startsWith("SELECT t.project_stage_id")) return result(state.next ? [state.next] : []);
+      if (sql.startsWith("SELECT s.id AS project_stage_id")) return result(state.next ? [state.next] : []);
       if (sql.startsWith("INSERT INTO project_phase_files")) { state.fileRows.push({ id: params[0] }); return result([{ id: params[0] }]); }
       if (sql.startsWith("INSERT INTO project_phase_evidence")) {
         state.evidence = { ...state.evidence, status: "pending", id: "8", file_id: params[3], phase_update_id: params[6] };

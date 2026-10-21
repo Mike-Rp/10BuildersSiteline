@@ -42,10 +42,10 @@ export async function getProjectData(req,res) {
     insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order)
     select c.project_id,c.project_stage_id,t.code,t.title,t.required,t.sort_order from created c
     join phase_checklist_templates t on t.project_stage_id=c.project_stage_id`,[ids]);
-   const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,s.sort_order,
+   const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,t.response_deadline_at,t.responded_at
-     from project_phase_team t join project_stages s on s.id=t.project_stage_id
-     left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by s.sort_order`,[ids])).rows;
+     from project_phase_team t join projects p on p.id=t.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id
+     left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by w.sort_order`,[ids])).rows;
    const documents=(await db.query(`select p.id as project_id,d.id,t.code,t.label,
     t.is_client_visible_default as client_visible,d.status='uploaded' as uploaded,d.uploaded_at,
     f.original_name,f.content_type,f.byte_size,d.file_ref
@@ -92,17 +92,17 @@ export async function getProjectData(req,res) {
      select project_id,project_stage_id from project_phase_team where project_id=any($1::uuid[])
      union select project_id,project_stage_id from project_phase_checklists where project_id=any($1::uuid[])
      union select id,current_stage_id from projects where id=any($1::uuid[]) and current_stage_id is not null
-   ) select ph.project_id,s.id::text as id,s.code as name,s.sort_order,
+   ) select ph.project_id,s.id::text as id,s.code as name,w.sort_order,
      (c.project_id is not null and count(i.id) filter(where i.required)>0) as configured,
      count(i.id) filter(where i.required)::int as required,
      count(i.id) filter(where i.required and e.status='approved')::int as approved
-     from phases ph join project_stages s on s.id=ph.project_stage_id
+     from phases ph join projects p on p.id=ph.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=ph.project_stage_id join project_stages s on s.id=ph.project_stage_id
      left join project_phase_checklists c on c.project_id=ph.project_id and c.project_stage_id=ph.project_stage_id
      left join project_phase_checklist_items i on i.project_id=ph.project_id and i.project_stage_id=ph.project_stage_id
      left join lateral(select status from project_phase_evidence
        where checklist_item_id=i.id and project_id=i.project_id and project_stage_id=i.project_stage_id
        order by id desc limit 1)e on true
-     group by ph.project_id,s.id,s.code,s.sort_order,c.project_id order by s.sort_order,s.id`,[ids])).rows:[];
+     group by ph.project_id,s.id,s.code,w.sort_order,c.project_id order by w.sort_order,s.id`,[ids])).rows:[];
    const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
    return projects.map(p=>{
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);

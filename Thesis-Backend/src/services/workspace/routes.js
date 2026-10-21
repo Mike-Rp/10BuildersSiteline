@@ -96,11 +96,11 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     const companyMeta = user.role === "client" ? [] : (await db.query("select subcontractor_id as id,metadata from workspace_company_metadata")).rows;
     const selections = user.role === "client" ? [] : (await db.query("select * from project_subcontractor_selections where project_id=any($1::uuid[])", [allowed])).rows;
     const map = rows => Object.fromEntries(rows.map(r => [r.id, r.metadata]));
-    const references = (await db.query(`select pt.code as type,s.code as name,s.sort_order,
+    const references = (await db.query(`select pt.code as type,s.code as name,w.sort_order,
  coalesce(array_agg(distinct d.code) filter(where d.code is not null),'{}') as disciplines
- from project_types pt cross join project_stages s
+ from project_types pt join project_type_stages w on w.project_type_id=pt.id join project_stages s on s.id=w.project_stage_id
  left join project_stage_discipline_links l on l.project_type_id=pt.id and l.project_stage_id=s.id
- left join disciplines d on d.id=l.discipline_id group by pt.code,s.code,s.sort_order order by s.sort_order`)).rows;
+ left join disciplines d on d.id=l.discipline_id group by pt.code,s.code,w.sort_order order by w.sort_order`)).rows;
     const backendPhases = {};
     for (const row of references)
         (backendPhases[row.type] ??= []).push({ name: row.name, disciplines: row.disciplines });
@@ -382,7 +382,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 await db.query("update subcontractor_workers set availability_status='assigned',current_project_id=$2 where id=any($1::uuid[])", [workers.rows.map(w => w.id), p.id]);
                 await db.query("insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count) values($1,$2,$3,$4)", [p.id, selected.subcontractor_id, selected.trade_id, workers.rowCount]);
             }
-            await db.query("update projects set lifecycle_status='active',current_stage_id=(select id from project_stages order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1", [p.id, assigned]);
+            await db.query("update projects set lifecycle_status='active',current_stage_id=(select project_stage_id from project_type_stages where project_type_id=projects.project_type_id order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1", [p.id, assigned]);
             meta.activation = { byId: user.id, by: user.full_name, at: new Date().toISOString() };
             break;
         }

@@ -96,6 +96,33 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       ["", "Residential", "Commercial", "Mixed-Use"],
     )
 
+    // Type-specific phase menus include the complete workflow, even without matching sites.
+    const phaseOptions = () => [...document.querySelectorAll(".as-toolbar select")[1].options].map(o => o.value)
+    const commonStart = ["", "Mobilization", "Design", "Foundation"]
+    await select(0, "Residential")
+    assert.deepEqual(phaseOptions(), [...commonStart, "Structure", "Envelope", "MEP Rough-In", "Finishes", "Landscape & Site Works", "Closeout"])
+    await select(1, "Envelope")
+    assert.equal(cards().length, 0)
+    await select(0, "Commercial")
+    assert.deepEqual(phaseOptions(), [...commonStart, "Structure", "Envelope / Curtain Wall", "MEP Rough-In", "Fire & Life Safety", "Fit-Out / Finishes", "Closeout"])
+    assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "")
+    assert.equal(cards().length, 7) // Incompatible residential phase was cleared.
+    await select(1, "Structure")
+    await select(0, "Residential")
+    assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "Structure")
+    await select(0, "Mixed-Use")
+    assert.deepEqual(phaseOptions(), [...commonStart, "Podium Structure", "Tower Structure", "Envelope / Curtain Wall", "MEP Rough-In", "Fire & Life Safety", "Retail/Commercial Fit-Out", "Residential Fit-Out", "Landscape & Site Works", "Closeout"])
+    assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "")
+    await select(1, "Podium Structure")
+    await select(0, "")
+    assert.deepEqual(phaseOptions(), [...commonStart, "Podium Structure", "Tower Structure", "Envelope / Curtain Wall", "MEP Rough-In", "Fire & Life Safety", "Retail/Commercial Fit-Out", "Residential Fit-Out", "Landscape & Site Works", "Closeout"])
+    assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "Podium Structure")
+    await select(0, "Residential")
+    await select(1, "Finishes")
+    await select(0, "")
+    assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "")
+    assert.equal(cards().length, 10)
+
     await act(() => button("Next").click())
 
     assert.match(cards()[0].textContent, /Building 11/)
@@ -276,6 +303,25 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     assert.equal(count("Awaiting review"), "0")
     assert.match(document.body.textContent, /No projects awaiting review/)
     assert.equal(cards().length, 0)
+
+    await act(() => root.render(React.createElement(ActiveSites, {
+      key: "legacy-mep", projects: [{ ...projects[0], type: "Commercial", phase: "MEP Rough-in" }], onOpen: () => {},
+    })))
+    await select(0, "Commercial")
+    await select(1, "MEP Rough-In")
+    assert.equal(cards().length, 1)
+    assert.match(cards()[0].textContent, /MEP Rough-in/)
+
+    // Database phase definitions drive the dropdown when supplied by the workspace.
+    await act(() => root.render(React.createElement(ActiveSites, {
+      key: "database-phases", projects: [{ ...projects[0], phase: "Database phase" }], onOpen: () => {},
+      phaseDefinitionsByType: { Residential: [{ name: "Database phase", disciplines: ["Civil"] }], "Mixed-Use": [{ name: "Shared database phase", disciplines: ["Civil"] }] },
+    })))
+    assert.deepEqual(phaseOptions(), ["", "Shared database phase"])
+    await select(0, "Residential")
+    assert.deepEqual(phaseOptions(), ["", "Database phase"])
+    await select(1, "Database phase")
+    assert.equal(cards().length, 1)
 
     // Revoked records disappear from Recently Viewed; no review UI without explicit authorization.
     await act(() => root.render(React.createElement(ActiveSites, {

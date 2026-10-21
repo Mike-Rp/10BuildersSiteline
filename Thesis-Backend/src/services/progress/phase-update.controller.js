@@ -17,7 +17,7 @@ export const submitPhaseUpdate = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
-      const stage = await resolveStage(client, body, p.current_stage_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const existing = await client.query(
         "SELECT id FROM project_phase_updates WHERE project_id = $1 AND status = 'pending'", [p.id]);
@@ -86,7 +86,7 @@ const resolvePhaseUpdate = decision => async (req, res) => {
       if (Number(p.current_stage_id) !== Number(update.prior_stage_id)) {
         throw new HttpError(409, "The project's stage changed after submission. Reject this update and submit a new one.");
       }
-      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id);
+      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const rejected = await client.query(
         "SELECT 1 FROM project_phase_evidence WHERE phase_update_id = $1 AND status = 'rejected' LIMIT 1", [update.id]);

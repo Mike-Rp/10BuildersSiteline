@@ -31,8 +31,8 @@ export const getPhaseOverview = async (req, res) => {
     if (!user) return;
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id);
-      const stages = await stageOptions(client);
-      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id);
+      const stages = await stageOptions(client, p.project_type_id);
+      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id, p.project_type_id);
       const checklist = await readChecklist(client, p.id, selected.id);
       const canSubmit = p.lifecycle_status === "active" && await isProjectSpm(client, user, p);
       const owner = await client.query(
@@ -86,7 +86,7 @@ async function itemProject(client, user, projectId, itemId, body = {}) {
   const item = await client.query(
     "SELECT project_stage_id FROM project_phase_checklist_items WHERE id = $1 AND project_id = $2", [itemId, p.id]);
   if (!item.rowCount) throw new HttpError(404, "Checklist item not found.");
-  const stage = await resolveStage(client, body, item.rows[0].project_stage_id);
+  const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id);
   if (Number(stage.id) !== Number(item.rows[0].project_stage_id)) throw new HttpError(422, "The checklist item belongs to another stage.");
   return { ...p, current_stage_id: stage.id, current_stage: stage.code };
 }
@@ -127,8 +127,8 @@ export const getProjectStages = async (req, res) => {
     const user = await requireUser(req, res, ["admin", "opm", "spm"]);
     if (!user) return;
     const stages = await withTransaction(async client => {
-      await phaseProject(client, user, req.params.id);
-      return stageOptions(client);
+      const p = await phaseProject(client, user, req.params.id);
+      return stageOptions(client, p.project_type_id);
     });
     return sendOk(res, "Selectable stages retrieved.", stages.length, stages);
   } catch (error) { return handleError(res, error); }
@@ -143,7 +143,7 @@ export const reportProjectIssue = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
-      const stage = await resolveStage(client, body, p.current_stage_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const checklist = await readChecklist(client, p.id, stage.id);
       const history = await recordPhaseHistory(client, selected, checklist.pct, body.issue_reason ?? body.note, user.id,
@@ -201,7 +201,7 @@ export const uploadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, req.user, req.params.id, { active: true });
       await assertProjectSpm(client, req.user, p);
-      const stage = await resolveStage(client, req.body, p.current_stage_id);
+      const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id);
       return insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id);
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);
@@ -256,11 +256,13 @@ export const advancePhase = async (req, res) => {
         throw new HttpError(422, "All required checklist items must be approved before advancing.");
       }
       const next = await client.query(
-        `SELECT t.project_stage_id, t.status, s.code
-           FROM project_phase_team t JOIN project_stages s ON s.id = t.project_stage_id
-          WHERE t.project_id = $1 AND s.sort_order >
-            (SELECT sort_order FROM project_stages WHERE id = $2)
-          ORDER BY s.sort_order LIMIT 1`, [p.id, p.current_stage_id]);
+        `SELECT s.id AS project_stage_id, t.status, s.code
+           FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
+           JOIN project_stages s ON s.id=w.project_stage_id
+           LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=s.id
+          WHERE p.id=$1 AND w.sort_order >
+            (SELECT sort_order FROM project_type_stages WHERE project_type_id=p.project_type_id AND project_stage_id=$2)
+          ORDER BY w.sort_order LIMIT 1`, [p.id, p.current_stage_id]);
       if (!next.rowCount) throw new HttpError(409, "This is the project's final assigned phase.");
       const phase = next.rows[0];
       if (phase.status !== "confirmed") throw new HttpError(422, "The next phase SPM must confirm their assignment.");

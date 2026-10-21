@@ -1,3 +1,4 @@
+import { validatePhaseTeam } from "./type-phases.utility.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from '../../common/utilities/transaction.utility.js';
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
@@ -48,6 +49,7 @@ export const createIntake = async (req, res) => {
       if(typeof company!=="string" || !company.trim() || company.length>150) throw Object.assign(new Error("Invalid client_name."),{status:400});
       const projectType=await client.query("SELECT id FROM project_types WHERE code=$1",[project_type]);
       if(!projectType.rowCount) throw Object.assign(new Error("Invalid project_type."),{status:422});
+      await validatePhaseTeam(client,projectType.rows[0].id,phase_team);
       if(draft) {
         const accepted=await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND status='confirmed' LIMIT 1",[draft.id]);
         if(accepted.rowCount) throw Object.assign(new Error("Allocation is locked after an SPM accepts."),{status:409});

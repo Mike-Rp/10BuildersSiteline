@@ -1281,7 +1281,7 @@ function AppInner() {
             "Active sites",
             "Project visibility from mobilization through closeout.",
           )}
-          <ActiveSites key={actor.id} reviewAvailable projects={active.map(p => ({
+          <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
             needsReview: hasPendingSiteReview(p),
@@ -2079,8 +2079,8 @@ function AppInner() {
                             "Any discipline"}
                       </small>
                     </span>
-                    <span>{nameFor(t.accountId)}</span>
-                    <Status status={t.status} />
+                    <span>{t.accountId ? nameFor(t.accountId) : "Unassigned"}</span>
+                    <Status status={t.accountId ? t.status : "unassigned"} />
                     {t.status !== "confirmed" && p.status !== "completed" ? (
                       <select
                         aria-label={`Reassign ${t.phase}`}

@@ -54,6 +54,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec(dummySql)
   await db.exec(dummySql) // the demo data can be loaded again
 
+  // Before migration the existing projects still use the legacy seven-stage workflow.
+  await db.exec(`create table project_type_stages(
+   project_type_id smallint not null references project_types(id),
+   project_stage_id smallint not null references project_stages(id),sort_order smallint not null,
+   primary key(project_type_id,project_stage_id),unique(project_type_id,sort_order));
+   insert into project_type_stages select t.id,s.id,s.sort_order from project_types t cross join project_stages s;`)
+
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
@@ -471,6 +478,49 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(raw.every(p => !("checklistProgress" in p)))
     assert.ok(clientProjectViews(client.state,client.user.id).every(p => !("checklistProgress" in p)))
   })
+
+
+  await t.test("migrated workflows drive details, filters, validation and unassigned phases",async()=>{
+    const migration=fs.readFileSync(here("../Thesis-Backend/migrations/004-project-type-workflows.sql"),"utf8");
+    await db.exec(migration);
+    await db.exec(migration);
+    let {user,state}=await asUser("patricia.domingo@10builders.com");
+    const expected={Residential:9,Commercial:9,"Mixed-Use":12};
+    for(const [type,count] of Object.entries(expected))assert.equal(state.backendPhases[type].length,count);
+    for(const p of state.projects.filter(p=>p.status!=="draft")){
+      assert.deepEqual(projectPhaseNames(p),state.backendPhases[p.type].map(p=>p.name));
+      assert.ok(p.team.filter(t=>!t.accountId).every(t=>t.status==="pending"));
+      const detail=await api("/projects/"+p.id);
+      assert.deepEqual(detail.phase_team.map(t=>t.stage),projectPhaseNames(p));
+      const stages=await api("/projects/"+p.id+"/stages");
+      assert.deepEqual(stages.map(s=>s.code),projectPhaseNames(p));
+    }
+    const commercial=state.projects.find(p=>p.type==="Commercial"&&p.status==="active");
+    await assert.rejects(api("/projects/"+commercial.id+"/phase-overview?stage=Tower%20Structure"),/project type|conflicting/i);
+    const unassigned=commercial.team.find(t=>!t.accountId);
+    assert.ok(unassigned);
+    const spm=state.accounts.find(a=>a.role==="spm"&&a.status==="active");
+    await sendApiWorkflow(state,state.accounts.find(a=>a.id===user.id),{type:"reassign_phase",projectId:commercial.id,phase:unassigned.phase,accountId:spm.id});
+    state=await loadState(user);
+    const assigned=state.projects.find(p=>p.id===commercial.id).team.find(t=>t.phase===unassigned.phase);
+    assert.equal(assigned.accountId,spm.id);
+    assert.equal(assigned.status,"pending","No automatic acceptance for the added phase");
+    const raw=await api("/projects/"+commercial.id);
+    await assert.rejects(api("/projects/intake",{method:"POST",json:{
+      name:"Incomplete type workflow",project_type:"Commercial",floor_area_sqm:1000,floor_count:2,
+      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:commercial.opmId,
+      phase_team:[{stage:"Mobilization",user_id:spm.id,is_lead:true}]
+    }}),/every phase/i);
+    const created=await api("/projects/intake",{method:"POST",json:{
+      name:"Complete type workflow",project_type:"Commercial",floor_area_sqm:1000,floor_count:2,
+      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:commercial.opmId,
+      phase_team:state.backendPhases.Commercial.map((p,i)=>({stage:p.name,user_id:spm.id,is_lead:i===0}))
+    }});
+    assert.equal((await api("/projects/"+created.project.id)).phase_team.length,9);
+    const client=await asUser("f.uy@aldenheights-hoa.com");
+    assert.ok(client.state.projects.every(p=>projectPhaseNames(p).length===expected[p.type]));
+    assert.ok((await api("/workspace/project-data")).every(p=>!("checklistProgress" in p)));
+  });
 
   await t.test("the API refuses requests without a session", async () => {
     setToken("")
