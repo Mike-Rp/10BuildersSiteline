@@ -678,6 +678,72 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await api("/workspace/project-data")).every(p=>!p.overview&&!("verifiedProgress" in p)))
   })
 
+  await t.test("lifecycle gates use verified approvals across every phase and protect archives",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const reference=session.state.projects.find(p=>p.name==="Rosaria Business Park")
+    const opmId=reference.opmId,spmId=reference.team[0].accountId
+    const spmEmail=session.state.accounts.find(a=>a.id===spmId).email
+    const opmEmail=session.state.accounts.find(a=>a.id===opmId).email
+    // This intentionally isolated fixture bypasses intake license/capacity validation;
+    // lifecycle actions below still run through the real authenticated API.
+    const id=randomUUID(),base="/projects/"+id
+    await db.query("insert into projects(id,name,project_type_id,client_name,lifecycle_status,suggested_opm_id,current_stage_id) select $1,'Disposable lifecycle verification',project_type_id,'Lifecycle fixture','active',$2,current_stage_id from projects where id=$3",[id,opmId,reference.id])
+    const stages=(await db.query("select w.project_stage_id as id,s.code from projects p join project_type_stages w on w.project_type_id=p.project_type_id join project_stages s on s.id=w.project_stage_id where p.id=$1 order by w.sort_order",[id])).rows
+    await db.query("update projects set lifecycle_status='active',current_stage_id=$2 where id=$1",[id,stages[0].id])
+    await db.query("insert into project_phase_team(project_id,project_stage_id,spm_user_id,is_lead,status) select $1,w.project_stage_id,$2,w.sort_order=1,'confirmed' from projects p join project_type_stages w on w.project_type_id=p.project_type_id where p.id=$1",[id,spmId])
+    await db.query("update project_phase_team set status='confirmed' where project_id=$1",[id])
+    await db.query("insert into project_phase_checklists(project_id,project_stage_id) select $1,unnest($2::smallint[]) on conflict do nothing",[id,stages.map(s=>s.id)])
+    await db.query("insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order,weight) select $1,t.project_stage_id,t.code,t.title,t.required,t.sort_order,t.weight from phase_checklist_templates t where t.project_stage_id=any($2::smallint[]) on conflict do nothing",[id,stages.map(s=>s.id)])
+    const items=(await db.query("select id,project_stage_id from project_phase_checklist_items where project_id=$1 order by id",[id])).rows
+    const first=items.find(i=>i.project_stage_id===stages[0].id),last=items.find(i=>i.project_stage_id===stages.at(-1).id)
+    const evidence=async(item,status,reviewer=opmId)=>db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at) values($1,$2,$3,$4,$5,$6,$7) returning id",[id,item.project_stage_id,item.id,status,spmId,reviewer,reviewer?new Date().toISOString():null])
+    for(const item of items)await evidence(item,"approved")
+    const stage=async()=>(await db.query("select current_stage_id,lifecycle_status from projects where id=$1",[id])).rows[0]
+    await asUser(opmEmail)
+    await evidence(first,"pending",null)
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)
+    await evidence(first,"approved")
+    await db.query("update project_phase_checklist_items set required=false where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===422)
+    await db.query("update project_phase_checklist_items set required=true where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    await db.query("update project_phase_team set status='pending' where project_id=$1 and project_stage_id=$2",[id,stages[1].id])
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),/confirm/)
+    await db.query("update project_phase_team set status='confirmed' where project_id=$1",[id])
+    await asUser(spmEmail)
+    const note=await api(base+"/phase-updates",{method:"POST",json:{stage_id:stages[1].id,note:"A note must not move a phase"}})
+    await asUser(opmEmail)
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)
+    await api(base+"/phase-updates/"+note.id+"/approve",{method:"POST",json:{}})
+    assert.equal((await stage()).current_stage_id,stages[0].id)
+    await api(base+"/advance-phase",{method:"POST",json:{}})
+    assert.equal((await stage()).current_stage_id,stages[1].id)
+    await db.query("update projects set current_stage_id=$2 where id=$1",[id,stages.at(-1).id])
+    const resolveNote=async()=>{
+      await asUser(spmEmail)
+      const note=await api(base+"/phase-updates",{method:"POST",json:{note:"Closeout completion check"}})
+      await asUser(opmEmail)
+      return api(base+"/phase-updates/"+note.id+"/approve",{method:"POST",json:{}})
+    }
+    await evidence(first,"rework_required")
+    await assert.rejects(api("/archive/projects/"+id+"/close",{method:"POST",json:{}}),error=>error.status===422)
+    assert.equal((await resolveNote()).project_archived,false,"Closeout cannot compensate for withdrawn earlier credit")
+    await evidence(first,"approved")
+    await db.query("update project_phase_team set status='pending' where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    assert.equal((await resolveNote()).project_archived,false,"all phase assignments remain required")
+    await db.query("update project_phase_team set status='confirmed' where project_id=$1",[id])
+    await db.query("update project_phase_checklist_items set required=false where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    assert.equal((await resolveNote()).project_archived,false,"missing required phase scope blocks closure")
+    await db.query("update project_phase_checklist_items set required=true where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    const pending=await evidence(last,"pending",null)
+    assert.equal((await resolveNote()).project_archived,false)
+    const preview=await api(base+"/evidence/"+pending.rows[0].id+"/review-preview")
+    const result=await api(base+"/evidence/"+pending.rows[0].id+"/approve",{method:"POST",json:{expected_review_token:preview.review_token}})
+    assert.equal(result.project_archived,true)
+    assert.equal((await stage()).lifecycle_status,"archived")
+    await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),/Archived|active/i)
+    assert.equal((await stage()).lifecycle_status,"archived")
+  })
+
   await t.test("migrated workflows drive details, filters, validation and unassigned phases",async()=>{
     const migration=fs.readFileSync(here("../Thesis-Backend/migrations/004-project-type-workflows.sql"),"utf8");
     await db.exec(migration);

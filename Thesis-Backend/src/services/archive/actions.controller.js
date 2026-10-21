@@ -12,7 +12,7 @@ export const closeProject = async (req,res) => {
     const data=await withTransaction(async db=>{
       const p=await phaseProject(db,actor,req.params.id,{active:true});
       if(!(await isProjectOpmOrAdmin(actor,p.id,db))) throw new HttpError(403,"Not responsible for this project.");
-      if(!(await maybeCloseProject(db,p,actor.id))) throw new HttpError(422,"Closeout must be fully approved and all pending reviews resolved.");
+      if(!(await maybeCloseProject(db,p,actor.id))) throw new HttpError(422,"Every project phase must be verified complete, assignments confirmed and blocking reviews resolved before Closeout can finish.");
       return {project_id:p.id,status:"archived"};
     });
     return sendOk(res,"Completed project archived.",1,data);

@@ -139,6 +139,33 @@ test("new projects cannot complete with missing earlier tracked-phase approvals"
   workflowFor(p).checklist.Mobilization[0].status = "missing"
   assert.equal(completionReady(p), false)
 })
+test("legacy baseline and approval labels cannot compensate for missing scope",()=>{
+  const state=readyForCloseout(),p=currentProject(state),work=workflowFor(p)
+  work.checklist.Closeout=checklistFor(p).map(item=>({...item,status:"approved",reviewedAt:"2026-10-14",reviewedBy:"a2",doc:evidence()}))
+  assert.equal(completionReady(p),true)
+  work.progressStart=6;work.progressBase=100;p.progress=100
+  const original=structuredClone(work.checklist.Mobilization)
+  delete work.checklist.Mobilization
+  assert.equal(completionReady(p),false)
+  work.checklist.Mobilization=structuredClone(original)
+  work.checklist.Mobilization[0].reviewedBy=undefined
+  assert.equal(completionReady(p),false)
+  work.checklist.Mobilization=original
+  work.checklist.Mobilization[0].weight=0
+  assert.equal(completionReady(p),false)
+})
+
+test("general note approval and its timer cannot activate the next phase",()=>{
+  let state=activeFixture()
+  state=execute(state,"a4",{type:"submit_progress",note:"Awaiting report review"})
+  state=approvePhase(state)
+  assert.equal(currentProject(state).phase,"Mobilization")
+  const timed=processWorkflowTimers(state,NOW+REVIEW_MS+1)
+  assert.equal(currentProject(timed).phase,"Mobilization")
+  state=execute(state,"a2",{type:"approve_update",expectedVersion:1})
+  assert.equal(currentProject(state).phase,"Mobilization")
+})
+
 test("site gallery uploads are shared explicitly, but internal diary and general evidence remain private", () => {
   let state = activeFixture()
   state = execute(state, "a4", {

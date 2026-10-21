@@ -1,15 +1,22 @@
 import { readChecklist } from "../progress/phase.utility.js";
+import { readVerifiedProgress } from "../progress/verified.utility.js";
+import { blockingReviews, verifiedComplete } from "../progress/lifecycle.utility.js";
 import { businessDeadline, recordArchiveEvent } from "./audit.utility.js";
 
 export async function maybeCloseProject(db, project, actorId = null) {
   if (project.lifecycle_status !== "active" || String(project.current_stage).toLowerCase() !== "closeout") return false;
+  // Recheck under the same lock for evidence review and maintenance callers alike.
+  const locked = await db.query("SELECT p.*,s.code AS current_stage FROM projects p LEFT JOIN project_stages s ON s.id=p.current_stage_id WHERE p.id=$1 FOR UPDATE OF p",[project.id]);
+  project = locked.rows[0];
+  if (!project || project.lifecycle_status !== "active" || String(project.current_stage).toLowerCase() !== "closeout") return false;
   const checklist = await readChecklist(db,project.id,project.current_stage_id);
-  if (!checklist.configured || checklist.approved_count !== checklist.required_count) return false;
-  const pending = await db.query(
-    `SELECT 1 FROM project_phase_updates WHERE project_id=$1 AND status='pending'
-     UNION ALL SELECT 1 FROM pending_rework_requests WHERE project_id=$1 AND status='pending'
-     UNION ALL SELECT 1 FROM pending_subcontractor_requests WHERE project_id=$1 AND status='pending' LIMIT 1`,[project.id]);
-  if (pending.rowCount) return false;
+  if (!verifiedComplete(checklist.verified)) return false;
+  const totals = (await readVerifiedProgress(db,[project.id])).get(project.id);
+  if (!verifiedComplete(totals?.project)) return false;
+  const assignments = await db.query(`SELECT 1 FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
+    LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=w.project_stage_id
+    WHERE p.id=$1 AND (t.spm_user_id IS NULL OR t.status IS DISTINCT FROM 'confirmed') LIMIT 1`,[project.id]);
+  if (assignments.rowCount || await blockingReviews(db,project.id)) return false;
   const crew = await db.query(
     "SELECT count(*)::int AS headcount FROM subcontractor_workers WHERE current_project_id=$1 AND availability_status='assigned' AND status='active'",
     [project.id]);
@@ -18,7 +25,7 @@ export async function maybeCloseProject(db, project, actorId = null) {
       WHERE id=$1 AND lifecycle_status='active'`,[project.id,actorId]);
   await recordArchiveEvent(db,actorId,"projects",project.id,"project_archived",{
     project_id:project.id,archive_category:"closed",final_headcount:crew.rows[0].headcount,
-    reason:"Closeout deliverables approved and all pending reviews resolved.",
+    reason:"Every project phase is verified complete, assignments confirmed and all pending reviews resolved.",
   });
   await db.query("UPDATE project_engineers SET unassigned_at=now(),updated_by=$2,updated_at=now() WHERE project_id=$1 AND unassigned_at IS NULL",[project.id,actorId]);
   await db.query(

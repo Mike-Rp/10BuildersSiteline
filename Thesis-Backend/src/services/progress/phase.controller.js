@@ -1,6 +1,7 @@
 import { maybeCloseProject } from "../archive/policy.js";
 import { createHash } from "node:crypto";
 import { readVerifiedProgress } from "./verified.utility.js";
+import { blockingReviews, verifiedComplete } from "./lifecycle.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
@@ -297,10 +298,11 @@ export const advancePhase = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
-      const issues=await client.query("SELECT 1 FROM pending_rework_requests WHERE project_id=$1 AND project_stage_id=$2 AND status='pending' LIMIT 1",[p.id,p.current_stage_id]);
-      if(issues.rowCount)throw new HttpError(409,"Resolve pending rework issues before advancing this phase.");
+      if(await blockingReviews(client,p.id))throw new HttpError(409,"Resolve pending rework, progress and subcontractor reviews before advancing this phase.");
+      const owner = await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2 AND status='confirmed' AND spm_user_id IS NOT NULL",[p.id,p.current_stage_id]);
+      if (!owner.rowCount) throw new HttpError(422,"The current phase SPM must confirm their assignment before handoff.");
       const checklist = await readChecklist(client, p.id, p.current_stage_id);
-      if (!checklist.configured || checklist.approved_count !== checklist.required_count) {
+      if (!verifiedComplete(checklist.verified)) {
         throw new HttpError(422, "All required checklist items must be approved before advancing.");
       }
       const next = await client.query(
@@ -315,7 +317,7 @@ export const advancePhase = async (req, res) => {
       const phase = next.rows[0];
       if (phase.status !== "confirmed") throw new HttpError(422, "The next phase SPM must confirm their assignment.");
       const nextChecklist = await readChecklist(client, p.id, phase.project_stage_id);
-      if (!nextChecklist.configured) throw new HttpError(422, "Configure the next phase's checklist before advancing.");
+      if (nextChecklist.verified.percentage === null) throw new HttpError(422, "Configure valid required scope for the next phase before advancing.");
       await client.query(
         `UPDATE projects SET current_stage_id = $2, current_pct = $3, updated_by = $4, updated_at = now() WHERE id = $1`,
         [p.id, phase.project_stage_id, nextChecklist.pct, user.id]);

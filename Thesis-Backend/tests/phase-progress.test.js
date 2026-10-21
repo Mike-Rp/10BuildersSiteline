@@ -59,6 +59,7 @@ function setup(options = {}) {
       state.queries.push({ sql, params });
       const result = rows => ({ rows, rowCount: rows.length });
       if (sql.startsWith("SELECT p.*")) return result([state.p]);
+      if (sql.startsWith("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2")) return result(state.currentUnconfirmed ? [] : [{}]);
       if (sql.includes("FROM project_phase_team") && sql.startsWith("SELECT 1")) {
         return result(params[1] === state.phaseOwner ? [{}] : []);
       }
@@ -70,6 +71,7 @@ function setup(options = {}) {
       }
       if (sql.startsWith("SELECT project_stage_id FROM project_phase_checklist_items")) return result([{ project_stage_id: 4 }]);
       if (sql.startsWith("SELECT id FROM project_phase_updates")) return result(state.update?.status === "pending" ? [state.update] : []);
+      if(sql.startsWith("SELECT 1 FROM project_phase_updates"))return result(state.issues.filter(issue=>issue.status==="pending").concat(state.update?.status==="pending"?[state.update]:[]));
       if(sql.startsWith("SELECT 1 FROM pending_rework_requests"))return result(state.issues.filter(issue=>issue.status==="pending"));
       if (sql.startsWith("SELECT * FROM project_phase_updates")) return result(state.update ? [state.update] : []);
       if (sql.startsWith("INSERT INTO project_phase_updates")) {
@@ -89,7 +91,7 @@ function setup(options = {}) {
       if (sql.startsWith("INSERT INTO project_phase_checklists")) return result([]);
       if (sql.startsWith("SELECT i.id")) {
         const items = Number(params[1]) === 4 ? state.items : (state.extraStageItems?.[params[1]] ?? state.nextItems ?? []);
-        const rows = items.map(item => ({ ...item,
+        const rows = items.map(item => ({ weight:10, reviewed_by:opm.id, reviewed_at:"2026-10-21", ...item,
           status: String(item.id) === String(state.evidence.checklist_item_id) ? state.evidence.status : item.status,
           evidence_id: state.evidence.id, file_id: state.evidence.file_id, submitted_by: state.evidence.submitted_by, phase_update_id: state.evidence.phase_update_id }));
         return result(rows);
@@ -602,4 +604,27 @@ test("multipart payload accepts issue chips and submitted item arrays", () => {
   assert.equal(body.checklist_submissions[0].item_id, "1");
   assert.throws(() => updateUtility.updateBody({ submitted_item_ids: ["1", "1"] }), /unique/);
   assert.throws(() => updateUtility.updateBody({ payload: "bad-json" }), /JSON object/);
+});
+
+test("counts alone cannot advance approvals without provenance or valid values",async()=>{
+  for(const invalid of [{reviewed_by:null},{reviewed_at:null},{weight:0}]) {
+    const state=setup({next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+    state.items.forEach(item=>{item.status="approved";Object.assign(item,invalid);});
+    state.evidence.status="approved";
+    const res=response();await controller.advancePhase(request(opm),res);
+    assert.equal(res.statusCode,422);assert.equal(state.p.current_stage_id,4);
+  }
+});
+test("pending general reviews block otherwise completed phase advancement",async()=>{
+  const state=setup({update:{id:"42",status:"pending"},next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+  state.items.forEach(item=>item.status="approved");state.evidence.status="approved";
+  const res=response();await controller.advancePhase(request(opm),res);
+  assert.equal(res.statusCode,409);assert.equal(state.p.current_stage_id,4);
+});
+
+test("handoff requires the current assignment to remain confirmed",async()=>{
+ const state=setup({currentUnconfirmed:true,next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+ state.items.forEach(item=>item.status="approved");state.evidence.status="approved";
+ const res=response();await controller.advancePhase(request(opm),res);
+ assert.equal(res.statusCode,422);assert.equal(state.p.current_stage_id,4);
 });

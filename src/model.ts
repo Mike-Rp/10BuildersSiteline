@@ -315,6 +315,7 @@ export type ChecklistItem = {
   note?: string
   submittedAt?: string
   reviewedAt?: string
+  reviewedBy?: string
   escalated?: boolean
   submittedBy?: string
 }

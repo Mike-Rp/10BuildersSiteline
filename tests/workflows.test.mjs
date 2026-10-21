@@ -448,7 +448,7 @@ test("company suggestions retain manpower documents, require approval, and do no
   assert.equal(selection.status, "archived")
   assert.equal(selection.archivedBy, "a4")
 })
-test("rework approval uses the source stage floor without changing phase or bypassing Office PM review", () => {
+test("legacy rework cannot apply stage-floor rollback or bypass targeted review", () => {
   let state = run(initialState(), "a6", {
     type: "submit_progress",
     projectId: "p1",
@@ -468,13 +468,9 @@ test("rework approval uses the source stage floor without changing phase or bypa
   assert.ok(
     workflowFor(state.projects.find((p) => p.id === "p1")).pendingRework,
   )
-  state = run(state, "a2", {
-    type: "approve_rework",
-    projectId: "p1",
-    expectedVersion: 1,
-  })
-  const site = state.projects.find((p) => p.id === "p1")
-  assert.equal(site.progress, 50)
-  assert.equal(site.phase, "Structure")
-  assert.equal(workflowFor(site).pendingRework, undefined)
+  const before = structuredClone(state)
+  assert.throws(() => run(state, "a2", {
+    type: "approve_rework", projectId: "p1", expectedVersion: 1,
+  }), /targeted rework review/)
+  assert.deepEqual(state,before)
 })
