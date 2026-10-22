@@ -1,9 +1,10 @@
 import ClientOverview from "./ClientOverview"
+import MonthlyReport from "./MonthlyReport"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
-import { downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
+import { downloadDoc, fileFor, Preview } from "./panels"
 import PhaseTimeline from "./PhaseTimeline"
 import { dateLabel, initials, type Account, type Doc } from "./model"
 import {
@@ -94,6 +95,7 @@ export default function ClientPortal({
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
   const [viewer, setViewer] = useState<Viewer>()
+  const [reportProjectId,setReportProjectId]=useState("")
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [documentQuery, setDocumentQuery] = useState("")
@@ -191,21 +193,7 @@ export default function ClientPortal({
   }
   function report() {
     if (!project) return
-    try {
-      const text = onReport(project.id)
-      downloadBlob(
-        new Blob([text], { type: "text/plain;charset=utf-8" }),
-        `${project.name.replace(/[\\/:*?"<>|]/g, "-")} — progress report.txt`,
-      )
-      onRecord(
-        project.id,
-        "Client progress report exported",
-        "Approved and baseline Client-visible history only.",
-      )
-      setMessage("Approved progress report exported as a text file.")
-    } catch (reason) {
-      setError((reason as Error).message)
-    }
+    setReportProjectId(project.id)
   }
   function documents(compact = false) {
     if (!project) return null
@@ -802,6 +790,7 @@ export default function ClientPortal({
           </div>
         </main>
       </div>
+      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {viewedDoc && viewer && (
         <Preview
           doc={viewedDoc}

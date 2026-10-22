@@ -16,6 +16,7 @@ import { login, setApiBase, setToken, api, apiEnvelope, downloadApiFile } from "
 import { saveApiAccount, saveApiProject, createCompany, uploadFile, sendApiWorkflow, persistAdminChanges } from "../src/api/actions.ts"
 import { randomUUID } from "node:crypto"
 import XLSX from "xlsx"
+import {currentReportMonth} from "../src/monthly-report.ts"
 import { loadState } from "../src/api/load.ts"
 import { projectDocumentIndex, projectDocumentIndexFor } from "../src/project-document-index.ts"
 import { clientDocumentIndex, clientProjectViews } from "../src/client-access.ts"
@@ -58,6 +59,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   const dummySql=fs.readFileSync(dummy,"utf8")
   await db.exec(dummySql)
   await db.exec(dummySql)
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
 
   const dbPort = await freePort()
   const apiPort = await freePort()
@@ -174,8 +176,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("admin account edits, new accounts, company files and rules survive reload", async () => {
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const self=state.accounts.find(a=>a.id===user.id)
-    await saveApiAccount({...self,phone:"+639171234567"},true)
-    const created=await saveApiAccount({...self,id:randomUUID(),name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
+    await saveApiAccount({...self,phone:"09171234567"},true)
+    const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
     assert.ok(created.id)
     assert.equal((await api("/accounts/"+created.id)).email,"integration.admin@example.test")
     const fileId=randomUUID()
@@ -190,7 +192,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const after={...state,rules:{...state.rules,grace:9}}
     await persistAdminChanges(state,after)
     assert.equal((await loadState(user)).rules.grace,9)
-    assert.equal((await loadState(user)).accounts.find(a=>a.id===self.id).phone,"+639171234567")
+    assert.equal((await loadState(user)).accounts.find(a=>a.id===self.id).phone,"09171234567")
     await assert.rejects(uploadFile(randomUUID(),new File(["not a pdf"],"fake.pdf",{type:"application/pdf"})),/Supported files/)
   })
 
@@ -214,6 +216,42 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await db.query("select metadata->'manpowerDocuments'->0->>'id' as id from workspace_company_metadata where subcontractor_id=$1",[company.id])).rows[0].id,id)
   })
 
+  await t.test("monthly report permissions, read-only generation and snapshot exports hold for every role", async () => {
+    const before=(await db.query("select id,current_stage_id,current_pct,lifecycle_status from projects order by id")).rows
+    const month=currentReportMonth()
+    for(const [email,projection] of [["patricia.domingo@10builders.com","staff"],["lea.fernandez@10builders.com","staff"],["mikaela.bautista@10builders.com","site"],["maria.santos@rosariabiz.ph","client"]]) {
+      const {state}=await asUser(email)
+      const p=state.projects.find(p=>p.name==='Rosaria Business Park')
+      const saved=await api(`/projects/${p.id}/monthly-report?month=${month}`)
+      assert.equal(saved.report.projection,projection)
+      assert.equal(saved.report.period.timezone,'Asia/Manila')
+      assert.equal(saved.report.period.monthToDate,true)
+      assert.equal(saved.report.opening.percentage,null,"new migration does not fabricate earlier October coverage")
+      assert.equal(saved.report.closing.percentage,null,"missing required phase snapshots remain unavailable")
+      if(projection==='client')for(const key of ['rework','pending','activity','movement'])assert.equal(Object.hasOwn(saved.report,key),false)
+      const printed=await api(`/projects/${p.id}/monthly-report/export`,{method:'POST',json:{snapshot:saved.snapshot,format:'print'}})
+      assert.deepEqual(printed.report,saved.report)
+      const csv=await api(`/projects/${p.id}/monthly-report/export`,{method:'POST',json:{snapshot:saved.snapshot,format:'csv'}})
+      assert.ok(csv.csv.includes(saved.report.period.generatedAt))
+      if(projection==='client')assert.doesNotMatch(csv.csv,/Pending evidence|Credit withdrawn|Confirmed rework/)
+      await assert.rejects(api(`/projects/${p.id}/monthly-report/export`,{method:'POST',json:{snapshot:saved.snapshot+'broken',format:'csv'}}),/Invalid/)
+      await assert.rejects(api(`/projects/${p.id}/monthly-report?month=2099-01`),/future/)
+    }
+    await asUser("lea.fernandez@10builders.com")
+    const denied=(await db.query("select id from projects where name='Brookfield Warehouse Ext.'")).rows[0].id
+    await assert.rejects(api(`/projects/${denied}/monthly-report?month=${month}`),/not found/i)
+    const id=(await db.query("select id from projects where name='Rosaria Business Park'")).rows[0].id
+    const snapshot=(await api(`/projects/${id}/monthly-report?month=${month}`)).snapshot
+    await asUser("maria.santos@rosariabiz.ph")
+    await assert.rejects(api(`/projects/${id}/monthly-report/export`,{method:'POST',json:{snapshot,format:'csv'}}),/another account/)
+    const client=await api(`/projects/${id}/monthly-report?month=${month}`)
+    const links=(await db.query("select * from user_client_project_links where project_id=$1",[id])).rows
+    await db.query("delete from user_client_project_links where project_id=$1",[id])
+    await assert.rejects(api(`/projects/${id}/monthly-report/export`,{method:'POST',json:{snapshot:client.snapshot,format:'csv'}}),/not found/i)
+    for(const link of links)await db.query("insert into user_client_project_links(user_id,project_id) values($1,$2)",[link.user_id,id])
+    assert.deepEqual((await db.query("select id,current_stage_id,current_pct,lifecycle_status from projects order by id")).rows,before,"reports and exports do not change workflow records")
+  })
+
   let newProjectId
   await t.test("project intake, confirmations, registered documents and allocation persist", async () => {
     let {user,state}=await asUser("patricia.domingo@10builders.com")
@@ -226,7 +264,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       const account=state.accounts.find(a=>a.id===id)
       const fileId=randomUUID()
       await uploadFile(fileId,new File(["%PDF-1.4\nVerified license"],"license.pdf",{type:"application/pdf"}))
-      await saveApiAccount({...account,expiry:"2028-12-31",docs:[{id:fileId,label:"PRC License",name:"license.pdf",uploaded:true,owner:account.name,date:"2026-10-18",clientVisible:false}]},true)
+      await saveApiAccount({...account,phone:"09171234567",expiry:"2028-12-31",docs:[{id:fileId,label:"PRC License",name:"license.pdf",uploaded:true,owner:account.name,date:"2026-10-18",clientVisible:false}]},true)
     }
     newProjectId=await saveApiProject(project,false)
     state=await loadState(user)
@@ -347,10 +385,33 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await downloadApiFile(item.doc.id)).size>0)
   })
 
+  await t.test("password reset requests require admin reauthentication and force a new password", async () => {
+    const { user, state } = await asUser("patricia.domingo@10builders.com")
+    const self = state.accounts.find(a => a.id === user.id)
+    const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", email:"santos.juan@10builders.com", docs:[]}, false, "Password@123")
+    setToken("")
+    await api("/auth/password-reset-request", {method:"POST",json:{name:"Juan",email:"santos.juan@10builders.com"}})
+    await api("/auth/password-reset-request", {method:"POST",json:{name:"Unknown Person",email:"unknown@example.com"}})
+    await assert.rejects(api("/accounts/password-reset-requests"))
+    await asUser("patricia.domingo@10builders.com")
+    const requests = await api("/accounts/password-reset-requests")
+    assert.equal(requests.filter(r => r.id === saved.id).length, 1)
+    await assert.rejects(api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"wrong"}}), /Administrator password/)
+    const reset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
+    assert.equal(reset.temp_password, "Santos789")
+    assert.equal((await api("/accounts/password-reset-requests")).some(r => r.id === saved.id), false)
+    setToken("")
+    await assert.rejects(login("santos.juan@10builders.com", "Password@123"))
+    const target = await login("santos.juan@10builders.com", "Santos789")
+    assert.equal(target.temp_password_issued, true)
+    await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
+    assert.equal((await api("/auth/me")).temp_password_issued, false)
+  })
+
   await t.test("first-login reset and employee resignation persist and revoke access",async()=>{
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const template=state.accounts.find(a=>a.id===user.id)
-    const saved=await saveApiAccount({...template,id:randomUUID(),name:"Resignation Test Admin",email:"resignation.admin@example.test",docs:[]},false,"Password@123")
+    const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",email:"resignation.admin@example.test",docs:[]},false,"Password@123")
     const invited=await login("resignation.admin@example.test","Password@123")
     assert.equal(invited.temp_password_issued,true)
     await assert.rejects(api("/auth/reset-password",{method:"POST",json:{password:"short"}}),/8 to 72/)

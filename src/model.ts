@@ -192,6 +192,7 @@ export type Account = {
   projectTypes: string[]
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
+  lastName?: string
   license: string
   expiry: string
   renewed?: boolean

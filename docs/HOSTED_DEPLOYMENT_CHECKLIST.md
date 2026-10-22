@@ -7,6 +7,93 @@ This file did not exist in the inspected checkout, so there was no existing
 "missing weight migration" placeholder to replace. The concrete recovery file is
 `Thesis-Backend/migrations/004-verified-activity-progress.sql`.
 
+## Security fix: license routes, uploads and daily license reminders
+
+Deploy this together with, or before, the verified-progress recovery. **It needs
+no database migration.** It changes only backend code and `vercel.json`.
+
+### What was wrong and what changed
+
+- `POST`/`PUT` `/api/v1/engineer/licenses` worked with no login, and the update
+  built its SQL from request text (SQL injection). Every `/licenses` route (both
+  `/engineer` and `/accounts`) now requires an administrator. `/certifications`
+  and the two `/projects/intake/upload-*` routes also require an administrator.
+- The license and contract updates use a fixed column list with bound parameters.
+  The license id and contract id must be UUIDs, the expiry must be a real
+  `YYYY-MM-DD` date, the license number is at most 120 characters, and sort
+  direction in list queries is limited to ASC or DESC.
+- `authenticate()` now checks the JWT signature and expiry, the stored session,
+  the account status and the deleted flag (same rules as `getCurrentUser`). An
+  expired session can no longer be renewed through `PUT /api/v1/auth`.
+- Upload folder names are limited to letters, digits, `_` and `-`; uploads accept
+  PDF, JPG and PNG only, up to 15 MB.
+- `/api/v1/health` returns only `ok`/`database` again. The temporary block that
+  returned the database host, user, password length and a password fingerprint
+  is removed. **If a build containing that block was ever deployed, treat the
+  database password as exposed and rotate it.**
+- Repeated failed sign-ins are blocked with HTTP 429 (10 failures per 15 minutes,
+  per address and per email). Each serverless instance counts separately, so this
+  slows guessing but is not a hard global limit.
+- Hosted 500 responses no longer return raw database error text, and
+  `/api-docs` is not served in production unless `ENABLE_API_DOCS=true`.
+
+### New environment variables (Vercel project settings, Production)
+
+| Name | Required | Purpose |
+|---|---|---|
+| `CRON_SECRET` | **Yes** | Protects `/api/v1/cron/license-sweep`. Vercel Cron sends it as `Authorization: Bearer <value>`. Without it every cron call is refused with 401. |
+| `CORS_ORIGINS` | No | Comma-separated browser origins allowed to call the API. Unset keeps the current open behavior. |
+| `ENABLE_API_DOCS` | No | `true` serves `/api-docs` in production. |
+
+Create `CRON_SECRET` privately, at least 32 random characters, for example:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Paste it into Vercel (Settings → Environment Variables → Production). Never put
+it in Git, chat or `.env.example`. Environment changes apply only to new
+deployments, so redeploy after adding it.
+
+### Automatic license reminders
+
+The manual "Notify engineer" button is removed; reminders are now automatic.
+`sweepLicenses` finds Office PM and Site PM accounts (active or still invited)
+whose PRC license is missing, has no uploaded document, is expired or expires
+within 90 days (the same window the app labels "Expiring soon"). It adds an
+in-app notice for that person and every active administrator. It runs:
+
+- **Right after a license is saved** (account workspace save, add license, PRC renewal),
+  for that account only.
+- **When notifications load**, at most every 30 minutes per server process, on the
+  request's own database connection, so it never blocks or fails the request.
+- **Daily by Vercel Cron**, `GET /api/v1/cron/license-sweep` at 22:00 UTC (06:00
+  Philippine time), as a backstop. Vercel runs crons only on the production
+  deployment; confirm the job is listed in Settings → Cron Jobs after deploy.
+
+A reminder is not repeated: expired and expiring licenses remind once per expiry
+date; missing and undocumented ones once per month. Saving a license with a new
+expiry date creates a new reminder.
+
+### Verify after deploying
+
+```powershell
+# Expect 401 (no login):
+curl.exe -s -o NUL -w "%{http_code}
+" -X PUT https://<site>/api/v1/engineer/licenses/00000000-0000-4000-8000-000000000000
+# Expect 401 (no or wrong secret):
+curl.exe -s -o NUL -w "%{http_code}
+" https://<site>/api/v1/cron/license-sweep
+# Expect only {"ok":true,"database":true}:
+curl.exe -s https://<site>/api/v1/health
+```
+
+Calling the sweep **with** the secret (HTTP 200) creates real notifications, so
+do that deliberately, once, and only if you want today's reminders to go out.
+
+Local regression coverage: `tests/license-security.test.mjs` (run with
+`npm test`). It uses a throwaway in-memory database only.
+
 ## Confirm the revision and database first
 
 - Working branch: `part-4-lifecycle-checks`, created from Part 4 commit `de158ce`.

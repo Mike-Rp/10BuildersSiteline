@@ -78,9 +78,54 @@ test("additive recovery dry run rolls back; repeat apply preserves evidence, his
   assert.doesNotMatch(sql,/^\s*(DROP|RENAME|DELETE|UPDATE|TRUNCATE)\b|ALTER\s+TABLE[^;]+\b(DROP|RENAME)\b/mi)
 })
 
-test("migration coverage: PostgreSQL prepares backend static SQL against only base + 001–003 + recovery",{timeout:60000},async t=>{
+test("rework evidence links enforce activity, project and phase scope, including existing recovery tables",{timeout:60000},async t=>{
+  const db=await database(t),api=client(db)
+  await migrateActivityProgress(api,{apply:true})
+  const item=(await db.query("select * from project_phase_checklist_items order by id limit 1")).rows[0]
+  const user=(await db.query("select id from users order by id limit 1")).rows[0].id
+  const otherProject=(await db.query("select id from projects where id<>$1 limit 1",[item.project_id])).rows[0].id
+  const otherStage=(await db.query("select id from project_stages where id<>$1 limit 1",[item.project_stage_id])).rows[0].id
+  const request=(await db.query(`insert into pending_rework_requests(project_id,project_stage_id,reason,submitted_by)
+    values($1,$2,'Evidence scope regression',$3) returning id`,[item.project_id,item.project_stage_id,user])).rows[0].id
+  await db.query(`insert into project_rework_activities(request_id,project_id,project_stage_id,checklist_item_id)
+    values($1,$2,$3,$4)`,[request,item.project_id,item.project_stage_id,item.id])
+  async function evidence(activity) {
+    return (await db.query(`insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,submitted_by)
+      values($1,$2,$3,$4) returning id`,[activity.project_id,activity.project_stage_id,activity.id,user])).rows[0].id
+  }
+  const correct=await evidence(item)
+  const wrong=[]
+  for(const [project,stage] of [[item.project_id,item.project_stage_id],[item.project_id,otherStage],[otherProject,item.project_stage_id]]) {
+    await db.query("insert into project_phase_checklists(project_id,project_stage_id) values($1,$2) on conflict do nothing",[project,stage])
+    const activity=(await db.query(`insert into project_phase_checklist_items(project_id,project_stage_id,code,title,sort_order)
+      values($1,$2,'scope_regression','Scope regression',999) returning *`,[project,stage])).rows[0]
+    wrong.push(await evidence(activity))
+  }
+  for(const column of ["withdrawn_evidence_id","correction_evidence_id"]) {
+    await db.query(`update project_rework_activities set ${column}=$2 where request_id=$1`,[request,correct])
+    for(const id of wrong)await assert.rejects(
+      db.query(`update project_rework_activities set ${column}=$2 where request_id=$1`,[request,id]),
+      error=>error.code==="23503")
+    await db.query(`update project_rework_activities set ${column}=null where request_id=$1`,[request])
+  }
+  // Simulate a table installed by the older recovery migration.
+  await db.exec(`alter table project_rework_activities drop constraint verified_withdrawn_evidence_scope;
+    alter table project_rework_activities drop constraint verified_correction_evidence_scope;`)
+  await db.query("update project_rework_activities set correction_evidence_id=$2 where request_id=$1",[request,wrong[0]])
+  await assert.rejects(migrateActivityProgress(api,{apply:true}),error=>error.code==="23503")
+  assert.equal((await db.query("select correction_evidence_id from project_rework_activities where request_id=$1",[request])).rows[0].correction_evidence_id,wrong[0])
+  await db.query("update project_rework_activities set correction_evidence_id=$2 where request_id=$1",[request,correct])
+  await migrateActivityProgress(api,{apply:true})
+  await migrateActivityProgress(api,{apply:true})
+  for(const column of ["withdrawn_evidence_id","correction_evidence_id"])await assert.rejects(
+    db.query(`update project_rework_activities set ${column}=$2 where request_id=$1`,[request,wrong[0]]),
+    error=>error.code==="23503")
+})
+
+test("migration coverage: PostgreSQL prepares backend static SQL against base + recovery + monthly-report migration",{timeout:60000},async t=>{
   const db=await database(t)
   await migrateActivityProgress(client(db),{apply:true})
+  await db.exec(read("Thesis-Backend/migrations/008-monthly-report-history.sql"))
   const directory=fileURLToPath(new URL("Thesis-Backend/src/",root))
   let count=0;const failures=[]
   for(const file of files(directory)) {

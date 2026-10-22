@@ -47,19 +47,23 @@ export const login = async (req,res) => {
 
 export const refresh = async (req, res) => {
   try {
+    // authenticate() verifies the JWT signature and expiry, so an expired session cannot be revived.
     const id = await authenticate(req, res);
 
     if (!id) {
-      return responseError(res, 'Invalid token.', 400);
+      return responseError(res, 'Invalid token.', 401);
     }
 
     const result = await execute(
       `SELECT
-        id,
-        full_name,
-        role_id,
-        status 
-      FROM users WHERE id = $1`,
+        u.id,
+        u.full_name,
+        u.email,
+        u.role_id,
+        r.code AS role,
+        u.status,
+        u.temp_password_issued
+      FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
       [
         id
       ]
@@ -70,8 +74,10 @@ export const refresh = async (req, res) => {
     const token = jwt.sign({
       details: {
         id: user.id,
-        name: user.name,
+        full_name: user.full_name,
         email: user.email,
+        role: user.role,
+        status: user.status,
         role_id: user.role_id,
         user: Buffer.from(JSON.stringify(user), 'utf8').toString('base64')
       },

@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from "../../common/utilities/auth.utility.js";
 import { mapMultiple, mapSingle } from "../../common/utilities/dao.utility.js";
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
+import { handleError, isUuid } from "../../common/utilities/access.utility.js";
+import { withTransaction } from "../../common/utilities/transaction.utility.js";
 
 export const getCertifications = async (req, res) => {
   try {
@@ -30,7 +32,7 @@ export const getCertifications = async (req, res) => {
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
 
     // 2. Safe Sorting
-    const sortOrder = req.query.sortOrder || 'DESC';
+    const sortOrder = String(req.query.sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     let sortClause = `ORDER BY uc.created_at ${sortOrder}`;
 
     switch (req.query.sortBy) {
@@ -121,17 +123,24 @@ export const getCertificationById = async (req, res) => {
 export const createCertification = async (req, res) => {
   try {
     const created_by = await authenticate(req, res);
+    if (!created_by) return responseError(res, 'Missing or invalid token.', 401);
 
-    const { codes, user_id } = req.body;
+    const { codes, user_id } = req.body || {};
+    if (!isUuid(user_id)) return responseError(res, 'user_id must be a valid id.', 400);
+    if (!Array.isArray(codes) || codes.length > 50
+      || codes.some((code) => typeof code !== 'string' || !code.trim() || code.length > 40)) {
+      return responseError(res, 'codes must be a list of up to 50 certification codes.', 400);
+    }
 
-    await execute(`
+    await withTransaction(async (client) => {
+      await client.query(`
         DELETE FROM user_certifications WHERE user_id = $1
       `,
       [ user_id ]
     );
 
-    for await (const code of codes) {
-      await execute(
+    for (const code of codes) {
+      await client.query(
         `
           INSERT INTO user_certifications (
             user_id,
@@ -156,13 +165,13 @@ export const createCertification = async (req, res) => {
         ]
       );
     }
+    });
 
     const details = await getCertification(user_id);
 
     responseOk(res, 'Resource created successfully', 1, details);
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 };
 

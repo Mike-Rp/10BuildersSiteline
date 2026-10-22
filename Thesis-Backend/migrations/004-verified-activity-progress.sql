@@ -69,6 +69,26 @@ CREATE TABLE IF NOT EXISTS public.project_rework_activities (
 CREATE INDEX IF NOT EXISTS rework_activities_project_phase
   ON public.project_rework_activities(project_id,project_stage_id);
 
+-- Evidence must belong to the linked activity, project and phase. Add these
+-- constraints on reruns too, so already-created recovery tables are protected.
+-- Invalid existing links stop the transaction; they are never silently repaired.
+CREATE UNIQUE INDEX IF NOT EXISTS verified_evidence_activity_scope
+  ON public.project_phase_evidence(id,checklist_item_id,project_id,project_stage_id);
+DO $scope$ BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.project_rework_activities'::regclass
+    AND conname='verified_withdrawn_evidence_scope') THEN
+    ALTER TABLE public.project_rework_activities ADD CONSTRAINT verified_withdrawn_evidence_scope
+      FOREIGN KEY(withdrawn_evidence_id,checklist_item_id,project_id,project_stage_id)
+      REFERENCES public.project_phase_evidence(id,checklist_item_id,project_id,project_stage_id);
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.project_rework_activities'::regclass
+    AND conname='verified_correction_evidence_scope') THEN
+    ALTER TABLE public.project_rework_activities ADD CONSTRAINT verified_correction_evidence_scope
+      FOREIGN KEY(correction_evidence_id,checklist_item_id,project_id,project_stage_id)
+      REFERENCES public.project_phase_evidence(id,checklist_item_id,project_id,project_stage_id);
+  END IF;
+END $scope$;
+
 CREATE TABLE IF NOT EXISTS public.project_type_stages (
   project_type_id smallint NOT NULL REFERENCES public.project_types(id),
   project_stage_id smallint NOT NULL REFERENCES public.project_stages(id),

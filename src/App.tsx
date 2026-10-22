@@ -1,3 +1,5 @@
+import PasswordResetRequests from "./PasswordResetRequests"
+import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
@@ -13,6 +15,7 @@ import PasswordReset from "./PasswordReset"
 import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import MonthlyReport from "./MonthlyReport"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
@@ -251,6 +254,7 @@ function AppInner() {
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
+  const [reportProjectId,setReportProjectId]=useState("")
   const [toast, setToast] = useState("")
   const [query, setQuery] = useState("")
   const [globalQuery, setGlobalQuery] = useState("")
@@ -1269,14 +1273,17 @@ function AppInner() {
   }
   function dashboard() {
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
-    return <AdminDashboard
-      overview={adminDashboardOverview(state)}
+    return <PasswordResetRequests>{(requests, openReset) => <AdminDashboard
+      overview={{ ...adminDashboardOverview(state), items: [
+        ...requests.map(request => ({ key: "password-reset:" + request.id, id: request.id, kind: "account" as const, category: "requests" as const, title: request.full_name, detail: "Password reset requested: " + request.email, label: "Reset password", icon: "shield" })),
+        ...adminDashboardOverview(state).items,
+      ] }}
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
       onActivity={() => setDialog({ kind: "activity" })}
-      onOpen={item => setDialog({ kind: item.kind, id: item.id })}
+      onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
-    />
+    />}</PasswordResetRequests>
   }
   function pageHeading(title: string, subtitle: string, action?: ReactNode) {
     return (
@@ -2013,7 +2020,7 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
-        {!docsOnly && <IntakeGuidance state={state} project={p} actor={actor} details />}
+        {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
             <div className="detail-stats">
@@ -2038,6 +2045,7 @@ function AppInner() {
                 <strong>{p.end ? dateLabel(p.end) : "Not set"}</strong>
               </div>
             </div>
+            <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
             <PlannedTimeline project={p} />
             <div className="phase-timeline">
               {phases.map((phase, i) => (
@@ -2454,23 +2462,10 @@ function AppInner() {
                   ))}
                 </div>
               )}
-              {a.license && (
-                <Button
-                  variant="text-button"
-                  icon="bell"
-                  onClick={() =>
-                    commit(
-                      (s) => s,
-                      "License renewal reminder recorded",
-                      `${a.name} · Reminder logged in SITELINE.`,
-                      "notice",
-                      "Engineer directory",
-                    )
-                  }
-                >
-                  Notify engineer
-                </Button>
-              )}
+              <p className="muted">
+                Renewal reminders are sent automatically when a license is
+                missing, expiring or expired.
+              </p>
             </section>
             <section className="detail-section">
               <h3>Engineer documents</h3>
@@ -3272,6 +3267,7 @@ function AppInner() {
           </div>
         </Modal>
       )}
+      {reportProjectId && <MonthlyReport projects={state.projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {preview && (
         <Preview doc={preview} onClose={() => setPreview(undefined)} />
       )}

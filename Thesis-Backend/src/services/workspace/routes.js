@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { monthlyReport, exportMonthlyReport } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
 import { Router } from "express";
@@ -10,7 +11,10 @@ import { getSubcontractors, createSubcontractor } from "../subcontractors/contro
 import subcontractors from "../subcontractors/routes.js";
 import phases from "../progress/phase.routes.js";
 import progress from "../progress/routes.js";
+import { sweepLicenses, sweepLicensesIfDue } from "../accounts/license-sweep.utility.js";
 const router = Router();
+router.get("/projects/:id/monthly-report", monthlyReport);
+router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
     if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
@@ -74,6 +78,23 @@ async function event(db, user, p, title, detail = "") {
  select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null]);
 }
+router.post("/auth/password-reset-request", async (req, res) => {
+    try {
+        const { name, email } = req.body || {};
+        if (typeof name !== "string" || !name.trim() || name.length > 150 || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new HttpError(400, "Enter your name and valid work email.");
+        await withTransaction(async db => {
+            const found = await db.query("select id,full_name from users where lower(email::text)=$1 and not coalesce(is_deleted,false) for update", [email.trim().toLowerCase()]);
+            const user = found.rows[0];
+            if (!user) return;
+            const pending = await db.query("select 1 from workspace_account_metadata where user_id=$1 and metadata->>'passwordResetRequestedAt' is not null", [user.id]);
+            if (pending.rowCount) return;
+            await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('passwordResetRequestedAt',now()::text)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata", [user.id]);
+            await event(db, user, null, "Password reset requested", user.full_name + " requested a password reset. Review Password reset requests on the dashboard.");
+        });
+        return sendOk(res, "If the details match an account, your request has been sent to the administrator.", 1, {});
+    } catch (error) { return handleError(res, error); }
+});
+router.get("/accounts/password-reset-requests", endpoint(["admin"], async db => (await db.query("select u.id,u.full_name,u.email,m.metadata->>'passwordResetRequestedAt' as requested_at from users u join workspace_account_metadata m on m.user_id=u.id where m.metadata->>'passwordResetRequestedAt' is not null and not coalesce(u.is_deleted,false) order by m.metadata->>'passwordResetRequestedAt' asc limit 100")).rows));
 router.post("/auth/login", login);
 router.post("/auth/logout", logout);
 router.post("/auth/reset-password", requireLogin, reset);
@@ -138,6 +159,7 @@ router.put("/workspace/settings", endpoint(["admin"], async (db, user, req) => {
     return rules;
 }));
 router.get("/notifications", endpoint(null, async (db, user, req) => {
+    await sweepLicensesIfDue(db);
     const { limit, offset } = paging(req, 100);
     return (await db.query(`select a.*,t.code as type,n.is_read from activity_log a join activity_types t on t.id=a.activity_type_id
  left join notification_recipients n on n.activity_log_id=a.id and n.recipient_user_id=$1
@@ -224,7 +246,7 @@ router.put("/accounts/:id/workspace", endpoint(["admin"], async (db, user, req) 
             await db.query("update stored_files set user_id=$2,purpose='account' where id=$1", [d.id, req.params.id]);
         }
     await db.query(`insert into workspace_account_metadata(user_id,metadata) values($1,$2)
- on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata`, [req.params.id, JSON.stringify({ docs: b.docs, contactPerson: b.contactPerson || "", assignmentHold: !!b.assignmentHold, ...(b.resignation ? { resignation: b.resignation } : {}), status: b.status === "deactivated" ? "deactivated" : null })]);
+ on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata`, [req.params.id, JSON.stringify({ docs: b.docs, ...(typeof b.lastName === "string" && b.lastName.trim() ? { lastName: b.lastName.trim() } : {}), contactPerson: b.contactPerson || "", assignmentHold: !!b.assignmentHold, ...(b.resignation ? { resignation: b.resignation } : {}), status: b.status === "deactivated" ? "deactivated" : null })]);
     if (Array.isArray(b.certifications)) {
         const types = (await db.query("select id,code from certification_types where code=any($1::text[])", [b.certifications])).rows;
         if (b.certifications.some(c => !types.some(t => t.code === c)))
@@ -241,6 +263,7 @@ router.put("/accounts/:id/workspace", endpoint(["admin"], async (db, user, req) 
         await db.query("update user_licenses set superseded_at=now() where user_id=$1 and superseded_at is null", [req.params.id]);
         await db.query(`insert into user_licenses(user_id,license_number,license_expiry,upload_file_ref,upload_status,created_by)
  values($1,$2,$3,$4,$5,$6)`, [req.params.id, b.license, b.expiry, doc ? "db://" + doc.id : null, doc ? "uploaded" : "pending", user.id]);
+        await sweepLicenses(db, { userId: req.params.id });
     }
     return {};
 }));

@@ -1,4 +1,6 @@
+import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
+import MonthlyReport from "./MonthlyReport"
 import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
 import EvidenceReview from "./EvidenceReview"
@@ -200,6 +202,7 @@ export default function RoleWorkspace({
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
   )
   const [dialog, setDialog] = useState<RoleDialog>()
+  const [reportProjectId,setReportProjectId]=useState("")
   // Project Monitoring modal: one modal that switches between its monitoring
   // content and the project repository. Reset whenever the modal closes.
   const [monitorView, setMonitorView] = useState<"monitoring" | "repository">(
@@ -687,6 +690,7 @@ export default function RoleWorkspace({
   }
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
+    const expiryDays = actor.expiry ? Math.ceil((new Date(actor.expiry + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
     return (
       <>
@@ -696,6 +700,10 @@ export default function RoleWorkspace({
             ? "Keep assignments, documentation, and site reviews moving."
             : `Welcome, ${actor.name.split(" ")[0]}. Your assignments, phase status and deadlines are below.`,
         )}
+        {!isOpm && expiryDays !== null && expiryDays <= 30 && <div className="license-expiry-warning" role="alert">
+          <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
+          <p>License expiry: {actor.expiry}. {expiryDays < 0 ? "Your license has expired." : expiryDays === 0 ? "Your license expires today." : expiryDays + " days remaining."} Contact your administrator to renew your license and keep your account eligible for new assignments.</p></div>
+        </div>}
         <div className="metrics-grid">
           {[
             {
@@ -3081,6 +3089,7 @@ export default function RoleWorkspace({
           <Status value={p.status} />
         </div>
         <ProjectClientDetails project={p} accounts={state.accounts} />
+        <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
         <div className="detail-stats">
           <div>
@@ -3100,6 +3109,7 @@ export default function RoleWorkspace({
             <strong>{actorName(phaseOwner(p))}</strong>
           </div>
         </div>
+        <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
         <div className="schedule-timeline">
           <PlannedTimeline project={p} />
         </div>
@@ -3871,6 +3881,7 @@ export default function RoleWorkspace({
               : projectDetail(detail)}
           </Modal>
         )}
+      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {dialog?.kind === "company" && company && (
         <Modal
           title="Subcontractor profile"

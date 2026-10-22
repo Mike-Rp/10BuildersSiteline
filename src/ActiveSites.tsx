@@ -1,3 +1,5 @@
+import OverallProjectProgress from "./OverallProjectProgress"
+import type { VerifiedProgress } from "./project-progress"
 import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, phaseDefinitions, timelineStatus, type PhaseDefinition } from "./model"
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./listing"
@@ -9,6 +11,7 @@ export type SiteCard = {
   type: string
   phase: string
   status: string
+  verifiedProgress?: VerifiedProgress
   progress: number
   start: string
   end?: string
@@ -283,6 +286,7 @@ export default function ActiveSites({
                 max={100}
                 value={Number.isFinite(p.progress) ? p.progress : undefined}
               />
+              <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
               <dl>
                 {p.lead && (
                   <div>

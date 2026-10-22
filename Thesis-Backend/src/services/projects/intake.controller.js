@@ -6,7 +6,6 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
-import { authenticate } from "../../common/utilities/auth.utility.js";
 
 export const createIntake = async (req, res) => {
   try {
@@ -108,9 +107,12 @@ export const createIntake = async (req, res) => {
 
 export const uploadContract = async (req, res) => {
   try {
-    const created_by = await authenticate(req, res);
+    const actor = await requireUser(req, res, ['admin']);
+    if (!actor) return;
+    const created_by = actor.id;
 
     const { project_id } = req.body;
+    if (!isUuid(project_id)) return responseError(res,'project_id must be a valid id.',400);
     const project=await execute("SELECT lifecycle_status FROM projects WHERE id=$1",[project_id]);
     if(project.rows[0]?.lifecycle_status==="archived") return responseError(res,"Archived projects are read-only.",409);
     
@@ -129,16 +131,18 @@ export const uploadContract = async (req, res) => {
 
     responseOk(res, 'Resource uploaded successfully', 1, {document_id}); 
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 }
 
 export const uploadSubconContract = async (req, res) => {
   try {
-    const created_by = await authenticate(req, res);
+    const actor = await requireUser(req, res, ['admin']);
+    if (!actor) return;
+    const created_by = actor.id;
 
     const { project_id, subcontractor_name, trade_scope } = req.body;
+    if (!isUuid(project_id)) return responseError(res,'project_id must be a valid id.',400);
     const project=await execute("SELECT lifecycle_status FROM projects WHERE id=$1",[project_id]);
     if(project.rows[0]?.lifecycle_status==="archived") return responseError(res,"Archived projects are read-only.",409);
     
@@ -157,7 +161,6 @@ export const uploadSubconContract = async (req, res) => {
 
     responseOk(res, 'Resource uploaded successfully', 1, {document_id}); 
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 }

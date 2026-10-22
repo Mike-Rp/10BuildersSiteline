@@ -23,7 +23,9 @@ const STATUS_TEXTS = {
   409: "Conflict",
   410: "Gone",
   422: "Unprocessable Entity",
+  429: "Too Many Requests",
   500: "Internal Server Error",
+  503: "Service Unavailable",
 };
 
 export const sendError = (res, message, code = 500) => {
@@ -45,7 +47,9 @@ export const handleError = (res, error) => {
   if (error.code === "23503") return sendError(res, "A referenced record does not exist.", 400);
   if (error.code === "23505") return sendError(res, "A record with these values already exists.", 409);
   errorlog(error);
-  return sendError(res, error.message, 500);
+  // Driver and SQL text stays in the server log on hosted deployments.
+  const hosted = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  return sendError(res, hosted ? "Internal server error." : error.message, 500);
 };
 
 
@@ -109,6 +113,18 @@ export const requireUser = async (req, res, allowedRoles = null) => {
     return null;
   }
   return user;
+};
+
+/** Express middleware: 401 without a valid session, 403 outside the allowed roles. */
+export const requireRoles = (...allowedRoles) => async (req, res, next) => {
+  try {
+    const user = await requireUser(req, res, allowedRoles);
+    if (!user) return;
+    req.user = user;
+    return next();
+  } catch (error) {
+    return handleError(res, error);
+  }
 };
 
 export const hasProjectAccess = async (user, projectId, db = null) => {

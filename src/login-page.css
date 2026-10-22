@@ -124,3 +124,5 @@
   #root .login-redesign .login-panel { flex: none; padding: 28px 24px; }
   #root .login-redesign .login-info { display: none; }
 }
+
+#root .login-redesign .login-help a { text-decoration: underline; text-underline-offset: 3px; }
