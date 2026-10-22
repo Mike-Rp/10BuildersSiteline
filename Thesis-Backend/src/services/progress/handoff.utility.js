@@ -26,7 +26,7 @@ export async function transitionPhase(db, project, actorId) {
   await db.query("UPDATE projects SET current_stage_id = $2, current_pct = $3, updated_by = $4, updated_at = now() WHERE id = $1",
     [project.id, phase.project_stage_id, upcoming.pct, actorId]);
   await recordPhaseHistory(db, { ...project, current_stage_id: phase.project_stage_id }, upcoming.pct,
-    `${project.current_stage} checklist complete. ${phase.code} activated for its confirmed Site PM.`, actorId);
+    `Automatic handoff: ${project.current_stage} checklist complete. ${phase.code} activated for its confirmed Site PM.`, actorId);
   return { advanced: true, project_id: project.id, current_stage_id: phase.project_stage_id,
     current_stage: phase.code, current_pct: upcoming.pct };
 }

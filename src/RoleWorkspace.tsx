@@ -1839,6 +1839,14 @@ export default function RoleWorkspace({
                   )}
                 </div>
               ))}
+              {workflowFor(p).checklist[p.phase]?.some(item => item.required === false) && <details className="role-details subsection">
+                <summary>Previous checklist records</summary>
+                <p className="role-muted">Retained for history. These records do not count toward the current required checklist.</p>
+                {workflowFor(p).checklist[p.phase].filter(item => item.required === false).map(item => <div key={item.id} className="qa-checklist-row">
+                  <div><h4>{item.label}</h4>{item.doc && <button className="inline-link" onClick={() => showDoc(p,item.doc!)}>{item.doc.name}</button>}</div>
+                  <span>Historical record</span>
+                </div>)}
+              </details>}
             </section>
             <section className="role-progress-submit">
               <h3>Field update & issue reporting</h3>
@@ -3189,7 +3197,7 @@ export default function RoleWorkspace({
         <section className="detail-section">
           <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
-        <PhaseHandoff key={p.id} project={p} actor={actor} onCommand={async command => await onCommand(command)} />
+        <PhaseHandoff project={p} actor={actor} />
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>

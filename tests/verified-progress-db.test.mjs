@@ -58,8 +58,10 @@ test("local migration, trusted aggregates, evidence versions and stable snapshot
   // This is a disposable test fixture, not a backfill of an existing user database.
   await snapshotProjectChecklists(db,projectId)
   const complete=await readProject()
-  assert.deepEqual([complete.project.earned,complete.project.total],[30,260])
-  assert.equal(complete.project.percentage,30/260*100)
+  // Legacy Structure keeps its five saved activities. Other newly initialized
+  // middle phases use three; new Mobilization and Closeout scopes use four.
+  assert.deepEqual([complete.project.earned,complete.project.total],[30,250])
+  assert.equal(complete.project.percentage,30/250*100)
   await db.query("update phase_checklist_templates set weight=50")
   await snapshotProjectChecklists(db,projectId)
   assert.deepEqual(await readProject(),complete,"template edits cannot rewrite existing project snapshots")
@@ -76,7 +78,7 @@ test("local migration, trusted aggregates, evidence versions and stable snapshot
   assert.equal((await readProject()).project.earned,30,"the latest rejected evidence cannot retain older credit")
   await db.query("update project_phase_checklist_items set weight=25 where id=$1",[item.id])
   const changed=await readProject()
-  assert.equal(changed.project.total,275)
+  assert.equal(changed.project.total,complete.project.total+15)
   assert.equal(changed.project.earned,30)
   assert.deepEqual((await db.query("select id,current_pct from projects order by id")).rows,original,"verified reads never rewrite legacy progress")
 })

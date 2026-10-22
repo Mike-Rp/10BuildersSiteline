@@ -426,7 +426,7 @@ function AppInner() {
   }
   // Let the next Site PM see an OPM handoff without a manual page reload.
   useEffect(() => {
-    if (signedOut || actor.role !== "spm" || !tokenUser()) return
+    if (signedOut || !["opm", "spm"].includes(actor.role) || !tokenUser()) return
     let active = true, loading = false
     const refresh = async () => {
       if (!active || loading || document.visibilityState === "hidden") return
@@ -570,12 +570,9 @@ function AppInner() {
       await reloadWorkspace()
       const message = response?.handoff?.advanced ? `Activity approved. ${response.handoff.current_stage} automatically activated for its assigned Site PM.`
         : response?.handoff?.reason ? `Activity approved. Phase remains open: ${response.handoff.reason}`
-        : command.type === "advance_phase" && response?.current_stage ? `${response.current_stage} activated.` : undefined
+        : undefined
       return {ok:true, message}
     }catch(error){
-      if(command.type === "advance_phase") {
-        try { await reloadWorkspace() } catch { /* Preserve the original handoff error. */ }
-      }
       return {ok:false,error:(error as Error).message}
     }
   }

@@ -1,4 +1,4 @@
-import { getProjectData } from "./project-data.controller.js";
+import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { fileType } from "../progress/phase-upload.utility.js";
 import { Router } from "express";
@@ -79,6 +79,7 @@ router.use(phases);
 router.use(progress);
 router.use(subcontractors);
 router.get("/workspace/project-data",getProjectData);
+router.post("/workspace/reconcile-phase-handoffs",reconcilePhaseHandoffs);
 router.get("/workspace", endpoint(null, async (db, user) => {
     await db.query(`update users u set status='suspended',updated_at=now() from workspace_account_metadata m
  where m.user_id=u.id and m.metadata->>'assignmentHold'='true' and m.metadata->'resignation'->>'status'='notice'

@@ -1,7 +1,9 @@
 import { phaseProgress, projectProgress } from "./project-progress.ts"
+import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import {
   DOC_LABELS,
   PHASES,
+  PROJECT_PHASE_DEFINITIONS,
   licenseState,
   projectPhaseNames,
   spmCandidates,
@@ -60,6 +62,10 @@ export const CHECKLISTS: Record<string, string[]> = {
     "Previous Activity Acceptance/Clearance (Finishes)",
   ],
 }
+// Standard defaults only; saved project checklists remain authoritative.
+for (const definitions of Object.values(PROJECT_PHASE_DEFINITIONS)) {
+  definitions.forEach((phase,index) => { CHECKLISTS[phase.name] = standardActivities(index,definitions.length).map(item => item.title) })
+}
 export const ISSUES = [
   "Failed inspection",
   "Material defect / damage",
@@ -92,7 +98,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 }
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
-  type: "advance_phase" | "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
+  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
   projectId?: string
   phase?: string
   doc?: Doc
@@ -383,6 +389,8 @@ export function assignmentBlock(p: Project, actorId: string) {
   return ""
 }
 export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
+  const sequence = projectPhaseNames(p)
+  const position = sequence.indexOf(phase)
   const templatePhase =
     {
       "Podium Structure": "Structure",
@@ -397,8 +405,8 @@ export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
       "Landscape & Site Works": "Finishes",
     }[phase] || phase
   return (
-    workflowFor(p).checklist[phase] ||
-    (CHECKLISTS[templatePhase] || []).map((label, i) => ({
+    workflowFor(p).checklist[phase]?.filter(item => item.required !== false) ||
+    (position >= 0 ? standardActivities(position,sequence.length).map(item => item.title) : CHECKLISTS[templatePhase] || []).map((label, i) => ({
       id: `${phase}-${i}`,
       label,
       required: true,

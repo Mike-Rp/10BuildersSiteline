@@ -3,6 +3,9 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
 import { LIST_SELECT, LIST_FROM, stripInternal } from "../projects/read.controller.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
+import { verifiedComplete } from "../progress/lifecycle.utility.js";
+import { transitionPhase } from "../progress/handoff.utility.js";
+import { ensureChecklist } from "../progress/phase.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
 const scope = `p.id in (
@@ -23,6 +26,49 @@ const group = rows => {
 const download = row => ({...row,download_url:row.file_ref?.startsWith("db:")?
  "/api/v1/files/"+row.file_ref.replace(/^db:(\/\/)?/,"")+"/content":null});
 
+// Explicit automation endpoint, not a mutation hidden inside a GET. No project,
+// stage or percentage is accepted from the caller. Stored approvals alone
+// establish eligibility; staff can only trigger checks within their existing scope.
+export async function reconcilePhaseHandoffs(req,res) {
+ try {
+  const user=await requireUser(req,res,["admin","opm","spm"]);if(!user)return;
+  const data=await withTransaction(async db=>{
+   await db.query("select set_config('app.current_user_id',$1,true)",[user.id]);
+   const candidates=(await db.query(`select p.id,p.current_stage_id,s.code AS current_stage from projects p
+    left join project_stages s on s.id=p.current_stage_id where p.lifecycle_status='active'
+    and not coalesce(p.is_deleted,false) and ${scope} order by p.id`,[user.role,user.id])).rows;
+   const initial=await readVerifiedProgress(db,candidates.map(project=>project.id));
+   const results=[];
+   for(const candidate of candidates) {
+    const initialPhase=initial.get(candidate.id)?.phases.find(phase=>phase.id===String(candidate.current_stage_id));
+    if(!verifiedComplete(initialPhase)) {
+     if(initialPhase?.reason)results.push({project_id:candidate.id,from:candidate.current_stage,advanced:false,reason:initialPhase.reason});
+     continue;
+    }
+    // Every mutation uses the same lock order as activity review. Re-read after
+    // acquiring the lock so simultaneous refreshes never advance the same phase twice.
+    const project=(await db.query(`SELECT p.*,s.code AS current_stage FROM projects p
+     LEFT JOIN project_stages s ON s.id=p.current_stage_id WHERE p.id=$1
+     AND p.lifecycle_status='active' AND NOT COALESCE(p.is_deleted,false) FOR UPDATE OF p`,[candidate.id])).rows[0];
+    if(!project || Number(project.current_stage_id)!==Number(candidate.current_stage_id))continue;
+    const totals=(await readVerifiedProgress(db,[project.id])).get(project.id);
+    const current=totals?.phases.find(phase=>phase.id===String(project.current_stage_id));
+    if(!verifiedComplete(current))continue;
+    // Final-phase completion remains with the existing closeout workflow.
+    const next=(await db.query(`SELECT 1 FROM project_type_stages w WHERE w.project_type_id=$1
+     AND w.sort_order>(SELECT sort_order FROM project_type_stages WHERE project_type_id=$1 AND project_stage_id=$2) LIMIT 1`,
+     [project.project_type_id,project.current_stage_id])).rowCount;
+    if(!next)continue;
+    const handoff=await transitionPhase(db,project,null);
+    results.push({project_id:project.id,from:project.current_stage,...handoff});
+   }
+   return results;
+  });
+  res.set("Cache-Control","private, no-store");
+  return sendOk(res,"Automatic phase handoffs checked.",data.length,data);
+ } catch(error){return handleError(res,error);}
+}
+
 export async function getProjectData(req,res) {
  try {
   const user=await requireUser(req,res,["admin","opm","spm","client"]);if(!user)return;
@@ -33,16 +79,14 @@ export async function getProjectData(req,res) {
    const ids=projects.map(p=>p.id);
    if(!ids.length)return [];
    const staff=user.role!=="client";
-   // Initialize missing current-phase checklists in one statement, preserving existing checklists.
-   if(staff)await db.query(`with created as(
-    insert into project_phase_checklists(project_id,project_stage_id)
-    select p.id,p.current_stage_id from projects p where p.id=any($1::uuid[])
-     and p.current_stage_id is not null and exists(
-      select 1 from phase_checklist_templates t where t.project_stage_id=p.current_stage_id and t.required)
-    on conflict do nothing returning project_id,project_stage_id)
-    insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order,weight)
-    select c.project_id,c.project_stage_id,t.code,t.title,t.required,t.sort_order,t.weight from created c
-    join phase_checklist_templates t on t.project_stage_id=c.project_stage_id`,[ids]);
+   // Use the same standard as activation and evidence submission. Never replace
+   // existing snapshots (including older phases with uploaded evidence).
+   if(staff) {
+    const missing=(await db.query(`select p.id,p.current_stage_id from projects p where p.id=any($1::uuid[])
+     and p.current_stage_id is not null and not exists(select 1 from project_phase_checklists c
+      where c.project_id=p.id and c.project_stage_id=p.current_stage_id)`,[ids])).rows;
+    for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id);
+   }
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,t.response_deadline_at,t.responded_at
      from project_phase_team t join projects p on p.id=t.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id

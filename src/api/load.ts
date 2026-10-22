@@ -39,6 +39,10 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
 
 // Everything the signed-in role may see, as the app's State.
 export async function loadState(me: { id: string; role: Role; full_name?: string; email?: string }): Promise<State> {
+  // Catch up completed phases from older sessions and retry resolved blockers
+  // before reading the confirmed workflow position. This never sends a phase or percentage.
+  const handoffs = me.role === "client" ? [] : await api<{project_id:string;from:string;advanced:boolean;reason?:string}[]>(
+    "/workspace/reconcile-phase-handoffs", {method:"POST",json:{}})
   const [projectData, subcontractors, notifications, workspace] = await Promise.all([
     api<Omit<ProjectParts,"clientId"|"register">[]>("/workspace/project-data"),
     optional(apiList<Dto>("/subcontractors"), []),
@@ -79,6 +83,10 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   const projects = parts.map((p) =>
     mapProject({ ...p, list:{...p.list,...(workspace.projects?.[p.list.id]||{})}, detail:{...p.detail,workspace:workspace.projects?.[p.list.id]||{},selections:(workspace.selections||[]).filter((s:Dto)=>s.project_id===p.list.id)}, clientId: people.clientIds.get(p.list.id) || "", register: registerFileUrl }),
   )
+  for(const project of projects) {
+    const handoff=handoffs.find(item=>item.project_id===project.id && !item.advanced && item.from===project.phase)
+    if(handoff?.reason)project.handoffBlocker=handoff.reason
+  }
   // Client accounts see only their own projects.
   const finalAccounts = people.accounts.map((a) =>
     a.id === me.id && a.role === "client" ? { ...a, scope: projects.map((p) => p.id), status: "active" as const } : a,

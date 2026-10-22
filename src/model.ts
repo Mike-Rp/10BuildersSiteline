@@ -232,6 +232,7 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  handoffBlocker?: string
   checklistProgress?: PhaseProgress[]
   verifiedProgress?: import("./project-progress").VerifiedProgress
   id: string

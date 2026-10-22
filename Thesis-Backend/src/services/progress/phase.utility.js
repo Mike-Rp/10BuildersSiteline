@@ -2,6 +2,7 @@ import {
   HttpError, hasProjectAccess, isUuid, isSmallintId,
 } from "../../common/utilities/access.utility.js";
 import { phaseProgress } from "../../domain/verified-progress.js";
+import { projectChecklistTemplateSql } from "./checklist-template.utility.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -46,14 +47,14 @@ export async function ensureChecklist(client, projectId, stageId) {
   const initialized = await client.query(
     `INSERT INTO project_phase_checklists (project_id, project_stage_id)
      SELECT $1, $2 WHERE EXISTS (
-       SELECT 1 FROM phase_checklist_templates WHERE project_stage_id = $2 AND required = true)
+       SELECT 1 FROM (${projectChecklistTemplateSql}) template WHERE required = true)
      ON CONFLICT DO NOTHING RETURNING project_id`, [projectId, stageId]);
   if (initialized.rowCount) {
     await client.query(
       `INSERT INTO project_phase_checklist_items
          (project_id, project_stage_id, code, title, required, sort_order, weight)
        SELECT $1, project_stage_id, code, title, required, sort_order, weight
-         FROM phase_checklist_templates WHERE project_stage_id = $2`, [projectId, stageId]);
+         FROM (${projectChecklistTemplateSql}) template`, [projectId, stageId]);
   }
 }
 

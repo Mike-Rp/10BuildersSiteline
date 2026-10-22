@@ -6,6 +6,7 @@ export async function submitChecklist(client, project, user, submission, updateI
   checklist ??= await readChecklist(client, project.id, project.current_stage_id);
   const item = checklist.items.find(i => String(i.id) === String(submission.item_id));
   if (!item) throw new HttpError(404, "Checklist item not found in the selected stage.");
+  if (item.required === false) throw new HttpError(409, "This checklist requirement is historical and no longer accepts new submissions.");
   if (item.status === "approved") throw new HttpError(409, "Approved evidence cannot be overwritten.");
   if (item.status === "pending") {
     // A separately submitted item can join the final update, without creating another version.

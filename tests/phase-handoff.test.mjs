@@ -1,8 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { phaseHandoff } from "../src/phase-handoff.ts"
-import { sendApiWorkflow } from "../src/api/actions.ts"
-import { setApiBase } from "../src/api/client.ts"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import React, { act } from "react"
@@ -31,28 +29,7 @@ test("handoff uses verified phase totals and ownership, never legacy percentage 
   assert.equal(phaseHandoff(p, actor).next, undefined)
 })
 
-test("handoff command calls the dedicated endpoint and preserves local evidence/history", async () => {
-  const previous = globalThis.fetch
-  const p = project(), before = structuredClone(p), calls = []
-  setApiBase("http://127.0.0.1:3000/api/v1")
-  globalThis.fetch = async (url, init) => {
-    calls.push({ url, init })
-    return new Response(JSON.stringify({ data: { current_stage: "Design" } }), { status: 200 })
-  }
-  try {
-    const result = await sendApiWorkflow({ projects: [p] }, actor, { type: "advance_phase", projectId: p.id })
-    assert.equal(result.current_stage, "Design")
-    assert.equal(calls.length, 1)
-    assert.equal(calls[0].url, "http://127.0.0.1:3000/api/v1/projects/p/advance-phase")
-    assert.equal(calls[0].init.method, "POST")
-    assert.deepEqual(JSON.parse(calls[0].init.body), {})
-    assert.deepEqual(p, before)
-    await assert.rejects(sendApiWorkflow({ projects: [p] }, { ...actor, role: "spm" }, { type: "advance_phase", projectId: p.id }), /ownership/)
-    assert.equal(calls.length, 1)
-  } finally { globalThis.fetch = previous }
-})
-
-test("Office PM confirms handoff, prevents duplicate requests, and sees server blockers", async () => {
+test("handoff displays blockers for staff with no manual Activate control", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" })
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -65,26 +42,15 @@ test("Office PM confirms handoff, prevents duplicate requests, and sees server b
   try {
     const { default: PhaseHandoff } = await server.ssrLoadModule("/src/PhaseHandoff.tsx")
     const p = project()
-    let calls = 0, finish
-    const command = () => { calls++; return new Promise(resolve => { finish = resolve }) }
-    await act(async () => root.render(React.createElement(PhaseHandoff, { project: p, actor, onCommand: command })))
-    const button = text => [...document.querySelectorAll("button")].find(b => b.textContent === text)
-    await act(async () => button("Activate Design").click())
-    assert.equal(calls, 0)
-    await act(async () => { button("Confirm activation of Design").click(); button("Confirm activation of Design")?.click() })
-    assert.equal(calls, 1)
-    assert.equal(p.phase, "Mobilization")
-    await act(async () => finish({ ok: false, error: "The next phase SPM must confirm their assignment." }))
-    assert.match(document.querySelector('[role="alert"]').textContent, /SPM must confirm/)
-    await act(async () => button("Activate Design").click())
-    await act(async () => button("Confirm activation of Design").click())
-    await act(async () => {
-      p.phase = "Design"
-      finish({ ok: true, message: "Design activated." })
-      root.render(React.createElement(PhaseHandoff, { project: p, actor, onCommand: command }))
-    })
-    assert.match(document.querySelector('[role="status"]').textContent, /Design activated/)
-    assert.equal(button("Activate Design"), undefined)
+    p.handoffBlocker = "The next phase SPM must confirm their assignment."
+    for (const role of ["opm", "spm"]) {
+      await act(async () => root.render(React.createElement(PhaseHandoff, { project: p, actor: { ...actor, role } })))
+      assert.match(document.querySelector('[role="status"]').textContent, /SPM must confirm/)
+      assert.ok(![...document.querySelectorAll("button")].some(button => /activate|confirm activation/i.test(button.textContent)))
+    }
+    p.phase = "Design"
+    await act(async () => root.render(React.createElement(PhaseHandoff, { project: p, actor })))
+    assert.equal(document.querySelector('[aria-label="Automatic phase handoff"]'), null)
   } finally {
     await act(async () => root.unmount())
     await server.close()
