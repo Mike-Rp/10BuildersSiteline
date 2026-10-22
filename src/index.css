@@ -1340,6 +1340,14 @@ tbody tr:hover { background: var(--surface-subtle); }
 .explorer-card-footer > .document-status-line { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
 .explorer-card-action { flex: none; margin-left: auto; }
 .document-back { display: inline-flex; align-items: center; gap: 8px; }
+.project-client-details { padding: 16px; margin-bottom: 18px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface); }
+.project-client-contact { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; margin: 12px 0 0; }
+.project-client-contact + .project-client-contact { padding-top: 12px; border-top: 1px solid var(--color-line); }
+.project-client-contact dt { color: var(--color-muted); font-size: 14px; }
+.project-client-contact dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .project-client-contact { grid-template-columns: 1fr; }
+}
 @media (max-width: 720px) {
   .project-explorer { padding: 14px; }
   .explorer-counters, .explorer-grid { grid-template-columns: 1fr; }

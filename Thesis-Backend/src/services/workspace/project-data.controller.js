@@ -79,6 +79,14 @@ export async function getProjectData(req,res) {
    const ids=projects.map(p=>p.id);
    if(!ids.length)return [];
    const staff=user.role!=="client";
+   // Only contacts linked to the already-authorized projects; never a global client directory.
+   const clientAccounts=staff?group((await db.query(`select l.project_id,u.id,u.full_name,u.email,u.phone,
+    m.metadata->>'contactPerson' as contact_person
+    from user_client_project_links l join users u on u.id=l.user_id
+    join roles r on r.id=u.role_id and r.code='client'
+    left join workspace_account_metadata m on m.user_id=u.id
+    where l.project_id=any($1::uuid[]) and not coalesce(u.is_deleted,false)
+    order by u.full_name,u.id`,[ids])).rows):new Map();
    // Use the same standard as activation and evidence submission. Never replace
    // existing snapshots (including older phases with uploaded evidence).
    if(staff) {
@@ -154,7 +162,7 @@ export async function getProjectData(req,res) {
    return projects.map(p=>{
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
-    return {list,detail:{...list,phase_team:phaseTeam},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
+    return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
      assignments:assigned,contracts:contractRows,pending:null,...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
    });

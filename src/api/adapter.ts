@@ -289,6 +289,9 @@ export function mapProject(parts: ProjectParts): Project {
     start: day(list.target_start_date),
     end: day(list.target_end_date) || undefined,
     clientId: parts.clientId,
+    ...(Array.isArray(detail.client_accounts) ? {clientAccounts: detail.client_accounts.map((client: Dto) => ({
+      id: client.id, name: client.full_name, email: client.email || "", phone: client.phone || "", contactPerson: client.contact_person || "",
+    }))} : {}),
     status,
     opmId: list.suggested_opm_id || "",
     team,
@@ -439,6 +442,14 @@ export function peopleFromProjects(
     else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id))
       add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
     const clientName: string = p.client_name || ""
+    if (Array.isArray(detail.client_accounts)) {
+      const linked = detail.client_accounts as Dto[]
+      for (const client of linked) add({...stubAccount(client.id,client.full_name,"client"),
+        email:client.email || "",phone:client.phone || "",contactPerson:client.contact_person || ""})
+      const selected = linked.length === 1 ? linked[0] : linked.find(client => client.id === me.id || client.full_name.toLowerCase() === clientName.toLowerCase())
+      if (selected) clientIds.set(p.id,selected.id)
+      continue
+    }
     const known = [...byId.values()].find(
       (a) =>
         a.role === "client" &&

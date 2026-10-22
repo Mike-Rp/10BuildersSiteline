@@ -118,7 +118,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.match(karlo.license, /PRC Registered Engineer/)
     const maria = state.accounts.find((a) => a.name === "Maria L. Santos")
     assert.equal(maria.scope.length, 3, "a client is linked to their projects")
-    assert.equal(state.projects.every((p) => state.accounts.some((a) => a.id === p.clientId)), true)
+    assert.equal(state.projects.every((p) => p.clientAccounts.length
+      ? state.accounts.some((a) => a.id === p.clientId)
+      : !p.clientId), true,"legacy projects without an actual account link do not borrow a same-name account")
   })
 
   await t.test("each role sees only its own projects", async () => {
@@ -137,6 +139,24 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const docs = state.projects[0].docs
     assert.equal(docs.filter((d) => d.uploaded && d.clientVisible).length, 4)
     assert.equal(docs.filter((d) => d.uploaded && !d.clientVisible).length, 0, "internal documents are not returned")
+  })
+
+  await t.test("monitoring returns only linked client contacts within staff project scope, with no account credentials", async () => {
+    for(const email of ["lea.fernandez@10builders.com","mikaela.bautista@10builders.com"]) {
+      const {state}=await asUser(email)
+      const payload=await api("/workspace/project-data")
+      for(const part of payload) {
+        const expected=(await db.query("select u.id from user_client_project_links l join users u on u.id=l.user_id join roles r on r.id=u.role_id and r.code='client' where l.project_id=$1 and not coalesce(u.is_deleted,false) order by u.full_name,u.id",[part.list.id])).rows.map(r=>r.id)
+        assert.deepEqual(part.detail.client_accounts.map(c=>c.id),expected)
+        for(const contact of part.detail.client_accounts) assert.deepEqual(Object.keys(contact).sort(),["contact_person","email","full_name","id","phone"])
+        assert.deepEqual(state.projects.find(p=>p.id===part.list.id).clientAccounts.map(c=>c.id),expected)
+      }
+      const rosaria=state.projects.find(p=>p.name==='Rosaria Business Park')
+      assert.equal(rosaria.clientAccounts[0].email,'maria.santos@rosariabiz.ph')
+    }
+    await asUser("maria.santos@rosariabiz.ph")
+    const clientPayload=await api("/workspace/project-data")
+    assert.ok(clientPayload.every(p=>!Object.hasOwn(p.detail,'client_accounts')),"client responses do not receive staff contact projections")
   })
 
   await t.test("a Site PM's names come from the project, and files download", async () => {

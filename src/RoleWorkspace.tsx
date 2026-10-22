@@ -1,4 +1,5 @@
 import ProjectProgress from "./ProjectProgress"
+import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
 import EvidenceReview from "./EvidenceReview"
 import ReworkReview from "./ReworkReview"
@@ -3079,6 +3080,7 @@ export default function RoleWorkspace({
           </div>
           <Status value={p.status} />
         </div>
+        <ProjectClientDetails project={p} accounts={state.accounts} />
         <IntakeGuidance state={state} project={p} actor={actor} />
         <div className="detail-stats">
           <div>
@@ -3859,7 +3861,7 @@ export default function RoleWorkspace({
             subtitle={
               monitorView === "repository"
                 ? `${ROLE_NAMES[actor.role]} · ${detail.name}`
-                : `${ROLE_NAMES[actor.role]} · ${actor.name}`
+                : detail.name
             }
             wide
             onClose={() => setDialog(undefined)}

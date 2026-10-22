@@ -162,6 +162,20 @@ test("companies and notifications map their key fields", () => {
   assert.equal(formatArea("18400.00"), "18,400")
 })
 
+test("linked client identity and contact details come from the project link, not a matching name", () => {
+  const me=mapAccount({id:"opm",full_name:"Office PM",role:"opm",status:"active"})
+  const contact={id:"actual-client",full_name:"Client Contact",email:"linked@example.test",phone:"09123456789",contact_person:"Owner Representative"}
+  const details=new Map([["p1",{client_accounts:[contact]}]])
+  const existing=[mapAccount({id:"unrelated",full_name:base.client_name,role:"client",status:"active",email:"wrong@example.test"})]
+  const people=peopleFromProjects(me,[base],details,existing)
+  assert.equal(people.clientIds.get("p1"),"actual-client")
+  assert.equal(people.accounts.find(a=>a.id==="actual-client").email,"linked@example.test")
+  const p=mapProject(parts({detail:details.get("p1"),clientId:people.clientIds.get("p1")}))
+  assert.deepEqual(p.clientAccounts,[{id:contact.id,name:contact.full_name,email:contact.email,phone:contact.phone,contactPerson:contact.contact_person}])
+  const unlinked=peopleFromProjects(me,[base],new Map([["p1",{client_accounts:[]}]]),existing)
+  assert.equal(unlinked.clientIds.has("p1"),false,"an absent link must not borrow another account with the same name")
+})
+
 test("an empty current review queue does not revive retired manual-percentage requests",()=>{
  const p=mapProject(parts({overview:{pending_update:null,checklist:{items:[]}}}))
  assert.equal(p.workflow.pendingUpdate,undefined)
