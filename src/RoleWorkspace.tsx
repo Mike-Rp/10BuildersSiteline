@@ -2105,8 +2105,8 @@ export default function RoleWorkspace({
         <div className="tabs standalone">
           {[
             ["progress", `Progress updates (${pendingUpdates.length})`],
-            ["rework", `Rework / issues (${pendingRework.length})`],
             ["qa", `QA/QC evidence (${qaCount})`],
+            ["rework", `Rework / issues (${pendingRework.length})`],
           ].map(([value, label]) => (
             <button
               key={value}
