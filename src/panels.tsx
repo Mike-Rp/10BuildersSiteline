@@ -1,4 +1,5 @@
 import { uploadFile } from "./api/actions"
+import ClientSearch from "./ClientSearch"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
@@ -1124,6 +1125,7 @@ export function IntakeForm({
       ].every((v) => v.trim())
     )
       return "Complete all required project fields."
+    if (!selectedClient) return "Select an available client account from the search results."
     if (datesBlocked) return startError || endError || DATE_ERRORS.invalid
     if (!draft.end) return "Enter the Target End Date."
     if (!endAfterStart(draft.start, draft.end))
@@ -1361,19 +1363,12 @@ export function IntakeForm({
               />
             </Field>
             <Field label="Client *" wide>
-              <select
-                required
+              <ClientSearch
+                clients={clients}
                 value={draft.clientId}
-                onChange={(e) => patch({ clientId: e.target.value })}
+                onChange={(clientId) => patch({ clientId })}
                 disabled={!!project}
-              >
-                <option value="">Select an existing client</option>
-                {clients.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} · {a.email}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
             {selectedClient && (
               <section
