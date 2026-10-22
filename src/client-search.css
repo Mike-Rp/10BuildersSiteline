@@ -1,8 +1,12 @@
 .client-search { min-width: 0; }
-.client-search-control { position: relative; display: flex; align-items: center; }
-.client-search-control > svg { position: absolute; left: 12px; color: var(--color-muted); pointer-events: none; }
-.client-search-control > input { padding-left: 39px; padding-right: 84px; }
-.client-search-control > .button { position: absolute; right: 12px; }
+.client-search-control { display: flex; align-items: center; gap: 10px; }
+.client-search-input { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0 12px; border: 1px solid var(--control-border, var(--color-line)); border-radius: 6px; background: var(--color-surface); }
+.client-search-input > svg { flex-shrink: 0; color: var(--color-muted); pointer-events: none; }
+#root .client-search-input > input { flex: 1; min-width: 0; width: 100%; padding: 11px 0; border: 0; border-radius: 0; background: transparent; }
+#root .client-search-input:focus-within { outline: 3px solid var(--color-steel, var(--color-primary)); outline-offset: 2px; }
+#root .client-search-input > input:focus-visible { outline: none; }
+.client-search-input:has(input:disabled) { background: var(--color-canvas); }
+.client-search-control > .button { position: static; flex-shrink: 0; }
 .client-search-hint { display: block; margin-top: 7px; color: var(--color-muted); overflow-wrap: anywhere; }
 .client-search-results { margin-top: 10px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface); }
 .client-search-count { padding: 10px 14px; background: var(--surface-subtle); border-radius: 6px 6px 0 0; color: var(--color-muted); }

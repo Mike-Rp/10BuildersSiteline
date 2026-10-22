@@ -63,8 +63,9 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
       }
     }}>
     <div className="client-search-control">
+      <div className="client-search-input">
       <Icon name="search" size={18} />
-      <input id={inputId} ref={input} type="search" role="combobox" required
+      <input id={inputId} ref={input} type="text" inputMode="search" role="combobox" required
         aria-haspopup="dialog" aria-expanded={expanded} aria-controls={expanded ? resultsId : undefined}
         aria-describedby={hintId} autoComplete="off" placeholder="Search clients by name or email"
         disabled={disabled} value={selected?.name || query}
@@ -86,7 +87,8 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
             results.current?.querySelector<HTMLButtonElement>("button[data-client-select]")?.focus()
           }
         }} />
-      {!disabled && (selected || query) && <Button variant="text-button" onClick={clear}
+      </div>
+      {!disabled && (selected || query) && <Button onClick={clear}
         aria-label={selected ? "Change selected client" : "Clear client search"}>{selected ? "Change" : "Clear"}</Button>}
     </div>
     <small id={hintId} className="client-search-hint">{selected
