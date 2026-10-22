@@ -15,6 +15,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
 import { login, setApiBase, setToken, api, apiEnvelope, downloadApiFile } from "../src/api/client.ts"
 import { saveApiAccount, saveApiProject, createCompany, uploadFile, sendApiWorkflow, persistAdminChanges } from "../src/api/actions.ts"
 import { randomUUID } from "node:crypto"
+import XLSX from "xlsx"
 import { loadState } from "../src/api/load.ts"
 import { projectDocumentIndex, projectDocumentIndexFor } from "../src/project-document-index.ts"
 import { clientDocumentIndex, clientProjectViews } from "../src/client-access.ts"
@@ -171,6 +172,26 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await loadState(user)).rules.grace,9)
     assert.equal((await loadState(user)).accounts.find(a=>a.id===self.id).phone,"+639171234567")
     await assert.rejects(uploadFile(randomUUID(),new File(["not a pdf"],"fake.pdf",{type:"application/pdf"})),/Supported files/)
+  })
+
+  await t.test("Excel uploads are restricted to manpower and cannot be linked as project or company documents", async () => {
+    const {state}=await asUser("patricia.domingo@10builders.com")
+    const book=XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Worker","Trade"],["Sample","Carpenter"]]),"Manpower")
+    const excel=new File([XLSX.write(book,{type:"buffer",bookType:"xlsx"})],"manpower.xlsx")
+    await assert.rejects(uploadFile(randomUUID(),excel),/Supported files/)
+    await assert.rejects(uploadFile(randomUUID(),new File(["workers"],"manpower.csv"),"manpower"),/Excel/)
+    await assert.rejects(uploadFile(randomUUID(),new File(["fake"],"manpower.xlsx"),"manpower"),/valid Excel/)
+    const id=randomUUID()
+    await uploadFile(id,excel,"manpower")
+    const doc={id,label:"Manpower list",name:excel.name,uploaded:true,owner:"Administrator",date:"2026-10-22",clientVisible:false}
+    const source=state.companies[0]
+    const company=await createCompany({...source,id:randomUUID(),name:"Manpower Format Test",documents:[],manpowerDocuments:[doc]})
+    assert.ok(company.id)
+    await assert.rejects(api(`/subcontractors/${company.id}/workspace`,{method:"PUT",json:{...source,name:"Manpower Format Test",status:"approved",documents:[doc],manpowerDocuments:[]}}),/Supported files/)
+    const active=state.projects.find(p=>p.status==='active')
+    await assert.rejects(api(`/projects/${active.id}/workspace`,{method:"PUT",json:{docs:[doc]}}),/Supported files/)
+    assert.equal((await db.query("select metadata->'manpowerDocuments'->0->>'id' as id from workspace_company_metadata where subcontractor_id=$1",[company.id])).rows[0].id,id)
   })
 
   let newProjectId

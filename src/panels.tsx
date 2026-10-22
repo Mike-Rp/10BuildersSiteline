@@ -66,7 +66,7 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-async function saveFile(id:string,file:File) { await uploadFile(id,file) }
+async function saveFile(id:string,file:File,spreadsheet=false) { await uploadFile(id,file,spreadsheet ? "manpower" : "document") }
 export async function fileFor(id:string) { return downloadApiFile(id) }
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -146,7 +146,7 @@ export function Upload({
     setSaving(true)
     try {
       const id = uid()
-      await saveFile(id, file)
+      await saveFile(id, file, spreadsheet)
       const saved=await onSave({
         id,
         label,
@@ -208,7 +208,7 @@ export function Upload({
               </p>
             </div>
           </div>
-          {file.type.startsWith("image/") ? (
+          {spreadsheet ? <p>Excel manpower list · Confirm to upload this workbook.</p> : file.type.startsWith("image/") ? (
             <img
               className="file-preview"
               src={preview}
@@ -321,8 +321,8 @@ export function DocumentList({
             <strong>{uploadLabel || "Add a signed document"}</strong>
             <p>
               {spreadsheet
-                ? "XLSX or XLS · Maximum 15 MB"
-                : "PDF, JPG or PNG · Maximum 10 MB"}
+                ? "Excel manpower list (.xlsx or .xls) · Maximum 15 MB"
+                : "PDF, JPG, JPEG or PNG · Maximum 10 MB"}
             </p>
           </div>
           <Upload

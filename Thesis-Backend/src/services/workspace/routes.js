@@ -1,6 +1,6 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
-import { fileType } from "../progress/phase-upload.utility.js";
+import { validateUpload } from "./upload-policy.utility.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -12,6 +12,10 @@ import phases from "../progress/phase.routes.js";
 import progress from "../progress/routes.js";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
+    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
+    return next();
+});
 const codes = ["notice_to_proceed", "building_permit", "owner_contract", "registered_plans", "environmental_certificate", "budget_boq", "subcontractor_agreement"];
 const endpoint = (roles, fn) => async (req, res) => {
     try {
@@ -43,10 +47,11 @@ async function project(db, user, id, write = false) {
         throw new HttpError(409, "Completed projects are read-only.");
     return p;
 }
-async function file(db, user, id) {
+async function file(db, user, id, purpose = "document") {
     const row = (await db.query("select * from stored_files where id=$1", [id])).rows[0];
     if (!row || !(user.role === "admin" || row.uploaded_by === user.id))
         throw new HttpError(404, "Uploaded file not found.");
+    await validateUpload(row, purpose);
     return row;
 }
 async function linkDocument(db, user, p, code, fileId) {
@@ -144,18 +149,16 @@ router.post("/notifications/read", endpoint(null, async (db, user, req) => {
     await db.query("update notification_recipients set is_read=true,read_at=now() where recipient_user_id=$1 and activity_log_id=any($2::bigint[])", [user.id, (req.body.ids || []).filter(id => /^\d+$/.test(String(id)))]);
     return {};
 }));
-router.post("/files", requireLogin, upload.single("file"), endpoint(["admin", "opm", "spm"], async (db, user, req) => {
+router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const f = req.file;
     if (!f || !isUuid(req.body.id))
         throw new HttpError(400, "A file and UUID are required.");
-    if (!/\.(xlsx?|csv)$/i.test(f.originalname) && f.size > 10 * 1024 * 1024)
-        throw new HttpError(400, "Documents must be 10 MB or smaller.");
-    if (!/\.(pdf|png|jpe?g|xlsx?|csv)$/i.test(f.originalname))
-        throw new HttpError(400, "Unsupported file type.");
-    const contentType = /\.(pdf|png|jpe?g)$/i.test(f.originalname) ? fileType(f) :
-        /\.csv$/i.test(f.originalname) ? "text/plain" : f.mimetype;
+    const purpose = req.body.purpose || "document";
+    if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
+        throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
+    const contentType = await validateUpload(f, purpose);
     await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
- values($1,$2,'upload',$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType || "application/octet-stream", f.size, f.buffer]);
+ values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
     return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content" };
 }));
 router.get("/files/:id/content", async (req, res) => {
@@ -245,9 +248,9 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
     const b = req.body;
     if (!isUuid(req.params.id))
         throw new HttpError(400, "Invalid company ID.");
-    for (const d of [...(b.documents || []), ...(b.manpowerDocuments || [])])
+    for (const [d, purpose] of [...(b.documents || []).map(d => [d, "document"]), ...(b.manpowerDocuments || []).map(d => [d, "manpower"])])
         if (d.uploaded) {
-            await file(db, user, d.id);
+            await file(db, user, d.id, purpose);
             await db.query("update stored_files set purpose='company' where id=$1", [d.id]);
         }
     const status = { approved: "approved", pending: "pending", rejected: "declined", archived: "archived" }[b.status];
@@ -395,9 +398,9 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             if (!b?.name?.trim())
                 throw new HttpError(400, "Company name is required.");
             const companyId = crypto.randomUUID();
-            for (const d of [...(b.documents || []), ...(b.manpowerDocuments || [])])
+            for (const [d, purpose] of [...(b.documents || []).map(d => [d, "document"]), ...(b.manpowerDocuments || []).map(d => [d, "manpower"])])
                 if (d.uploaded)
-                    await file(db, user, d.id);
+                    await file(db, user, d.id, purpose);
             await db.query(`insert into subcontractors(id,company_name,trade_id,contact_email,source,directory_status,created_by,updated_by)
   select $1,$2,id,$3,'directory','pending',$4,$4 from trades where code='Structural / Rebar'`, [companyId, b.name, b.email || null, user.id]);
             await db.query("insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2)", [companyId, JSON.stringify({

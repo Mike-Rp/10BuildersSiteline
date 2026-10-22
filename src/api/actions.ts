@@ -8,10 +8,11 @@ const issueCodes: Record<string, string> = {
     "Rework required": "rework_required", "Design / plan change": "design_change", "Weather delay": "weather_delay",
     "Subcontractor manpower shortage": "manpower_shortage", "Safety incident": "safety_incident", "Other": "other",
 };
-export async function uploadFile(id: string, file: File) {
+export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document") {
     const body = new FormData();
     body.set("id", id);
     body.set("file", file);
+    body.set("purpose", purpose);
     const saved = await api<Dto>("/files", { method: "POST", body });
     registerFileUrl(id, saved.download_url);
 }

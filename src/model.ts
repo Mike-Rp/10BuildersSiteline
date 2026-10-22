@@ -565,6 +565,7 @@ export function validateFile(file: File, spreadsheet = false) {
     ? ["xlsx", "xls"]
     : ["pdf", "jpg", "jpeg", "png"]
   const max = spreadsheet ? 15 : 10
+  if (!file.size) return "Choose a non-empty file."
   if (!extensions.includes(file.name.split(".").pop()?.toLowerCase() || ""))
     return `Use ${extensions.join(", ").toUpperCase()} files only.`
   if (file.size > max * 1024 * 1024)
