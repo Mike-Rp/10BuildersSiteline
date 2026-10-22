@@ -9,8 +9,13 @@ import { getSubcontractors, createSubcontractor } from "../subcontractors/contro
 import subcontractors from "../subcontractors/routes.js";
 import phases from "../progress/phase.routes.js";
 import progress from "../progress/routes.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
+import { sweepLicensesThrottled } from "../licenses/sweep.js";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+// Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
+const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
+    "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const codes = ["notice_to_proceed", "building_permit", "owner_contract", "registered_plans", "environmental_certificate", "budget_boq", "subcontractor_agreement"];
 const endpoint = (roles, fn) => async (req, res) => {
     try {
@@ -87,9 +92,11 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     await db.query(`update workspace_account_metadata set metadata=metadata||jsonb_build_object('status','deactivated',
  'resignation',(metadata->'resignation')||jsonb_build_object('status','deactivated','deactivatedAt',now()))
  where metadata->>'assignmentHold'='true' and metadata->'resignation'->>'status'='notice' and (metadata->'resignation'->>'effectiveDate')::timestamptz<=now()`);
+    await sweepLicensesThrottled(db);
     const allowed = (await db.query(`select p.id from projects p where not coalesce(p.is_deleted,false) and
  ($1='admin' or p.suggested_opm_id=$2 or exists(select 1 from project_phase_team t where t.project_id=p.id and t.spm_user_id=$2)
  or exists(select 1 from project_engineers e where e.project_id=p.id and e.user_id=$2 and e.unassigned_at is null)
+ or exists(select 1 from engineer_assignment_history h where h.project_id=p.id and h.user_id=$2 and h.ended_at is not null)
  or exists(select 1 from user_client_project_links l where l.project_id=p.id and l.user_id=$2))`, [user.role, user.id])).rows.map(r => r.id);
     const projectMeta = user.role === "client" ? [] : (await db.query("select project_id as id,metadata from workspace_project_metadata where project_id=any($1::uuid[])", [allowed])).rows;
     const accountMeta = (await db.query("select user_id as id,metadata from workspace_account_metadata where $1='admin' or user_id=$2", [user.role, user.id])).rows;
@@ -122,10 +129,15 @@ router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
     return {};
 }));
 router.put("/workspace/settings", endpoint(["admin"], async (db, user, req) => {
-    const rules = req.body;
+    // Merge, so settings this screen does not send (such as the reminder days) are kept.
+    const current = (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules || {};
+    const rules = { ...current, ...req.body };
     for (const k of ["grace", "cap", "response", "idle"])
         if (!Number.isInteger(rules[k]) || rules[k] < 1 || rules[k] > 365)
             throw new HttpError(400, "Invalid rule value.");
+    if (rules.reminderDays !== undefined && (!Array.isArray(rules.reminderDays) || !rules.reminderDays.length || rules.reminderDays.length > 12
+        || rules.reminderDays.some(d => !Number.isInteger(d) || d < 0 || d > 365)))
+        throw new HttpError(400, "Reminder days must be whole numbers from 0 to 365.");
     await db.query("update workspace_settings set rules=$1 where singleton", [JSON.stringify(rules)]);
     await event(db, user, null, "Workspace rules updated");
     return rules;
@@ -284,6 +296,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
     const leader = () => { if (user.role !== "spm" || lead !== user.id)
         throw new HttpError(403, "Only the Lead Site PM can do this."); };
     const meta = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    if (LICENSE_COMMANDS.has(c.type))
+        await assertLicenseActive(user, db);
     switch (c.type) {
         case "upload_registered": {
             opm();

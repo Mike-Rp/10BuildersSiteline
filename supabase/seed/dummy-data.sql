@@ -91,7 +91,7 @@ insert into public.user_certifications (user_id, certification_type_id) values
   ('95c19e86-7e25-421f-8194-18a1096d95f9', (select id from public.certification_types where code = 'DOLE-Safety'));
 
 insert into public.projects (id, name, project_type_id, client_name, floor_area_sqm, floor_count, target_start_date, current_stage_id, current_pct, crew_required, crew_assigned, lifecycle_status, suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, archived_at) values
-  ('5400952f-e868-4d7c-87d5-30ac7612599c', 'Rosaria Business Park', (select id from public.project_types where code = 'Commercial'), 'Maria L. Santos', 9120, 6, '2026-03-10', (select id from public.project_stages where code = 'Structure'), 60, 14, 14, 'active', 'd167b58a-4cc8-49ef-895c-067965ad281e', null, null, null, null),
+  ('5400952f-e868-4d7c-87d5-30ac7612599c', 'Rosaria Business Park', (select id from public.project_types where code = 'Mixed-Use'), 'Maria L. Santos', 9120, 6, '2026-03-10', (select id from public.project_stages where code = 'Structure'), 60, 14, 14, 'active', 'd167b58a-4cc8-49ef-895c-067965ad281e', null, null, null, null),
   ('502293ef-a9c6-4c06-89ff-7e490519b3c1', 'Meralco Ave. Fit-out', (select id from public.project_types where code = 'Commercial'), 'Ferdinand Uy', 3200, 3, '2026-02-01', (select id from public.project_stages where code = 'Finishes'), 67, 10, 10, 'active', 'd167b58a-4cc8-49ef-895c-067965ad281e', null, null, null, null),
   ('d60fa456-6d28-418c-8a09-47858c1d94b0', 'Brookfield Warehouse Ext.', (select id from public.project_types where code = 'Commercial'), 'Maria L. Santos', 6500, 2, '2026-06-15', (select id from public.project_stages where code = 'Design'), 33, 9, 8, 'active', '1262a8dd-643e-4128-8e86-d7b2029eefde', null, null, null, null),
   ('bee1c338-50bd-4d96-88fd-6ed2b22fe286', 'Alden Heights Residences — Tower B', (select id from public.project_types where code = 'Residential'), 'Ferdinand Uy', 18400, 22, '2026-09-01', (select id from public.project_stages where code = 'Mobilization'), 0, 40, 0, 'sent_to_opm', '1262a8dd-643e-4128-8e86-d7b2029eefde', 92, 40, 'Medium', null),
@@ -416,5 +416,42 @@ insert into public.notification_recipients (activity_log_id, recipient_user_id, 
   (7, 'fab4c2e6-4f56-48ea-8655-b9c90ae3ed15', true, now() - interval '29 hours'),
   (7, '95c19e86-7e25-421f-8194-18a1096d95f9', true, now() - interval '29 hours'),
   (8, 'fab4c2e6-4f56-48ea-8655-b9c90ae3ed15', false, null);
+
+-- Expired-license demo (dates are relative to today, so the demo never goes stale):
+--   Renz, Karlo ........ valid
+--   Bea Concepcion ..... expiring soon (20 days)
+--   Rafael Mercado ..... expired, inside the grace period (13 days ago, 18 days left)
+--   Mikaela Bautista ... expired 5 days ago, renewal under review
+--   Diego Salvador ..... expired 40 days ago, grace period over (Lead Site PM of Brookfield)
+--   Lea Fernandez ...... Office PM expired 35 days ago, grace period over (Rosaria + Meralco)
+update public.user_licenses set upload_file_ref = 'seed/licenses/' || id::text || '.pdf', upload_status = 'uploaded'
+ where upload_file_ref is null and superseded_at is null;
+update public.user_licenses set license_expiry = current_date + 20 where user_id = '95c19e86-7e25-421f-8194-18a1096d95f9' and superseded_at is null;
+update public.user_licenses set license_expiry = current_date - 13 where user_id = '1216a40a-8c34-4823-8676-736d1f0b03c6' and superseded_at is null;
+update public.user_licenses set license_expiry = current_date - 5  where user_id = 'f33b54f0-db8a-4869-844e-cc8996e75af4' and superseded_at is null;
+update public.user_licenses set license_expiry = current_date - 40 where user_id = 'afc7d1f8-529f-4232-821e-7f40e7171262' and superseded_at is null;
+update public.user_licenses set license_expiry = current_date - 35 where user_id = 'd167b58a-4cc8-49ef-895c-067965ad281e' and superseded_at is null;
+do $$ begin
+  if to_regclass('public.license_renewal_requests') is not null then
+    delete from public.license_renewal_requests where file_ref like 'seed/licenses/renewal-%';
+    insert into public.license_renewal_requests(user_id, license_number, license_expiry, file_ref, submitted_by, submitted_at)
+    values ('f33b54f0-db8a-4869-844e-cc8996e75af4', 'PRC Registered Engineer No. 005678', current_date + 730,
+            'seed/licenses/renewal-mikaela.pdf', 'f33b54f0-db8a-4869-844e-cc8996e75af4', now() - interval '2 days');
+  end if;
+  if exists(select 1 from information_schema.columns where table_schema = 'public' and table_name = 'projects' and column_name = 'target_end_date') then
+    -- Target end dates, so the assignment warning ("license expires during this project") can be shown.
+    update public.projects set target_end_date = current_date + 90  where id = '502293ef-a9c6-4c06-89ff-7e490519b3c1';
+    update public.projects set target_end_date = current_date + 120 where id = 'd60fa456-6d28-418c-8a09-47858c1d94b0';
+    update public.projects set target_end_date = current_date + 200 where id = '5400952f-e868-4d7c-87d5-30ac7612599c';
+    update public.projects set target_end_date = current_date + 300 where id = 'bee1c338-50bd-4d96-88fd-6ed2b22fe286';
+  end if;
+end $$;
+
+-- License grace period: 30 days (Administrators can change it in Settings).
+do $$ begin
+  if to_regclass('public.workspace_settings') is not null then
+    update public.workspace_settings set rules = rules || '{"grace":30}'::jsonb where singleton;
+  end if;
+end $$;
 
 commit;

@@ -1,13 +1,11 @@
 import { SIGN_IN_MESSAGES } from "../../src/signInPolicy.ts"
 import { DUMMY_CREDENTIALS, DUMMY_USERNAMES } from "./dummy-data.ts"
-import { licenseState, type Account, type State } from "../../src/model.ts"
+import { type Account, type State } from "../../src/model.ts"
 
 // Local sign-in until a real authentication service exists. The role always
 // comes from the matched account record; callers cannot choose it.
 export const INVALID_CREDENTIALS = SIGN_IN_MESSAGES.mismatch
 export const ACCOUNT_UNAVAILABLE = SIGN_IN_MESSAGES.inactive
-export const LICENSE_EXPIRED =
-  "Your professional license grace period has ended. Contact your Administrator."
 
 export function authenticate(
   state: Pick<State, "accounts" | "rules">,
@@ -53,11 +51,9 @@ export function sessionAccount(
 }
 
 export function assertCanSignIn(
-  state: Pick<State, "rules">,
+  _state: Pick<State, "rules">,
   account: Account,
 ): Account {
   if (account.status !== "active") throw new Error(ACCOUNT_UNAVAILABLE)
-  if (licenseState(account, state.rules.grace) === "Grace expired")
-    throw new Error(LICENSE_EXPIRED)
   return account
 }

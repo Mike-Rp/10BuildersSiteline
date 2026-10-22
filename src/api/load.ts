@@ -1,4 +1,6 @@
 import type { Account, Role, State } from "../model.ts"
+import type { LicenseData } from "../licenseTypes.ts"
+import { fetchMyLicense, fetchOverview, fetchRenewals, fetchRequests } from "./licenses.ts"
 import { api, apiList, ApiError, registerFileUrl } from "./client.ts"
 import {
   buildState,
@@ -18,6 +20,17 @@ const optional = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
   } catch (error) {
     // A role may simply not be allowed to read something (403/404).
     if (error instanceof ApiError && [403, 404].includes(error.status)) return fallback
+    throw error
+  }
+}
+
+// License information is an add-on: if it cannot be read (for example the database is behind on migrations), the rest of
+// the workspace still loads.
+const tolerant = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
+  try {
+    return await promise
+  } catch (error) {
+    if (error instanceof ApiError) return fallback
     throw error
   }
 }
@@ -92,6 +105,22 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     companies: subcontractors.map((s) => ({...mapCompany(s, projectIdsByName),...(workspace.companies?.[s.id]||{})})),
     events: notifications.map((n) => mapEvent(n, me.role === "admin" ? undefined : me.id)),
   })
+  const license: LicenseData = {}
+  if (me.role === "opm" || me.role === "spm") {
+    const [mine, requests] = await Promise.all([tolerant(fetchMyLicense(), undefined), tolerant(fetchRequests(), [])])
+    license.self = mine
+    license.requests = requests
+    const self = loaded.accounts.find((a) => a.id === me.id)
+    if (self && mine?.renewal?.status === "under_review") self.renewalUnderReview = true
+  }
+  if (me.role === "admin") {
+    const [overview, renewals] = await Promise.all([tolerant(fetchOverview(), []), tolerant(fetchRenewals(), [])])
+    license.overview = overview
+    license.renewals = renewals
+    const reviewing = new Set(renewals.map((r) => r.user_id))
+    for (const account of loaded.accounts) if (reviewing.has(account.id)) account.renewalUnderReview = true
+  }
+  loaded.license = license
   if(workspace.rules)loaded.rules=workspace.rules
   if(workspace.preferences?.muted)loaded.muted=workspace.preferences.muted
   loaded.backendPhases=workspace.backendPhases

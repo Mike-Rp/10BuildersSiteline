@@ -16,6 +16,7 @@ await db.exec("create role authenticated; create role anon; create role service_
 await db.exec(fs.readFileSync(here("../supabase/migrations/20261017000002_thesis_backend_schema.sql"), "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
 await db.exec(fs.readFileSync(here("../supabase/seed/dummy-data.sql"), "utf8"))
 await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
+await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-engineer-license-workflow.sql"),"utf8"))
 const dbPort = await free(), apiPort = await free()
 const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
 await pg.start()

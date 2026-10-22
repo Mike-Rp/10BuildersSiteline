@@ -3,7 +3,6 @@ import test from "node:test"
 import {
   ACCOUNT_UNAVAILABLE,
   INVALID_CREDENTIALS,
-  LICENSE_EXPIRED,
 } from "../src/auth.ts"
 import { DUMMY_CREDENTIALS, DUMMY_USERNAMES } from "./fixtures/dummy-data.ts"
 import { initialState } from "./fixtures/demo-state.ts"
@@ -75,12 +74,15 @@ test("deactivated, suspended and invited accounts cannot sign in", () => {
   }
 })
 
-test("engineers past the license grace period cannot sign in", () => {
-  const state = withAccount(initialState(), "a5", { expiry: "2020-01-01" })
-  assert.throws(
-    () => authenticate(state, emailOf(state, "a5"), DUMMY_CREDENTIALS.a5),
-    { message: LICENSE_EXPIRED },
-  )
+test("engineers with an expired license can still sign in, even past the grace period", () => {
+  // They must be able to view their projects and upload a renewed license. The backend pauses signing,
+  // submitting and approving instead.
+  for (const expiry of ["2020-01-01", "2000-01-01"]) {
+    const state = withAccount(initialState(), "a5", { expiry })
+    const account = authenticate(state, emailOf(state, "a5"), DUMMY_CREDENTIALS.a5)
+    assert.equal(account.id, "a5")
+    assert.equal(account.role, "spm")
+  }
 })
 
 test("a stored session is restored only for an account that may still sign in", () => {

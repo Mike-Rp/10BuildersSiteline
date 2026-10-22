@@ -467,3 +467,10 @@ left join public.users o on o.id=p.suggested_opm_id
 left join public.users l on l.id=md5('siteline-bulk-v1/user/spm/' || (2*series.n-1))::uuid
 left join public.users c on c.id=md5('siteline-bulk-v1/user/client/' || (1+(series.n-1)%25))::uuid
 order by series.n;
+
+-- License grace period: 30 days (Administrators can change it in Settings).
+do $$ begin
+  if to_regclass('public.workspace_settings') is not null then
+    update public.workspace_settings set rules = rules || '{"grace":30}'::jsonb where singleton;
+  end if;
+end $$;

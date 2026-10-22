@@ -3,6 +3,7 @@ import { maybeCloseProject } from "../archive/policy.js";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isProjectOpmOrAdmin, isUuid, paging,
@@ -93,6 +94,7 @@ const resolveRework = (decision) => async (req, res) => {
  
     const newStatus = decision === "approve" ? "approved" : "rejected";
     const data = await withTransaction(async (client) => {
+      await assertLicenseActive(user,client);
       const lookup=await client.query("SELECT project_id FROM pending_rework_requests WHERE id=$1",[id]);
       if(!lookup.rowCount) throw new HttpError(404,"Rework request not found.");
       const project=await phaseProject(client,user,lookup.rows[0].project_id);
@@ -136,7 +138,7 @@ export const getProjectHistory = async (req, res) => {
     if (!user) return;
     const { id } = req.params;
     if (!isUuid(id)) return sendError(res, "Invalid project id.", 400);
-    if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
+    if (!(await hasProjectAccess(user, id, null, { includeFormer: true }))) return sendError(res, "Project not found.", 404);
     const { limit, offset } = paging(req, 50, 200);
  
     const result = await execute(

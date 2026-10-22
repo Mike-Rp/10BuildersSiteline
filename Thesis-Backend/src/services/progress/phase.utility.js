@@ -1,6 +1,7 @@
 import {
   HttpError, hasProjectAccess, isUuid, isSmallintId,
 } from "../../common/utilities/access.utility.js";
+import { markPhaseCompleted } from "../licenses/history.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -62,12 +63,13 @@ export async function readChecklist(client, projectId, stageId) {
     `SELECT i.id, i.code, i.title, i.required, i.sort_order,
             COALESCE(e.status, 'missing') AS status,
             e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note,
-            e.submitted_by, e.submission_note, e.phase_update_id, f.original_name, f.content_type
+            e.submitted_by, su.full_name AS submitted_by_name, e.submission_note, e.phase_update_id, f.original_name, f.content_type
        FROM project_phase_checklist_items i
        LEFT JOIN LATERAL (
          SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1
        ) e ON true
        LEFT JOIN project_phase_files f ON f.id=e.file_id
+       LEFT JOIN users su ON su.id=e.submitted_by
       WHERE i.project_id = $1 AND i.project_stage_id = $2 ORDER BY i.sort_order, i.id`, [projectId, stageId]);
   const required = result.rows.filter(i => i.required);
   const approved = required.filter(i => i.status === "approved").length;
@@ -83,6 +85,8 @@ export async function recordPhaseHistory(client, project, pct, note, userId, opt
         recorded_by, recorded_at, created_by, updated_by, issue_categories, entry_type)
      VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $7, $7, $8, $9) RETURNING id, recorded_at`,
     [project.id, project.current_stage_id, pct, note, isIssue, !isIssue, userId, issueCategories, entryType]);
+  // A phase that reaches 100% is credited to whoever holds it (and to the engineer who took it over).
+  if (Number(pct) === 100) await markPhaseCompleted(client, project.id, project.current_stage_id);
   if (updateProject) {
     // Reviewing an older stage must not overwrite the current stage's cached percentage.
     await client.query(

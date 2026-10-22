@@ -1,7 +1,7 @@
 import {
   DOC_LABELS,
   PHASES,
-  licenseState,
+  licenseExpired,
   projectPhaseNames,
   spmCandidates,
   today,
@@ -107,6 +107,15 @@ export type WorkflowCommand = {
   expectedVersion?: number
   company?: Company
 }
+// Commands an Office PM or Site PM signs, submits or approves. They are paused while the license is expired (the
+// backend enforces the same list). Viewing, notes, photos and declining stay available.
+export const LICENSE_PAUSED_MESSAGE = "Paused until your license renewal is verified"
+export const LICENSE_COMMANDS: ReadonlySet<WorkflowCommand["type"]> = new Set([
+  "accept_opm", "upload_registered", "accept_assignment", "select_company", "replace_company", "archive_company",
+  "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "approve_rework",
+  "decline_rework", "submit_checklist", "approve_checklist", "reject_checklist", "request_company",
+  "archive_company_request", "activate_project", "acknowledge_client_subcon", "report_client_subcon_issue",
+])
 export function workflowFor(p: Project): ProjectWorkflow {
   return (
     p.workflow || {
@@ -806,10 +815,12 @@ export function applyWorkflow(
 ): State {
   const actor = state.accounts.find((a) => a.id === actorId)
   assert(
-    actor &&
-      actor.status === "active" &&
-      licenseState(actor, state.rules.grace) !== "Grace expired",
+    actor && actor.status === "active",
     "This account is not eligible for an active session.",
+  )
+  assert(
+    !LICENSE_COMMANDS.has(command.type) || !licenseExpired(actor),
+    LICENSE_PAUSED_MESSAGE,
   )
   assert(
     actor.role === "opm" || actor.role === "spm",

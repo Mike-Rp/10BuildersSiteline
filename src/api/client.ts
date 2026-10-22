@@ -184,6 +184,12 @@ export function tokenUser(): {
   }
 }
 
+// Authenticated download of any API path (for example a license renewal document).
+export async function downloadBlob(path: string): Promise<Blob | undefined> {
+  const response = await request(path)
+  return response.ok ? response.blob() : undefined
+}
+
 // Authenticated file download (documents, photos).
 const fileUrls = new Map<string, string>()
 export const registerFileUrl = (

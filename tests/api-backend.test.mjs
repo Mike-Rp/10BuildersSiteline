@@ -48,6 +48,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-engineer-license-workflow.sql"),"utf8"))
   const dummySql = fs.readFileSync(dummy, "utf8")
   await db.exec(dummySql)
   await db.exec(dummySql) // the demo data can be loaded again

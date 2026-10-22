@@ -11,6 +11,7 @@ const scope = `p.id in (
    select 1 from project_engineers e where e.project_id=scoped.id and e.user_id=$2 and e.unassigned_at is null)))
  or ($1='spm' and (exists(select 1 from project_phase_team t where t.project_id=scoped.id and t.spm_user_id=$2)
    or exists(select 1 from project_engineers e where e.project_id=scoped.id and e.user_id=$2 and e.unassigned_at is null)))
+ or ($1 in ('opm','spm') and exists(select 1 from engineer_assignment_history h where h.project_id=scoped.id and h.user_id=$2 and h.ended_at is not null))
  or ($1='client' and scoped.lifecycle_status in ('active','archived') and exists(
    select 1 from user_client_project_links l where l.project_id=scoped.id and l.user_id=$2)))
 )`;
@@ -68,10 +69,11 @@ export async function getProjectData(req,res) {
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
    const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,
     coalesce(e.status,'missing') as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
-    e.review_note,e.submitted_by,e.submission_note,e.phase_update_id,f.original_name,f.content_type
+    e.review_note,e.submitted_by,su.full_name as submitted_by_name,e.submission_note,e.phase_update_id,f.original_name,f.content_type
     from project_phase_checklist_items i join projects p on p.id=i.project_id and p.current_stage_id=i.project_stage_id
     left join lateral(select * from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
     left join project_phase_files f on f.id=e.file_id
+    left join users su on su.id=e.submitted_by
     where i.project_id=any($1::uuid[]) order by i.sort_order,i.id`,[ids])).rows:[];
    const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage
     from project_phase_updates u join project_stages selected on selected.id=u.selected_stage_id

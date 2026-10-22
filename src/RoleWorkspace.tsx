@@ -12,6 +12,7 @@ import LeadSubcontractorPanel, {
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
+import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
 import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
@@ -164,6 +165,7 @@ export default function RoleWorkspace({
   onStayActive,
   onResume,
   onPause,
+  onReload,
 }: {
   state: State
   actor: Account
@@ -175,8 +177,10 @@ export default function RoleWorkspace({
   onStayActive: () => void
   onResume: () => void
   onPause: () => void
+  onReload: () => unknown
 }) {
   const isOpm = actor.role === "opm"
+  const [renewing, setRenewing] = useState(false)
   useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
@@ -443,19 +447,33 @@ export default function RoleWorkspace({
   }
   function header(title: string, subtitle: string, action?: ReactNode) {
     return (
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            {isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="eyebrow">
+              {isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}
+            </div>
+            <h1>
+              {title}
+              <span className="heading-dot">.</span>
+            </h1>
+            <p>{subtitle}</p>
           </div>
-          <h1>
-            {title}
-            <span className="heading-dot">.</span>
-          </h1>
-          <p>{subtitle}</p>
+          {action}
         </div>
-        {action}
-      </div>
+        <LicenseBanner license={state.license?.self} onUpload={() => setRenewing(true)} />
+        {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
+          <ReassignRequests
+            requests={state.license?.requests || []}
+            onError={setError}
+            onChanged={() => {
+              setError("")
+              setMessage("Reassignment answered.")
+              void onReload()
+            }}
+          />
+        )}
+      </>
     )
   }
   function timeline(p: Project) {
@@ -899,6 +917,7 @@ export default function RoleWorkspace({
           />
           <CompactPager list={dashSchedule} />
         </Panel>
+        <WorkRecord userId={actor.id} />
       </>
     )
   }
@@ -2227,7 +2246,9 @@ export default function RoleWorkspace({
                             />
                           </div>
                           <p>
-                            Submitted{" "}
+                            {item.submittedBy || item.submittedByName
+                              ? `Evidence submitted by ${item.submittedByName || actorName(item.submittedBy || "")}`
+                              : "Submitted"}{" "}
                             {item.submittedAt
                               ? new Date(item.submittedAt).toLocaleString()
                               : "date unavailable"}
@@ -4127,6 +4148,18 @@ export default function RoleWorkspace({
             </Button>
           </div>
         </Modal>
+      )}
+      {renewing && (
+        <RenewalUploadDialog
+          license={state.license?.self}
+          onClose={() => setRenewing(false)}
+          onDone={() => {
+            setRenewing(false)
+            setError("")
+            setMessage("Renewal uploaded. An Administrator will review it.")
+            void onReload()
+          }}
+        />
       )}
       {preview && (
         <Preview

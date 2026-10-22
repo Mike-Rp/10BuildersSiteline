@@ -1,3 +1,4 @@
+import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
@@ -403,6 +404,12 @@ export const addLicense = async (req, res) => {
     if (!licenseNumber || !String(licenseNumber).trim()) { cleanup(); return sendError(res, "license_number is required.", 400); }
     if (!licenseExpiry || !/^\d{4}-\d{2}-\d{2}$/.test(licenseExpiry) || Number.isNaN(Date.parse(licenseExpiry))) {
       cleanup(); return sendError(res, "license_expiry is required (YYYY-MM-DD).", 400);
+    }
+
+    // An engineer's own upload never takes effect by itself: it waits for an Administrator to verify it.
+    if (!isAdmin) {
+      const request = await withTransaction((client) => createRenewalRequest(client, user, b, req.file));
+      return sendOk(res, "Renewal uploaded. It will be reviewed by an Administrator.", 1, request, 201);
     }
 
     const data = await withTransaction(async (client) => {
