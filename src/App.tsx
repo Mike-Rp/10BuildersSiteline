@@ -278,6 +278,7 @@ function AppInner() {
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
   const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
+  const [readinessAvailable, setReadinessAvailable] = useState(false)
   const [mustResetPassword,setMustResetPassword]=useState(false)
   const [idleWarning, setIdleWarning] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
@@ -423,14 +424,17 @@ function AppInner() {
     }
   }
   async function reloadWorkspace() {
-    const loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email})
+    let loaded: State
+    try { loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email}) }
+    catch (error) { setReadinessAvailable(false); throw error }
     stateRef.current=loaded
     setState(loaded)
+    setReadinessAvailable(true)
     return loaded
   }
   // Let the next Site PM see an OPM handoff without a manual page reload.
   useEffect(() => {
-    if (signedOut || !["opm", "spm"].includes(actor.role) || !tokenUser()) return
+    if (signedOut || !["admin", "opm", "spm"].includes(actor.role) || !tokenUser()) return
     let active = true, loading = false
     const refresh = async () => {
       if (!active || loading || document.visibilityState === "hidden") return
@@ -438,8 +442,8 @@ function AppInner() {
       const snapshot = stateRef.current
       try {
         const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
-        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded) }
-      } catch { /* A transient background failure leaves the current workspace usable. */ }
+        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true) }
+      } catch { if(active)setReadinessAvailable(false) /* A failed read does not assert current blockers. */ }
       finally { loading = false }
     }
     const timer = window.setInterval(() => { void refresh() }, 15000)
@@ -503,6 +507,7 @@ function AppInner() {
     email?: string
   }): Promise<Account> {
     setLoadingWorkspaceRole(user.role)
+    setReadinessAvailable(false)
     try {
       setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
       const loaded = await loadApiState(user)
@@ -516,6 +521,7 @@ function AppInner() {
       }
       stateRef.current = loaded
       setState(loaded)
+      setReadinessAvailable(true)
       return account
     } finally {
       setLoadingWorkspaceRole(undefined)
@@ -1274,6 +1280,7 @@ function AppInner() {
   function dashboard() {
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
     return <PasswordResetRequests>{(requests, openReset) => <AdminDashboard
+      readinessAvailable={readinessAvailable}
       overview={{ ...adminDashboardOverview(state), items: [
         ...requests.map(request => ({ key: "password-reset:" + request.id, id: request.id, kind: "account" as const, category: "requests" as const, title: request.full_name, detail: "Password reset requested: " + request.email, label: "Reset password", icon: "shield" })),
         ...adminDashboardOverview(state).items,

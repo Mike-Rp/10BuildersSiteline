@@ -15,7 +15,7 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
     const count = (category: string) => items.filter(item => item.category === category).length
     const intakeCounts = intakeViewCounts(state.projects.filter(isIntake), project => intakeGuidance(state, project, actor))
     return {
-      "Active sites": { count: count("updates"), description: "projects awaiting Office PM review" },
+      "Active sites": { count: count("updates"), description: "projects with pending reviews or blocked phase handoffs" },
       "Project intake": { count: intakeCounts.action, description: "intake records needing your action" },
       Directory: { count: count("requests"), description: "subcontractor requests awaiting approval" },
       Team: { count: count("licenses"), description: "active staff accounts with license alerts" },

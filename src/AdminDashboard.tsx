@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { Button, Empty, Icon } from "./ui"
 import type { DashboardCategory, DashboardItem } from "./admin-dashboard"
 import "./admin-dashboard.css"
@@ -7,7 +7,8 @@ const categories: ["all" | DashboardCategory, string][] = [
   ["all", "All"], ["requests", "Requests"], ["licenses", "Licenses"], ["updates", "Project updates"], ["intake", "Intake"],
 ]
 
-export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onActivity, activity }: {
+export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onActivity, activity, readinessAvailable = true }: {
+  readinessAvailable?: boolean
   overview: { activeProjects: number; intakeProjects: number; teamAccounts: number; items: DashboardItem[] }
   onNavigate: (page: string) => void
   onOpen: (item: DashboardItem) => void
@@ -17,11 +18,23 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
 }) {
   const [category, setCategory] = useState<"all" | DashboardCategory>("all")
   const [page, setPage] = useState(1)
-  const filtered = overview.items.filter(item => category === "all" || item.category === category)
+  const [blockersOnly, setBlockersOnly] = useState(false)
+  const attentionHeading = useRef<HTMLHeadingElement>(null)
+  const blockers = [...new Map(overview.items.filter(item => item.blocker).map(item => [item.id, item])).values()]
+  const filtered = overview.items.filter(item => blockersOnly && blockers.length ? item.blocker : category === "all" || item.category === category)
   const pages = Math.max(1, Math.ceil(filtered.length / 6))
   const current = Math.min(page, pages)
   const visible = filtered.slice((current - 1) * 6, current * 6)
   return <div className="admin-overview">
+    {readinessAvailable && blockers.length > 0 && <section className="ao-blocker-banner" aria-label="Priority attention">
+      <span className="ao-blocker-icon" aria-hidden="true"><Icon name="alert" size={24} /></span>
+      <div className="ao-blocker-copy"><strong>{blockers.length} {blockers.length === 1 ? "project cannot" : "projects cannot"} advance</strong>
+        <p>{blockers.length === 1 ? `${blockers[0].title}: ${blockers[0].detail}` : "Review the issues preventing phase handoff."}</p></div>
+      <Button onClick={() => {
+        if (blockers.length === 1) onOpen(blockers[0])
+        else { setBlockersOnly(true); setPage(1); attentionHeading.current?.focus(); attentionHeading.current?.scrollIntoView?.({block:"nearest",behavior:"auto"}) }
+      }}>{blockers.length === 1 ? "Review issue" : "View blockers"}<Icon name="arrow" size={16} /></Button>
+    </section>}
     <header className="ao-heading">
       <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Workspace overview<span>.</span></h1><p>Your current workload, open decisions, and latest updates.</p></div>
       <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
@@ -39,9 +52,10 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
     </div>
     <div className="ao-content">
       <section className="ao-panel" aria-labelledby="ao-attention-title">
-        <header className="ao-panel-header"><div><h2 id="ao-attention-title">Needs attention</h2><p>Open an item to view its details and existing actions.</p></div><span className="ao-count" aria-label={`${overview.items.length} attention items`}>{overview.items.length}</span></header>
+        <header className="ao-panel-header"><div><h2 id="ao-attention-title" ref={attentionHeading} tabIndex={-1}>Needs attention</h2><p>Open an item to view its details and existing actions.</p></div><span className="ao-count" aria-label={`${overview.items.length} attention items`}>{overview.items.length}</span></header>
         <div className="ao-filters" role="group" aria-label="Filter attention items">
-          {categories.map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setPage(1) }}>{label}</button>)}
+          {categories.map(([key, label]) => <button key={key} aria-pressed={!blockersOnly && category === key} onClick={() => { setCategory(key); setBlockersOnly(false); setPage(1) }}>{label}</button>)}
+          {blockersOnly && blockers.length > 0 && <button aria-pressed="true" onClick={() => {setBlockersOnly(false);setPage(1)}}>Blockers · Show all</button>}
         </div>
         {visible.length ? <ul className="ao-task-list">{visible.map(item => <li key={item.key}>
           <button className="ao-task" onClick={() => onOpen(item)}>

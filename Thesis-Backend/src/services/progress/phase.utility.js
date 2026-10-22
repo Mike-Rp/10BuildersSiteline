@@ -58,8 +58,8 @@ export async function ensureChecklist(client, projectId, stageId) {
   }
 }
 
-export async function readChecklist(client, projectId, stageId) {
-  await ensureChecklist(client, projectId, stageId);
+export async function readChecklist(client, projectId, stageId, { initialize = true } = {}) {
+  if (initialize) await ensureChecklist(client, projectId, stageId);
   const result = await client.query(
     `SELECT i.id, i.code, i.title, i.required, i.sort_order, i.weight,
             CASE WHEN e.status='rejected' AND e.rework_request_id IS NOT NULL THEN 'rework_required' ELSE COALESCE(e.status,'missing') END AS status,

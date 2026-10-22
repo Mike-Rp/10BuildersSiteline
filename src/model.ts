@@ -233,6 +233,7 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  handoffReadiness?: { state: "blocked" | "incomplete" | "unknown" | "inactive" | "final" | "ready"; stageId: string; reason?: string; reasonCode?: string }
   handoffBlocker?: string
   checklistProgress?: PhaseProgress[]
   verifiedProgress?: import("./project-progress").VerifiedProgress

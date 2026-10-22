@@ -4,7 +4,7 @@ import { requireUser, sendOk, handleError } from "../../common/utilities/access.
 import { LIST_SELECT, LIST_FROM, stripInternal } from "../projects/read.controller.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
-import { transitionPhase } from "../progress/handoff.utility.js";
+import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
 import { ensureChecklist } from "../progress/phase.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
@@ -158,13 +158,21 @@ export async function getProjectData(req,res) {
        order by id desc limit 1)e on true
      group by ph.project_id,s.id,s.code,w.sort_order,c.project_id order by w.sort_order,s.id`,[ids])).rows:[];
    const verified = staff ? await readVerifiedProgress(db,ids) : new Map();
+   // Read the same gates as automatic handoff, only for already-authorized
+   // Administrator projects. Do not initialize future scope for a banner read.
+   const readiness = new Map();
+   if (user.role === "admin") for (const project of projects) {
+    const result = await assessPhaseHandoff(db, project);
+    readiness.set(project.id, { state: result.state, stageId: String(project.current_stage_id),
+     reason: result.reason, reasonCode: result.reasonCode });
+   }
    const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
    return projects.map(p=>{
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
-     assignments:assigned,contracts:contractRows,pending:null,...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
+     assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
    });
   });
   res.set("Cache-Control","private, no-store");

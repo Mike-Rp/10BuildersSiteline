@@ -11,12 +11,19 @@ export type DashboardItem = {
   detail: string
   label: string
   icon: string
+  blocker?: boolean
 }
 
 // Uses only the Administrator's existing authorized workspace; no additional reads.
 export function adminDashboardOverview(state: State) {
   const intake = state.projects.filter(p => ["pending", "draft", "changes_requested"].includes(p.status))
+  const blockers = state.projects.filter(p => p.status === "active" && p.handoffReadiness?.state === "blocked" &&
+    ["pending_reviews", "current_assignment", "next_assignment", "next_scope"].includes(p.handoffReadiness.reasonCode || "") && p.handoffReadiness.reason)
+    .sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+  const blockedIds = new Set(blockers.map(p => p.id))
   const items: DashboardItem[] = [
+    ...blockers.map(p => ({ key: `project:${p.id}`, id: p.id, kind: "project" as const, category: "updates" as const,
+      title: p.name, detail: p.handoffReadiness!.reason!, label: "Handoff blocked", icon: "alert", blocker: true })),
     ...state.companies.filter(c => c.status === "pending").map(c => ({
       key: `company:${c.id}`, id: c.id, kind: "company" as const, category: "requests" as const,
       title: c.name, detail: "Subcontractor request awaiting approval", label: "Request", icon: "shield",
@@ -26,7 +33,7 @@ export function adminDashboardOverview(state: State) {
       key: `account:${a.id}`, id: a.id, kind: "account" as const, category: "licenses" as const,
       title: a.name, detail: `License: ${licenseState(a, state.rules.grace)}`, label: "License review", icon: "doc",
     })),
-    ...state.projects.filter(hasPendingSiteReview).map(p => ({
+    ...state.projects.filter(p => hasPendingSiteReview(p) && !blockedIds.has(p.id)).map(p => ({
       key: `project:${p.id}`, id: p.id, kind: "project" as const, category: "updates" as const,
       title: p.name, detail: "Progress update or site issue awaiting Office PM review", label: "Project update", icon: "activity",
     })),

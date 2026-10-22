@@ -25,6 +25,28 @@ const workspace = () => ({
   companies: [{id:"request",name:"Requested company",status:"pending"},{id:"approved",name:"Approved company",status:"approved"}],
 })
 
+test("only explicit server handoff blockers become shared project tasks, never percentages or missing data", () => {
+  const state = workspace()
+  const project = state.projects[0]
+  project.progress = 100
+  project.handoffBlocker = "Unstructured legacy message"
+  assert.equal(adminDashboardOverview(state).items.filter(i=>i.blocker).length,0)
+  for(const status of ["unknown","incomplete","ready","final","inactive"]) {
+    project.handoffReadiness={state:status,stageId:"1",reasonCode:"next_assignment",reason:"Confirm next Site PM."}
+    assert.equal(adminDashboardOverview(state).items.filter(i=>i.blocker).length,0)
+  }
+  project.handoffReadiness={state:"blocked",stageId:"1",reasonCode:"next_assignment",reason:"Confirm next Site PM."}
+  project.workflow={pendingUpdate:{id:"another-reason"},pendingRework:{id:"another"}}
+  const items=adminDashboardOverview(state).items
+  assert.equal(items.filter(i=>i.id===project.id).length,1)
+  assert.equal(items.find(i=>i.blocker).key,`project:${project.id}`)
+  assert.equal(items.find(i=>i.blocker).detail,"Confirm next Site PM.")
+  for(const status of ["completed","archived","pending","draft"]) {
+    project.status=status
+    assert.equal(adminDashboardOverview(state).items.filter(i=>i.blocker).length,0)
+  }
+})
+
 test("admin overview separates workload totals from one queue of current follow-up records", () => {
   const overview = adminDashboardOverview(workspace())
   assert.equal(overview.activeProjects, 3)
@@ -118,6 +140,24 @@ test("Administrator dashboard filters and pages attention items and preserves ac
     await act(()=>root.render(React.createElement(AdminDashboard,{...props,overview:adminDashboardOverview(emptyState())})))
     assert.match(document.body.textContent,/Nothing waiting for attention/)
     assert.equal(document.querySelectorAll(".ao-task").length,0)
+    const blocker = (id) => ({key:`project:${id}`,id,kind:"project",category:"updates",title:id,detail:"Confirm next phase SPM.",label:"Handoff blocked",icon:"alert",blocker:true})
+    const one=blocker("one"),two=blocker("two")
+    await act(()=>root.render(React.createElement(AdminDashboard,{...props,overview:{...props.overview,items:[one]}})))
+    assert.match(document.querySelector(".ao-blocker-banner").textContent,/1 project cannot advance/)
+    assert.equal(document.querySelector(".ao-blocker-banner").getAttribute("role"),null,"no polling live announcement")
+    await act(()=>button("Review issue").click())
+    assert.equal(opened.at(-1),one,"banner opens the very same task object")
+    await act(()=>root.render(React.createElement(AdminDashboard,{...props,readinessAvailable:false,overview:{...props.overview,items:[one]}})))
+    assert.equal(document.querySelector(".ao-blocker-banner"),null,"loading/failed readiness hides the warning")
+    await act(()=>root.render(React.createElement(AdminDashboard,{...props,overview:{...props.overview,items:[one,two,...props.overview.items]}})))
+    assert.match(document.querySelector(".ao-blocker-banner").textContent,/2 projects cannot advance/)
+    await act(()=>button("View blockers").click())
+    assert.equal(document.activeElement.id,"ao-attention-title")
+    assert.equal(document.querySelectorAll(".ao-task").length,2)
+    await act(()=>button("Requests").click())
+    assert.equal(document.querySelectorAll(".ao-task").length,1,"ordinary filters still work")
+    await act(()=>root.render(React.createElement(AdminDashboard,{...props,overview:props.overview})))
+    assert.equal(document.querySelector(".ao-blocker-banner"),null,"resolved blockers disappear")
   } finally {
     await act(()=>root.unmount())
     await server.close()
