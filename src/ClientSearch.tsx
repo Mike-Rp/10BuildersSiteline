@@ -23,8 +23,9 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
   const [page, setPage] = useState(0)
   const selected = clients.find(client => client.id === value)
   const term = query.trim().toLocaleLowerCase()
+  // Search only visible identity fields; UUID fragments can match unrelated clients.
   const matches = term ? clients.filter(client =>
-    [client.name, client.email, client.id].some(text => text.toLocaleLowerCase().includes(term))) : []
+    [client.name, client.email].some(text => text.toLocaleLowerCase().includes(term))) : []
   const pages = Math.max(1, Math.ceil(matches.length / 3))
   const currentPage = Math.min(page, pages - 1)
   const expanded = open && !!term && !selected && !disabled

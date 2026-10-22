@@ -21,6 +21,7 @@ test("intake client search opens only after typing, paginates, selects real IDs,
     const state=emptyState()
     const names=["Adrian Aguilar","Bianca Aguilar","Carlo Aguilar","Diana Aguilar","Enzo Aguilar"]
     const clients=names.map((name,i)=>({id:`client-${i+1}`,role:"client",name,email:`client00${i+1}@example.test`,status:"active",phone:"09123456789",contactPerson:"Client Contact",scope:[],projectTypes:[],docs:[]}))
+    clients[4].id="11111111-ad00-4000-8000-111111111111"
     state.accounts=[...clients,{...clients[0],id:"blocked",name:"Blocked Aguilar",status:"suspended"},{...clients[0],id:"inactive",name:"Inactive Aguilar",status:"deactivated"},{...clients[0],id:"staff",name:"Staff Aguilar",role:"opm"}]
     let closed=0
     await act(()=>root.render(React.createElement(Modal,{title:"New project intake",onClose:()=>closed++},React.createElement(IntakeForm,{state,onSubmit:()=>{},onClient:a=>a,onClose:()=>closed++}))))
@@ -43,6 +44,14 @@ test("intake client search opens only after typing, paginates, selects real IDs,
     await act(()=>get('[aria-label="Next client results"]').click())
     assert.equal(document.querySelectorAll('.client-search-row').length,2)
     assert.match(get('.client-search-pages').textContent,/Page 2 of 2/)
+    await type(" Ad ")
+    assert.equal(get('.client-search-count').textContent,"1 matching client","hidden ID fragments must not match unrelated names")
+    assert.match(get('.client-search-person').textContent,/Adrian Aguilar/)
+    assert.equal(get('.client-search-pages'),null,"narrowing search resets pagination")
+    await type("Adrain")
+    assert.match(get('.client-search-empty').textContent,/No clients found/,"misspellings are not fuzzy matched")
+    await type(clients[4].id)
+    assert.match(get('.client-search-empty').textContent,/No clients found/,"internal account IDs are not searchable")
     await type("CLIENT002@EXAMPLE.TEST")
     assert.equal(get('.client-search-count').textContent,"1 matching client")
     await act(()=>search().dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})))
