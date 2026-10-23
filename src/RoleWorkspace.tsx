@@ -2011,6 +2011,7 @@ export default function RoleWorkspace({
               label="Shared site photo (Client-visible)"
               buttonLabel="Upload site photo"
               owner={actor.name}
+              clientVisible
               onSave={async (doc) =>
                 await act(
                   { type: "add_photo", projectId: p.id, doc },

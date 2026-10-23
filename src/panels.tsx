@@ -13,6 +13,7 @@ import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
 import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
+import { newUploadedDoc } from "./uploadDocument"
 import {
   accountError,
   clientForEmail,
@@ -101,6 +102,7 @@ export function Upload({
   buttonLabel = "Upload document",
   ariaLabel,
   spreadsheet = false,
+  clientVisible = false,
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
@@ -109,6 +111,8 @@ export function Upload({
   buttonLabel?: string
   ariaLabel?: string
   spreadsheet?: boolean
+  // Internal by default. Only the shared site-photo gallery sets this, because that gallery is shared with the Client Portal.
+  clientVisible?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File>()
@@ -149,17 +153,7 @@ export function Upload({
     try {
       const id = uid()
       await saveFile(id, file, spreadsheet)
-      const saved=await onSave({
-        id,
-        label,
-        name: file.name,
-        uploaded: true,
-        clientVisible: false,
-        owner,
-        date: today(),
-        size: file.size,
-        mime: file.type,
-      })
+      const saved=await onSave(newUploadedDoc({ id, label, file, owner, clientVisible }))
       if(saved===false)throw new Error("The server could not save this change. Review the workspace message and try again.")
       clear()
     } catch (e) {
