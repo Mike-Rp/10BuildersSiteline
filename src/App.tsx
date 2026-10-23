@@ -16,6 +16,7 @@ import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, c
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import MonthlyReport from "./MonthlyReport"
+import Reports from "./Reports"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
@@ -1312,6 +1313,7 @@ function AppInner() {
     )
   }
   function renderPage() {
+    if (page === "Reports") return <Reports projects={state.projects} />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
       return (

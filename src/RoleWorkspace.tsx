@@ -1,6 +1,7 @@
 import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
+import Reports from "./Reports"
 import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
@@ -146,6 +147,7 @@ const OPM_NAV = [
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
+  ["Reports", "doc"],
 ]
 const SPM_NAV = [
   ["Dashboard", "grid"],
@@ -157,6 +159,7 @@ const SPM_NAV = [
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
+  ["Reports", "doc"],
 ]
 type Result = {
   ok: boolean
@@ -3434,6 +3437,7 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
+    if (page === "Reports") return <Reports projects={projects} />
     switch (page) {
       case "Dashboard":
         return dashboard()
