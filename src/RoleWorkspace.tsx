@@ -6,6 +6,7 @@ import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
+import ChecklistApprovalBanner from "./ChecklistApprovalBanner"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
@@ -458,6 +459,13 @@ export default function RoleWorkspace({
     setPickedId(p.id)
     navigate("Documents")
   }
+  function openChecklistApprovals(project?: Project) {
+    updateListQuery(`${actor.role}:review-qa`, current => ({
+      ...current, search: "", filters: project ? { project: project.id } : {}, page: 1,
+    }))
+    navigate("Rework & approvals")
+    setTab("qa")
+  }
   async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
       setError("Document access is outside your project scope.")
@@ -724,6 +732,7 @@ export default function RoleWorkspace({
         {header(
           isOpm ? "Project overview" : "Site overview",
         )}
+        {isOpm && <ChecklistApprovalBanner projects={allActive} actor={actor} onReview={openChecklistApprovals} />}
         {!isOpm && expiryDays !== null && expiryDays <= 30 && <div className="license-expiry-warning" role="alert">
           <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
           <p>License expiry: {actor.expiry}. {expiryDays < 0 ? "Your license has expired." : expiryDays === 0 ? "Your license expires today." : expiryDays + " days remaining."} Contact your administrator to renew your license and keep your account eligible for new assignments.</p></div>
@@ -2097,7 +2106,13 @@ export default function RoleWorkspace({
     )
     const qaList = runList(`${actor.role}:review-qa`, qaItems, {
       searchText: projectText,
-      filters: [phaseFilterP(qaItems)],
+      filters: [phaseFilterP(qaItems), {
+        id: "project",
+        label: "Project",
+        allLabel: "All projects",
+        options: qaItems.map(p => ({ value: p.id, label: p.name })),
+        test: (p, value) => p.id === value,
+      }],
     })
     const submissionItems = tab === "rework" ? pendingRework : pendingUpdates
     const submitter = (p: Project) => {
@@ -2526,10 +2541,7 @@ export default function RoleWorkspace({
           <button
             key={`${p.id}-qa`}
             className="deadline-list-item"
-            onClick={() => {
-              navigate("Rework & approvals")
-              setTab("qa")
-            }}
+            onClick={() => openChecklistApprovals(p)}
           >
             <Icon name="shield" />
             <div>
