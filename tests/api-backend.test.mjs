@@ -256,6 +256,60 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual((await db.query("select id,current_stage_id,current_pct,lifecycle_status from projects order by id")).rows,before,"reports and exports do not change workflow records")
   })
 
+  await t.test("overall monthly summary covers exactly the authorized projects, matches each project report and exports its own snapshot", async () => {
+    const month=currentReportMonth()
+    const all=(await db.query("select id,name from projects where not coalesce(is_deleted,false)")).rows
+    for(const [email,projection] of [["patricia.domingo@10builders.com","staff"],["lea.fernandez@10builders.com","staff"],["mikaela.bautista@10builders.com","site"],["maria.santos@rosariabiz.ph","client"]]) {
+      await asUser(email)
+      const {summary,snapshot}=await api(`/reports/monthly-summary?month=${month}`)
+      assert.equal(summary.projection,projection)
+      assert.equal(new Set(summary.rows.map(r=>r.id)).size,summary.rows.length,"each project appears once")
+      const allowed=[]
+      for(const p of all){
+        try{allowed.push({p,report:(await api(`/projects/${p.id}/monthly-report?month=${month}`)).report})}catch(error){assert.match(error.message,/not found/i)}
+      }
+      assert.deepEqual(summary.rows.map(r=>r.id).sort(),allowed.map(a=>a.p.id).sort(),`${email}: summary scope equals per-project report access`)
+      for(const {report} of allowed){
+        const row=summary.rows.find(r=>r.id===report.project.id)
+        assert.equal(row.opening,report.opening.percentage);assert.equal(row.closing,report.closing.percentage);assert.equal(row.change,report.netChange)
+        assert.equal(row.completedPhases?.length??null,report.completedPhases?.length??null)
+        if(projection==="staff")assert.equal(row.approvals,report.approvals?.events??null)
+        if(projection!=="client")assert.deepEqual(row.pending,report.pending)
+        else for(const key of ["approvals","rework","pending"])assert.equal(Object.hasOwn(row,key),false)
+      }
+      const filters={search:summary.rows[0]?.name.slice(0,4)||"",type:"",outstanding:"all"}
+      const csv=(await api("/reports/monthly-summary/export",{method:"POST",json:{snapshot,format:"csv",filters}})).csv
+      const printed=await api("/reports/monthly-summary/export",{method:"POST",json:{snapshot,format:"print",filters}})
+      assert.deepEqual(printed.summary,summary)
+      assert.ok(csv.includes(summary.period.generatedAt))
+      for(const row of summary.rows)assert.equal(csv.includes(`"${row.name}"`),printed.view.rows.some(r=>r.id===row.id),"CSV rows follow the filters")
+      if(projection==="client")assert.doesNotMatch(csv,/Pending|Approval events|Confirmed rework/)
+      await assert.rejects(api("/reports/monthly-summary?month=2099-01"),/future/)
+      await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:snapshot+"x",format:"csv"}}),/Invalid/)
+    }
+    // A project created after the cutoff of a past month is excluded from that month.
+    await asUser("patricia.domingo@10builders.com")
+    const earliest=(await db.query("select min(created_at) as at from projects")).rows[0].at
+    const [y,m]=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila",year:"numeric",month:"2-digit"}).format(new Date(earliest)).split("-").map(Number)
+    const before=m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,"0")}`
+    const old=(await api(`/reports/monthly-summary?month=${before}`)).summary
+    assert.equal(old.rows.length,0);assert.equal(old.inclusion.excludedAfterCutoff,all.length)
+    // Snapshots are not interchangeable between a single report and the summary, or between accounts.
+    const rosaria=all.find(p=>p.name==="Rosaria Business Park").id
+    const single=(await api(`/projects/${rosaria}/monthly-report?month=${month}`)).snapshot
+    await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:single,format:"csv"}}),/Invalid report snapshot/)
+    const adminSummary=await api(`/reports/monthly-summary?month=${month}`)
+    await assert.rejects(api(`/projects/${rosaria}/monthly-report/export`,{method:"POST",json:{snapshot:adminSummary.snapshot,format:"csv"}}),/does not match/)
+    await asUser("maria.santos@rosariabiz.ph")
+    await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:adminSummary.snapshot,format:"csv"}}),/another account/)
+    // Access removed after the preview blocks the export.
+    const clientSummary=await api(`/reports/monthly-summary?month=${month}`)
+    const links=(await db.query("select * from user_client_project_links where project_id=$1",[rosaria])).rows
+    await db.query("delete from user_client_project_links where project_id=$1",[rosaria])
+    try{await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:clientSummary.snapshot,format:"csv"}}),/access changed/)}
+    finally{for(const link of links)await db.query("insert into user_client_project_links(user_id,project_id) values($1,$2)",[link.user_id,rosaria])}
+  })
+
   let newProjectId
   await t.test("project intake, confirmations, registered documents and allocation persist", async () => {
     let {user,state}=await asUser("patricia.domingo@10builders.com")

@@ -3480,7 +3480,7 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
-    if (page === "Reports") return <Reports projects={projects} />
+    if (page === "Reports") return <Reports />
     switch (page) {
       case "Dashboard":
         return dashboard()

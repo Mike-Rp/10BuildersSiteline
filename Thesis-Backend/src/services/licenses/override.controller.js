@@ -1,11 +1,11 @@
 // Administrator override after a license was not renewed within the grace period.
 // The system suggests; the Administrator decides; the replacement must accept. Nothing moves until then.
 import execute from "../../common/utilities/query.utility.js";
-import { HttpError, handleError, hasProjectAccess, isUuid, isSmallintId, requireUser, sendError, sendOk } from "../../common/utilities/access.utility.js";
+import { HttpError, handleError, hasProjectAccess, isUuid, isSmallintId, paging, requireUser, sendError, sendOk } from "../../common/utilities/access.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertEligibleManager, LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
-import { loadLicenseState } from "../../common/utilities/license-status.utility.js";
+import { loadLicenseState, loadLicenseStates } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { readChecklist } from "../progress/phase.utility.js";
@@ -140,7 +140,7 @@ export const overview = async (req, res) => {
     if (!user) return;
     const people = (await execute(
       `select u.id, u.full_name, r.code as role from users u join roles r on r.id=u.role_id
-        where r.code in ('opm','spm') and u.status in ('active','suspended') and not coalesce(u.is_deleted,false) order by u.full_name`)).rows;
+        where r.code in ('opm','spm') and u.status in ('active','suspended') and not coalesce(u.is_deleted,false) order by u.full_name, u.id`)).rows;
     const assignments = (await execute(
       `select t.spm_user_id as user_id, 'spm' as role, p.id as project_id, p.name as project_name, t.project_stage_id as stage_id,
               s.code as stage, t.is_lead, o.id as override_id
@@ -151,10 +151,13 @@ export const overview = async (req, res) => {
        select p.suggested_opm_id, 'opm', p.id, p.name, null, null, false, o.id
          from projects p left join license_overrides o on o.project_id=p.id and o.project_stage_id is null and o.status='pending_acceptance'
         where p.suggested_opm_id is not null and p.lifecycle_status<>'archived' and not coalesce(p.is_deleted,false)`)).rows;
+    const states = await loadLicenseStates(people.map((p) => p.id));
+    const byUser = new Map();
+    for (const a of assignments) byUser.set(a.user_id, [...(byUser.get(a.user_id) || []), a]);
     const items = [];
     for (const person of people) {
-      const state = await loadLicenseState(person.id);
-      const mine = assignments.filter((a) => a.user_id === person.id).map((a) => ({
+      const state = states.get(person.id);
+      const mine = (byUser.get(person.id) || []).map((a) => ({
         projectId: a.project_id, projectName: a.project_name, stageId: a.stage_id, stage: a.stage, role: a.role, isLead: a.is_lead, pendingOverrideId: a.override_id,
       }));
       items.push({
@@ -166,7 +169,10 @@ export const overview = async (req, res) => {
       });
     }
     const filtered = req.query.needs_cover === "true" ? items.filter((i) => i.needsCover) : items;
-    return sendOk(res, "License overview retrieved.", filtered.length, filtered);
+    // Paged only when asked (page, pageSize, limit or offset). `count` is always the full total.
+    const paged = ["page", "pageSize", "limit", "offset"].some((key) => req.query[key] !== undefined);
+    const { limit, offset } = paging(req, 50, 100);
+    return sendOk(res, "License overview retrieved.", filtered.length, paged ? filtered.slice(offset, offset + limit) : filtered);
   } catch (error) { return handleError(res, error); }
 };
 

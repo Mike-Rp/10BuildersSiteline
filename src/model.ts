@@ -780,6 +780,29 @@ export function headcount(type: string, area: string, floors: string) {
     multiplier,
   }
 }
+export const WORK_EMAIL_DOMAIN = "10builders.com"
+const emailPart = (name: string) =>
+  name.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
+
+// lastname.firstname, then lastname.firstname.middleinitial, then a number on the
+// last form that is still free. `accounts` must include deactivated accounts:
+// a company email is never reused.
+export function suggestWorkEmail(
+  names: { first: string; middle?: string; last: string },
+  accounts: Pick<Account, "email">[],
+) {
+  const first = emailPart(names.first), last = emailPart(names.last)
+  if (!first || !last) return ""
+  const initial = emailPart(names.middle || "").charAt(0)
+  const taken = new Set(accounts.map((a) => a.email.trim().toLowerCase()))
+  const address = (local: string) => `${local}@${WORK_EMAIL_DOMAIN}`
+  const base = `${last}.${first}`
+  if (!taken.has(address(base))) return address(base)
+  const withInitial = initial ? `${base}.${initial}` : base
+  if (initial && !taken.has(address(withInitial))) return address(withInitial)
+  for (let n = 2; ; n++) if (!taken.has(address(withInitial + n))) return address(withInitial + n)
+}
+
 export function accountError(
   a: Pick<Account, "id" | "name" | "email" | "role" | "scope" | "projectTypes">,
   state: State,

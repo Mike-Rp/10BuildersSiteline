@@ -109,6 +109,37 @@ choose Save as PDF. This is not a direct or certified PDF download.
 Deploy frontend/backend together; the signing key uses the existing JWT_SECRET.
 Changing it invalidates older report snapshots. Snapshots are not public links.
 
+## Overall monthly project summary
+
+The Reports page opens on an overall summary for the selected month (default:
+current month). GET `/api/v1/reports/monthly-summary?month=YYYY-MM` runs in one
+repeatable-read, read-only transaction with one `now()` cutoff for every project.
+It lists the account's authorized projects in a single query (same rules as
+`hasProjectAccess`; clients need an active/archived linked project), loads all
+baselines, events and Site PM phase assignments in three batched queries, and
+runs `buildMonthlyReport` once per project. The single-project endpoint uses the
+same loader, so a summary row always matches that project's own report.
+
+- Inclusion: projects that existed before the cutoff, including those with no
+  activity. Projects created on or after the cutoff are excluded and counted.
+- Rows (`Thesis-Backend/src/domain/monthly-summary.js`, shared with the browser)
+  carry opening/closing verified percentages, net change (suppressed when scope
+  changed), approval events, completed phases, confirmed rework and pending
+  reviews at cutoff. Missing values stay `null` and show as Unavailable.
+- Totals add only projects with a value. Fewer contributing projects is shown as
+  "Partial · n of m projects". Project percentages are never summed or averaged.
+- Statements are generated from those figures only. No delays or causes are inferred.
+- Projections: staff see every metric; Site PMs do not get approval or rework
+  figures, and pending reviews cover only their assigned phases; clients see
+  progress and completed phases only.
+
+POST `/reports/monthly-summary/export` takes the signed snapshot, `format` and
+the on-screen `filters` (search, type, outstanding). The server applies the same
+`summaryView` filter, rechecks project access (and Site PM phase assignments)
+for every exported row, then returns CSV or the print data. Single-report and
+summary snapshots are not interchangeable. "View details" opens the existing
+project report for the same month.
+
 ## Local migration and hosted rollout
 
 Prerequisites: existing base/001–003, approved type workflows and verified schema

@@ -74,3 +74,26 @@ export async function loadLicenseState(userId, { db, today = localDay() } = {}) 
   });
   return { ...computed, licenseId: license?.id || null, licenseNumber: license?.license_number || null, renewal, rules, today };
 }
+
+/** loadLicenseState for many engineers in three queries, so a list does not cost three round trips per person. */
+export async function loadLicenseStates(userIds, { db, today = localDay() } = {}) {
+  const run = db ? (sql, params) => db.query(sql, params) : execute;
+  const states = new Map();
+  if (!userIds.length) return states;
+  const rules = await readLicenseRules(db);
+  const licenses = new Map((await run(
+    `select distinct on (user_id) user_id, id, license_number, license_expiry::text as license_expiry
+       from user_licenses where user_id = any($1::uuid[]) and superseded_at is null order by user_id, created_at desc, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
+  const renewals = new Map((await run(
+    `select distinct on (user_id) user_id, id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note
+       from license_renewal_requests where user_id = any($1::uuid[]) order by user_id, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
+  for (const id of userIds) {
+    const license = licenses.get(id), renewal = renewals.get(id) || null;
+    const computed = computeLicenseStatus({
+      expiry: license?.license_expiry, today, reminderDays: rules.reminderDays, graceDays: rules.graceDays,
+      renewalOpen: renewal?.status === "under_review",
+    });
+    states.set(id, { ...computed, licenseId: license?.id || null, licenseNumber: license?.license_number || null, renewal, rules, today });
+  }
+  return states;
+}

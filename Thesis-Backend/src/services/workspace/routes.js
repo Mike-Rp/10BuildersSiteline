@@ -1,5 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
-import { monthlyReport, exportMonthlyReport } from "../reports/controller.js";
+import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
 import { Router } from "express";
@@ -17,6 +17,8 @@ import { sweepLicenses, sweepLicensesIfDue } from "../accounts/license-sweep.uti
 const router = Router();
 router.get("/projects/:id/monthly-report", monthlyReport);
 router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
+router.get("/reports/monthly-summary", monthlySummary);
+router.post("/reports/monthly-summary/export", exportMonthlySummary);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
@@ -83,20 +85,43 @@ async function event(db, user, p, title, detail = "") {
  select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null]);
 }
+const normalizeResetName = value => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+async function findResetAccounts(db, body) {
+    const { firstName, middleName = "", lastName } = body || {};
+    if ([firstName, lastName].some(value => typeof value !== "string" || !value.trim() || value.length > 100) || typeof middleName !== "string" || middleName.length > 100)
+        throw new HttpError(400, "Enter your first and last name. Middle name is optional.");
+    const first = normalizeResetName(firstName), middle = normalizeResetName(middleName), last = normalizeResetName(lastName);
+    const result = await db.query("select id,full_name,email from users where not coalesce(is_deleted,false)");
+    const matches = result.rows.filter(user => {
+        const name = normalizeResetName(user.full_name.replace(/\s*\([^)]*\)/g, ""));
+        if (middle) return name === `${first} ${middle} ${last}`;
+        return name === `${first} ${last}` || (name.startsWith(first + " ") && name.endsWith(" " + last) && name.length > first.length + last.length + 2);
+    });
+    return matches;
+}
+router.post("/auth/password-reset-lookup", async (req, res) => {
+    try {
+        const matches = await withTransaction(db => findResetAccounts(db, req.body));
+        return sendOk(res, "Account lookup complete.", 1, { accounts: matches.map(user => ({ name: user.full_name, email: user.email })) });
+    } catch (error) { return handleError(res, error); }
+});
 router.post("/auth/password-reset-request", async (req, res) => {
     try {
-        const { name, email } = req.body || {};
-        if (typeof name !== "string" || !name.trim() || name.length > 150 || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new HttpError(400, "Enter your name and valid work email.");
+        const { email } = req.body || {};
+        if (typeof email !== "string" || email.length > 254) throw new HttpError(400, "Confirm your work email.");
         await withTransaction(async db => {
-            const found = await db.query("select id,full_name from users where lower(email::text)=$1 and not coalesce(is_deleted,false) for update", [email.trim().toLowerCase()]);
+            const matches = await findResetAccounts(db, req.body);
+            const match = matches.find(user => user.email.toLowerCase() === email.trim().toLowerCase());
+            if (!match) throw new HttpError(409, "Your account details have changed. Please look up your name again or contact your administrator.");
+            const found = await db.query("select id,full_name from users where id=$1 and lower(email::text)=$2 and not coalesce(is_deleted,false) for update", [match.id, email.trim().toLowerCase()]);
             const user = found.rows[0];
-            if (!user) return;
+            if (!user) throw new HttpError(409, "Your account details have changed. Please look up your name again.");
             const pending = await db.query("select 1 from workspace_account_metadata where user_id=$1 and metadata->>'passwordResetRequestedAt' is not null", [user.id]);
             if (pending.rowCount) return;
             await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('passwordResetRequestedAt',now()::text)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata", [user.id]);
             await event(db, user, null, "Password reset requested", user.full_name + " requested a password reset. Review Password reset requests on the dashboard.");
         });
-        return sendOk(res, "If the details match an account, your request has been sent to the administrator.", 1, {});
+        return sendOk(res, "Your request has been sent to the administrator.", 1, {});
     } catch (error) { return handleError(res, error); }
 });
 router.get("/accounts/password-reset-requests", endpoint(["admin"], async db => (await db.query("select u.id,u.full_name,u.email,m.metadata->>'passwordResetRequestedAt' as requested_at from users u join workspace_account_metadata m on m.user_id=u.id where m.metadata->>'passwordResetRequestedAt' is not null and not coalesce(u.is_deleted,false) order by m.metadata->>'passwordResetRequestedAt' asc limit 100")).rows));

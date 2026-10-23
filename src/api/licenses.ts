@@ -1,4 +1,4 @@
-import { api, downloadBlob } from "./client.ts"
+import { api, apiList, downloadBlob } from "./client.ts"
 import type {
   HistoryRow,
   LicenseSelf,
@@ -11,7 +11,8 @@ import type {
 
 export const fetchMyLicense = () => api<LicenseSelf>("/licenses/me")
 export const fetchRequests = () => api<ReassignRequest[]>("/licenses/requests")
-export const fetchOverview = () => api<OverviewItem[]>("/licenses/overview")
+// Pages of 100 so no single response is large; screens look engineers up by id, so every page is loaded.
+export const fetchOverview = () => apiList<OverviewItem>("/licenses/overview")
 export const fetchRenewals = (status = "under_review") => api<RenewalQueueItem[]>("/licenses/renewals?status=" + status)
 
 /** The engineer's renewal. It waits for an Administrator; nothing is lifted by the upload itself. */

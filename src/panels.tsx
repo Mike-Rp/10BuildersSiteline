@@ -49,6 +49,7 @@ import {
   type Project,
   type Rules,
   type State,
+  suggestWorkEmail,
 } from "./model"
 
 const INTAKE_PROJECT_TYPES = [
@@ -603,15 +604,17 @@ export function AccountForm({
   )
   const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
   const generatedIdentity = !account && !clientOnly
+  // Once the administrator edits the email, name changes stop overwriting it.
+  const [emailEdited, setEmailEdited] = useState(false)
+  const suggestion = suggestWorkEmail(nameParts, state.accounts)
+  const plainEmail = suggestWorkEmail({ ...nameParts, middle: "" }, [])
   function updateName(part: "first" | "middle" | "last", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
-    const emailPart = (name: string) => name.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
-    const first = emailPart(next.first), last = emailPart(next.last)
     setDraft(current => ({ ...current,
       lastName: next.last.trim(),
       name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
-      email: first && last ? last + "." + first + "@10builders.com" : "",
+      ...(emailEdited ? {} : { email: suggestWorkEmail(next, state.accounts) }),
     }))
     setError("")
   }
@@ -722,16 +725,18 @@ export function AccountForm({
           <input
             required
             type="email"
-            readOnly={generatedIdentity}
             value={draft.email}
             onChange={(e) => {
+              if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
               setError("")
             }}
             placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>
-        {generatedIdentity && <p className="field wide">Email is generated from your last name and first name. Middle name is optional.</p>}
+        {generatedIdentity && <div className="field wide">
+          {emailEdited && <Button onClick={() => { setEmailEdited(false); setDraft(current => ({ ...current, email: suggestion })); setError("") }}>Use suggested email{suggestion ? ` (${suggestion})` : ""}</Button>}
+        </div>}
         <Field label="Contact number">
           <input
             value={draft.phone}

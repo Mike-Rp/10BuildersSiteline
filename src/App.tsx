@@ -1332,7 +1332,7 @@ function AppInner() {
     )
   }
   function renderPage() {
-    if (page === "Reports") return <Reports projects={state.projects} />
+    if (page === "Reports") return <Reports />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
       return (

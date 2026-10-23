@@ -149,6 +149,18 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   const evidenceByKarlo = []
   for (const who of ["admin", "renz", "lea", "karlo", "rafael", "mikaela", "diego", "bea", "client"]) scopeBefore[who] = await projectIds(who)
 
+  await t.test("the overview pages in a stable order with the full total, and stays unpaged when no paging is asked", async () => {
+    const all = (await call("admin", "GET", "/licenses/overview")).data
+    assert.ok(all.length >= 3)
+    const first = await call("admin", "GET", "/licenses/overview?page=1&limit=2")
+    const second = await call("admin", "GET", "/licenses/overview?page=2&limit=2")
+    assert.equal(first.data.length, 2)
+    assert.equal(first.body.count, all.length, "count is the full total, not the page size")
+    assert.deepEqual([...first.data, ...second.data].map((i) => i.id), all.slice(0, 2 + second.data.length).map((i) => i.id))
+    const cover = (await call("admin", "GET", "/licenses/overview?needs_cover=true&limit=100")).data
+    assert.deepEqual(cover.map((i) => i.id), all.filter((i) => i.needsCover).map((i) => i.id))
+  })
+
   await t.test("the seeded engineers cover every license state", async () => {
     const overview = (await call("admin", "GET", "/licenses/overview")).data
     const by = (who) => overview.find((i) => i.id === idOf(who))

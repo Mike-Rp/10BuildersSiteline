@@ -148,11 +148,13 @@ export async function createAccountRecord(client, actor, body) {
   const roleRow = await client.query("SELECT id FROM roles WHERE code=$1",[role]);
   if (!roleRow.rowCount) throw new HttpError(400,"Role is not configured.");
   const hash = await bcrypt.hash(password,12);
+  // The unique email covers deactivated accounts too: a company email is never reused.
   const inserted = await client.query(
     `INSERT INTO users (id,full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by)
      VALUES ($1,$2,$3,$4,$5,true,$6,'invited',$7,$7)
      RETURNING id,full_name,email,phone,status,date_added::text AS date_added`,
-    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id]);
+    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
+    .catch((error) => { throw error.code === "23505" ? new HttpError(409,"This email is already assigned to another account.") : error; });
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
   return { ...inserted.rows[0],role,temp_password:password };
 }
