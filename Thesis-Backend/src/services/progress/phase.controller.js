@@ -1,4 +1,8 @@
 import { maybeCloseProject } from "../archive/policy.js";
+import { createHash } from "node:crypto";
+import { readVerifiedProgress } from "./verified.utility.js";
+import { verifiedComplete } from "./lifecycle.utility.js";
+import { transitionPhase } from "./handoff.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
@@ -7,7 +11,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
-import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue } from "./phase-update.utility.js";
+import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
 export { submitPhaseUpdate } from "./phase-update.controller.js";
 import {
   phaseProject, assertProjectSpm, isProjectSpm, readChecklist, recordPhaseHistory,
@@ -33,8 +37,8 @@ export const getPhaseOverview = async (req, res) => {
     if (!user) return;
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id);
-      const stages = await stageOptions(client);
-      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id);
+      const stages = await stageOptions(client, p.project_type_id);
+      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id, p.project_type_id);
       const checklist = await readChecklist(client, p.id, selected.id);
       const canSubmit = p.lifecycle_status === "active" && await isProjectSpm(client, user, p);
       const owner = await client.query(
@@ -88,13 +92,14 @@ async function itemProject(client, user, projectId, itemId, body = {}) {
   const item = await client.query(
     "SELECT project_stage_id FROM project_phase_checklist_items WHERE id = $1 AND project_id = $2", [itemId, p.id]);
   if (!item.rowCount) throw new HttpError(404, "Checklist item not found.");
-  const stage = await resolveStage(client, body, item.rows[0].project_stage_id);
+  const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id);
   if (Number(stage.id) !== Number(item.rows[0].project_stage_id)) throw new HttpError(422, "The checklist item belongs to another stage.");
   return { ...p, current_stage_id: stage.id, current_stage: stage.code };
 }
 
 export const uploadEvidence = async (req, res) => {
   try {
+    rejectProgressInput(req.body);
     const data = await withTransaction(async client => {
       const p = await itemProject(client, req.user, req.params.id, req.params.itemId, req.body);
       const checklist = await readChecklist(client, p.id, p.current_stage_id);
@@ -113,6 +118,7 @@ export const markChecklistSubmitted = async (req, res) => {
   try {
     const user = await requireUser(req, res, ["spm"]);
     if (!user) return;
+    rejectProgressInput(req.body);
     const body = updateBody({ stage_id: req.body?.stage_id, stage: req.body?.stage, checklist_submissions: [{
       item_id: req.params.itemId, file_id: req.body?.file_id, submission_note: req.body?.submission_note,
     }] });
@@ -130,8 +136,8 @@ export const getProjectStages = async (req, res) => {
     const user = await requireUser(req, res, ["admin", "opm", "spm"]);
     if (!user) return;
     const stages = await withTransaction(async client => {
-      await phaseProject(client, user, req.params.id);
-      return stageOptions(client);
+      const p = await phaseProject(client, user, req.params.id);
+      return stageOptions(client, p.project_type_id);
     });
     return sendOk(res, "Selectable stages retrieved.", stages.length, stages);
   } catch (error) { return handleError(res, error); }
@@ -147,53 +153,98 @@ export const reportProjectIssue = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
       await assertLicenseActive(user, client);
-      const stage = await resolveStage(client, body, p.current_stage_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
+      if(Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
+      await validateFiles(client,selected,user.id,body.file_ids);
       const checklist = await readChecklist(client, p.id, stage.id);
       const history = await recordPhaseHistory(client, selected, checklist.pct, body.issue_reason ?? body.note, user.id,
         { isIssue: true, issueCategories: body.issue_categories, entryType: "issue", updateProject: false });
+      if(body.file_ids.length)await client.query("INSERT INTO project_phase_update_files(history_id,file_id) SELECT $1,unnest($2::uuid[])",[history.id,body.file_ids]);
       return insertIssue(client, selected, user.id, body, null, history.id);
     });
     return sendOk(res, "Issue reported.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
 };
 
+async function reviewableEvidence(client,user,projectId,evidenceId) {
+  const p=await phaseProject(client,user,projectId,{active:true});
+  if (!(await isProjectOpmOrAdmin(user,p.id,client))) throw new HttpError(403,"Office PM approval is required.");
+  const found=await client.query(`SELECT e.*, i.required, i.weight, i.title AS activity_title, s.code AS phase_name
+    FROM project_phase_evidence e
+    JOIN project_phase_checklist_items i ON i.id=e.checklist_item_id AND i.project_id=e.project_id AND i.project_stage_id=e.project_stage_id
+    JOIN project_stages s ON s.id=e.project_stage_id
+    LEFT JOIN project_phase_updates u ON u.id=e.phase_update_id
+    WHERE e.id=$1 AND e.project_id=$2 AND (e.phase_update_id IS NULL OR
+      (u.project_id=e.project_id AND u.selected_stage_id=e.project_stage_id)) FOR UPDATE OF e`,[evidenceId,p.id]);
+  const evidence=found.rows[0];
+  if (!evidence) throw new HttpError(404,"Evidence not found.");
+  const latest=await client.query("SELECT id FROM project_phase_evidence WHERE checklist_item_id = $1 ORDER BY id DESC LIMIT 1",[evidence.checklist_item_id]);
+  if(evidence.status!=="pending" || String(latest.rows[0]?.id)!==String(evidence.id)) {
+    throw new HttpError(409,"Evidence is already reviewed or superseded.");
+  }
+  return {p,evidence};
+}
+
+async function evidenceReviewPreview(client,p,evidence) {
+  const checklist=await readChecklist(client,p.id,evidence.project_stage_id);
+  const project=(await readVerifiedProgress(client,[p.id])).get(p.id).project;
+  const phase=checklist.verified;
+  const added=evidence.required ? evidence.weight : 0;
+  const advance=before=>before.percentage===null ? before : {
+    earned:before.earned+added,total:before.total,percentage:(before.earned+added)/before.total*100,reason:null,
+  };
+  const before={phase,project},after={phase:advance(phase),project:advance(project)};
+  const review_token=createHash("sha256").update(JSON.stringify({id:evidence.id,before,weight:evidence.weight,required:evidence.required})).digest("hex");
+  return {evidence_id:String(evidence.id),item_id:String(evidence.checklist_item_id),phase_name:evidence.phase_name,
+    activity:evidence.activity_title,before,after,review_token};
+}
+
+export const getEvidenceReviewPreview=async(req,res)=>{
+  try {
+    const user=await requireUser(req,res,["admin","opm"]);if(!user)return;
+    if(!isBigintId(req.params.evidenceId))return sendError(res,"Invalid evidence id.",400);
+    const data=await withTransaction(async client=>{
+      const {p,evidence}=await reviewableEvidence(client,user,req.params.id,req.params.evidenceId);
+      return evidenceReviewPreview(client,p,evidence);
+    });
+    res.set?.("Cache-Control","private, no-store");
+    return sendOk(res,"Activity review impact retrieved.",1,data);
+  } catch(error){return handleError(res,error);}
+};
+
 const reviewEvidence = decision => async (req, res) => {
   try {
     const user = await requireUser(req, res, ["admin", "opm"]);
     if (!user) return;
+    rejectProgressInput(req.body);
     if (!isBigintId(req.params.evidenceId)) return sendError(res, "Invalid evidence id.", 400);
     const note = optionalNote(req.body?.review_note);
     if (decision === "rejected" && !note) return sendError(res, "review_note is required for rejection.", 400);
     const data = await withTransaction(async client => {
       // All phase mutations lock the project first, then the evidence, to serialize approvals and transitions.
-      const p = await phaseProject(client, user, req.params.id, { active: true });
-      if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
       await assertLicenseActive(user, client);
-      const found = await client.query(
-        `SELECT * FROM project_phase_evidence WHERE id = $1 AND project_id = $2 FOR UPDATE`,
-        [req.params.evidenceId, p.id]);
-      const evidence = found.rows[0];
-      if (!evidence) throw new HttpError(404, "Evidence not found.");
-      if (evidence.phase_update_id != null) throw new HttpError(409, "Confirm or reject the combined phase update instead.");
-      const selected = { ...p, current_stage_id: evidence.project_stage_id };
-      const latest = await client.query(
-        `SELECT id FROM project_phase_evidence WHERE checklist_item_id = $1 ORDER BY id DESC LIMIT 1`,
-        [evidence.checklist_item_id]);
-      if (evidence.status !== "pending" || String(latest.rows[0].id) !== String(evidence.id)) {
-        throw new HttpError(409, "Evidence is already reviewed or superseded.");
+      const {p,evidence}=await reviewableEvidence(client,user,req.params.id,req.params.evidenceId);
+      if(req.body?.expected_review_token!==undefined) {
+        const preview=await evidenceReviewPreview(client,p,evidence);
+        if(typeof req.body.expected_review_token!=="string" || req.body.expected_review_token!==preview.review_token) {
+          throw new HttpError(409,"The activity or progress totals changed. Close this review and open a fresh preview.");
+        }
       }
+      const selected = { ...p, current_stage_id: evidence.project_stage_id, current_stage:evidence.phase_name };
       await client.query(
         `UPDATE project_phase_evidence SET status = $2, reviewed_by = $3, reviewed_at = now(), review_note = $4
           WHERE id = $1`, [evidence.id, decision, user.id, note]);
       const checklist = await readChecklist(client, p.id, selected.current_stage_id);
-      if (decision === "approved") {
-        await recordPhaseHistory(client, selected, checklist.pct, note ?? "Checklist evidence approved.", user.id, { entryType: "checklist_review" });
-      }
+      await recordPhaseHistory(client, selected, checklist.pct, note ?? "Checklist evidence approved.", user.id,
+        {entryType:"checklist_review",updateProject:decision==="approved",isIssue:decision==="rejected"});
       const projectArchived=decision==="approved" && Number(p.current_stage_id)===Number(selected.current_stage_id)
         ? await maybeCloseProject(client,p,user.id) : false;
-      return { evidence_id: evidence.id, status: decision,project_archived:projectArchived, stage_pct: checklist.pct, current_pct: Number(p.current_stage_id) === Number(selected.current_stage_id) ? checklist.pct : p.current_pct,
-        approved_count: checklist.approved_count, required_count: checklist.required_count };
+      const handoff = decision === "approved" && user.role === "opm" && !projectArchived &&
+        Number(p.current_stage_id) === Number(evidence.project_stage_id) && verifiedComplete(checklist.verified)
+        ? await transitionPhase(client, p, user.id) : undefined;
+      return { evidence_id: evidence.id, status: decision,project_archived:projectArchived, handoff, stage_pct: checklist.pct, current_pct: handoff?.advanced ? handoff.current_pct : Number(p.current_stage_id) === Number(selected.current_stage_id) ? checklist.pct : p.current_pct,
+        approved_count: checklist.approved_count, required_count: checklist.required_count, verified_phase:checklist.verified };
     });
     return sendOk(res, `Evidence ${decision}.`, 1, data);
   } catch (error) { return handleError(res, error); }
@@ -206,7 +257,7 @@ export const uploadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, req.user, req.params.id, { active: true });
       await assertProjectSpm(client, req.user, p);
-      const stage = await resolveStage(client, req.body, p.current_stage_id);
+      const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id);
       return insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id);
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);
@@ -257,28 +308,9 @@ export const advancePhase = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
       await assertLicenseActive(user, client);
-      const checklist = await readChecklist(client, p.id, p.current_stage_id);
-      if (!checklist.configured || checklist.approved_count !== checklist.required_count) {
-        throw new HttpError(422, "All required checklist items must be approved before advancing.");
-      }
-      const next = await client.query(
-        `SELECT t.project_stage_id, t.status, s.code
-           FROM project_phase_team t JOIN project_stages s ON s.id = t.project_stage_id
-          WHERE t.project_id = $1 AND s.sort_order >
-            (SELECT sort_order FROM project_stages WHERE id = $2)
-          ORDER BY s.sort_order LIMIT 1`, [p.id, p.current_stage_id]);
-      if (!next.rowCount) throw new HttpError(409, "This is the project's final assigned phase.");
-      const phase = next.rows[0];
-      if (phase.status !== "confirmed") throw new HttpError(422, "The next phase SPM must confirm their assignment.");
-      const nextChecklist = await readChecklist(client, p.id, phase.project_stage_id);
-      if (!nextChecklist.configured) throw new HttpError(422, "Configure the next phase's checklist before advancing.");
-      await client.query(
-        `UPDATE projects SET current_stage_id = $2, current_pct = $3, updated_by = $4, updated_at = now() WHERE id = $1`,
-        [p.id, phase.project_stage_id, nextChecklist.pct, user.id]);
-      await recordPhaseHistory(client, { ...p, current_stage_id: phase.project_stage_id },
-        nextChecklist.pct, "Office PM activated the next phase.", user.id);
-      return { project_id: p.id, current_stage_id: phase.project_stage_id,
-        current_stage: phase.code, current_pct: nextChecklist.pct };
+      const handoff = await transitionPhase(client, p, user.id);
+      if (!handoff.advanced) throw new HttpError(handoff.code, handoff.reason);
+      return handoff;
     });
     return sendOk(res, "Next phase activated.", 1, data);
   } catch (error) { return handleError(res, error); }

@@ -1,6 +1,8 @@
 import {
   HttpError, hasProjectAccess, isUuid, isSmallintId,
 } from "../../common/utilities/access.utility.js";
+import { phaseProgress } from "../../domain/verified-progress.js";
+import { projectChecklistTemplateSql } from "./checklist-template.utility.js";
 import { markPhaseCompleted } from "../licenses/history.js";
 
 export const checklistPct = (approved, required) => {
@@ -46,34 +48,38 @@ export async function ensureChecklist(client, projectId, stageId) {
   const initialized = await client.query(
     `INSERT INTO project_phase_checklists (project_id, project_stage_id)
      SELECT $1, $2 WHERE EXISTS (
-       SELECT 1 FROM phase_checklist_templates WHERE project_stage_id = $2 AND required = true)
+       SELECT 1 FROM (${projectChecklistTemplateSql}) template WHERE required = true)
      ON CONFLICT DO NOTHING RETURNING project_id`, [projectId, stageId]);
   if (initialized.rowCount) {
     await client.query(
       `INSERT INTO project_phase_checklist_items
-         (project_id, project_stage_id, code, title, required, sort_order)
-       SELECT $1, project_stage_id, code, title, required, sort_order
-         FROM phase_checklist_templates WHERE project_stage_id = $2`, [projectId, stageId]);
+         (project_id, project_stage_id, code, title, required, sort_order, weight)
+       SELECT $1, project_stage_id, code, title, required, sort_order, weight
+         FROM (${projectChecklistTemplateSql}) template`, [projectId, stageId]);
   }
 }
 
-export async function readChecklist(client, projectId, stageId) {
-  await ensureChecklist(client, projectId, stageId);
+export async function readChecklist(client, projectId, stageId, { initialize = true } = {}) {
+  if (initialize) await ensureChecklist(client, projectId, stageId);
   const result = await client.query(
-    `SELECT i.id, i.code, i.title, i.required, i.sort_order,
-            COALESCE(e.status, 'missing') AS status,
-            e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note,
-            e.submitted_by, su.full_name AS submitted_by_name, e.submission_note, e.phase_update_id, f.original_name, f.content_type
+    `SELECT i.id, i.code, i.title, i.required, i.sort_order, i.weight,
+            CASE WHEN e.status='rejected' AND e.rework_request_id IS NOT NULL THEN 'rework_required' ELSE COALESCE(e.status,'missing') END AS status,
+            e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note, e.reviewed_by,
+            e.submitted_by, su.full_name AS submitted_by_name, e.submission_note, e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason, f.original_name, f.content_type
        FROM project_phase_checklist_items i
        LEFT JOIN LATERAL (
          SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1
        ) e ON true
+       LEFT JOIN pending_rework_requests r ON r.id=e.rework_request_id
        LEFT JOIN project_phase_files f ON f.id=e.file_id
        LEFT JOIN users su ON su.id=e.submitted_by
       WHERE i.project_id = $1 AND i.project_stage_id = $2 ORDER BY i.sort_order, i.id`, [projectId, stageId]);
   const required = result.rows.filter(i => i.required);
   const approved = required.filter(i => i.status === "approved").length;
   return { configured: required.length > 0, approved_count: approved, required_count: required.length,
+    verified: phaseProgress({ id: String(stageId), configured: required.length > 0,
+      activities: result.rows.map(item => ({ id: String(item.id), required: item.required, weight: item.weight,
+        status: item.status, approvalValid: !!item.reviewed_by && !!item.reviewed_at })) }),
     pct: checklistPct(approved, required.length), items: result.rows };
 }
 

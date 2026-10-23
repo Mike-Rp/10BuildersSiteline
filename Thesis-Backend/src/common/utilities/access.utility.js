@@ -24,7 +24,9 @@ const STATUS_TEXTS = {
   409: "Conflict",
   410: "Gone",
   422: "Unprocessable Entity",
+  429: "Too Many Requests",
   500: "Internal Server Error",
+  503: "Service Unavailable",
 };
 
 export const sendError = (res, message, code = 500, errorCode) => {
@@ -49,7 +51,9 @@ export const handleError = (res, error) => {
   // A missing column, table or function means the database is behind the code: say so, without raw SQL.
   if (["42703", "42P01", "42883"].includes(error.code))
     return sendError(res, "The database is missing a required update. Ask an administrator to run the pending database migrations, then try again.", 503);
-  return sendError(res, error.message, 500);
+  // Driver and SQL text stays in the server log on hosted deployments.
+  const hosted = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  return sendError(res, hosted ? "Internal server error." : error.message, 500);
 };
 
 
@@ -113,6 +117,18 @@ export const requireUser = async (req, res, allowedRoles = null) => {
     return null;
   }
   return user;
+};
+
+/** Express middleware: 401 without a valid session, 403 outside the allowed roles. */
+export const requireRoles = (...allowedRoles) => async (req, res, next) => {
+  try {
+    const user = await requireUser(req, res, allowedRoles);
+    if (!user) return;
+    req.user = user;
+    return next();
+  } catch (error) {
+    return handleError(res, error);
+  }
 };
 
 // includeFormer: read-only access for an engineer who held a phase or the Office PM role earlier (history stays visible).

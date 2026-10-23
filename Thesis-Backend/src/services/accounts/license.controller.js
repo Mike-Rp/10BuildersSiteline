@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from "../../common/utilities/auth.utility.js";
 import { mapMultiple, mapSingle } from "../../common/utilities/dao.utility.js";
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
+import { handleError, isUuid } from "../../common/utilities/access.utility.js";
 
 export const getLicenses = async (req, res) => {
   try {
@@ -37,7 +38,7 @@ export const getLicenses = async (req, res) => {
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
 
     // 2. Safe Sorting
-    const sortOrder = req.query.sortOrder || 'DESC';
+    const sortOrder = String(req.query.sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     let sortClause = `ORDER BY l.created_at ${sortOrder}`;
 
     switch (req.query.sortBy) {
@@ -118,6 +119,7 @@ export const getLicenses = async (req, res) => {
 export const getLicenseById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!isUuid(id)) return responseError(res, 'Invalid license id.', 400);
     const details = await getLicense(id);
 
     if (!details) {
@@ -135,8 +137,9 @@ export const getLicenseById = async (req, res) => {
 export const createLicense = async (req, res) => {
   try {
     const created_by = await authenticate(req, res);
+    if (!created_by) return responseError(res, 'Missing or invalid token.', 401);
 
-    const { license_number, license_expiry, user_id } = req.body;
+    const { license_number, license_expiry, user_id } = req.body || {};
 
     const id = await uploadAttachment(
       req.file,
@@ -154,17 +157,17 @@ export const createLicense = async (req, res) => {
 
     responseOk(res, 'Resource created successfully', 1, details);
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 };
 
 export const updateLicense = async (req, res) => {
   try {
     const created_by = await authenticate(req, res);
+    if (!created_by) return responseError(res, 'Missing or invalid token.', 401);
     const { id } = req.params;
-    
-    const { license_number, license_expiry, user_id } = req.body;
+
+    const { license_number, license_expiry, user_id } = req.body || {};
 
     const document_id = await uploadAttachment(
       req.file,
@@ -184,7 +187,7 @@ export const updateLicense = async (req, res) => {
     responseOk(res, 'Resource updated successfully', 1, details);
   }
   catch (error) {
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 };
 

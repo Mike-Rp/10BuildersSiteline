@@ -15,8 +15,9 @@ const db = new PGlite({ extensions: { citext } })
 await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
 await db.exec(fs.readFileSync(here("../supabase/migrations/20261017000002_thesis_backend_schema.sql"), "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
 await db.exec(fs.readFileSync(here("../supabase/seed/dummy-data.sql"), "utf8"))
-await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/003-react-integration.sql"),"utf8"))
-await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-engineer-license-workflow.sql"),"utf8"))
+for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql","009-engineer-license-workflow.sql"]) {
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/"+migration),"utf8"))
+}
 const dbPort = await free(), apiPort = await free()
 const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
 await pg.start()
@@ -24,12 +25,12 @@ const server = spawn(process.execPath, ["src/index.js"], { cwd: backend, stdio: 
 for (let i = 0; i < 120; i++) { try { if ((await fetch(`http://127.0.0.1:${apiPort}/api/v1/health`)).ok) break } catch {} await new Promise((r) => setTimeout(r, 250)) }
 
 const runs = [
-  ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Schedule performance", "Documents", "Directory", "Team", "Archive", "Settings"],
-  ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Schedule", "Archive", "Activity log", "Preferences"],
-  ["karlo.espiritu@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory", "Schedule"],
+  ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Documents", "Directory", "Team", "Archive", "Settings"],
+  ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Archive", "Activity log", "Preferences"],
+  ["karlo.espiritu@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],
-  ["f.uy@aldenheights-hoa.com", "Project Overview", "Phase Timeline", "Schedule Performance", "Project Documents", "Progress History", "Site"],
-  ["maria.santos@rosariabiz.ph", "Project Overview", "Phase Timeline", "Project Documents", "Progress History"],
+  ["f.uy@aldenheights-hoa.com", "Active sites", "Project Overview", "Phase Timeline", "Project Documents", "Progress History", "Site"],
+  ["maria.santos@rosariabiz.ph", "Active sites", "Project Overview", "Phase Timeline", "Project Documents", "Progress History"],
 ]
 let failed = false
 for (const [email, ...labels] of runs.filter(([e]) => !process.argv[2] || e.startsWith(process.argv[2]))) {

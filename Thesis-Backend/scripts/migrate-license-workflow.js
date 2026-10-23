@@ -1,4 +1,4 @@
-// Applies migrations/004-engineer-license-workflow.sql with a dry run first.
+// Applies migrations/009-engineer-license-workflow.sql with a dry run first.
 //
 //   npm run db:license-workflow                          dry run: runs it inside a transaction, reports, rolls back
 //   npm run db:license-workflow -- --apply               applies it (local databases only, or CONFIRM_BACKUP=yes)
@@ -22,7 +22,7 @@ const count = async (table) => (await client.query(`select count(*)::int as n fr
 const exists = async (table) => (await client.query("select to_regclass($1) is not null as ok", ["public." + table])).rows[0].ok;
 try {
     console.log(`${apply ? "APPLYING" : "DRY RUN (rolled back at the end)"} to database ${process.env.DB_NAME || ""} on ${process.env.DB_SERVER || ""}`);
-    const sql = (await readFile(new URL("../migrations/004-engineer-license-workflow.sql", import.meta.url), "utf8"))
+    const sql = (await readFile(new URL("../migrations/009-engineer-license-workflow.sql", import.meta.url), "utf8"))
         .replace(/^begin;\s*/im, "").replace(/^commit;\s*/im, "");
     await client.query("BEGIN");
     const before = { tables: {}, kept: {}, rules: (await client.query("select rules from public.workspace_settings where singleton")).rows[0]?.rules };
@@ -52,7 +52,7 @@ try {
 
     if (apply) {
         await client.query("CREATE TABLE IF NOT EXISTS phase_schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())");
-        await client.query("INSERT INTO phase_schema_migrations(name) VALUES ('004-engineer-license-workflow.sql') ON CONFLICT DO NOTHING");
+        await client.query("INSERT INTO phase_schema_migrations(name) VALUES ('009-engineer-license-workflow.sql') ON CONFLICT DO NOTHING");
         await client.query("COMMIT");
         console.log("\nApplied.");
     } else {

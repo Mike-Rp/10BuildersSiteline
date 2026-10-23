@@ -8,7 +8,7 @@ import { assertLicenseActive } from "../../common/utilities/license-gate.utility
 import { phaseProject, assertProjectSpm, readChecklist, recordPhaseHistory } from "./phase.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
-import { updateBody, optionalNote, resolveStage, validateFiles, insertIssue, issueReason } from "./phase-update.utility.js";
+import { updateBody, optionalNote, resolveStage, validateFiles, insertIssue, issueReason, rejectProgressInput } from "./phase-update.utility.js";
 
 export const submitPhaseUpdate = async (req, res) => {
   try {
@@ -19,7 +19,7 @@ export const submitPhaseUpdate = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
       await assertLicenseActive(user, client);
-      const stage = await resolveStage(client, body, p.current_stage_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const existing = await client.query(
         "SELECT id FROM project_phase_updates WHERE project_id = $1 AND status = 'pending'", [p.id]);
@@ -44,6 +44,7 @@ export const submitPhaseUpdate = async (req, res) => {
         submissions.push(await submitChecklist(client, selected, user, item, id, checklist));
       }
       const isIssue = body.issue_categories.length > 0 || body.issue_reason !== null;
+      if(isIssue&&Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const issue = isIssue ? await insertIssue(client, selected, user.id, body, id) : null;
       return {
         ...update.rows[0], project_id: p.id, selected_stage_id: stage.id, selected_stage: stage.code,
@@ -61,6 +62,7 @@ const resolvePhaseUpdate = decision => async (req, res) => {
     const user = await requireUser(req, res, ["admin", "opm"]);
     if (!user) return;
     if (!isBigintId(req.params.updateId)) return sendError(res, "Invalid update id.", 400);
+    rejectProgressInput(req.body);
     const note = optionalNote(req.body?.resolution_note, "resolution_note");
     if (decision === "rejected" && !note) return sendError(res, "resolution_note is required for rejection.", 400);
     const data = await withTransaction(async client => {
@@ -74,13 +76,7 @@ const resolvePhaseUpdate = decision => async (req, res) => {
       const update = found.rows[0];
       if (update.status !== "pending") throw new HttpError(409, `Update is already ${update.status}.`);
       if (decision === "rejected") {
-        await client.query(
-          `UPDATE project_phase_evidence SET status = 'rejected', reviewed_by = $2, reviewed_at = now(), review_note = $3
-            WHERE phase_update_id = $1 AND status = 'pending'`, [update.id, user.id, note]);
-        await client.query(
-          `UPDATE pending_rework_requests SET status = 'rejected', resolved_by = $2, resolved_at = now(),
-            resolution_note = $3, updated_by = $2, updated_at = now()
-            WHERE phase_update_id = $1 AND status = 'pending'`, [update.id, user.id, note]);
+        // Report review is independent of each evidence review and issue decision.
         await client.query(
           `UPDATE project_phase_updates SET status = 'rejected', resolved_by = $2, resolved_at = now(), resolution_note = $3
             WHERE id = $1`, [update.id, user.id, note]);
@@ -89,22 +85,13 @@ const resolvePhaseUpdate = decision => async (req, res) => {
       if (Number(p.current_stage_id) !== Number(update.prior_stage_id)) {
         throw new HttpError(409, "The project's stage changed after submission. Reject this update and submit a new one.");
       }
-      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id);
+      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
-      const rejected = await client.query(
-        "SELECT 1 FROM project_phase_evidence WHERE phase_update_id = $1 AND status = 'rejected' LIMIT 1", [update.id]);
-      if (rejected.rowCount) throw new HttpError(409, "This update contains rejected checklist evidence.");
-      await client.query(
-        `UPDATE project_phase_evidence SET status = 'approved', reviewed_by = $2, reviewed_at = now(), review_note = $3
-          WHERE phase_update_id = $1 AND status = 'pending'`, [update.id, user.id, note]);
       const checklist = await readChecklist(client, p.id, stage.id);
-      await client.query(
-        `UPDATE projects SET current_stage_id = $2, current_pct = $3, updated_by = $4, updated_at = now() WHERE id = $1`,
-        [p.id, stage.id, checklist.pct, user.id]);
       const isIssue = update.issue_categories.length > 0 || update.issue_reason != null;
       const history = await recordPhaseHistory(client, selected, checklist.pct,
         update.note ?? (isIssue ? issueReason(update) : null), update.submitted_by,
-        { isIssue, issueCategories: update.issue_categories });
+        { isIssue, issueCategories: update.issue_categories, updateProject:false });
       await client.query(
         `INSERT INTO project_phase_update_files (history_id, file_id)
          SELECT $1, file_id FROM project_phase_submission_files WHERE update_id = $2`, [history.id, update.id]);
@@ -114,9 +101,9 @@ const resolvePhaseUpdate = decision => async (req, res) => {
       await client.query(
         `UPDATE project_phase_updates SET status = 'approved', resolved_by = $2, resolved_at = now(),
           resolution_note = $3, history_id = $4 WHERE id = $1`, [update.id, user.id, note, history.id]);
-      const projectArchived=await maybeCloseProject(client,selected,user.id);
-      return { id: update.id, status: "approved",project_archived:projectArchived,current_stage_id: stage.id,
-        current_stage: stage.code, current_pct: checklist.pct, history_id: history.id };
+      const projectArchived=await maybeCloseProject(client,p,user.id);
+      return { id: update.id, status: "approved",project_archived:projectArchived,current_stage_id: p.current_stage_id,
+        current_stage: p.current_stage, current_pct: p.current_pct, history_id: history.id };
     });
     return sendOk(res, `Update ${decision}.`, 1, data);
   } catch (error) { return handleError(res, error); }

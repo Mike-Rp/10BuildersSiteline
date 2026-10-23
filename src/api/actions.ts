@@ -8,10 +8,11 @@ const issueCodes: Record<string, string> = {
     "Rework required": "rework_required", "Design / plan change": "design_change", "Weather delay": "weather_delay",
     "Subcontractor manpower shortage": "manpower_shortage", "Safety incident": "safety_incident", "Other": "other",
 };
-export async function uploadFile(id: string, file: File) {
+export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document") {
     const body = new FormData();
     body.set("id", id);
     body.set("file", file);
+    body.set("purpose", purpose);
     const saved = await api<Dto>("/files", { method: "POST", body });
     registerFileUrl(id, saved.download_url);
 }
@@ -61,7 +62,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         case "reassign_phase": {
             const assignments = await api<Dto[]>("/confirmations/projects/" + id + "/phase-team");
             const assignment = assignments.find(t => t.stage_code === command.phase);
-            if (assignment && ["declined", "auto_expired"].includes(assignment.status)) {
+            if (assignment && (!assignment.spm_user_id || ["declined", "auto_expired"].includes(assignment.status))) {
                 await post("/archive/phase-assignments/" + assignment.assignment_id + "/reassign", { new_user_id: command.accountId, note: command.note || "Phase assignment replaced." });
                 return;
             }
@@ -75,6 +76,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "submit_progress": {
             const file_ids = command.evidence ? [await phaseFile(id, command.evidence)] : [];
+            if(command.issues?.length){
+                await post(base+"/rework-requests",{stage:project.phase,reason:command.note,
+                    issue_categories:command.issues.map(v=>issueCodes[v]||v),affected_activity_ids:command.affectedActivityIds||[],file_ids});
+                return;
+            }
             await post(base + "/phase-updates", { stage: command.phase || project.phase, note: command.note,
                 issue_categories: (command.issues || []).map(v => issueCodes[v] || v), file_ids });
             return;
@@ -88,16 +94,15 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "approve_checklist":
         case "reject_checklist": {
-            const overview = await api<Dto>(base + "/phase-overview");
-            const item = overview.checklist?.items?.find((i: Dto) => String(i.id) === String(command.itemId));
-            if (!item?.evidence_id)
+            const item = project.workflow?.checklist[command.phase || project.phase]?.find(i => i.id === command.itemId);
+            const evidenceId = command.evidenceId || item?.evidenceId;
+            if (!evidenceId)
                 throw new Error("No submitted evidence was found.");
             const rejected = command.type === "reject_checklist";
-            if (item.phase_update_id)
-                await post(base + "/phase-updates/" + item.phase_update_id + (rejected ? "/reject" : "/approve"), { resolution_note: command.note || "Please revise and resubmit the evidence." });
-            else
-                await post(base + "/evidence/" + item.evidence_id + (rejected ? "/reject" : "/approve"), { review_note: command.note || "Please revise and resubmit the evidence." });
-            return;
+            return await post(base + "/evidence/" + evidenceId + (rejected ? "/reject" : "/approve"), {
+                review_note: command.note,
+                ...(command.expectedReviewToken ? {expected_review_token:command.expectedReviewToken} : {}),
+            });
         }
         case "approve_update":
         case "request_update": {
@@ -113,11 +118,13 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "approve_rework":
         case "decline_rework": {
-            const overview = await api<Dto>(base + "/phase-overview");
-            const issue = overview.issues?.find((i: Dto) => i.status === "pending");
-            if (!issue)
+            const requestId=command.requestId||project.workflow?.pendingRework?.id;
+            if (!requestId)
                 throw new Error("No pending rework request was found.");
-            await post("/rework-requests/" + issue.id + (command.type === "approve_rework" ? "/approve" : "/reject"), { resolution_note: command.note || "Reviewed." });
+            await post("/rework-requests/" + requestId + (command.type === "approve_rework" ? "/approve" : "/reject"), {
+                resolution_note:command.note,selected_activity_ids:command.selectedActivityIds,
+                expected_review_token:command.expectedReviewToken,
+            });
             return;
         }
         case "add_note":

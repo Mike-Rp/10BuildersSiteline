@@ -1,3 +1,4 @@
+import { validatePhaseTeam } from "./type-phases.utility.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from '../../common/utilities/transaction.utility.js';
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
@@ -5,7 +6,6 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
-import { authenticate } from "../../common/utilities/auth.utility.js";
 
 export const createIntake = async (req, res) => {
   try {
@@ -48,6 +48,7 @@ export const createIntake = async (req, res) => {
       if(typeof company!=="string" || !company.trim() || company.length>150) throw Object.assign(new Error("Invalid client_name."),{status:400});
       const projectType=await client.query("SELECT id FROM project_types WHERE code=$1",[project_type]);
       if(!projectType.rowCount) throw Object.assign(new Error("Invalid project_type."),{status:422});
+      await validatePhaseTeam(client,projectType.rows[0].id,phase_team);
       if(draft) {
         const accepted=await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND status='confirmed' LIMIT 1",[draft.id]);
         if(accepted.rowCount) throw Object.assign(new Error("Allocation is locked after an SPM accepts."),{status:409});
@@ -106,9 +107,12 @@ export const createIntake = async (req, res) => {
 
 export const uploadContract = async (req, res) => {
   try {
-    const created_by = await authenticate(req, res);
+    const actor = await requireUser(req, res, ['admin']);
+    if (!actor) return;
+    const created_by = actor.id;
 
     const { project_id } = req.body;
+    if (!isUuid(project_id)) return responseError(res,'project_id must be a valid id.',400);
     const project=await execute("SELECT lifecycle_status FROM projects WHERE id=$1",[project_id]);
     if(project.rows[0]?.lifecycle_status==="archived") return responseError(res,"Archived projects are read-only.",409);
     
@@ -127,16 +131,18 @@ export const uploadContract = async (req, res) => {
 
     responseOk(res, 'Resource uploaded successfully', 1, {document_id}); 
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 }
 
 export const uploadSubconContract = async (req, res) => {
   try {
-    const created_by = await authenticate(req, res);
+    const actor = await requireUser(req, res, ['admin']);
+    if (!actor) return;
+    const created_by = actor.id;
 
     const { project_id, subcontractor_name, trade_scope } = req.body;
+    if (!isUuid(project_id)) return responseError(res,'project_id must be a valid id.',400);
     const project=await execute("SELECT lifecycle_status FROM projects WHERE id=$1",[project_id]);
     if(project.rows[0]?.lifecycle_status==="archived") return responseError(res,"Archived projects are read-only.",409);
     
@@ -155,7 +161,6 @@ export const uploadSubconContract = async (req, res) => {
 
     responseOk(res, 'Resource uploaded successfully', 1, {document_id}); 
   } catch (error) {
-    console.log(error);
-    return responseError(res, error.message, 500);
+    return handleError(res, error);
   }
 }

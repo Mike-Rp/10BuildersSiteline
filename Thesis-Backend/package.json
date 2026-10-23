@@ -12,6 +12,7 @@
     "serve": "node src/index.js",
     "db:integrate": "node scripts/migrate-react.js",
     "db:normalize-types": "node scripts/normalize-project-types.js",
+    "db:project-types": "node scripts/migrate-project-types.js",
     "db:license-workflow": "node scripts/migrate-license-workflow.js"
   },
   "type": "module",

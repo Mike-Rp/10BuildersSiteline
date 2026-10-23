@@ -1,7 +1,22 @@
+import PasswordResetRequests from "./PasswordResetRequests"
+import OverallProjectProgress from "./OverallProjectProgress"
+import AdminDashboard from "./AdminDashboard"
+import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
+import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
+import WorkspaceSkeleton from "./LoadingSkeleton"
+import NavigationCount from "./NavigationCount"
+import { navigationAttention } from "./navigation-attention"
+import { adminDashboardOverview } from "./admin-dashboard"
+import ProjectProgress from "./ProjectProgress"
+import { hasPendingSiteReview } from "./active-sites-review"
+import ActiveSites from "./ActiveSites"
+import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
 import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import MonthlyReport from "./MonthlyReport"
+import Reports from "./Reports"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
@@ -9,7 +24,6 @@ import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
 import {
   api,
-  apiEnabled,
   ApiError,
   login as apiLogin,
   logout as apiLogout,
@@ -39,7 +53,6 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import {
   EngineerHistory,
   LicenseAssignmentWarning,
-  LicenseAttention,
   LicenseProfileBlock,
   OverrideDialog,
   PhaseLicenseFlag,
@@ -50,7 +63,6 @@ import {
 import {
   AccountDeactivationForm,
   AccountForm,
-  Chart,
   CompanyForm,
   DocumentList,
   downloadBlob,
@@ -75,6 +87,7 @@ import {
   uid,
   workload,
   projectDateErrors,
+  PROJECT_TYPES,
   type Account,
   type Company,
   type Doc,
@@ -111,6 +124,7 @@ import {
   DOCUMENT_TABS,
   adminBreadcrumb,
   resolveAdminTarget,
+  normalizeWorkspacePage,
   type DirectoryTab,
   type DocumentsTab,
 } from "./adminNav"
@@ -249,8 +263,10 @@ function AppInner() {
     state.accounts.find((a) => a.id === sessionId) ||
     stubAccount("", "", "client")
   const [page, setPage] = useState("Dashboard")
+  const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
+  const [reportProjectId,setReportProjectId]=useState("")
   const [toast, setToast] = useState("")
   const [query, setQuery] = useState("")
   const [globalQuery, setGlobalQuery] = useState("")
@@ -273,6 +289,8 @@ function AppInner() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [checkingSession, setCheckingSession] = useState(true)
+  const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
+  const [readinessAvailable, setReadinessAvailable] = useState(false)
   const [mustResetPassword,setMustResetPassword]=useState(false)
   const [idleWarning, setIdleWarning] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
@@ -287,12 +305,6 @@ function AppInner() {
   )
   const pending = state.companies.filter((c) => c.status === "pending")
   const engineers = state.accounts.filter((a) => a.role !== "client")
-  const licenseAlerts = engineers.filter(
-    (a) =>
-      ["Expired", "Grace expired", "Expiring soon"].includes(
-        licenseState(a, state.rules.grace),
-      ) && a.status === "active",
-  )
   const unread = state.events.filter(
     (e) =>
       !e.read &&
@@ -311,12 +323,19 @@ function AppInner() {
   const selectedAccount = state.accounts.find((a) => a.id === dialog?.id)
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
+  // Restores the signed-in session after a refresh. Only a rejected token or an
+  // account that may no longer sign in ends the session; a server or network
+  // hiccup keeps the token and offers a retry instead of the login page.
+  const [restoreError, setRestoreError] = useState("")
+  const [restoreAttempt, setRestoreAttempt] = useState(0)
   useEffect(() => {
     if (!tokenUser()) {
       setCheckingSession(false)
       return
     }
     let cancelled = false
+    setCheckingSession(true)
+    setRestoreError("")
     api<Parameters<typeof startApiSession>[0]>("/auth/me")
       .then(startApiSession)
       .then((account) => {
@@ -324,8 +343,15 @@ function AppInner() {
         setSessionId(account.id)
         setSignedOut(false)
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return
+        const transient =
+          error instanceof TypeError ||
+          (error instanceof ApiError && (error.status === 0 || error.status >= 500))
+        if (transient && tokenUser()) {
+          setRestoreError("Your session is still active, but the workspace could not be loaded.")
+          return
+        }
         clearSession()
         apiLogout()
       })
@@ -335,7 +361,7 @@ function AppInner() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [restoreAttempt])
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(""), 5000)
@@ -412,11 +438,34 @@ function AppInner() {
     }
   }
   async function reloadWorkspace() {
-    const loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email})
+    let loaded: State
+    try { loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email}) }
+    catch (error) { setReadinessAvailable(false); throw error }
     stateRef.current=loaded
     setState(loaded)
+    setReadinessAvailable(true)
     return loaded
   }
+  // Let the next Site PM see an OPM handoff without a manual page reload.
+  useEffect(() => {
+    if (signedOut || !["admin", "opm", "spm"].includes(actor.role) || !tokenUser()) return
+    let active = true, loading = false
+    const refresh = async () => {
+      if (!active || loading || document.visibilityState === "hidden") return
+      loading = true
+      const snapshot = stateRef.current
+      try {
+        const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
+        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true) }
+      } catch { if(active)setReadinessAvailable(false) /* A failed read does not assert current blockers. */ }
+      finally { loading = false }
+    }
+    const timer = window.setInterval(() => { void refresh() }, 15000)
+    const onFocus = () => { void refresh() }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onFocus)
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
+  }, [actor.id, actor.role, signedOut])
   async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
     if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}
     try {
@@ -437,7 +486,7 @@ function AppInner() {
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
     const target = resolveAdminTarget(next)
-    setPage(target ? target.page : next)
+    setPage(target ? target.page : normalizeWorkspacePage(next))
     resetListState()
     if (target?.documentsTab) setDocumentsTab(target.documentsTab)
     if (target?.directoryTab) setDirectoryTab(target.directoryTab)
@@ -456,9 +505,12 @@ function AppInner() {
   function openPendingRequests() {
     navigate("Approvals")
   }
-  function openTarget(target: string) {
-    if (target === "Approvals") openPendingRequests()
-    else navigate(target)
+  // Needs attention → "Engineer license expired": open the override for the first assignment that still needs cover.
+  function openLicenseCover(userId: string) {
+    const item = state.license?.overview?.find((i) => i.id === userId)
+    const open = item?.assignments.find((a) => !a.pendingOverrideId)
+    if (open) setOverrideTarget({ projectId: open.projectId, stageId: open.stageId })
+    else setDialog({ kind: "account", id: userId })
   }
   function clearSession() {
     resetListMemory()
@@ -475,19 +527,26 @@ function AppInner() {
     full_name?: string
     email?: string
   }): Promise<Account> {
-    setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
-    const loaded = await loadApiState(user)
-    const account = loaded.accounts.find((a) => a.id === user.id)
+    setLoadingWorkspaceRole(user.role)
+    setReadinessAvailable(false)
     try {
-      if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
-      assertCanSignIn(loaded, account)
-    } catch (error) {
-      await apiLogout()
-      throw error
+      setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
+      const loaded = await loadApiState(user)
+      const account = loaded.accounts.find((a) => a.id === user.id)
+      try {
+        if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
+        assertCanSignIn(loaded, account)
+      } catch (error) {
+        await apiLogout()
+        throw error
+      }
+      stateRef.current = loaded
+      setState(loaded)
+      setReadinessAvailable(true)
+      return account
+    } finally {
+      setLoadingWorkspaceRole(undefined)
     }
-    stateRef.current = loaded
-    setState(loaded)
-    return account
   }
   async function signIn(email: string, password: string) {
     const account: Account = await guardedSignIn(signInAttempts,email,async()=>{
@@ -538,10 +597,15 @@ function AppInner() {
   async function sendWorkflow(command:WorkflowCommand) {
     if(signedOut)return {ok:false,error:"Your session has ended. Sign in again to continue."}
     try{
-      await sendApiWorkflow(stateRef.current,actor,command)
+      const response = await sendApiWorkflow(stateRef.current,actor,command)
       await reloadWorkspace()
-      return {ok:true}
-    }catch(error){return {ok:false,error:(error as Error).message}}
+      const message = response?.handoff?.advanced ? `Activity approved. ${response.handoff.current_stage} automatically activated for its assigned Site PM.`
+        : response?.handoff?.reason ? `Activity approved. Phase remains open: ${response.handoff.reason}`
+        : undefined
+      return {ok:true, message}
+    }catch(error){
+      return {ok:false,error:(error as Error).message}
+    }
   }
   async function updateAccount(account:Account) {
     try{await saveApiAccount(account,true);await reloadWorkspace();setToast("Account details updated");setDialog({kind:"account",id:account.id});return true}
@@ -809,37 +873,11 @@ function AppInner() {
   }
   const accountSearch = (a: Account) =>
     `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
-  const activeSitesItems = state.projects.filter((p) => p.status === "active")
-  const activeSitesList = runList("admin:active-sites", activeSitesItems, {
-    searchText: (p) => `${projectSearch(p)} ${p.phase}`,
-    filters: [
-      typeFilter(activeSitesItems),
-      {
-        id: "phase",
-        label: "Phase",
-        allLabel: "All phases",
-        options: optionsFrom(activeSitesItems.map((p) => p.phase)),
-        test: (p, value) => p.phase === value,
-      },
-    ],
-  })
-  const scheduleList = runList("admin:schedule", activeSitesItems, {
-    searchText: (p) => `${projectSearch(p)} ${p.phase}`,
-    filters: [
-      typeFilter(activeSitesItems),
-      {
-        id: "phase",
-        label: "Phase",
-        allLabel: "All phases",
-        options: optionsFrom(activeSitesItems.map((p) => p.phase)),
-        test: (p, value) => p.phase === value,
-      },
-    ],
-  })
   const intakeItems = state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
-  const intakeList = runList("admin:intake", intakeItems, {
+  const intakeCounts = intakeViewCounts(intakeItems, p => intakeGuidance(state, p, actor))
+  const intakeList = runList("admin:intake", intakeItems.filter(p => intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
     searchText: projectSearch,
     filters: [
       {
@@ -853,7 +891,7 @@ function AppInner() {
         ],
         test: (p, value) => p.status === value,
       },
-      typeFilter(intakeItems),
+      { ...typeFilter(intakeItems), options: PROJECT_TYPES.map(value => ({ value, label: value })) },
     ],
   })
   // Engineer Directory: the server filters, counts and pages (/accounts, ordered by
@@ -1142,7 +1180,6 @@ function AppInner() {
             <Panel
               key={c.id}
               title={c.name}
-              subtitle="Project-level subcontractor"
               actions={<Status status={c.status} />}
             >
               <div className="approval-content">
@@ -1262,274 +1299,21 @@ function AppInner() {
     )
   }
   function dashboard() {
-    // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
-    const dashActive = runList("dash:admin-active", active, { searchText: () => "" }, { pageSize: 5 })
-    const dashSchedule = runList("dash:admin-schedule", active, { searchText: () => "" }, { pageSize: 5 })
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
-    const totalCurrent = state.projects.filter(
-      (p) => !["completed", "declined", "expired"].includes(p.status),
-    ).length
-    return (
-      <>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">YOUR OPERATIONS, AT A GLANCE</div>
-            <h1>
-              Workspace overview<span className="heading-dot">.</span>
-            </h1>
-            <p>
-              A clear view of your projects, people, and what needs your
-              attention.
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            icon="plus"
-            onClick={() => setDialog({ kind: "intake" })}
-          >
-            New project intake
-          </Button>
-        </div>
-        <div className="metrics-grid">
-          {[
-            {
-              title: "Active projects",
-              value: active.length,
-              note: `${totalCurrent} projects in your pipeline`,
-              icon: "building",
-              target: "Active sites",
-              label: "View projects",
-            },
-            {
-              title: "Pending confirmations",
-              value: intake.filter((p) => !p.opmAccepted).length,
-              note: "Awaiting Office PM response",
-              icon: "clock",
-              target: "Project intake",
-              label: "Review intake",
-            },
-            {
-              title: "Team members",
-              value: state.accounts.filter((a) =>
-                ["active", "invited"].includes(a.status),
-              ).length,
-              note: `${engineers.filter((a) => a.status === "active").length} active in-house personnel`,
-              icon: "users",
-              target: "Team",
-              label: "Manage team",
-            },
-            {
-              title: "Pending approvals",
-              value: pending.length,
-              note: "New subcontractor requests",
-              icon: "shield",
-              target: "Approvals",
-              label: "Review requests",
-            },
-          ].map((m) => (
-            <button
-              className="metric-card"
-              key={m.title}
-              onClick={() => openTarget(m.target)}
-            >
-              <div className="metric-top">
-                <span>{m.title}</span>
-                <span className="metric-icon">
-                  <Icon name={m.icon} />
-                </span>
-              </div>
-              <div className="metric-value">
-                {m.value.toString().padStart(2, "0")}
-              </div>
-              <div className="metric-bottom">
-                <span>{m.note}</span>
-                <Icon name="arrow" size={16} />
-              </div>
-            </button>
-          ))}
-        </div>
-        {(pending.length > 0 || licenseAlerts.length > 0) && (
-          <div className="attention-strip">
-            <span className="attention-icon">
-              <Icon name="alert" size={20} />
-            </span>
-            <div>
-              <strong>A little attention goes a long way.</strong>
-              <span>
-                {pending.length} subcontractor{" "}
-                {pending.length === 1 ? "request needs" : "requests need"}{" "}
-                approval
-                {licenseAlerts.length > 0
-                  ? ` and ${licenseAlerts.length} engineer license${
-                      licenseAlerts.length > 1 ? "s need" : " needs"
-                    } review`
-                  : ""}
-                .
-              </span>
-            </div>
-            <Button
-              variant="text-button"
-              onClick={() =>
-                pending.length
-                  ? openPendingRequests()
-                  : navigate("Engineer directory")
-              }
-            >
-              Review items
-              <Icon name="arrow" size={16} />
-            </Button>
-          </div>
-        )}
-        <LicenseAttention
-          overview={state.license?.overview || []}
-          renewals={state.license?.renewals || []}
-          onOverride={setOverrideTarget}
-          onReview={() => setRenewalsOpen(true)}
-        />
-        <div className="dashboard-main-grid">
-          <Panel
-            title="Active sites"
-            subtitle="Keep every project moving in the right direction."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => navigate("Active sites")}
-              >
-                View all projects
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            <ListSection
-              list={dashActive}
-              compact
-              empty={projectTable([])}
-              render={(items) => projectTable(items)}
-            />
-            <div className="panel-foot">
-              <span>
-                <i className="status-dot green" />
-                Live workspace data
-              </span>
-              <span>{active.length} active projects</span>
-            </div>
-          </Panel>
-          <Panel
-            title="Intake pipeline"
-            subtitle="From first details to ready for site."
-            actions={<Icon name="activity" size={18} />}
-            className="pipeline-panel"
-          >
-            <div className="pipeline-total">
-              <strong>{intake.length.toString().padStart(2, "0")}</strong>
-              <span>projects in intake</span>
-              <span className="pipeline-badge">In progress</span>
-            </div>
-            <div className="pipeline-stages">
-              {[
-                {
-                  label: "Awaiting Office PM",
-                  count: intake.filter(
-                    (p) => p.status === "pending" && !p.opmAccepted,
-                  ).length,
-                  tone: "green",
-                },
-                {
-                  label: "Site PM confirmation",
-                  count: intake.filter(
-                    (p) =>
-                      p.opmAccepted &&
-                      p.team.some((t) => t.status !== "confirmed"),
-                  ).length,
-                  tone: "sage",
-                },
-                {
-                  label: "Changes requested",
-                  count: intake.filter((p) => p.status === "changes_requested")
-                    .length,
-                  tone: "amber",
-                },
-                {
-                  label: "Draft projects",
-                  count: intake.filter((p) => p.status === "draft").length,
-                  tone: "gray",
-                },
-              ].map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => {
-                    navigate("Project intake")
-                    if (s.tone === "amber") setFilter("changes_requested")
-                  }}
-                >
-                  <span>
-                    <i className={`status-dot ${s.tone}`} />
-                    {s.label}
-                  </span>
-                  <b>{s.count.toString().padStart(2, "0")}</b>
-                </button>
-              ))}
-            </div>
-            <Button
-              className="full-width"
-              onClick={() => navigate("Project intake")}
-            >
-              Open intake log
-              <Icon name="arrow" size={16} />
-            </Button>
-          </Panel>
-        </div>
-        <div className="dashboard-bottom-grid">
-          <Panel
-            title="Schedule performance"
-            subtitle="Recorded project completion and progress history."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => navigate("Schedule performance")}
-              >
-                View report
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            <Chart
-              compact
-              projects={dashSchedule.view.items}
-              summaryProjects={active}
-            />
-            <CompactPager list={dashSchedule} />
-          </Panel>
-          <Panel
-            title="Recent activity"
-            subtitle="The latest across your workspace."
-            actions={
-              <Button
-                variant="text-button"
-                onClick={() => setDialog({ kind: "activity" })}
-              >
-                View all
-                <Icon name="arrow" size={16} />
-              </Button>
-            }
-          >
-            {activityList(dashActivity.view.items, true)}
-            <CompactPager list={dashActivity} />
-          </Panel>
-        </div>
-        <div className="workspace-footer">
-          <span>
-            SITELINE <span>Built for the work ahead.</span>
-          </span>
-          <span>
-            <i className="status-dot green" />
-            Administrator workspace
-          </span>
-        </div>
-      </>
-    )
+    return <PasswordResetRequests>{(requests, openReset) => <AdminDashboard
+      readinessAvailable={readinessAvailable}
+      overview={{ ...adminDashboardOverview(state), items: [
+        ...requests.map(request => ({ key: "password-reset:" + request.id, id: request.id, kind: "account" as const, category: "requests" as const, title: request.full_name, detail: "Password reset requested: " + request.email, label: "Reset password", icon: "shield" })),
+        ...adminDashboardOverview(state).items,
+      ] }}
+      onNavigate={navigate}
+      onNewIntake={() => setDialog({ kind: "intake" })}
+      onActivity={() => setDialog({ kind: "activity" })}
+      onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
+      activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
+    />}</PasswordResetRequests>
   }
-  function pageHeading(title: string, subtitle: string, action?: ReactNode) {
+  function pageHeading(title: string, action?: ReactNode) {
     return (
       <div className="page-heading">
         <div>
@@ -1542,56 +1326,25 @@ function AppInner() {
             {title}
             <span className="heading-dot">.</span>
           </h1>
-          <p>{subtitle}</p>
         </div>
         {action}
       </div>
     )
   }
   function renderPage() {
+    if (page === "Reports") return <Reports projects={state.projects} />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
       return (
         <>
           {pageHeading(
             "Active sites",
-            "Project visibility from mobilization through closeout.",
           )}
-          <div className="summary-pills">
-            <span>
-              <b>{active.length}</b> Active projects
-            </span>
-            <span>
-              <b>
-                {
-                  new Set(active.flatMap((p) => p.team.map((t) => t.accountId)))
-                    .size
-                }
-              </b>{" "}
-              Site leads
-            </span>
-            <span>
-              <b>
-                {active.length
-                  ? Math.round(
-                      active.reduce((n, p) => n + p.progress, 0) /
-                        active.length,
-                    )
-                  : 0}
-                %
-              </b>{" "}
-              Average progress
-            </span>
-          </div>
-          <Panel title="Project monitoring">
-            <ListSection
-              list={activeSitesList}
-              placeholder="Search projects or personnel"
-              noun="project"
-              render={(items) => projectTable(items)}
-              empty={projectTable([])}
-            />
-          </Panel>
+          <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
+            ...p,
+            lead: state.accounts.find(a => a.id === leadId(p))?.name,
+            needsReview: hasPendingSiteReview(p),
+          }))} onOpen={id => setDialog({ kind: "project", id })} />
         </>
       )
     if (page === "Project intake")
@@ -1599,7 +1352,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Project intake",
-            "Plan the project. Find the right people. Set work in motion.",
             <Button
               variant="primary"
               icon="plus"
@@ -1608,91 +1360,19 @@ function AppInner() {
               New project intake
             </Button>,
           )}
-          <div className="notice">
-            <Icon name="shield" />
-            <p>
-              Intake handoff: Administrator → Office PM acceptance → six
-              required documents → Lead and Site PM acceptance → subcontractor
-              coordination → activation. Admin cannot accept on behalf of
-              another role.
-            </p>
-          </div>
           <Panel
             title="Project intake log"
             subtitle={`${intake.length} current intake records`}
           >
+            <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />
             <ListSection
               list={intakeList}
               placeholder="Search intake records"
               noun="record"
-              render={(items) => projectTable(items, true)}
-              empty={projectTable([], true)}
+              render={(items) => <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "project", id: p.id })} />}
+              empty={<Empty title={!intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>Existing intake records appear here as projects move through setup.</Empty>}
             />
           </Panel>
-        </>
-      )
-    if (page === "Schedule performance")
-      return (
-        <>
-          {pageHeading(
-            "Schedule performance",
-            "Recorded completion and progress history across projects.",
-          )}
-          <div className="notice">
-            <Icon name="activity" />
-            <p>
-              Completion percentages and history come from project records.
-              Planned-versus-actual comparisons will appear when a saved
-              schedule baseline is available.
-            </p>
-          </div>
-          <ListToolbar
-            list={scheduleList}
-            placeholder="Search projects"
-            noun="project"
-          />
-          {!scheduleList.count ? (
-            scheduleList.narrowed ? (
-              <NoResults list={scheduleList} />
-            ) : (
-              <Empty title="No active project schedules yet" />
-            )
-          ) : (
-          <>
-          <Panel
-            title="Portfolio schedule"
-            subtitle={`${scheduleList.count} active projects · recorded completion`}
-          >
-            <Chart
-              projects={scheduleList.view.items}
-              summaryProjects={scheduleList.matched}
-            />
-          </Panel>
-          <div className="schedule-cards">
-            {scheduleList.view.items.map((p) => (
-              <Panel
-                key={p.id}
-                title={p.name}
-                subtitle={`${p.phase} · ${p.progress}% actual recorded completion`}
-                actions={
-                  <Button
-                    variant="icon-button"
-                    aria-label={`View ${p.name}`}
-                    icon="arrow"
-                    onClick={() => setDialog({ kind: "project", id: p.id })}
-                  />
-                }
-              >
-                <div className="schedule-timeline">
-                  <PlannedTimeline project={p} />
-                </div>
-                <Chart compact projects={[p]} />
-              </Panel>
-            ))}
-          </div>
-          </>
-          )}
-          <ListPager list={scheduleList} />
         </>
       )
     const projectDocumentsTab = () => (
@@ -1938,7 +1618,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Documents",
-            "Project records and engineer credentials in one place.",
           )}
           {pageTabs(
             "Documents sections",
@@ -1958,7 +1637,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Directory",
-            "Your engineers and verified subcontractor companies.",
             directoryTab === "subcontractors" ? (
               <Button
                 variant="primary"
@@ -1987,7 +1665,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Team & accounts",
-            "Manage access, responsibilities, and the people in your organization.",
             <Button
               variant="primary"
               icon="plus"
@@ -2118,7 +1795,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Archive",
-            "Keep completed work and resolved records within reach.",
           )}
           <div className="notice">
             <Icon name="archive" />
@@ -2258,7 +1934,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Organization settings",
-            "Clear rules for a consistent, accountable operation.",
           )}
           <div className="notice">
             <Icon name="shield" />
@@ -2269,7 +1944,6 @@ function AppInner() {
           </div>
           <Panel
             title="Organization rules"
-            subtitle="Applies across all projects and personnel"
           >
             <SettingsForm
               rules={state.rules}
@@ -2286,7 +1960,6 @@ function AppInner() {
           </Panel>
           <Panel
             title="Notification preferences"
-            subtitle="Choose the updates that appear in your notification inbox."
           >
             <div className="notification-settings">
               {["request", "approval", "progress", "notice"].map((type) => (
@@ -2366,6 +2039,7 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
+        {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
             <div className="detail-stats">
@@ -2390,6 +2064,7 @@ function AppInner() {
                 <strong>{p.end ? dateLabel(p.end) : "Not set"}</strong>
               </div>
             </div>
+            <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
             <PlannedTimeline project={p} />
             <div className="phase-timeline">
               {phases.map((phase, i) => (
@@ -2463,10 +2138,10 @@ function AppInner() {
                       </small>
                     </span>
                     <span>
-                      {nameFor(t.accountId)}
+                      {t.accountId ? nameFor(t.accountId) : "Unassigned"}
                       <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
                     </span>
-                    <Status status={t.status} />
+                    <Status status={t.accountId ? t.status : "unassigned"} />
                     {t.status !== "confirmed" && p.status !== "completed" ? (
                       <select
                         aria-label={`Reassign ${t.phase}`}
@@ -2535,10 +2210,7 @@ function AppInner() {
             </section>
             {p.status === "active" && (
               <section className="detail-section">
-                <h3>
-                  Schedule performance <Badge>Recorded</Badge>
-                </h3>
-                <Chart compact projects={[p]} />
+                <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
               </section>
             )}
           </>
@@ -2825,23 +2497,10 @@ function AppInner() {
                   ))}
                 </div>
               )}
-              {a.license && (
-                <Button
-                  variant="text-button"
-                  icon="bell"
-                  onClick={() =>
-                    commit(
-                      (s) => s,
-                      "License renewal reminder recorded",
-                      `${a.name} · Reminder logged in SITELINE.`,
-                      "notice",
-                      "Engineer directory",
-                    )
-                  }
-                >
-                  Notify engineer
-                </Button>
-              )}
+              <p className="muted">
+                Renewal reminders are sent automatically when a license is
+                missing, expiring or expired.
+              </p>
             </section>
             <WorkRecord userId={a.id} />
             <section className="detail-section">
@@ -3009,8 +2668,25 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signedOut || checkingSession || !actor.id)
-    return <LoginPage checkingSession={checkingSession} onSignIn={signIn} />
+  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole} />
+  if (signedOut && restoreError)
+    return (
+      <main className="session-restore" aria-busy={checkingSession}>
+        {checkingSession ? null : (
+          <div role="alert">
+            <p>{restoreError}</p>
+            <div className="session-restore-actions">
+              <Button variant="primary" onClick={() => setRestoreAttempt((n) => n + 1)}>
+                Retry
+              </Button>
+              <Button onClick={() => { setRestoreError(""); endSession() }}>Sign out</Button>
+            </div>
+          </div>
+        )}
+      </main>
+    )
+  if (signedOut || !actor.id)
+    return <LoginPage onSignIn={signIn} workspaceRole={loadingWorkspaceRole} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
@@ -3164,9 +2840,17 @@ function AppInner() {
         onPause={endSession}
       />
     )
+  const navigationCounts = navigationAttention(state, actor)
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+        <div className="workspace-switch">
+          <span className="workspace-avatar">10</span>
+          <span>
+            <strong>10 Builders</strong>
+            <small>Administrator workspace</small>
+          </span>
+        </div>
         <div className="brand">
           <span className="brand-mark">
             <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -3183,28 +2867,19 @@ function AppInner() {
             SITELINE<small>Project operations</small>
           </div>
         </div>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">10</span>
-          <span>
-            <strong>10 Builders</strong>
-            <small>Administrator workspace</small>
-          </span>
-          <Icon name="down" size={15} />
-        </div>
         <nav aria-label="Main navigation">
           {NAV.map((n) => (
             <div key={n.label}>
               {n.group && <div className="nav-group-label">{n.group}</div>}
               <button
                 aria-label={n.label}
+                aria-description={navigationCounts[n.label]?.count ? `${navigationCounts[n.label].count} ${navigationCounts[n.label].description}` : undefined}
                 className={`nav-item ${page === n.label ? "active" : ""}`}
                 onClick={() => navigate(n.label)}
               >
                 <Icon name={n.icon} size={19} />
                 <span>{n.label}</span>
-                {n.label === "Directory" && pending.length > 0 && (
-                  <b className="nav-count">{pending.length}</b>
-                )}
+                <NavigationCount item={navigationCounts[n.label]} />
                 {n.label === "Dashboard" && page === n.label && <i />}
               </button>
             </div>
@@ -3363,7 +3038,6 @@ function AppInner() {
       {dialog?.kind === "intake" && (
         <Modal
           title={selectedProject ? "Resubmit project" : "New project intake"}
-          subtitle="A strong start for every project."
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3379,7 +3053,6 @@ function AppInner() {
       {dialog?.kind === "sent" && selectedProject && (
         <Modal
           title="Project handed off successfully"
-          subtitle="The first step is complete."
           onClose={() => setDialog(undefined)}
         >
           <div className="success-state">
@@ -3414,7 +3087,6 @@ function AppInner() {
                 ? "Project documents"
                 : "Project details"
             }
-            subtitle="Administrator · Project monitoring"
             wide
             onClose={() => setDialog(undefined)}
           >
@@ -3429,7 +3101,6 @@ function AppInner() {
                 ? "Engineer documents"
                 : "Personnel profile"
             }
-            subtitle="Identity, qualifications & assignments"
             wide
             onClose={() => setDialog(undefined)}
           >
@@ -3516,7 +3187,6 @@ function AppInner() {
       {dialog?.kind === "company" && selectedCompany && (
         <Modal
           title="Subcontractor company"
-          subtitle="Company profile, availability, commitments & documents"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3526,7 +3196,6 @@ function AppInner() {
       {dialog?.kind === "add-company" && (
         <Modal
           title="Add subcontractor company"
-          subtitle="Administrator-verified company directory record"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3543,7 +3212,6 @@ function AppInner() {
       {dialog?.kind === "activity" && (
         <Modal
           title="Workspace activity"
-          subtitle="Requests, approvals, personnel updates and document history."
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3559,7 +3227,6 @@ function AppInner() {
       {dialog?.kind === "search" && (
         <Modal
           title="Search workspace"
-          subtitle="Find projects, people and companies."
           onClose={() => setDialog(undefined)}
         >
           <Search
@@ -3621,7 +3288,6 @@ function AppInner() {
       {dialog?.kind === "help" && (
         <Modal
           title="Welcome to your workspace"
-          subtitle="Built for the work ahead."
           onClose={() => setDialog(undefined)}
         >
           <div className="help-content">
@@ -3650,6 +3316,7 @@ function AppInner() {
           </div>
         </Modal>
       )}
+      {reportProjectId && <MonthlyReport projects={state.projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {preview && (
         <Preview doc={preview} onClose={() => setPreview(undefined)} />
       )}
@@ -3739,14 +3406,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return (
-    <>
-      <AppInner />
-      {apiEnabled && (
-        <div className="api-mode-banner" role="status">
-          Connected to database
-        </div>
-      )}
-    </>
-  )
+  return <AppInner />
 }

@@ -677,3 +677,21 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .document-status-line { font-size: 14px; line-height: 1.4; color: var(--color-muted); }
 #root .document-status-line.action { color: var(--color-warning); font-weight: 600; }
 #root .panel.action-required > .panel-header { background: transparent; border-bottom-color: var(--warning-border); }
+#root .session-restore { min-height: 100vh; background: var(--page-bg, #F3F5F8); display: grid; place-items: center; padding: 24px; text-align: center; font-size: 16px; color: var(--color-muted); }
+#root .session-restore [role="alert"] { display: grid; gap: 16px; max-width: 420px; }
+#root .session-restore-actions { display: flex; gap: 12px; justify-content: center; }
+
+#root .password-reset-page .login-card { max-width:520px; min-height:0; }
+#root .password-reset-page .login-panel { flex:1; width:100%; padding:32px; }
+#root .password-reset-page .login-form { gap:14px; }
+#root .password-reset-page h1 { font-size:28px; }
+#root .password-match { color:var(--color-success); margin:0; }
+#root .notification-container > .button { width:44px; height:44px; min-width:44px; padding:10px; border:1px solid var(--color-line); background:var(--color-canvas); border-radius:9px; color:var(--color-primary); }
+#root .notification-container > .button:hover { background:var(--color-line); }
+#root .notification-container > .button svg { width:23px; height:23px; }
+#root .notification-dot { width:9px; height:9px; top:5px; right:5px; border:2px solid white; }
+#root .activity-icon { display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1; }
+#root .activity-icon svg { display:block; flex:none; margin:0; }
+#root .license-expiry-warning { display:flex; align-items:center; gap:14px; padding:18px; margin-bottom:20px; border:1px solid var(--warning-border); border-radius:6px; background:var(--amber-soft); color:var(--color-primary); }
+#root .license-expiry-warning > svg { flex-shrink:0; color:var(--color-warning); }
+#root .license-expiry-warning p { margin:5px 0 0; }

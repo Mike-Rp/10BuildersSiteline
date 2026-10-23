@@ -251,14 +251,16 @@ export const getPhaseTeam = async (req, res) => {
     if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
 
     const result = await execute(
-      `SELECT pt.id AS assignment_id,pt.project_stage_id AS stage_id, ps.code AS stage_code, ps.sort_order,
+      `SELECT pt.id AS assignment_id,pt.project_stage_id AS stage_id, ps.code AS stage_code, w.sort_order,
               pt.spm_user_id, u.full_name AS spm_name, pt.status, pt.is_lead,
               pt.response_deadline_at, pt.responded_at
          FROM project_phase_team pt
+         JOIN projects p ON p.id=pt.project_id
+         JOIN project_type_stages w ON w.project_type_id=p.project_type_id AND w.project_stage_id=pt.project_stage_id
          JOIN project_stages ps ON ps.id = pt.project_stage_id
          LEFT JOIN users u ON u.id = pt.spm_user_id
         WHERE pt.project_id = $1
-        ORDER BY ps.sort_order ASC`,
+        ORDER BY w.sort_order ASC`,
       [id]
     );
     return sendOk(res, "Resource retrieved successfully.", result.rowCount, result.rows);
@@ -317,8 +319,8 @@ const respondToPhase = (newStatus) => async (req, res) => {
                 SET lifecycle_status = 'active',
                     current_stage_id = COALESCE(current_stage_id, (
                       SELECT t.project_stage_id FROM project_phase_team t
-                      JOIN project_stages s ON s.id = t.project_stage_id
-                      WHERE t.project_id = $1 AND t.status = 'confirmed' ORDER BY s.sort_order LIMIT 1)),
+                      JOIN project_type_stages w ON w.project_type_id=projects.project_type_id AND w.project_stage_id=t.project_stage_id
+                      WHERE t.project_id = $1 AND t.status = 'confirmed' ORDER BY w.sort_order LIMIT 1)),
                     current_pct = CASE WHEN current_stage_id IS NULL THEN 0 ELSE current_pct END,
                     updated_by = $2, updated_at = now()
               WHERE id = $1 AND lifecycle_status = 'spm_review' AND EXISTS (SELECT 1 FROM project_documents d JOIN document_types t ON t.id=d.document_type_id WHERE d.project_id=$1 AND t.code='subcontractor_agreement' AND d.status='uploaded')

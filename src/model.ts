@@ -159,8 +159,7 @@ export const PROJECT_PHASE_DEFINITIONS: Record<"Residential" | "Commercial" | "M
       },
     ],
   }
-// The only project types intake offers. (The database still has the older Infrastructure,
-// Industrial and Renovation rows for foreign keys, but no project uses them.)
+// Selectable project types; legacy database rows may still exist.
 export const PROJECT_TYPES = ["Residential", "Commercial", "Mixed-Use"]
 export const ROLE_NAMES = {
   admin: "Administrator",
@@ -194,6 +193,7 @@ export type Account = {
   projectTypes: string[]
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
+  lastName?: string
   license: string
   expiry: string
   renewed?: boolean
@@ -235,6 +235,10 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  handoffReadiness?: { state: "blocked" | "incomplete" | "unknown" | "inactive" | "final" | "ready"; stageId: string; reason?: string; reasonCode?: string }
+  handoffBlocker?: string
+  checklistProgress?: PhaseProgress[]
+  verifiedProgress?: import("./project-progress").VerifiedProgress
   id: string
   name: string
   type: string
@@ -243,6 +247,7 @@ export type Project = {
   start: string
   end?: string
   clientId: string
+  clientAccounts?: { id: string; name: string; email: string; phone: string; contactPerson?: string }[]
   status: "active" | "pending" | "changes_requested" | "draft" | "completed" | "declined" | "expired"
   opmId: string
   team: {
@@ -275,6 +280,13 @@ export type Project = {
     evidence?: Doc
   }[]
 }
+export type PhaseProgress = {
+  id: string
+  name: string
+  configured: boolean
+  approved: number
+  required: number
+}
 export type Company = {
   id: string
   name: string
@@ -298,13 +310,18 @@ export type Company = {
 }
 export type ChecklistItem = {
   id: string
+  evidenceId?: string
   label: string
-  status: "missing" | "submitted" | "approved"
+  required?: boolean
+  weight?: number
+  status: "missing" | "submitted" | "approved" | "rework_required"
+  reworkReason?: string
   version: number
   doc?: Doc
   note?: string
   submittedAt?: string
   reviewedAt?: string
+  reviewedBy?: string
   escalated?: boolean
   submittedBy?: string
   submittedByName?: string
@@ -556,6 +573,7 @@ export function validateFile(file: File, spreadsheet = false) {
     ? ["xlsx", "xls"]
     : ["pdf", "jpg", "jpeg", "png"]
   const max = spreadsheet ? 15 : 10
+  if (!file.size) return "Choose a non-empty file."
   if (!extensions.includes(file.name.split(".").pop()?.toLowerCase() || ""))
     return `Use ${extensions.join(", ").toUpperCase()} files only.`
   if (file.size > max * 1024 * 1024)

@@ -167,6 +167,9 @@ export function mapPhoto(
 // ----------------------------------------------------------------- projects
 
 export type ProjectParts = {
+  handoffReadiness?: Project["handoffReadiness"]
+  checklistProgress?: Project["checklistProgress"]
+    verifiedProgress?: Project["verifiedProgress"]
   list: Dto // item of GET /projects
   detail: Dto // GET /projects/:id
   documents: Dto[]
@@ -190,7 +193,7 @@ export function mapProject(parts: ProjectParts): Project {
   const status = projectStatus(list)
   const team: Project["team"] = (detail.phase_team || []).map((t: Dto) => ({
     phase: t.stage,
-    accountId: t.spm_user_id,
+    accountId: t.spm_user_id || "",
     status: teamStatus(t.status),
     requiredDisciplines: t.required_disciplines,
     sequence: t.sort_order,
@@ -217,9 +220,13 @@ export function mapProject(parts: ProjectParts): Project {
     checklist[list.current_stage] = items.map(
       (i): ChecklistItem => ({
         id: String(i.id),
+        evidenceId: i.evidence_id == null ? undefined : String(i.evidence_id),
+        reworkReason:i.rework_reason||undefined,
         label: i.title,
+        required: i.required,
+        weight: i.weight,
         status:
-          i.status === "approved"
+          i.status === "rework_required" ? "rework_required" : i.status === "approved"
             ? "approved"
             : i.status === "pending" || i.status === "submitted"
               ? "submitted"
@@ -271,6 +278,9 @@ export function mapProject(parts: ProjectParts): Project {
     note:rework.reason,issues:rework.issue_categories||[],priorPhase:list.current_stage,priorProgress:Number(list.current_pct||0),
     requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0)}
   const project: Project = {
+    ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
+    ...(parts.verifiedProgress ? { verifiedProgress: parts.verifiedProgress } : {}),
+    ...(parts.handoffReadiness ? { handoffReadiness: parts.handoffReadiness } : {}),
     id,
     name: list.name,
     type: list.project_type,
@@ -282,6 +292,9 @@ export function mapProject(parts: ProjectParts): Project {
     start: day(list.target_start_date),
     end: day(list.target_end_date) || undefined,
     clientId: parts.clientId,
+    ...(Array.isArray(detail.client_accounts) ? {clientAccounts: detail.client_accounts.map((client: Dto) => ({
+      id: client.id, name: client.full_name, email: client.email || "", phone: client.phone || "", contactPerson: client.contact_person || "",
+    }))} : {}),
     status,
     opmId: list.suggested_opm_id || "",
     team,
@@ -419,7 +432,7 @@ export function peopleFromProjects(
   add(me)
   for (const p of list) {
     const detail = details.get(p.id) || {}
-    for (const t of detail.phase_team || [])
+    for (const t of (detail.phase_team || []).filter((t: Dto) => t.spm_user_id))
       add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
     if (detail.opm_assignment?.target_user_id)
       add(
@@ -432,6 +445,14 @@ export function peopleFromProjects(
     else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id))
       add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
     const clientName: string = p.client_name || ""
+    if (Array.isArray(detail.client_accounts)) {
+      const linked = detail.client_accounts as Dto[]
+      for (const client of linked) add({...stubAccount(client.id,client.full_name,"client"),
+        email:client.email || "",phone:client.phone || "",contactPerson:client.contact_person || ""})
+      const selected = linked.length === 1 ? linked[0] : linked.find(client => client.id === me.id || client.full_name.toLowerCase() === clientName.toLowerCase())
+      if (selected) clientIds.set(p.id,selected.id)
+      continue
+    }
     const known = [...byId.values()].find(
       (a) =>
         a.role === "client" &&

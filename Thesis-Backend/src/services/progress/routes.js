@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   submitProgressUpdate, getPendingUpdate, approveProgressUpdate, rejectProgressUpdate,
   getEscalatedUpdates, sweepOverdueUpdates,
-  submitReworkRequest, getReworkRequests, approveRework, rejectRework,
+  submitReworkRequest, getReworkRequests, approveRework, rejectRework, getReworkPreview,
   getProjectHistory, addProjectNote, getProjectNotes,
 } from "./controller.js";
  
@@ -21,6 +21,7 @@ router.post("/progress-updates/:id/reject", async (req, res) => { await rejectPr
 router.post("/projects/:id/rework-requests", async (req, res) => { await submitReworkRequest(req, res); });
 router.get("/rework-requests", async (req, res) => { await getReworkRequests(req, res); });
 router.post("/rework-requests/:id/approve", async (req, res) => { await approveRework(req, res); });
+router.post("/rework-requests/:id/preview", getReworkPreview);
 router.post("/rework-requests/:id/reject", async (req, res) => { await rejectRework(req, res); });
  
 

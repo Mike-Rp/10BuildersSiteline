@@ -58,10 +58,13 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(read("../supabase/migrations/20261017000002_thesis_backend_schema.sql").replace(/^create extension if not exists pgcrypto.*$/m, ""))
-  await db.exec(read("../Thesis-Backend/migrations/003-react-integration.sql"))
-  await db.exec(read("../Thesis-Backend/migrations/004-engineer-license-workflow.sql"))
+  for (const migration of ["001-phase-checklists.sql", "002-phase-update-confirmation.sql", "003-react-integration.sql", "004-verified-activity-progress.sql"])
+    await db.exec(read("../Thesis-Backend/migrations/" + migration))
+  await db.exec(read("../Thesis-Backend/migrations/004-verified-activity-progress.sql")) // safe to run again
+  await db.exec(read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql"))
   await db.exec(read("../supabase/seed/dummy-data.sql"))
-  await db.exec(read("../Thesis-Backend/migrations/004-engineer-license-workflow.sql")) // backfills the seeded holders
+  await db.exec(read("../Thesis-Backend/migrations/008-monthly-report-history.sql"))
+  await db.exec(read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql")) // backfills the seeded holders
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
@@ -140,7 +143,6 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
       where n.recipient_user_id=$1 and a.title like $2 order by a.id`, [userId, title])
 
   const brook = await project("Brookfield Warehouse Ext.")
-  const rosaria = await project("Rosaria Business Park")
   const designStage = await stage("Design")
   const mobilization = await stage("Mobilization")
   const scopeBefore = {}
@@ -150,7 +152,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   await t.test("the seeded engineers cover every license state", async () => {
     const overview = (await call("admin", "GET", "/licenses/overview")).data
     const by = (who) => overview.find((i) => i.id === idOf(who))
-    assert.equal(by("renz").status, "valid")
+    assert.equal(by("lea").status, "valid")
     assert.equal(by("karlo").status, "valid")
     assert.equal(by("bea").status, "expiring_soon")
     assert.equal(by("rafael").status, "expired")
@@ -159,9 +161,10 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.equal(by("mikaela").status, "renewal_under_review")
     assert.equal(by("mikaela").restricted, true)
     assert.equal(by("diego").graceEnded, true)
-    assert.equal(by("lea").graceEnded, true)
+    assert.equal(by("renz").status, "expired")
+    assert.equal(by("renz").graceEnded, true)
     assert.equal(by("diego").needsCover, true)
-    assert.equal(by("lea").needsCover, true)
+    assert.equal(by("renz").needsCover, true)
     assert.equal(by("rafael").needsCover, false, "still inside the grace period")
     assert.equal(by("diego").assignments.some((a) => a.isLead && a.stage === "Mobilization"), true)
     // Status comes from the dates: nothing about it can be typed in.
@@ -240,28 +243,29 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   })
 
   await t.test("an expired Office PM cannot sign, approve or accept, but can view", async () => {
-    const R = rosaria.id
+    const R = brook.id
     const attempts = [
       ["approve a phase update", "POST", `/progress/projects/${R}/phase-updates/1/approve`, {}],
       ["reject a phase update", "POST", `/progress/projects/${R}/phase-updates/1/reject`, { resolution_note: "no" }],
       ["approve evidence", "POST", `/progress/projects/${R}/evidence/1/approve`, {}],
       ["reject evidence", "POST", `/progress/projects/${R}/evidence/1/reject`, { review_note: "no" }],
-      ["approve rework", "POST", "/progress/rework-requests/00000000-0000-4000-8000-000000000001/approve", {}],
-      ["reject rework", "POST", "/progress/rework-requests/00000000-0000-4000-8000-000000000001/reject", {}],
+      ["approve rework", "POST", "/progress/rework-requests/00000000-0000-4000-8000-000000000001/approve", { resolution_note: "x" }],
+      ["reject rework", "POST", "/progress/rework-requests/00000000-0000-4000-8000-000000000001/reject", { resolution_note: "x" }],
       ["advance the phase", "POST", `/progress/projects/${R}/advance-phase`, {}],
       ["accept an assignment", "POST", "/confirmations/1/accept", {}],
       ["upload the registered documents", "POST", `/projects/${R}/workspace-command`, { type: "upload_registered", docIndex: 0 }],
     ]
-    for (const [label, method, path, body] of attempts) paused(await call("lea", method, path, body), label)
-    assert.equal((await call("lea", "GET", "/workspace")).status, 200)
-    assert.equal((await call("lea", "GET", "/workspace/project-data")).status, 200)
-    assert.equal((await call("lea", "GET", "/licenses/me")).status, 200)
-    notPaused(await call("lea", "POST", "/confirmations/1/decline", {}), "decline")
-    assert.equal((await q("select suggested_opm_id from projects where id=$1", [R]))[0].suggested_opm_id, idOf("lea"), "not removed from the project")
+    for (const [label, method, path, body] of attempts) paused(await call("renz", method, path, body), label)
+    assert.equal((await call("renz", "GET", "/workspace")).status, 200)
+    assert.equal((await call("renz", "GET", "/workspace/project-data")).status, 200)
+    assert.equal((await call("renz", "GET", "/licenses/me")).status, 200)
+    notPaused(await call("renz", "POST", "/confirmations/1/decline", {}), "decline")
+    assert.equal((await q("select suggested_opm_id from projects where id=$1", [R]))[0].suggested_opm_id, idOf("renz"), "not removed from the project")
   })
 
   await t.test("approvals made before expiry stay valid and still count in verified progress", async () => {
     const P = brook.id
+    await setExpiry("renz", 420) // valid while he approves; he expires below
     const overview = async (who) => (await call(who, "GET", `/progress/projects/${P}/phase-overview`)).data
     const items = (await overview("karlo")).checklist.items.filter((i) => i.status === "missing")
     assert.ok(items.length >= 2, "the current phase has at least two items waiting for evidence")
@@ -445,24 +449,25 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   })
 
   await t.test("the Office PM role can be reassigned the same way, and the original keeps read-only history", async () => {
-    await q("update projects set project_type_id=(select id from project_types where code='Mixed-Use') where id=$1", [rosaria.id])
-    const options = (await call("admin", "GET", `/licenses/override-options?project_id=${rosaria.id}`)).data
+    await setExpiry("renz", -45)
+    const options = (await call("admin", "GET", `/licenses/override-options?project_id=${brook.id}`)).data
     assert.deepEqual([options.role, options.available], ["opm", true])
-    assert.equal(options.candidates[0].id, idOf("renz"))
-    assert.equal((await call("admin", "POST", "/licenses/overrides", { project_id: rosaria.id, to_user_id: idOf("renz"), reason: REASON_3 })).status, 201)
-    assert.equal((await q("select suggested_opm_id from projects where id=$1", [rosaria.id]))[0].suggested_opm_id, idOf("lea"), "nothing moves yet")
-    const mine = (await call("renz", "GET", "/licenses/requests")).data[0]
+    assert.equal(options.candidates[0].id, idOf("lea"), "the only Office PM specialised in Commercial with a valid license")
+    assert.ok(!options.candidates.some((c) => c.id === idOf("renz")))
+    assert.equal((await call("admin", "POST", "/licenses/overrides", { project_id: brook.id, to_user_id: idOf("lea"), reason: REASON_3 })).status, 201)
+    assert.equal((await q("select suggested_opm_id from projects where id=$1", [brook.id]))[0].suggested_opm_id, idOf("renz"), "nothing moves yet")
+    const mine = (await call("lea", "GET", "/licenses/requests")).data[0]
     assert.equal(mine.title, "Reassigned project")
-    assert.equal((await call("renz", "POST", `/licenses/requests/${mine.id}/accept`, {})).status, 200)
-    assert.equal((await q("select suggested_opm_id from projects where id=$1", [rosaria.id]))[0].suggested_opm_id, idOf("renz"))
-    assert.ok((await projectIds("lea")).includes(rosaria.id), "the original can still view the project")
-    // After a late renewal she still cannot approve: the role is no longer hers.
-    const up = await call("lea", "POST", "/licenses/renewals", undefined, renewalForm())
+    assert.equal((await call("lea", "POST", `/licenses/requests/${mine.id}/accept`, {})).status, 200)
+    assert.equal((await q("select suggested_opm_id from projects where id=$1", [brook.id]))[0].suggested_opm_id, idOf("lea"))
+    assert.ok((await projectIds("renz")).includes(brook.id), "the original can still view the project")
+    // After a late renewal he still cannot approve: the role is no longer his.
+    const up = await call("renz", "POST", "/licenses/renewals", undefined, renewalForm())
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/verify`, {})).status, 200)
-    const approve = await call("lea", "POST", `/progress/projects/${rosaria.id}/phase-updates/1/approve`, {})
+    const approve = await call("renz", "POST", `/progress/projects/${brook.id}/phase-updates/1/approve`, {})
     assert.ok([403, 404].includes(approve.status) && approve.code !== "LICENSE_PAUSED", approve.text)
-    const roles = (await call("admin", "GET", `/licenses/history?project_id=${rosaria.id}`)).data.filter((h) => h.role === "opm")
-    assert.deepEqual(roles.map((h) => h.name), ["Lea M. Fernandez", "Renz D. Villaverde"])
+    const roles = (await call("admin", "GET", `/licenses/history?project_id=${brook.id}`)).data.filter((h) => h.role === "opm")
+    assert.deepEqual(roles.map((h) => h.name), ["Renz D. Villaverde", "Lea M. Fernandez"])
   })
 
   await t.test("reminders go out once per reminder day to the engineer, their superior and the Administrator", async () => {
@@ -506,7 +511,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   await t.test("privacy: the reason is Administrator-only and the replacement only ever sees \"Previous engineer unavailable\"", async () => {
     const everything = async (who) => {
       const parts = []
-      for (const path of ["/licenses/requests", "/workspace/project-data", "/workspace", "/notifications", "/licenses/me", `/licenses/history?project_id=${brook.id}`, `/licenses/history?project_id=${rosaria.id}`, `/licenses/work-record/${idOf(who)}`]) {
+      for (const path of ["/licenses/requests", "/workspace/project-data", "/workspace", "/notifications", "/licenses/me", `/licenses/history?project_id=${brook.id}`, `/licenses/history?project_id=${brook.id}`, `/licenses/work-record/${idOf(who)}`]) {
         const r = await call(who, "GET", path)
         if (r.status === 200) parts.push(r.text)
       }
@@ -549,7 +554,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   await t.test("role scoping is unchanged for accounts that never held a reassigned assignment", async () => {
     for (const who of ["admin", "mikaela", "client"]) assert.deepEqual(await projectIds(who), scopeBefore[who], `${who} sees the same projects as before`)
     // Anyone who held something keeps (read-only) access, and the new holders gain exactly what they took over.
-    for (const who of ["diego", "lea"]) for (const id of scopeBefore[who]) assert.ok((await projectIds(who)).includes(id), `${who} keeps ${id}`)
-    assert.ok((await projectIds("renz")).includes(rosaria.id))
+    for (const who of ["diego", "renz"]) for (const id of scopeBefore[who]) assert.ok((await projectIds(who)).includes(id), `${who} keeps ${id}`)
+    assert.ok((await projectIds("lea")).includes(brook.id), "the new Office PM gained exactly the project they took over")
   })
 })

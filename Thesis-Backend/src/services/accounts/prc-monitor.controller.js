@@ -1,6 +1,7 @@
 import { isUuid, requireUser, sendError, sendOk, handleError } from '../../common/utilities/access.utility.js';
 import execute from '../../common/utilities/query.utility.js';
 import { withTransaction } from '../../common/utilities/transaction.utility.js';
+import { sweepLicenses } from './license-sweep.utility.js';
 
 export const requireLicenseAdmin = async (req, res, next) => {
   try {
@@ -73,6 +74,7 @@ export const renewPrcLicense = async (req, res) => {
         ) VALUES ($1,$2,$3,$4,'uploaded',NULL,$5,$5)
         RETURNING id, user_id, license_number, license_expiry, upload_status
       `, [user_id, license_number.trim(), license_expiry, req.file.path, req.licenseAdmin.id]);
+      await sweepLicenses(client, { userId: user_id });
       return inserted.rows[0];
     });
     return sendOk(res, 'License renewal recorded by Admin.', 1, result);

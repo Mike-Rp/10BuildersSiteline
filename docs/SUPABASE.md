@@ -61,3 +61,7 @@ Production always uses `/api/v1` on the website's own HTTPS domain and ignores `
 After deployment, open `https://10builderssiteline.vercel.app/api/v1/health`. A 200 response with `{"ok":true,"database":true}` confirms that both the function and database work. A JSON 503 response means the function is running but database configuration or connectivity needs attention. A Vercel 404 means the API function was not deployed.
 
 Vercel Functions limit request and response payloads to 4.5 MB, below this app's existing 10-15 MB upload limits. Larger files require a separate API host or a direct storage upload design. Legacy disk-backed upload endpoints also require adapting storage before using them on serverless hosting; the integrated workspace endpoints store file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
+
+## Project-type phases
+
+After loading the legacy schema and demo data, run `npm.cmd --prefix Thesis-Backend run db:project-types`. This installs the 9 Residential, 9 Commercial and 12 Mixed-Use phases and migrates existing projects. See [Project-type workflows](PROJECT-TYPE-WORKFLOWS.md) for migration mappings and assignment/checklist requirements.

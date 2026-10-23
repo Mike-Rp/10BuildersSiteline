@@ -1,3 +1,4 @@
+import { hasPendingSiteReview } from "../src/active-sites-review.ts"
 import assert from "node:assert/strict"
 import test from "node:test"
 import { DOC_LABELS } from "../src/model.ts"
@@ -29,6 +30,18 @@ const base = {
   suggested_opm_id: "opm-1",
   created_at: "2026-10-17T09:31:05.711Z",
 }
+
+test("trusted verified totals remain separate from current-phase and historical percentages", () => {
+  const verifiedProgress = {
+    project: { earned: 80, total: 270, percentage: 80/270*100, reason: null },
+    phases: [{ id: "4", name: "Structure", earned: 20, total: 30, percentage: 20/30*100, reason: null }],
+  }
+  const project = mapProject(parts({verifiedProgress}))
+  assert.deepEqual(project.verifiedProgress,verifiedProgress)
+  assert.equal(project.progress,60)
+  assert.ok(project.history.some(h=>h.progress===62))
+  assert.equal(mapProject(parts()).verifiedProgress,undefined,"legacy progress is never converted into verified credit")
+})
 const parts = (over = {}) => ({
   list: base,
   detail: {
@@ -149,7 +162,41 @@ test("companies and notifications map their key fields", () => {
   assert.equal(formatArea("18400.00"), "18,400")
 })
 
+test("linked client identity and contact details come from the project link, not a matching name", () => {
+  const me=mapAccount({id:"opm",full_name:"Office PM",role:"opm",status:"active"})
+  const contact={id:"actual-client",full_name:"Client Contact",email:"linked@example.test",phone:"09123456789",contact_person:"Owner Representative"}
+  const details=new Map([["p1",{client_accounts:[contact]}]])
+  const existing=[mapAccount({id:"unrelated",full_name:base.client_name,role:"client",status:"active",email:"wrong@example.test"})]
+  const people=peopleFromProjects(me,[base],details,existing)
+  assert.equal(people.clientIds.get("p1"),"actual-client")
+  assert.equal(people.accounts.find(a=>a.id==="actual-client").email,"linked@example.test")
+  const p=mapProject(parts({detail:details.get("p1"),clientId:people.clientIds.get("p1")}))
+  assert.deepEqual(p.clientAccounts,[{id:contact.id,name:contact.full_name,email:contact.email,phone:contact.phone,contactPerson:contact.contact_person}])
+  const unlinked=peopleFromProjects(me,[base],new Map([["p1",{client_accounts:[]}]]),existing)
+  assert.equal(unlinked.clientIds.has("p1"),false,"an absent link must not borrow another account with the same name")
+})
+
 test("an empty current review queue does not revive retired manual-percentage requests",()=>{
  const p=mapProject(parts({overview:{pending_update:null,checklist:{items:[]}}}))
  assert.equal(p.workflow.pendingUpdate,undefined)
+})
+
+
+test("Active Sites review membership follows current backend queues and ignores resolved issues and retired updates", () => {
+  const mapped = (pending_update, issues = []) => mapProject(parts({ overview: { pending_update, issues } }))
+  const update = { id: "pending-update", prior_pct: 60, requested_pct: 60 }
+  const issue = { id: "pending-issue", status: "pending" }
+  assert.equal(hasPendingSiteReview(mapped(update)), true)
+  assert.equal(hasPendingSiteReview(mapped(null, [issue])), true)
+  const both = mapped(update, [issue])
+  assert.ok(both.workflow.pendingUpdate)
+  assert.ok(both.workflow.pendingRework)
+  assert.equal(hasPendingSiteReview(both), true)
+  // A retired legacy pending-update response must not restore a resolved review.
+  const resolved = mapped(null, [{ ...issue, status: "resolved" }])
+  assert.equal(hasPendingSiteReview(resolved), false)
+  assert.equal(resolved.workflow.pendingUpdate, undefined)
+  assert.equal(resolved.workflow.pendingRework, undefined)
+  assert.equal(hasPendingSiteReview({ ...both, status: "pending" }), false)
+  assert.equal(hasPendingSiteReview({ ...both, status: "completed" }), false)
 })

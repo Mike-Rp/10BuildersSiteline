@@ -134,13 +134,15 @@ export const getProjectById = async (req, res) => {
           WHERE project_id = $1 AND unassigned_at IS NULL
           ORDER BY assigned_at`, [id]),
       execute(
-        `SELECT t.project_stage_id AS stage_id, s.code AS stage, s.sort_order,
+        `SELECT t.project_stage_id AS stage_id, s.code AS stage, w.sort_order,
                 t.spm_user_id, u.full_name AS spm_name, t.status, t.is_lead
            FROM project_phase_team t
+           JOIN projects p ON p.id=t.project_id
+           JOIN project_type_stages w ON w.project_type_id=p.project_type_id AND w.project_stage_id=t.project_stage_id
            JOIN project_stages s ON s.id = t.project_stage_id
            LEFT JOIN users u ON u.id = t.spm_user_id
           WHERE t.project_id = $1
-          ORDER BY s.sort_order`, [id]),
+          ORDER BY w.sort_order`, [id]),
       execute(
         `SELECT w.id, w.full_name, w.role_title, d.code AS discipline, w.current_project_until
            FROM subcontractor_workers w

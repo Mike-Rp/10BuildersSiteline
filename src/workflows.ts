@@ -1,7 +1,11 @@
+import { phaseProgress, projectProgress } from "./project-progress.ts"
+import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import {
   DOC_LABELS,
   PHASES,
+  PROJECT_PHASE_DEFINITIONS,
   licenseExpired,
+  licenseState,
   projectPhaseNames,
   spmCandidates,
   today,
@@ -59,6 +63,10 @@ export const CHECKLISTS: Record<string, string[]> = {
     "Previous Activity Acceptance/Clearance (Finishes)",
   ],
 }
+// Standard defaults only; saved project checklists remain authoritative.
+for (const definitions of Object.values(PROJECT_PHASE_DEFINITIONS)) {
+  definitions.forEach((phase,index) => { CHECKLISTS[phase.name] = standardActivities(index,definitions.length).map(item => item.title) })
+}
 export const ISSUES = [
   "Failed inspection",
   "Material defect / damage",
@@ -104,6 +112,11 @@ export type WorkflowCommand = {
   accepted?: boolean
   accountId?: string
   itemId?: string
+  evidenceId?: string
+  expectedReviewToken?: string
+  requestId?: string
+  affectedActivityIds?: string[]
+  selectedActivityIds?: string[]
   expectedVersion?: number
   company?: Company
 }
@@ -386,6 +399,8 @@ export function assignmentBlock(p: Project, actorId: string) {
   return ""
 }
 export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
+  const sequence = projectPhaseNames(p)
+  const position = sequence.indexOf(phase)
   const templatePhase =
     {
       "Podium Structure": "Structure",
@@ -400,10 +415,12 @@ export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
       "Landscape & Site Works": "Finishes",
     }[phase] || phase
   return (
-    workflowFor(p).checklist[phase] ||
-    (CHECKLISTS[templatePhase] || []).map((label, i) => ({
+    workflowFor(p).checklist[phase]?.filter(item => item.required !== false) ||
+    (position >= 0 ? standardActivities(position,sequence.length).map(item => item.title) : CHECKLISTS[templatePhase] || []).map((label, i) => ({
       id: `${phase}-${i}`,
       label,
+      required: true,
+      weight: 10,
       status: "missing",
       version: 0,
     }))
@@ -632,59 +649,48 @@ function assertLead(p: Project, actor: Account) {
     "All six Office PM documents and every Site PM acceptance are required first.",
   )
 }
-function approvedShare(p: Project) {
-  const work = ensure(p)
-  const phases = projectPhaseNames(p).slice(work.progressStart || 0)
-  return (
-    phases.reduce((sum, phase) => {
-      const items = checklistFor(p, phase)
-      return (
-        sum +
-        (items.length
-          ? items.filter((i) => i.status === "approved").length / items.length
-          : 1)
-      )
-    }, 0) / phases.length
-  )
+function localVerifiedPhases(p: Project) {
+  const stored = workflowFor(p).checklist
+  return projectPhaseNames(p).map(name => ({
+    id: name, configured: Array.isArray(stored[name]) && stored[name].length > 0,
+    activities: (stored[name] || []).map(item => ({
+      id: name + ":" + item.id, required: item.required !== false, weight: item.weight ?? 10,
+      status: item.status, approvalValid: !!item.reviewedAt && !!item.reviewedBy && !!item.doc?.uploaded,
+    })),
+  }))
+}
+function localPhaseComplete(p: Project) {
+  const phase = localVerifiedPhases(p).find(row => row.id === p.phase)
+  return !!phase && phaseProgress(phase).percentage === 100 &&
+    p.team.some(row => row.phase === p.phase && !!row.accountId && row.status === "confirmed")
+}
+function localReviewHold(p: Project) {
+  const work = workflowFor(p)
+  return !!work.pendingRework || !!work.pendingUpdate || Object.values(work.checklist)
+    .some(items => items.some(item => item.status === "submitted" || item.status === "rework_required"))
 }
 function updatePercentage(p: Project) {
-  const work = ensure(p)
-  const base = work.progressBase ?? p.progress
-  const anchor = work.progressAnchor || 0
-  const share = approvedShare(p)
-  p.progress = Math.max(
-    base,
-    Math.min(
-      100,
-      Math.round(
-        base +
-          ((100 - base) * Math.max(0, share - anchor)) /
-            Math.max(0.00001, 1 - anchor),
-      ),
-    ),
-  )
+  const totals = projectProgress(localVerifiedPhases(p), projectPhaseNames(p))
+  // Historical caches cannot pass a lifecycle gate when scope is unavailable.
+  if (totals.percentage !== null) p.progress = totals.percentage
 }
 export function completionReady(p: Project) {
-  const work = workflowFor(p)
   const closeoutOwner = p.team.find((row) => row.phase === "Closeout")
-  const trackedPhases = projectPhaseNames(p).slice(work.progressStart ?? 0)
   return (
     p.status === "active" &&
     p.phase === "Closeout" &&
     !!closeoutOwner?.accountId &&
     closeoutOwner.status === "confirmed" &&
-    !work.pendingRework &&
-    !work.pendingUpdate &&
-    trackedPhases.every((phase) =>
-      checklistFor(p, phase).every((item) => item.status === "approved"),
-    )
+    !localReviewHold(p) &&
+    projectProgress(localVerifiedPhases(p), projectPhaseNames(p)).percentage === 100 &&
+    projectPhaseNames(p).every(phase => p.team.some(row => row.phase === phase && !!row.accountId && row.status === "confirmed"))
   )
 }
-function advanceIfReady(state: State, p: Project, now: number) {
+function advanceIfReady(state: State, p: Project, now: number, allowHandoff = true) {
   if (
     p.status !== "active" ||
-    workflowFor(p).pendingRework ||
-    !checklistFor(p).every((i) => i.status === "approved")
+    localReviewHold(p) ||
+    !localPhaseComplete(p)
   )
     return
   const phases = projectPhaseNames(p)
@@ -717,6 +723,7 @@ function advanceIfReady(state: State, p: Project, now: number) {
     )
     return
   }
+  if (!allowHandoff) return
   const next = p.team.find((t) => t.phase === phases[index + 1])
   if (!next?.accountId || next.status !== "confirmed") return
   const from = p.phase
@@ -1336,6 +1343,7 @@ export function applyWorkflow(
       p.progress = 0
       p.note = "Setup complete. Project activated."
       work.deadline = undefined
+      for (const phase of projectPhaseNames(p)) work.checklist[phase] ||= checklistFor(p, phase)
       work.progressBase = 0
       work.progressStart = 0
       work.progressAnchor = 0
@@ -1397,6 +1405,7 @@ export function applyWorkflow(
       p.progress = 0
       p.note = "Setup complete. Project activated."
       work.deadline = undefined
+      for (const phase of projectPhaseNames(p)) work.checklist[phase] ||= checklistFor(p, phase)
       work.progressBase = 0
       work.progressStart = 0
       work.progressAnchor = 0
@@ -1505,7 +1514,7 @@ export function applyWorkflow(
         "approval",
         "Rework & approvals",
       )
-      advanceIfReady(next, p, now)
+      advanceIfReady(next, p, now, false)
       break
     case "approve_rework":
     case "decline_rework": {
@@ -1517,19 +1526,11 @@ export function applyWorkflow(
       )
       const approved = command.type === "approve_rework"
       const reviewedIssue = work.pendingRework
-      if (approved) {
-        p.progress = Math.min(p.progress, projectStageFloor(p))
-        work.progressStart ??= Math.max(
-          0,
-          projectPhaseNames(p).indexOf(p.phase),
-        )
-        work.progressBase = p.progress
-        work.progressAnchor = approvedShare(p)
-      }
+      assert(!approved, "Use the connected targeted rework review with an activity selection and trusted impact preview.")
       p.history.push({
         date: day,
         text: approved
-          ? `Rework approved by Office PM. System stage-floor rollback to ${p.progress}%.`
+          ? "Targeted rework confirmed."
           : "Rework flag declined by Office PM; progress unchanged.",
         progress: p.progress,
         phase: p.phase,
@@ -1596,13 +1597,9 @@ export function applyWorkflow(
           "Review requires submitted evidence.",
         )
         if (command.type === "approve_checklist") {
-          work.progressBase ??= p.progress
-          work.progressStart ??= Math.max(
-            0,
-            projectPhaseNames(p).indexOf(p.phase),
-          )
           item.status = "approved"
           item.reviewedAt = date
+          item.reviewedBy = actor.id
           item.escalated = false
           updatePercentage(p)
           p.history.push({
@@ -1866,7 +1863,7 @@ export function processWorkflowTimers(state: State, now = Date.now()): State {
         undefined,
         now,
       )
-      if (!material) advanceIfReady(s, p, now)
+      // Informational timer resolution must not advance or complete a project.
     }
     for (const item of checklistFor(original).filter(
       (i) =>

@@ -1,3 +1,19 @@
+import OverallProjectProgress from "./OverallProjectProgress"
+import ProjectProgress from "./ProjectProgress"
+import MonthlyReport from "./MonthlyReport"
+import Reports from "./Reports"
+import ProjectClientDetails from "./ProjectClientDetails"
+import PhaseHandoff from "./PhaseHandoff"
+import MyProfile from "./MyProfile"
+import EvidenceReview from "./EvidenceReview"
+import ReworkReview from "./ReworkReview"
+import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
+import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
+import NavigationCount from "./NavigationCount"
+import { navigationAttention } from "./navigation-attention"
+import { hasPendingSiteReview } from "./active-sites-review"
+import { normalizeWorkspacePage } from "./adminNav"
+import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
   useEffect,
@@ -13,7 +29,7 @@ import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
-import { Chart, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
   ListPager,
@@ -21,9 +37,11 @@ import {
   ListToolbar,
   NoResults,
   runList,
+  getListQuery,
+  updateListQuery,
   useListMemory,
 } from "./ListControls"
-import { inDateRange, optionsFrom, type FilterDef } from "./listing"
+import { inDateRange, optionsFrom, withPage, type FilterDef } from "./listing"
 
 type DeadlineEntry = {
   key: string
@@ -47,6 +65,7 @@ import {
   projectPhaseDisciplines,
   projectPhaseNames,
   ROLE_NAMES,
+  PROJECT_TYPES,
   spmCandidates,
   uid,
   today,
@@ -72,7 +91,6 @@ import {
   registeredComplete,
   registeredCount,
   REVIEW_MS,
-  projectStageFloor,
   teamConfirmed,
   visibleEvents,
   workflowFor,
@@ -127,10 +145,10 @@ const OPM_NAV = [
   ["Active sites", "building"],
   ["Deadlines", "clock"],
   ["Rework & approvals", "shield"],
-  ["Schedule performance", "trend"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
+  ["Reports", "doc"],
 ]
 const SPM_NAV = [
   ["Dashboard", "grid"],
@@ -139,14 +157,15 @@ const SPM_NAV = [
   ["Deadlines", "clock"],
   ["Document repository", "folder"],
   ["Subcon directory", "users"],
-  ["Schedule performance", "trend"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
+  ["Reports", "doc"],
 ]
 type Result = {
   ok: boolean
   error?: string
+  message?: string
 }
 type RoleDialog = {
   kind: string
@@ -184,12 +203,15 @@ export default function RoleWorkspace({
   useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
+  const navigationCounts = navigationAttention(state, actor)
   const [page, setPage] = useState("Dashboard")
+  const [profileOpen, setProfileOpen] = useState(false)
   const [pickedId, setPickedId] = useState(
     () =>
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
   )
   const [dialog, setDialog] = useState<RoleDialog>()
+  const [reportProjectId,setReportProjectId]=useState("")
   // Project Monitoring modal: one modal that switches between its monitoring
   // content and the project repository. Reset whenever the modal closes.
   const [monitorView, setMonitorView] = useState<"monitoring" | "repository">(
@@ -220,12 +242,17 @@ export default function RoleWorkspace({
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
   const [confirmTab, setConfirmTab] = useState("mine")
+  const [intakeView, setIntakeView] = useState<IntakeView>("all")
+  const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
   const [note, setNote] = useState("")
   const [issueChoices, setIssueChoices] = useState<string[]>([])
+  const [affectedActivities,setAffectedActivities]=useState<string[]>([])
+  useEffect(()=>setAffectedActivities([]),[pickedId])
   const [evidence, setEvidence] = useState<Doc>()
+  const [evidenceReview,setEvidenceReview]=useState<WorkflowCommand>()
   const [diary, setDiary] = useState("")
   const [declineReason, setDeclineReason] = useState("")
   const [assignmentSort, setAssignmentSort] = useState("recommended")
@@ -359,7 +386,8 @@ export default function RoleWorkspace({
       test: (item, value) => inDateRange(pick(item), undefined, value),
     },
   ]
-  const intakesList = runList(`${actor.role}:confirmations`, intakes, {
+  const intakeCounts = intakeViewCounts(intakes, p => intakeGuidance(state, p, actor))
+  const intakesList = runList(`${actor.role}:confirmations`, intakes.filter(p => intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
     searchText: projectText,
     filters: [
       {
@@ -373,17 +401,16 @@ export default function RoleWorkspace({
         ],
         test: (p, value) => p.status === value,
       },
-      typeFilterP(intakes),
+      { ...typeFilterP(intakes), options: PROJECT_TYPES.map(value => ({ value, label: value })) },
     ],
   })
-  const activeSitesList = runList(`${actor.role}:active-sites`, active, {
-    searchText: projectText,
-    filters: [typeFilterP(active), phaseFilterP(active)],
-  })
-  const scheduleList = runList(`${actor.role}:schedule`, allActive, {
-    searchText: projectText,
-    filters: [typeFilterP(allActive), phaseFilterP(allActive)],
-  })
+  const assignmentQuery = getListQuery(`${actor.role}:assignments`)
+  useEffect(() => {
+    for (const section of ["current", "upcoming", "previous"]) {
+      const key = `${actor.role}:assignments-${section}`
+      if (getListQuery(key).page !== 1) updateListQuery(key, q => withPage(q, 1))
+    }
+  }, [actor.role, assignmentQuery, assignmentFilter, assignmentSort, assignmentIntakeView])
   const activityFeed = runList(`${actor.role}:activity`, events, {
     searchText: (e) => `${e.title} ${e.detail}`,
     filters: [
@@ -406,11 +433,11 @@ export default function RoleWorkspace({
       return false
     }
     setError("")
-    setMessage(success || "Workspace updated.")
+    setMessage(result.message || success || "Workspace updated.")
     return true
   }
   function navigate(next: string) {
-    setPage(next)
+    setPage(normalizeWorkspacePage(next))
     setConfirmTab("mine")
     setQuery("")
     setError("")
@@ -445,7 +472,7 @@ export default function RoleWorkspace({
     )
       setPreview(doc)
   }
-  function header(title: string, subtitle: string, action?: ReactNode) {
+  function header(title: string, action?: ReactNode) {
     return (
       <>
         <div className="page-heading">
@@ -457,7 +484,6 @@ export default function RoleWorkspace({
               {title}
               <span className="heading-dot">.</span>
             </h1>
-            <p>{subtitle}</p>
           </div>
           {action}
         </div>
@@ -520,8 +546,8 @@ export default function RoleWorkspace({
                     "Phase responsibility"}
               </small>
             </div>
-            <span>{actorName(t.accountId)}</span>
-            <Status value={t.status} />
+            <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>
+            <Status value={t.accountId ? t.status : "unassigned"} />
             {allowReassign &&
               t.status !== "confirmed" &&
               p.status !== "completed" && (
@@ -555,21 +581,23 @@ export default function RoleWorkspace({
   }
   function confirmationCard(p: Project) {
     const work = workflowFor(p)
-    const stage = officePmStage(p)
+    const guidance = intakeGuidance(state, p, actor)
     return (
       <Panel
         key={p.id}
-        className={stage.kind === "action" ? "action-required" : ""}
+        className={guidance?.kind === "action" ? "action-required" : ""}
         title={p.name}
         subtitle={`${p.type} · ${p.area} sqm · ${p.floors} floors`}
         actions={
           <div className="button-group">
-            {stage.kind === "action" && (
+            {guidance?.kind === "action" && (
               <Badge tone="amber">Action Required</Badge>
             )}
             <Status
               value={
-                p.status === "changes_requested"
+                p.status === "draft"
+                  ? "draft"
+                  : p.status === "changes_requested"
                   ? "changes requested"
                   : p.opmAccepted
                     ? "Office PM accepted"
@@ -580,15 +608,7 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
-          {stage.message && (
-            <p className={`stage-message ${stage.kind}`}>
-              <Icon
-                name={stage.kind === "action" ? "alert" : "clock"}
-                size={16}
-              />
-              {stage.message}
-            </p>
-          )}
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
           <div className="role-project-facts">
             <span>
@@ -605,12 +625,11 @@ export default function RoleWorkspace({
               {registeredCount(p)}/6 documents
             </span>
           </div>
-          {p.status === "changes_requested" ? (
+          {p.status === "changes_requested" || p.status === "draft" ? (
             <div className="notice">
               <Icon name="clock" />
               <p>
-                {p.note} Administrator resubmission is required; the same Office
-                PM is excluded from this intake.
+                {p.status === "draft" ? "Administrator must complete and submit this draft before Office PM acceptance." : `${p.note} Administrator resubmission is required; the same Office PM is excluded from this intake.`}
               </p>
             </div>
           ) : !p.opmAccepted ? (
@@ -618,6 +637,7 @@ export default function RoleWorkspace({
               <Button
                 variant="primary"
                 icon="check"
+                disabled={guidance?.action !== "confirm"}
                 onClick={async () => {
                   if (
                     await act(
@@ -633,6 +653,7 @@ export default function RoleWorkspace({
                 Accept Office PM assignment
               </Button>
               <Button
+                disabled={guidance?.action !== "confirm"}
                 onClick={() => {
                   setDeclineReason("")
                   setDialog({ kind: "changes", projectId: p.id })
@@ -650,16 +671,6 @@ export default function RoleWorkspace({
             </div>
           ) : (
             <>
-              <div className="notice">
-                <Icon name={registeredComplete(p) ? "check" : "upload"} />
-                <p>
-                  {registeredComplete(p)
-                    ? "All six documents are on file. The Lead Site PM accepts first, followed by the remaining Site PMs. Subcontractor allocation stays locked until all responses are accepted."
-                    : `Upload the ${6 - registeredCount(p)} remaining required document${
-                        registeredCount(p) === 5 ? "" : "s"
-                      }. Site PM acceptance remains locked.`}
-                </p>
-              </div>
               <div className="role-actions">
                 <Button
                   variant="primary"
@@ -668,10 +679,10 @@ export default function RoleWorkspace({
                 >
                   {registeredComplete(p)
                     ? "View project documents"
-                    : "Resume Document Upload"}
+                    : "Open required documents"}
                 </Button>
                 <Button onClick={openSiteResponses}>
-                  Track Site PM responses
+                  {guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
                 </Button>
               </div>
             </>
@@ -701,16 +712,17 @@ export default function RoleWorkspace({
   }
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
+    const expiryDays = actor.expiry ? Math.ceil((new Date(actor.expiry + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
-    const dashSchedule = runList(`${actor.role}:dash-schedule`, allActive, { searchText: () => "" }, { pageSize: 5 })
     return (
       <>
         {header(
           isOpm ? "Project overview" : "Site overview",
-          isOpm
-            ? "Keep assignments, documentation, and site reviews moving."
-            : `Welcome, ${actor.name.split(" ")[0]}. Your assignments, phase status and deadlines are below.`,
         )}
+        {!isOpm && expiryDays !== null && expiryDays <= 30 && <div className="license-expiry-warning" role="alert">
+          <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
+          <p>License expiry: {actor.expiry}. {expiryDays < 0 ? "Your license has expired." : expiryDays === 0 ? "Your license expires today." : expiryDays + " days remaining."} Contact your administrator to renew your license and keep your account eligible for new assignments.</p></div>
+        </div>}
         <div className="metrics-grid">
           {[
             {
@@ -870,7 +882,6 @@ export default function RoleWorkspace({
         <div className="role-two-column">
           <Panel
             title="Upcoming deadlines"
-            subtitle="Assignment targets and reviews needing attention."
             actions={
               <Button
                 variant="text-button"
@@ -884,7 +895,6 @@ export default function RoleWorkspace({
           </Panel>
           <Panel
             title="Recent activity"
-            subtitle="Updates scoped to your assigned work."
             actions={
               <Button
                 variant="text-button"
@@ -898,25 +908,6 @@ export default function RoleWorkspace({
             <CompactPager list={dashActivity} />
           </Panel>
         </div>
-        <Panel
-          title="Schedule performance"
-          subtitle="Recorded completion and project history."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Schedule performance")}
-            >
-              View report
-            </Button>
-          }
-        >
-          <Chart
-            compact
-            projects={dashSchedule.view.items}
-            summaryProjects={allActive}
-          />
-          <CompactPager list={dashSchedule} />
-        </Panel>
         <WorkRecord userId={actor.id} />
       </>
     )
@@ -937,6 +928,7 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           <div className="document-completion">
             <progress max={6} value={registeredCount(p)} />
             <strong>{registeredCount(p)} / 6</strong>
@@ -1205,7 +1197,6 @@ export default function RoleWorkspace({
         <>
           {header(
             "Document repository",
-            "Original project records you are authorized to view.",
           )}
           {repositoryBrowser(projects)}
         </>
@@ -1214,7 +1205,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Project documents",
-          "Choose a project to upload its required documents and browse its records.",
         )}
         {repositoryBrowser(projects.filter((p) => p.opmId === actor.id))}
       </>
@@ -1247,18 +1237,14 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
           {pending.length > 0 && (
             <>
-              <div className="notice">
-                <Icon name={block ? "shield" : "check"} />
-                <p>
-                  {block ||
-                    `Your ${pending.length} pending phase responsibilit${
-                      pending.length === 1 ? "y is" : "ies are"
-                    } ready. One acceptance confirms all phases assigned to you on this project.`}
-                </p>
-              </div>
+              {isIntake(p)
+                ? block ? <div className="notice"><Icon name="shield" /><p>{block}</p></div>
+                  : pending.length > 1 && <p>One acceptance confirms all {pending.length} pending phases assigned to you.</p>
+                : <div className="notice"><Icon name={block ? "shield" : "check"} /><p>{block || `Your ${pending.length} pending phase responsibilit${pending.length === 1 ? "y is" : "ies are"} ready. One acceptance confirms all phases assigned to you on this project.`}</p></div>}
               <div className="role-actions">
                 <Button
                   variant="primary"
@@ -1410,13 +1396,16 @@ export default function RoleWorkspace({
     }
   }
   function assignmentCard(p: Project, info: ReturnType<typeof assignmentInfo>) {
+    const guidance = intakeGuidance(state, p, actor)
+    const blocker = guidance && info.pending.length ? assignmentBlock(p, actor.id) : ""
+    const actionNotes = guidance ? (blocker ? [blocker] : []) : info.actions
     const statusLabel =
       info.group === "current"
         ? "Current Project"
         : info.group === "upcoming"
-          ? info.pending.length
+          ? guidance?.kind === "action"
             ? "Action needed"
-            : "Upcoming"
+            : guidance ? "Waiting / prerequisites" : "Upcoming"
           : p.status === "completed"
             ? "Completed"
             : p.status === "declined"
@@ -1440,7 +1429,7 @@ export default function RoleWorkspace({
             tone={
               info.group === "current"
                 ? "green"
-                : info.pending.length
+                : guidance?.kind === "action"
                   ? "amber"
                   : ""
             }
@@ -1479,6 +1468,7 @@ export default function RoleWorkspace({
             <dd>{p.status === "pending" ? "Not started" : p.phase}</dd>
           </div>
         </dl>
+        <IntakeGuidance state={state} project={p} actor={actor} />
         {p.status !== "pending" && (
           <div className="assignment-progress">
             <div
@@ -1494,9 +1484,9 @@ export default function RoleWorkspace({
             <strong>{p.progress}%</strong>
           </div>
         )}
-        {(info.actions.length > 0 || info.deadline) && (
+        {(actionNotes.length > 0 || info.deadline) && (
           <ul className="assignment-actions-list">
-            {info.actions.map((text) => (
+            {actionNotes.map((text) => (
               <li key={text}>
                 <Icon name="clock" size={16} />
                 {text}
@@ -1517,7 +1507,7 @@ export default function RoleWorkspace({
         )}
         <div className="assignment-card-footer">
           <Button
-            variant={info.pending.length ? "primary" : ""}
+            variant={guidance?.kind === "action" ? "primary" : ""}
             icon="chevron"
             onClick={() => {
               setAssignmentId(p.id)
@@ -1525,7 +1515,7 @@ export default function RoleWorkspace({
             }}
             aria-label={`View assignment for ${p.name}`}
           >
-            View Assignment
+            {guidance?.kind === "action" ? guidance.label : "View Assignment"}
           </Button>
         </div>
       </article>
@@ -1538,7 +1528,6 @@ export default function RoleWorkspace({
         <>
           {header(
             "Assignment details",
-            "Accept, decline and coordinate this assignment.",
             <Button icon="chevron" onClick={() => setAssignmentId("")}>
               Back to assignments
             </Button>,
@@ -1561,11 +1550,12 @@ export default function RoleWorkspace({
       if (group === "upcoming") return time(a.p.start) - time(b.p.start)
       return time(b.info.sortDate) - time(a.info.sortDate)
     }
-    const visible = rows.filter(({ p, info }) =>
+    const counts = intakeViewCounts(projects, p => intakeGuidance(state, p, actor))
+    const visible = rows.filter(({ p }) => assignmentIntakeView === "all" || intakeGuidance(state, p, actor)?.kind === assignmentIntakeView).filter(({ p, info }) =>
       assignmentFilter === "all"
         ? true
         : assignmentFilter === "action"
-          ? info.pending.length > 0
+          ? isIntake(p) ? intakeGuidance(state, p, actor)?.kind === "action" : info.pending.length > 0
           : assignmentFilter === "completed"
             ? p.status === "completed"
             : assignmentFilter === "closed"
@@ -1579,7 +1569,7 @@ export default function RoleWorkspace({
           id: "type",
           label: "Project type",
           allLabel: "All types",
-          options: optionsFrom(rows.map(({ p }) => p.type)),
+          options: PROJECT_TYPES.map(value => ({ value, label: value })),
           test: ({ p }, value) => p.type === value,
         },
         {
@@ -1615,8 +1605,9 @@ export default function RoleWorkspace({
       <>
         {header(
           "Assignments",
-          "Your projects by status. Open an assignment to accept, decline or coordinate it.",
         )}
+        <IntakeTabs value={assignmentIntakeView} counts={counts} allLabel="All assignments" onChange={setAssignmentIntakeView} />
+        {assignmentIntakeView !== "all" && !visible.length && <Empty title={assignmentIntakeView === "action" ? "No available intake actions" : "No intake assignments waiting for others"}>Current and previous construction assignments remain under All assignments. Check any selected status filter.</Empty>}
         <div className="assignment-toolbar">
           <label>
             <span>Status</span>
@@ -1751,7 +1742,7 @@ export default function RoleWorkspace({
               {checklistFor(p, t.phase).map((item) => (
                 <div key={item.id} className="repository-check">
                   <span>{item.label}</span>
-                  <Status value={item.status} />
+                  <Status value={item.status.replace(/_/g," ")} />
                 </div>
               ))}
             </details>
@@ -1794,8 +1785,8 @@ export default function RoleWorkspace({
           <div className="notice">
             <Icon name="shield" />
             <p>
-              A site issue is awaiting Office PM review. Current progress is
-              held at {p.progress}%. Rework is never auto-approved.
+              A site issue is awaiting Office PM review. Reporting an issue
+              does not deduct progress. Rework requires a manual decision.
             </p>
           </div>
         ) : (
@@ -1830,6 +1821,7 @@ export default function RoleWorkspace({
                   <div>
                     <h4>{item.label}</h4>
                     {item.note && <p className="error">{item.note}</p>}
+                    {item.reworkReason&&<p className="error">Rework: {item.reworkReason}</p>}
                     {item.doc && (
                       <button
                         className="inline-link"
@@ -1845,12 +1837,12 @@ export default function RoleWorkspace({
                       </p>
                     )}
                   </div>
-                  <Status value={item.status} />
-                  {item.status === "missing" && (
+                  <Status value={item.status.replace(/_/g," ")} />
+                  {["missing","rework_required"].includes(item.status) && (
                     <Upload
                       label={item.label}
                       owner={actor.name}
-                      buttonLabel="Upload evidence"
+                      buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
                       onSave={async (doc) =>
                         await act(
@@ -1869,6 +1861,14 @@ export default function RoleWorkspace({
                   )}
                 </div>
               ))}
+              {workflowFor(p).checklist[p.phase]?.some(item => item.required === false) && <details className="role-details subsection">
+                <summary>Previous checklist records</summary>
+                <p className="role-muted">Retained for history. These records do not count toward the current required checklist.</p>
+                {workflowFor(p).checklist[p.phase].filter(item => item.required === false).map(item => <div key={item.id} className="qa-checklist-row">
+                  <div><h4>{item.label}</h4>{item.doc && <button className="inline-link" onClick={() => showDoc(p,item.doc!)}>{item.doc.name}</button>}</div>
+                  <span>Historical record</span>
+                </div>)}
+              </details>}
             </section>
             <section className="role-progress-submit">
               <h3>Field update & issue reporting</h3>
@@ -1908,10 +1908,17 @@ export default function RoleWorkspace({
                   </button>
                 ))}
               </div>
+              {issueChoices.length>0&&<fieldset className="subsection"><legend>Affected activities — {p.phase}</legend>
+                {checklistFor(p).map(item=><label className="qa-checklist-row" key={item.id}>
+                  <input type="checkbox" checked={affectedActivities.includes(item.id)} onChange={()=>setAffectedActivities(ids=>ids.includes(item.id)?ids.filter(id=>id!==item.id):[...ids,item.id])}/>
+                  <span>{item.label}</span>
+                </label>)}
+                <p className="role-muted">Reporting an issue does not deduct progress. Office PM must review it first.</p>
+              </fieldset>}
               <Field
                 label={
-                  issueChoices.includes("Other")
-                    ? "Explain the Other issue *"
+                  issueChoices.length>0
+                    ? "Explain the issue *"
                     : "Field notes (optional)"
                 }
               >
@@ -1925,7 +1932,7 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={!!work.pendingUpdate && !issueChoices.length}
+                  disabled={(!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
                   onClick={async () => {
                     if (
                       await act(
@@ -1934,6 +1941,7 @@ export default function RoleWorkspace({
                           projectId: p.id,
                           note,
                           issues: issueChoices,
+                          affectedActivityIds:affectedActivities,
                           evidence,
                         },
                         issueChoices.length
@@ -1942,6 +1950,7 @@ export default function RoleWorkspace({
                       )
                     ) {
                       setNote("")
+                      setAffectedActivities([])
                       setIssueChoices([])
                       setEvidence(undefined)
                     }
@@ -2044,124 +2053,28 @@ export default function RoleWorkspace({
       <>
         {header(
           "Active sites",
-          isOpm
-            ? "Read-only monitoring, accountable phase owners and site reminders."
-            : "Report progress only while your confirmed phase is active.",
         )}
-        <ListSection
-          list={activeSitesList}
-          placeholder="Search active sites"
-          noun="site"
-          touch={!isOpm}
-          empty={null}
-          render={(items) => (
-            <>
-              {items.map((p) => (
-            <Panel
-              key={p.id}
-              title={p.name}
-              subtitle={`${p.type} · ${p.phase} · Office PM: ${actorName(p.opmId)}`}
-              actions={
-                <div className="button-group">
-                  <Badge tone="green">{p.progress}% recorded</Badge>
-                  <Button
-                    onClick={() =>
-                      setDialog({ kind: "project", projectId: p.id })
-                    }
-                  >
-                    View details
-                  </Button>
-                  {isOpm && (
-                    <Button
-                      icon="bell"
-                      onClick={async () =>
-                        await act(
-                          { type: "request_update", projectId: p.id },
-                          "Site PM update reminder recorded.",
-                        )
-                      }
-                    >
-                      Request update
-                    </Button>
-                  )}
-                </div>
-              }
-            >
-              {isOpm ? (
-                <div className="role-card-content">
-                  <div className="site-progress-header">
-                    <div>
-                      <h3>{p.phase}</h3>
-                      <p>Current owner: {actorName(phaseOwner(p))}</p>
-                    </div>
-                    <strong>{p.progress}%</strong>
-                  </div>
-                  <progress
-                    className="role-full-progress"
-                    max={100}
-                    value={p.progress}
-                  />
-                  {workflowFor(p).pendingRework && (
-                    <div className="notice subsection">
-                      <Icon name="alert" />
-                      <p>A site issue is waiting for your rework decision.</p>
-                      <Button
-                        onClick={() => {
-                          navigate("Rework & approvals")
-                          setTab("rework")
-                        }}
-                      >
-                        Review issue
-                      </Button>
-                    </div>
-                  )}
-                  {workflowFor(p).pendingUpdate && (
-                    <div className="notice subsection">
-                      <Icon name="clock" />
-                      <p>A progress note is awaiting review.</p>
-                      <Button
-                        onClick={() => {
-                          navigate("Rework & approvals")
-                          setTab("progress")
-                        }}
-                      >
-                        Review update
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="role-site-tabs">
-                  <button
-                    className="site-expand"
-                    onClick={() => setPickedId(p.id)}
-                  >
-                    <Icon name="activity" size={18} />
-                    {phaseOwner(p) === actor.id
-                      ? "Open current phase workspace"
-                      : "View completed responsibility"}
-                    <Icon
-                      name={picked?.id === p.id ? "down" : "chevron"}
-                      size={17}
-                    />
-                  </button>
-                  {picked?.id === p.id && progressForm(p)}
-                </div>
-              )}
-            </Panel>
-              ))}
-            </>
-          )}
-        />
-        {!active.length && (
-          <Empty
-            title={isOpm ? "No active sites yet" : "No current active phase"}
-          >
-            {isOpm
-              ? "Intake projects activate only after all documents, acceptances and the signed subcontractor agreement are complete."
-              : "Future-phase responsibilities remain under Assignments until the prior checklist is approved and your phase becomes active."}
-          </Empty>
-        )}
+        <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
+          ...p,
+          lead: state.accounts.find(a => a.id === leadId(p))?.name,
+          needsReview: hasPendingSiteReview(p),
+        }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
+          renderActions={id => {
+            const p = allActive.find(site => site.id === id)!
+            return isOpm ? <>
+              <Button icon="bell" onClick={async () => {
+                await act({ type: "request_update", projectId: id }, "Site PM update reminder recorded.")
+              }}>Request update</Button>
+              {p.workflow?.pendingRework && <Button onClick={() => { navigate("Rework & approvals"); setTab("rework") }}>Review issue</Button>}
+              {p.workflow?.pendingUpdate && <Button onClick={() => { navigate("Rework & approvals"); setTab("progress") }}>Review update</Button>}
+            </> : active.some(site => site.id === id) ? <Button onClick={() => {
+              setPickedId(id)
+              requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
+            }}>Open phase workspace</Button> : null
+          }} />
+        {!isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
+          <Panel title={`${picked.name} - Phase workspace`}>{progressForm(picked)}</Panel>
+        </div>}
       </>
     )
   }
@@ -2197,13 +2110,12 @@ export default function RoleWorkspace({
       <>
         {header(
           "Rework & approvals",
-          "Human review where it matters. No silent numeric progress changes.",
         )}
         <div className="tabs standalone">
           {[
             ["progress", `Progress updates (${pendingUpdates.length})`],
-            ["rework", `Rework / issues (${pendingRework.length})`],
             ["qa", `QA/QC evidence (${qaCount})`],
+            ["rework", `Rework / issues (${pendingRework.length})`],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -2265,35 +2177,27 @@ export default function RoleWorkspace({
                             <Button
                               variant="primary"
                               icon="check"
-                              onClick={async () =>
-                                await act(
-                                  {
+                              onClick={() => setEvidenceReview({
                                     type: "approve_checklist",
                                     projectId: p.id,
                                     phase: p.phase,
                                     itemId: item.id,
+                                    evidenceId:item.evidenceId,
                                     expectedVersion: item.version,
-                                  },
-                                  "QA/QC evidence approved; project progress recalculated.",
-                                )
-                              }
+                                  })}
                             >
                               Approve evidence
                             </Button>
                             <Button
                               variant="danger-ghost"
-                              onClick={async () =>
-                                await act(
-                                  {
+                              onClick={() => setEvidenceReview({
                                     type: "reject_checklist",
                                     projectId: p.id,
                                     phase: p.phase,
                                     itemId: item.id,
+                                    evidenceId:item.evidenceId,
                                     expectedVersion: item.version,
-                                  },
-                                  "Evidence rejected. Site PM can resubmit corrections.",
-                                )
-                              }
+                                  })}
                             >
                               Reject evidence
                             </Button>
@@ -2325,18 +2229,6 @@ export default function RoleWorkspace({
                 tab === "rework"
                   ? workflowFor(p).pendingRework!
                   : workflowFor(p).pendingUpdate!
-              const remaining = Math.max(
-                0,
-                Math.ceil(
-                  (Date.parse(submission.submittedAt) +
-                    REVIEW_MS -
-                    Date.now()) /
-                    86400000,
-                ),
-              )
-              const material =
-                submission.priorPhase !== submission.requestedPhase ||
-                submission.priorProgress !== submission.requestedProgress
               return (
                 <Panel
                   key={p.id}
@@ -2381,12 +2273,8 @@ export default function RoleWorkspace({
                       <Icon name="shield" />
                       <p>
                         {tab === "rework"
-                          ? `Rework always requires a manual decision. Approval rolls progress back to at most the ${p.phase} stage floor of ${projectStageFloor(p)}%; declining leaves progress unchanged.`
-                          : material
-                            ? "This submission changes stage or percentage. It must be manually reviewed and is escalated after three days; no silent numeric change is applied."
-                            : `Informational update only; stage and percentage are unchanged. Auto-approval in ${remaining} day${
-                                remaining === 1 ? "" : "s"
-                              } if left unreviewed. Checklist evidence and rework are never auto-approved.`}
+                          ? "Only the selected affected activities require correction. Review the phase and project impact before confirming; dismissing the request leaves approvals unchanged."
+                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving this report grants no activity credit and does not change the project phase."}
                       </p>
                     </div>
                     <div className="role-actions">
@@ -2398,18 +2286,19 @@ export default function RoleWorkspace({
                               setReviewAction({
                                 type: "approve_rework",
                                 projectId: p.id,
+                                requestId:submission.id,
                                 expectedVersion: submission.version,
                               })
                             }
                           >
-                            Approve rework — adjust to{" "}
-                            {Math.min(p.progress, projectStageFloor(p))}%
+                            Review rework impact
                           </Button>
                           <Button
                             onClick={() =>
                               setReviewAction({
                                 type: "decline_rework",
                                 projectId: p.id,
+                                requestId:submission.id,
                                 expectedVersion: submission.version,
                               })
                             }
@@ -2432,7 +2321,7 @@ export default function RoleWorkspace({
                             )
                           }
                         >
-                          Approve progress update
+                          Approve progress note
                         </Button>
                       )}
                     </div>
@@ -2746,6 +2635,7 @@ export default function RoleWorkspace({
         subtitle={`${p.team.filter((t) => t.status === "confirmed").length}/${p.team.length} phase assignments confirmed`}
       >
         <div className="role-card-content">
+          <IntakeGuidance state={state} project={p} actor={actor} />
           {workflowFor(p).deadline && (
             <div className="notice">
               <Icon name="clock" />
@@ -2861,7 +2751,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Subcontractor directory",
-          "Verified companies, availability, commitments, and manpower documents.",
           <Button
             icon="plus"
             variant="primary"
@@ -3035,7 +2924,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Archive",
-          "Read-only records of completed work and resolved responsibilities.",
         )}
         <div className="tabs standalone">
           {(isOpm
@@ -3209,6 +3097,9 @@ export default function RoleWorkspace({
           </div>
           <Status value={p.status} />
         </div>
+        <ProjectClientDetails project={p} accounts={state.accounts} />
+        <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
+        <IntakeGuidance state={state} project={p} actor={actor} />
         <div className="detail-stats">
           <div>
             <small>RECORDED PROGRESS</small>
@@ -3227,6 +3118,7 @@ export default function RoleWorkspace({
             <strong>{actorName(phaseOwner(p))}</strong>
           </div>
         </div>
+        <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
         <div className="schedule-timeline">
           <PlannedTimeline project={p} />
         </div>
@@ -3324,11 +3216,9 @@ export default function RoleWorkspace({
           )}
         </section>
         <section className="detail-section">
-          <h3>
-            Schedule performance <Badge>Recorded</Badge>
-          </h3>
-          <Chart compact projects={[p]} />
+          <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
+        <PhaseHandoff project={p} actor={actor} />
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>
@@ -3551,6 +3441,7 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
+    if (page === "Reports") return <Reports projects={projects} />
     switch (page) {
       case "Dashboard":
         return dashboard()
@@ -3559,11 +3450,10 @@ export default function RoleWorkspace({
           <>
             {header(
               "Confirmation queue",
-              "Track every acceptance needed before a project goes live.",
             )}
             <div className="tabs standalone">
               {[
-                ["mine", `My confirmations (${intakes.length})`],
+                ["mine", `Intake overview (${intakes.length})`],
                 [
                   "responses",
                   `Site PM responses (${responsesNeedingAction.length})`,
@@ -3572,7 +3462,7 @@ export default function RoleWorkspace({
                 <button
                   key={value}
                   className={confirmTab === value ? "active" : ""}
-                  onClick={() => setConfirmTab(value)}
+                  onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
                   {label}
                 </button>
@@ -3581,16 +3471,16 @@ export default function RoleWorkspace({
             {confirmTab === "responses" ? (
               responseTracking()
             ) : (
-              <ListSection
+              <><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /><ListSection
                 list={intakesList}
                 placeholder="Search confirmations"
                 noun="project"
                 touch={!isOpm}
                 empty={
-                  <Empty title="No intake assignments awaiting confirmation" />
+                  <Empty title={!intakes.length ? "No intake assignments" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"} />
                 }
                 render={(items) => <>{items.map(confirmationCard)}</>}
-              />
+              /></>
             )}
           </>
         )
@@ -3606,7 +3496,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Deadlines & follow-ups",
-              "Business-day assignment windows and three-day review escalation.",
             )}
             <Panel
               title="Upcoming responsibilities"
@@ -3620,45 +3509,6 @@ export default function RoleWorkspace({
         return reviews()
       case "Subcon directory":
         return directory()
-      case "Schedule performance":
-        return (
-          <>
-            {header(
-              "Schedule performance",
-              "Planned versus actual curves, clearly separated from approved progress.",
-            )}
-            <div className="notice">
-              <Icon name="activity" />
-              <p>
-                Recorded percentages and history come from project records. A
-                planned-versus-actual comparison requires a saved baseline.
-              </p>
-            </div>
-            <ListSection
-              list={scheduleList}
-              placeholder="Search active projects"
-              noun="project"
-              touch={!isOpm}
-              empty={<Empty title="No active-project schedules yet" />}
-              render={(items) => (
-                <>
-                  {items.map((p) => (
-                    <Panel
-                      key={p.id}
-                      title={p.name}
-                      subtitle={`${p.phase} · ${p.progress}% recorded completion`}
-                    >
-                      <div className="schedule-timeline">
-                        <PlannedTimeline project={p} />
-                      </div>
-                      <Chart projects={[p]} />
-                    </Panel>
-                  ))}
-                </>
-              )}
-            />
-          </>
-        )
       case "Archive":
         return archives()
       case "Activity log":
@@ -3666,7 +3516,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Activity log",
-              "Your project requests, approvals, progress and document history.",
             )}
             <Panel title="Project activity">
               <ListSection
@@ -3685,7 +3534,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Your preferences",
-              "Personal notifications and current account details.",
             )}
             <Panel
               title="Notification preferences"
@@ -3742,6 +3590,13 @@ export default function RoleWorkspace({
   return (
     <div className="app-shell role-workspace">
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+        <div className="workspace-switch">
+          <span className="workspace-avatar">10</span>
+          <span>
+            <strong>10 Builders</strong>
+            <small>{ROLE_NAMES[actor.role]} workspace</small>
+          </span>
+        </div>
         <div className="brand">
           <span className="brand-mark">
             <Icon name="building" size={28} />
@@ -3749,13 +3604,6 @@ export default function RoleWorkspace({
           <div>
             SITELINE<small>Project operations</small>
           </div>
-        </div>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">10</span>
-          <span>
-            <strong>10 Builders</strong>
-            <small>{ROLE_NAMES[actor.role]} workspace</small>
-          </span>
         </div>
         <nav aria-label="Main navigation">
           {nav.map(([label, icon], i) => (
@@ -3768,34 +3616,19 @@ export default function RoleWorkspace({
               <button
                 className={`nav-item ${page === label ? "active" : ""}`}
                 aria-label={label}
+                aria-description={navigationCounts[label]?.count ? `${navigationCounts[label].count} ${navigationCounts[label].description}` : undefined}
                 onClick={() => navigate(label)}
               >
                 <Icon name={icon} size={19} />
                 <span>{label}</span>
-                {label === "Rework & approvals" &&
-                  pendingUpdates.length + pendingRework.length + qaCount >
-                    0 && (
-                    <b className="nav-count">
-                      {pendingUpdates.length + pendingRework.length + qaCount}
-                    </b>
-                  )}
-                {label === "Assignments" && tasks.length > 0 && (
-                  <b className="nav-count">{tasks.length}</b>
-                )}
-                {isOpm &&
-                  label === "Confirmation queue" &&
-                  tasks.length + responsesNeedingAction.length > 0 && (
-                    <b className="nav-count">
-                      {tasks.length + responsesNeedingAction.length}
-                    </b>
-                  )}
+                <NavigationCount item={navigationCounts[label]} />
               </button>
             </div>
           ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-person">
-            <span className="avatar">{initials(actor.name)}</span>
+            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
             <span>
               <strong>{actor.name}</strong>
               <small>{ROLE_NAMES[actor.role]}</small>
@@ -3873,7 +3706,7 @@ export default function RoleWorkspace({
                 </div>
               )}
             </div>
-            <span className="avatar">{initials(actor.name)}</span>
+            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
           </div>
         </header>
         <main className="main-content">
@@ -4044,7 +3877,7 @@ export default function RoleWorkspace({
             subtitle={
               monitorView === "repository"
                 ? `${ROLE_NAMES[actor.role]} · ${detail.name}`
-                : `${ROLE_NAMES[actor.role]} · ${actor.name}`
+                : detail.name
             }
             wide
             onClose={() => setDialog(undefined)}
@@ -4054,10 +3887,10 @@ export default function RoleWorkspace({
               : projectDetail(detail)}
           </Modal>
         )}
+      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {dialog?.kind === "company" && company && (
         <Modal
           title="Subcontractor profile"
-          subtitle="Company and workforce records"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -4122,32 +3955,12 @@ export default function RoleWorkspace({
           </div>
         </Modal>
       )}
-      {reviewAction && (
-        <Modal
-          title={
-            reviewAction.type === "approve_rework"
-              ? "Approve rework and adjust progress?"
-              : "Decline rework without changing progress?"
-          }
-          onClose={() => setReviewAction(undefined)}
-        >
-          <p>
-            Rework decisions are manual, recorded, and applied to the current
-            project version. Review the issue and evidence before confirming.
-          </p>
-          <div className="modal-actions">
-            <Button onClick={() => setReviewAction(undefined)}>Cancel</Button>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                if (await act(reviewAction, "Rework decision recorded."))
-                  setReviewAction(undefined)
-              }}
-            >
-              Confirm decision
-            </Button>
-          </div>
-        </Modal>
+      {evidenceReview && (
+        <EvidenceReview key={`${evidenceReview.projectId}-${evidenceReview.evidenceId}-${evidenceReview.type}`}
+          projectId={evidenceReview.projectId!} evidenceId={evidenceReview.evidenceId || ""}
+          reject={evidenceReview.type==="reject_checklist"} onClose={()=>setEvidenceReview(undefined)}
+          onConfirm={(expectedReviewToken,note)=>act({...evidenceReview,expectedReviewToken,note},
+            evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
       )}
       {renewing && (
         <RenewalUploadDialog
@@ -4161,6 +3974,12 @@ export default function RoleWorkspace({
           }}
         />
       )}
+      {reviewAction && (
+        <ReworkReview key={`${reviewAction.requestId}-${reviewAction.type}`} requestId={reviewAction.requestId!}
+          confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
+          onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
+      )}
+      {profileOpen && <MyProfile actor={actor} projects={projects} onClose={() => setProfileOpen(false)} />}
       {preview && (
         <Preview
           doc={preview}

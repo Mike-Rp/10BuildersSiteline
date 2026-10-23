@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { sweepLicenses } from "./license-sweep.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser, isUuid,
 } from "../../common/utilities/access.utility.js";
@@ -139,7 +140,7 @@ export async function createAccountRecord(client, actor, body) {
   const role = body.role;
   if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
-  if (phone!==null && (typeof phone!=="string" || phone.length>30)) throw new HttpError(400,"Invalid contact number.");
+  if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
   const scope = normalizeScope(role,body.scope);
   const password = body.password ?? makeTempPassword();
@@ -253,7 +254,7 @@ export const updateAccount = async (req, res) => {
     const fullName = pick(b, "full_name", "fullName");
     if (fullName !== undefined && (!String(fullName).trim() || String(fullName).length > 150)) return sendError(res, "full_name must be 1-150 characters.", 400);
     if (b.email !== undefined && !EMAIL_RE.test(b.email)) return sendError(res, "A valid email is required.", 400);
-    if (b.phone && String(b.phone).length > 30) return sendError(res, "phone is too long (max 30 characters).", 400);
+    if (b.phone !== undefined && b.phone !== null && b.phone !== "" && (typeof b.phone !== "string" || !/^\d{11}$/.test(b.phone))) return sendError(res, "Contact number must contain exactly 11 digits.", 400);
 
     const data = await withTransaction(async (client) => {
       const found = await client.query(
@@ -323,15 +324,21 @@ export const regeneratePassword = async (req, res) => {
     const { id } = req.params;
     if (!isUuid(id)) return sendError(res, "Invalid account id.", 400);
 
-    const tempPassword = makeTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
-
     const data = await withTransaction(async (client) => {
+      const admin = (await client.query("select password_hash from users where id=$1", [actor.id])).rows[0];
+      if (typeof req.body?.adminPassword !== "string" || !(await bcrypt.compare(req.body.adminPassword, admin.password_hash))) throw new HttpError(403, "Administrator password is incorrect.");
+      const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
+      if (!target) throw new HttpError(404, "Account not found.");
+      const lastName = target.last_name || target.full_name.replace(/\s*\([^)]*\)/g, "").trim().split(/\s+/).pop();
+      const tempPassword = lastName + "789";
+      if (Buffer.byteLength(tempPassword, "utf8") > 72) throw new HttpError(400, "Last name is too long for a temporary password.");
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(
         `UPDATE users SET password_hash = $2, temp_password_issued = true, updated_by = $3, updated_at = now()
           WHERE id = $1 AND COALESCE(is_deleted, false) = false RETURNING id`, [id, passwordHash, actor.id]);
       if (updated.rowCount === 0) throw new HttpError(404, "Account not found.");
       await client.query(`DELETE FROM users_token WHERE user_id = $1`, [id]); // old sessions stop working
+      await client.query("update workspace_account_metadata set metadata=metadata - 'passwordResetRequestedAt' where user_id=$1", [id]);
       return { id, temp_password: tempPassword };
     });
     return sendOk(res, "Temporary password issued.", 1, data);
@@ -427,6 +434,7 @@ export const addLicense = async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $6)
          RETURNING id, user_id, license_number, license_expiry::text AS license_expiry, upload_status`,
         [id, String(licenseNumber).trim(), licenseExpiry, req.file ? req.file.path.replace(/\\/g, "/") : null, req.file ? "uploaded" : "pending", user.id]);
+      await sweepLicenses(client, { userId: id });
       return inserted.rows[0];
     });
     return sendOk(res, "License saved.", 1, data, 201);

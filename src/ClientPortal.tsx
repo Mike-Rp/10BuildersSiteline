@@ -1,8 +1,12 @@
+import ClientOverview from "./ClientOverview"
+import MonthlyReport from "./MonthlyReport"
+import { normalizeWorkspacePage } from "./adminNav"
+import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Badge, Button, Empty, Field, Icon } from "./ui"
-import { Chart, downloadBlob, downloadDoc, fileFor, Preview } from "./panels"
+import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
+import { downloadDoc, fileFor, Preview } from "./panels"
 import PhaseTimeline from "./PhaseTimeline"
-import { dateLabel, initials, today, type Account, type Doc } from "./model"
+import { dateLabel, initials, type Account, type Doc } from "./model"
 import {
   clientDocumentIndex,
   type ClientDocument,
@@ -18,9 +22,9 @@ type Viewer = {
   kind: "document" | "photo"
 }
 const NAV = [
+  ["Active sites", "grid"],
   ["Project Overview", "building"],
   ["Phase Timeline", "activity"],
-  ["Schedule Performance", "trend"],
   ["Project Documents", "folder"],
   ["Progress History", "clock"],
   ["Site Photographs", "doc"],
@@ -86,16 +90,17 @@ export default function ClientPortal({
   onStayActive: () => void
 }) {
   const [page, setPage] = useState("Project Overview")
+  const [siteDetails, setSiteDetails] = useState(false)
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
   const [viewer, setViewer] = useState<Viewer>()
+  const [reportProjectId,setReportProjectId]=useState("")
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [documentQuery, setDocumentQuery] = useState("")
   useListMemory()
   const project = projects.find((p) => p.id === projectId) || projects[0]
-  const uploaded = project?.documents.filter((doc) => doc.uploaded).length || 0
   const history = project?.history.slice().reverse() || []
   const notices = projects
     .flatMap((p) =>
@@ -147,7 +152,8 @@ export default function ClientPortal({
     return () => window.removeEventListener("pointerdown", outside)
   }, [])
   function navigate(next: string) {
-    setPage(next)
+    setSiteDetails(false)
+    setPage(normalizeWorkspacePage(next))
     setMobileNav(false)
     setBell(false)
     setError("")
@@ -187,21 +193,7 @@ export default function ClientPortal({
   }
   function report() {
     if (!project) return
-    try {
-      const text = onReport(project.id)
-      downloadBlob(
-        new Blob([text], { type: "text/plain;charset=utf-8" }),
-        `${project.name.replace(/[\\/:*?"<>|]/g, "-")} — progress report.txt`,
-      )
-      onRecord(
-        project.id,
-        "Client progress report exported",
-        "Approved and baseline Client-visible history only.",
-      )
-      setMessage("Approved progress report exported as a text file.")
-    } catch (reason) {
-      setError((reason as Error).message)
-    }
+    setReportProjectId(project.id)
   }
   function documents(compact = false) {
     if (!project) return null
@@ -280,21 +272,21 @@ export default function ClientPortal({
   }
   function historyList(compact = false) {
     const emptyHistory = (
-      <Empty title="No approved progress updates yet">
-        Submissions awaiting review are not included in your project history.
+      <Empty title="No shared progress updates yet">
+        Updates will appear when they are shared with your account.
       </Empty>
     )
     const row = (item: (typeof history)[number]) => (
       <article key={item.id}>
         <span className="client-history-mark">
-          <Icon name="check" size={16} />
+          <Icon name="clock" size={16} />
         </span>
         <div>
           <span className="client-history-date">
             {dateLabel(item.date)} · {item.phase}
           </span>
           <p>{item.text}</p>
-          <Badge tone="green">Approved / recorded</Badge>
+          <Badge>Recorded update</Badge>
         </div>
         <strong>{item.progress}%</strong>
       </article>
@@ -385,6 +377,7 @@ export default function ClientPortal({
     if (!project) return null
     if (!project.photos.length)
       return (
+        compact ? <p className="co-empty">No site photos shared yet.</p> :
         <div className="client-photo-empty">
           <span>
             <Icon name="building" size={34} />
@@ -411,7 +404,7 @@ export default function ClientPortal({
         ))}
       </div>
     )
-    if (compact) return grid(project.photos.slice(0, 3))
+    if (compact) return grid(project.photos.slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0, 2))
     const photoView = runList(`client:photos:${project.id}`, project.photos, {
       searchText: (photo) => `${photo.label} ${photo.name}`,
       filters: [
@@ -441,187 +434,29 @@ export default function ClientPortal({
   }
   function overview() {
     if (!project) return null
-    return (
-      <>
-        <section className="client-project-hero">
-          <div>
-            <div className="client-hero-tags">
-              <Badge tone="green">
-                {project.status === "completed"
-                  ? "Completed project"
-                  : "Active construction"}
-              </Badge>
-              <Badge>Client access · Read only</Badge>
-            </div>
-            <span className="eyebrow">YOUR PROJECT, IN VIEW</span>
-            <h1>{project.name}</h1>
-            <p>
-              {project.type} <span>·</span>{" "}
-              {project.location || "Project location not specified"}
-            </p>
-            <div className="client-project-specs">
-              <span>
-                <Icon name="building" size={17} />
-                {project.area} sqm · {project.floors} floors
-              </span>
-              <span>
-                <Icon name="calendar" size={17} />
-                Target {dateLabel(project.start)} –{" "}
-                {project.end ? dateLabel(project.end) : "end not set"}
-              </span>
-            </div>
-          </div>
-          <div className="client-progress-block">
-            <span>Recorded project completion</span>
-            <strong>
-              {project.progress}
-              <small>%</small>
-            </strong>
-            <progress value={project.progress} max={100} />
-            <p>System tracked · Office PM reviewed</p>
-          </div>
-        </section>
-        <div className="client-overview-metrics">
-          <div>
-            <span>Current construction phase</span>
-            <strong>{project.phase}</strong>
-            <small>
-              {project.status === "completed"
-                ? "All required completion checks passed"
-                : "Future phases remain locked until sign-off"}
-            </small>
-          </div>
-          <div>
-            <span>Approved / baseline updates</span>
-            <strong>{history.length.toString().padStart(2, "0")}</strong>
-            <small>
-              {history[0]
-                ? `Latest record ${dateLabel(history[0].date)}`
-                : "Updates appear after review"}
-            </small>
-          </div>
-          <div>
-            <span>Authorized documents</span>
-            <strong>{uploaded.toString().padStart(2, "0")}</strong>
-            <small>Available for view and download</small>
-          </div>
-        </div>
-        {project.status === "completed" && (
-          <div className="client-completion-banner">
-            <Icon name="check" />
-            <div>
-              <h3>Construction completed</h3>
-              <p>
-                {project.completedAt
-                  ? `Closeout sign-offs completed on ${dateLabel(project.completedAt)}. `
-                  : "This is a historical completed project record. "}
-                Project records and authorized documents remain available in
-                read-only form.
-              </p>
-            </div>
-          </div>
-        )}
-        <Panel
-          title="Your construction journey"
-          subtitle="A clear view of the current phase and what comes next."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Phase Timeline")}
-            >
-              View timeline
-              <Icon name="arrow" size={16} />
-            </Button>
-          }
-        >
-          <PhaseTimeline
-            phase={project.phase}
-            phases={project.phases}
-            completed={project.status === "completed"}
-          />
-        </Panel>
-        <div className="client-two-column">
-          <Panel
-            title="Schedule performance"
-            subtitle="Recorded project completion and history."
-          >
-            <Chart compact projects={[project]} />
-            <p className="client-chart-disclaimer">
-              This chart shows recorded project progress. A schedule comparison
-              requires a saved planned baseline.
-            </p>
-          </Panel>
-          <Panel
-            title={`Activity status · ${project.phase}`}
-            subtitle="Read-only checklist status. No internal review notes or evidence files."
-          >
-            {checklist()}
-          </Panel>
-        </div>
-        <Panel
-          title="Latest approved progress"
-          subtitle="Only reviewed or baseline records are shown."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Progress History")}
-            >
-              View history
-              <Icon name="arrow" size={16} />
-            </Button>
-          }
-        >
-          {historyList(true)}
-        </Panel>
-        <Panel
-          title="Project documents"
-          subtitle="Your authorized permits, plans and clearances."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Project Documents")}
-            >
-              Open repository
-              <Icon name="arrow" size={16} />
-            </Button>
-          }
-        >
-          {documents(true)}
-        </Panel>
-        <Panel
-          title="Site photographs"
-          subtitle="Shared project imagery, separate from internal inspection evidence."
-          actions={
-            <Button
-              variant="text-button"
-              onClick={() => navigate("Site Photographs")}
-            >
-              View gallery
-              <Icon name="arrow" size={16} />
-            </Button>
-          }
-        >
-          {photos(true)}
-        </Panel>
-        <Panel
-          title="Your project contacts"
-          subtitle="For questions about your approved project information."
-        >
-          <div className="client-contacts">
-            {project.contacts.map((contact) => (
-              <div key={contact.role}>
-                <span className="avatar large">{initials(contact.name)}</span>
-                <div>
-                  <strong>{contact.name}</strong>
-                  <p>{contact.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </>
-    )
+    return <ClientOverview project={project} latest={history[0]} photos={photos(true)} onNavigate={navigate} onDetails={() => setSiteDetails(true)} />
   }
+  function projectDetails() {
+    if (!project) return null
+    return <>
+      <dl className="client-project-facts">
+        <div><dt>Project type</dt><dd>{project.type}</dd></div>
+        <div><dt>Location</dt><dd>{project.location || "Not set"}</dd></div>
+        <div><dt>Floor area</dt><dd>{project.area} sqm</dd></div>
+        <div><dt>Floors</dt><dd>{project.floors}</dd></div>
+        <div><dt>Target start</dt><dd>{project.start ? dateLabel(project.start) : "Not set"}</dd></div>
+        <div><dt>Target completion</dt><dd>{project.end ? dateLabel(project.end) : "Not set"}</dd></div>
+      </dl>
+      <Panel title="Project contacts">
+        <div className="client-contacts">
+          {project.contacts.map(contact => <div key={contact.role}><span className="avatar large">{initials(contact.name)}</span><div><strong>{contact.name}</strong><p>{contact.role}</p></div></div>)}
+          {!project.contacts.length && <p>No project contacts recorded.</p>}
+        </div>
+      </Panel>
+      <Panel title={`Activity status · ${project.phase}`}>{checklist()}</Panel>
+    </>
+  }
+
   function pageContent() {
     if (page === "Preferences")
       return (
@@ -674,6 +509,10 @@ export default function ClientPortal({
           </Panel>
         </>
       )
+    if (page === "Active sites") return <>
+      <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1></div></div>
+      <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
+    </>
     if (!project)
       return (
         <div className="client-access-empty">
@@ -719,24 +558,6 @@ export default function ClientPortal({
           </Panel>
         </>
       )
-    if (page === "Schedule Performance")
-      return (
-        <>
-          <div className="notice">
-            <Icon name="activity" />
-            <p>
-              Recorded project completion is {project.progress}%. The history
-              below shows the progress entries available for this project.
-            </p>
-          </div>
-          <Panel
-            title={project.name}
-            subtitle={`Current phase: ${project.phase} · Recorded completion: ${project.progress}%`}
-          >
-            <Chart projects={[project]} />
-          </Panel>
-        </>
-      )
     if (page === "Project Documents")
       return (
         <DocumentRepository
@@ -774,8 +595,7 @@ export default function ClientPortal({
     if (page === "Progress History")
       return (
         <Panel
-          title="Approved project history"
-          subtitle="Pending updates, internal notes and staff review queues are excluded."
+          title="Recorded project history"
           actions={
             <Button variant="primary" icon="download" onClick={report}>
               Download progress report
@@ -788,7 +608,6 @@ export default function ClientPortal({
     return (
       <Panel
         title="Shared site photographs"
-        subtitle="Photographs explicitly made available by the project team."
       >
         {photos()}
       </Panel>
@@ -802,15 +621,8 @@ export default function ClientPortal({
             <Icon name="building" size={28} />
           </span>
           <div>
-            SITELINE<small>Project operations</small>
+            SITELINE<small>Client portal</small>
           </div>
-        </div>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">10</span>
-          <span>
-            <strong>10 Builders</strong>
-            <small>Client project portal</small>
-          </span>
         </div>
         <div className="nav-group-label">YOUR PROJECT</div>
         <nav aria-label="Client navigation">
@@ -822,18 +634,10 @@ export default function ClientPortal({
               onClick={() => navigate(label)}
             >
               <Icon name={icon} size={19} />
-              <span>{label}</span>
+              <span>{{"Project Overview":"Overview","Phase Timeline":"Timeline","Project Documents":"Documents","Progress History":"Progress history","Site Photographs":"Site photos"}[label] || label}</span>
             </button>
           ))}
         </nav>
-        <div className="client-privacy-card">
-          <Icon name="shield" />
-          <strong>Your view. Your project.</strong>
-          <p>
-            A read-only view of approved progress and documents authorized for
-            you.
-          </p>
-        </div>
         <div className="sidebar-bottom">
           <div className="sidebar-person">
             <span className="avatar">{initials(actor.name)}</span>
@@ -882,7 +686,7 @@ export default function ClientPortal({
               {bell && (
                 <div className="notification-popover">
                   <div className="popover-heading">
-                    <h3>Approved project updates</h3>
+                    <h3>Project updates</h3>
                     <Button
                       variant="text-button"
                       onClick={() => onRead(notices.map((item) => item.id))}
@@ -918,7 +722,7 @@ export default function ClientPortal({
                     </button>
                   ))}
                   {notices.length === 0 && (
-                    <Empty title="No approved updates yet" />
+                    <Empty title="No shared updates yet" />
                   )}
                 </div>
               )}
@@ -927,23 +731,14 @@ export default function ClientPortal({
           </div>
         </header>
         <main className="main-content">
-          <div className="workspace-meta">
-            <span>
-              <i className="status-dot green" />
-              CLIENT PORTAL <span className="mid-dot">/</span> Read-only access
-            </span>
-            <span>
-              <Icon name="calendar" size={16} />
-              {dateLabel(today())}
-            </span>
-          </div>
           {project && (
             <div className="client-project-toolbar">
-              <Field label="Your authorized project">
+              <Field label="Your project">
                 <select
                   value={project.id}
                   onChange={(event) => {
                     setProjectId(event.target.value)
+                    setSiteDetails(false)
                     setViewer(undefined)
                     setDocumentQuery("")
                     setError("")
@@ -969,12 +764,7 @@ export default function ClientPortal({
                   {page}
                   <span className="heading-dot">.</span>
                 </h1>
-                <p>
-                  Authorized information for your assigned project. No editing
-                  access.
-                </p>
               </div>
-              <Badge>Read only</Badge>
             </div>
           )}
           {error && (
@@ -990,6 +780,7 @@ export default function ClientPortal({
             </div>
           )}
           {pageContent()}
+          {siteDetails && project && <Modal wide title={project.name} subtitle="Project details" onClose={() => setSiteDetails(false)}>{projectDetails()}</Modal>}
           <div className="workspace-footer">
             <span>
               SITELINE <span>Built for the work ahead.</span>
@@ -997,6 +788,7 @@ export default function ClientPortal({
           </div>
         </main>
       </div>
+      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {viewedDoc && viewer && (
         <Preview
           doc={viewedDoc}

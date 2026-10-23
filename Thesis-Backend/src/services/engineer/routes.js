@@ -10,7 +10,8 @@ import {
 import {
   getEngineers, downloadEngineerDocument, prepareContractUpload, uploadContractFile, uploadEmploymentContract,
 } from "./engineers.controller.js";
-import { requireLogin } from "../../common/utilities/access.utility.js";
+import { requireLogin, requireRoles } from "../../common/utilities/access.utility.js";
+import { requireLicenseAdmin } from "../accounts/prc-monitor.controller.js";
 const router = Router();
 
 
@@ -30,31 +31,31 @@ router.post('/engineers/:id/employment-contract', prepareContractUpload, uploadC
   await uploadEmploymentContract(req, res);
 });
 
-router.get('/licenses', async (req, res) => {
+router.get('/licenses', requireLicenseAdmin, async (req, res) => {
   await getLicenses(req, res);
 });
 
-router.get('/licenses/:id', async (req, res) => {
+router.get('/licenses/:id', requireLicenseAdmin, async (req, res) => {
   await getLicenseById(req, res);
 });
 
-router.post('/licenses/', upload.single('file'), async (req, res) => {
+router.post('/licenses/', requireLicenseAdmin, upload.single('file'), async (req, res) => {
   await createLicense(req, res);
 });
 
-router.put('/licenses/:id', upload.single('file'), async (req, res) => {
+router.put('/licenses/:id', requireLicenseAdmin, upload.single('file'), async (req, res) => {
   await updateLicense(req, res);
 });
 
-router.get('/certifications', async (req, res) => {
+router.get('/certifications', requireRoles('admin'), async (req, res) => {
   await getCertifications(req, res);
 });
 
-router.get('/certifications/:id', async (req, res) => {
+router.get('/certifications/:id', requireRoles('admin'), async (req, res) => {
   await getCertificationById(req, res);
 });
 
-router.post('/certifications/', upload.single('file'), async (req, res) => {
+router.post('/certifications/', requireRoles('admin'), upload.single('file'), async (req, res) => {
   await createCertification(req, res);
 });
 

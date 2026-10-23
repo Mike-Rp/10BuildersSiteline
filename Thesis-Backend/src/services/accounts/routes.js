@@ -1,4 +1,5 @@
 import { requireLicenseAdmin } from '../accounts/prc-monitor.controller.js';
+import { requireRoles } from '../../common/utilities/access.utility.js';
 import { Router } from "express";
 import { listAccounts as getUsers, getAccount as getUserById, createAccount as createUser,
   updateAccount as updateUser, deleteAccount as deleteUser, updateAccountStatus, regeneratePassword, issueTemporaryPassword } from "./manage.controller.js";
@@ -11,11 +12,11 @@ router.patch("/:id/status",updateAccountStatus);
 router.post("/:id/regenerate-password",regeneratePassword);
 router.patch("/:id",updateUser);
 
-router.get('/licenses', async (req, res) => {
+router.get('/licenses', requireLicenseAdmin, async (req, res) => {
   await getLicenses(req, res);
 });
 
-router.get('/licenses/:id', async (req, res) => {
+router.get('/licenses/:id', requireLicenseAdmin, async (req, res) => {
   await getLicenseById(req, res);
 });
 
@@ -27,15 +28,15 @@ router.put('/licenses/:id', requireLicenseAdmin, upload.single('file'), async (r
   await updateLicense(req, res);
 });
 
-router.get('/certifications', async (req, res) => {
+router.get('/certifications', requireRoles('admin'), async (req, res) => {
   await getCertifications(req, res);
 });
 
-router.get('/certifications/:id', async (req, res) => {
+router.get('/certifications/:id', requireRoles('admin'), async (req, res) => {
   await getCertificationById(req, res);
 });
 
-router.post('/certifications/', upload.single('file'), async (req, res) => {
+router.post('/certifications/', requireRoles('admin'), upload.single('file'), async (req, res) => {
   await createCertification(req, res);
 });
 

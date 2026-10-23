@@ -50,14 +50,18 @@ export function ProjectCard({
       </span>
       <div className="explorer-card-body">
         <h3>{project.name}</h3>
-        {meta && <p className="explorer-card-meta">{meta}</p>}
-        <p className="explorer-card-files">
-          <Icon name="doc" size={15} />
-          {files(project.fileCount)}
-        </p>
+        <div className="explorer-card-details">
+          {meta && <p className="explorer-card-meta">{meta}</p>}
+          <p className="explorer-card-files">
+            <Icon name="doc" size={15} />
+            {files(project.fileCount)}
+          </p>
+        </div>
         {status?.tone === "action" && (
           <Badge tone="amber">Action Required</Badge>
         )}
+      </div>
+      <div className="explorer-card-footer">
         {status && (
           <small className={`document-status-line ${status.tone}`}>
             {status.tone === "success" ? (
@@ -67,15 +71,15 @@ export function ProjectCard({
             )}
           </small>
         )}
+        <Button
+          className="explorer-card-action"
+          aria-label={`Explore ${project.name}`}
+          onClick={() => onExplore(project.id)}
+        >
+          Explore
+          <Icon name="arrow" size={16} />
+        </Button>
       </div>
-      <Button
-        className="explorer-card-action"
-        aria-label={`Explore ${project.name}`}
-        onClick={() => onExplore(project.id)}
-      >
-        Explore
-        <Icon name="arrow" size={16} />
-      </Button>
     </article>
   )
 }

@@ -1,4 +1,5 @@
 import { uploadFile } from "./api/actions"
+import ClientSearch from "./ClientSearch"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
@@ -67,7 +68,7 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-async function saveFile(id:string,file:File) { await uploadFile(id,file) }
+async function saveFile(id:string,file:File,spreadsheet=false) { await uploadFile(id,file,spreadsheet ? "manpower" : "document") }
 export async function fileFor(id:string) { return downloadApiFile(id) }
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -147,7 +148,7 @@ export function Upload({
     setSaving(true)
     try {
       const id = uid()
-      await saveFile(id, file)
+      await saveFile(id, file, spreadsheet)
       const saved=await onSave({
         id,
         label,
@@ -209,7 +210,7 @@ export function Upload({
               </p>
             </div>
           </div>
-          {file.type.startsWith("image/") ? (
+          {spreadsheet ? <p>Excel manpower list · Confirm to upload this workbook.</p> : file.type.startsWith("image/") ? (
             <img
               className="file-preview"
               src={preview}
@@ -322,8 +323,8 @@ export function DocumentList({
             <strong>{uploadLabel || "Add a signed document"}</strong>
             <p>
               {spreadsheet
-                ? "XLSX or XLS · Maximum 15 MB"
-                : "PDF, JPG or PNG · Maximum 10 MB"}
+                ? "Excel manpower list (.xlsx or .xls) · Maximum 15 MB"
+                : "PDF, JPG, JPEG or PNG · Maximum 10 MB"}
             </p>
           </div>
           <Upload
@@ -606,6 +607,20 @@ export function AccountForm({
       docs: [],
     },
   )
+  const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
+  const generatedIdentity = !account && !clientOnly
+  function updateName(part: "first" | "middle" | "last", value: string) {
+    const next = { ...nameParts, [part]: value }
+    setNameParts(next)
+    const emailPart = (name: string) => name.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
+    const first = emailPart(next.first), last = emailPart(next.last)
+    setDraft(current => ({ ...current,
+      lastName: next.last.trim(),
+      name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
+      email: first && last ? last + "." + first + "@10builders.com" : "",
+    }))
+    setError("")
+  }
   const [pass, setPass] = useState(password())
   const [error, setError] = useState("")
   const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
@@ -614,6 +629,9 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
+    if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
+    if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
     const err = clientOnly
       ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
         ? "A client name and valid email are required."
@@ -694,31 +712,37 @@ export function AccountForm({
             </select>
           </Field>
         )}
-        <Field label={clientOnly ? "Client / company name *" : "Full name *"}>
+        {generatedIdentity ? <>
+          <Field label="First name *"><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
+          <Field label="Middle name"><input autoComplete="additional-name" value={nameParts.middle} onChange={e => updateName("middle", e.target.value)} placeholder="Middle name (optional)" /></Field>
+          <Field label="Last name *"><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
+        </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"}>
           <input
             required
             value={draft.name}
             onChange={(e) => patch({ name: e.target.value })}
             placeholder="Full name"
           />
-        </Field>
-        <Field label="Email address *">
+        </Field>}
+        <Field label="Email address *" wide={generatedIdentity}>
           <input
             required
             type="email"
+            readOnly={generatedIdentity}
             value={draft.email}
             onChange={(e) => {
               patch({ email: e.target.value })
               setError("")
             }}
-            placeholder="name@company.com"
+            placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>
+        {generatedIdentity && <p className="field wide">Email is generated from your last name and first name. Middle name is optional.</p>}
         <Field label="Contact number">
           <input
             value={draft.phone}
-            onChange={(e) => patch({ phone: e.target.value })}
-            placeholder="09XX XXX XXXX"
+            type="tel" inputMode="numeric" maxLength={11} pattern="[0-9]{11}" title="Enter exactly 11 digits" onChange={(e) => patch({ phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
+            placeholder="09123456789"
           />
         </Field>
         {clientOnly && (
@@ -776,6 +800,16 @@ export function AccountForm({
           ))}
         </section>
       )}
+      {!account && !clientOnly && ["spm", "opm"].includes(draft.role) && <section className="form-section">
+        <h3>Professional license</h3>
+        <div className="form-grid">
+          <Field label="PRC license number *"><input required value={draft.license} onChange={e => patch({ license: e.target.value })} /></Field>
+          <Field label="Expiry date *"><input required type="date" value={draft.expiry} onChange={e => patch({ expiry: e.target.value })} /></Field>
+        </div>
+        {draft.docs.some(d => d.label === "PRC License" && d.uploaded)
+          ? <div className="uploaded-inline"><Icon name="check" />{draft.docs.find(d => d.label === "PRC License")?.name}<Button onClick={() => patch({ docs: draft.docs.filter(d => d.label !== "PRC License") })}>Replace</Button></div>
+          : <Upload label="PRC License" onSave={doc => patch({ docs: [...draft.docs, doc] })} />}
+      </section>}
       {!account && !clientOnly && (
         <section className="form-section">
           <h3>Temporary credentials</h3>
@@ -1125,6 +1159,7 @@ export function IntakeForm({
       ].every((v) => v.trim())
     )
       return "Complete all required project fields."
+    if (!selectedClient) return "Select an available client account from the search results."
     if (datesBlocked) return startError || endError || DATE_ERRORS.invalid
     if (!draft.end) return "Enter the Target End Date."
     if (!endAfterStart(draft.start, draft.end))
@@ -1362,19 +1397,12 @@ export function IntakeForm({
               />
             </Field>
             <Field label="Client *" wide>
-              <select
-                required
+              <ClientSearch
+                clients={clients}
                 value={draft.clientId}
-                onChange={(e) => patch({ clientId: e.target.value })}
+                onChange={(clientId) => patch({ clientId })}
                 disabled={!!project}
-              >
-                <option value="">Select an existing client</option>
-                {clients.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} · {a.email}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
             {selectedClient && (
               <section

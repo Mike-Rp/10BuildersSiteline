@@ -59,17 +59,20 @@ function setup(options = {}) {
       state.queries.push({ sql, params });
       const result = rows => ({ rows, rowCount: rows.length });
       if (sql.startsWith("SELECT p.*")) return result([state.p]);
+      if (sql.startsWith("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2")) return result(state.currentUnconfirmed ? [] : [{}]);
       if (sql.includes("FROM project_phase_team") && sql.startsWith("SELECT 1")) {
         return result(params[1] === state.phaseOwner ? [{}] : []);
       }
       
-      if (sql.startsWith("SELECT id, code, sort_order FROM project_stages")) {
+      if (sql.startsWith("SELECT s.id,s.code,w.sort_order FROM project_type_stages")) {
         const all = updateUtility.STAGES.map((code, i) => ({ id: i + 1, code, sort_order: i + 1 }));
         return result(all.filter(stage => (params[1] == null || stage.id === Number(params[1])) &&
           (params[2] == null || stage.code.toLowerCase() === params[2].toLowerCase())));
       }
       if (sql.startsWith("SELECT project_stage_id FROM project_phase_checklist_items")) return result([{ project_stage_id: 4 }]);
       if (sql.startsWith("SELECT id FROM project_phase_updates")) return result(state.update?.status === "pending" ? [state.update] : []);
+      if(sql.startsWith("SELECT 1 FROM project_phase_updates"))return result(state.issues.filter(issue=>issue.status==="pending").concat(state.update?.status==="pending"?[state.update]:[]));
+      if(sql.startsWith("SELECT 1 FROM pending_rework_requests"))return result(state.issues.filter(issue=>issue.status==="pending"));
       if (sql.startsWith("SELECT * FROM project_phase_updates")) return result(state.update ? [state.update] : []);
       if (sql.startsWith("INSERT INTO project_phase_updates")) {
         state.update = { id: "42", project_id: params[0], selected_stage_id: params[1], prior_stage_id: params[2],
@@ -88,12 +91,12 @@ function setup(options = {}) {
       if (sql.startsWith("INSERT INTO project_phase_checklists")) return result([]);
       if (sql.startsWith("SELECT i.id")) {
         const items = Number(params[1]) === 4 ? state.items : (state.extraStageItems?.[params[1]] ?? state.nextItems ?? []);
-        const rows = items.map(item => ({ ...item,
+        const rows = items.map(item => ({ weight:10, reviewed_by:opm.id, reviewed_at:"2026-10-21", ...item,
           status: String(item.id) === String(state.evidence.checklist_item_id) ? state.evidence.status : item.status,
           evidence_id: state.evidence.id, file_id: state.evidence.file_id, submitted_by: state.evidence.submitted_by, phase_update_id: state.evidence.phase_update_id }));
         return result(rows);
       }
-      if (sql.startsWith("SELECT * FROM project_phase_evidence")) return result([state.evidence]);
+      if (sql.startsWith("SELECT * FROM project_phase_evidence") || sql.startsWith("SELECT e.*")) return result([state.evidence]);
       if (sql.startsWith("SELECT id FROM project_phase_evidence")) return result([{ id: state.evidence.id }]);
       if (sql.startsWith("UPDATE project_phase_evidence")) {
         if (sql.includes("SET phase_update_id")) state.evidence.phase_update_id = params[1];
@@ -109,7 +112,7 @@ function setup(options = {}) {
         state.p.current_stage_id = params[1]; state.p.current_pct = params[2]; return result([state.p]);
       }
       if (sql.startsWith("SELECT id FROM project_phase_files")) return result(state.fileRows.filter(file => params[0].includes(file.id)));
-      if (sql.startsWith("SELECT t.project_stage_id")) return result(state.next ? [state.next] : []);
+      if (sql.startsWith("SELECT s.id AS project_stage_id")) return result(state.next ? [{ spm_user_id: spm.id, ...state.next }] : []);
       if (sql.startsWith("INSERT INTO project_phase_files")) { state.fileRows.push({ id: params[0] }); return result([{ id: params[0] }]); }
       if (sql.startsWith("INSERT INTO project_phase_evidence")) {
         state.evidence = { ...state.evidence, status: "pending", id: "8", file_id: params[3], phase_update_id: params[6] };
@@ -181,7 +184,8 @@ test("OPM approval advances progress by one fifth and records approved history",
   assert.equal(state.p.current_pct, 20);
   assert.equal(state.history[0][2], 20);
   assert.equal(state.history[0][4], false);
-  assert.match(state.queries[0].sql, /FOR UPDATE OF p/);
+  // The license gate (a read of the engineer's license) runs first; the project lock is the first project query.
+  assert.match(state.queries.find((q) => !/license_expiry/.test(q.sql)).sql, /FOR UPDATE OF p/);
 });
 
 test("a second approval cannot increment progress again", async () => {
@@ -220,7 +224,9 @@ test("rejected evidence requires a reason and contributes no progress", async ()
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.current_pct, 0);
   assert.equal(state.evidence.status, "rejected");
-  assert.equal(state.history.length, 0);
+  assert.equal(state.history.length, 1);
+  assert.equal(state.history[0][3], "Missing test results.");
+  assert.equal(state.history[0][4], true, "rejection audit must not become a client-visible progress approval");
 });
 
 test("reviewing a previous stage does not overwrite the current stage percentage", async () => {
@@ -417,6 +423,43 @@ test("a completed checklist advances to the next confirmed phase and resets prog
   assert.equal(res.body.data.current_pct, 0);
 });
 
+test("final OPM activity approval automatically hands off once, retaining approvals", async () => {
+  const state = setup({ next: { project_stage_id: 5, status: "confirmed", code: "MEP Rough-in" },
+    nextItems: [{ id: "6", required: true, status: "missing" }] });
+  state.items.forEach(item => item.status = "approved");
+  const res = response();
+  await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.data.handoff.advanced, true);
+  assert.equal(state.p.current_stage_id, 5);
+  assert.equal(state.p.current_pct, 0);
+  assert.equal(state.evidence.status, "approved");
+  assert.equal(state.history.length, 2);
+  const duplicate = response();
+  await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), duplicate);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(state.history.length, 2);
+});
+
+test("automatic handoff blockers preserve a successful activity approval", async () => {
+  for (const options of [
+    { next: { project_stage_id: 5, status: "pending", code: "MEP Rough-in" } },
+    { next: { project_stage_id: 5, status: "confirmed", code: "MEP Rough-in" }, nextItems: [] },
+    { update: { id: "42", status: "pending" } },
+    { currentUnconfirmed: true },
+  ]) {
+    const state = setup(options);
+    state.items.forEach(item => item.status = "approved");
+    const res = response();
+    await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.data.handoff.advanced, false);
+    assert.ok(res.body.data.handoff.reason);
+    assert.equal(state.evidence.status, "approved");
+    assert.equal(state.p.current_stage_id, 4);
+  }
+});
+
 test("a completed phase cannot advance into an unconfigured checklist", async () => {
   const state = setup({ next: { project_stage_id: 5, status: "confirmed", code: "MEP Rough-in" }, nextItems: [] });
   state.items.forEach(i => i.status = "approved");
@@ -469,7 +512,7 @@ test("one update saves notes, a site report, issue chips, and file-free checklis
   assert.equal(res.body.data.file_ids.length, 1);
 });
 
-test("OPM confirmation approves the marked items and creates one combined history entry", async () => {
+test("OPM confirmation records the report without approving its activities", async () => {
   const state = setup();
   state.evidence.status = "missing";
   await controller.submitPhaseUpdate(request(spm, { note: "Rain and unsafe conditions.",
@@ -478,21 +521,21 @@ test("OPM confirmation approves the marked items and creates one combined histor
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.update.status, "approved");
-  assert.equal(state.evidence.status, "approved");
-  assert.equal(state.p.current_pct, 20);
+  assert.equal(state.evidence.status, "pending");
+  assert.equal(state.p.current_pct, 0);
   assert.equal(state.history.length, 1);
   assert.equal(state.history[0][4], true);
   assert.deepEqual(state.history[0][7], ["weather_delay", "safety_incident"]);
 });
 
-test("selected stage changes only when OPM confirms the update", async () => {
+test("confirming a report from another stage cannot change workflow position", async () => {
   const state = setup();
   await controller.submitPhaseUpdate(request(spm, { stage: "Finishes" }), response());
   assert.equal(state.p.current_stage_id, 4);
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
-  assert.equal(state.p.current_stage_id, 6);
+  assert.equal(state.p.current_stage_id, 4);
 });
 
 test("SPMs cannot confirm their own updates", async () => {
@@ -514,7 +557,7 @@ test("a second OPM confirmation cannot duplicate history", async () => {
   assert.equal(state.history.length, 1);
 });
 
-test("OPM rejection keeps stage and progress unchanged and rejects submitted items", async () => {
+test("OPM report rejection keeps activity review decisions independent", async () => {
   const state = setup();
   state.evidence.status = "missing";
   await controller.submitPhaseUpdate(request(spm, { submitted_item_ids: ["1"] }), response());
@@ -522,7 +565,7 @@ test("OPM rejection keeps stage and progress unchanged and rejects submitted ite
   await updateController.rejectPhaseUpdate(request(opm, { resolution_note: "Inspection is incomplete." }, { updateId: "42" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.update.status, "rejected");
-  assert.equal(state.evidence.status, "rejected");
+  assert.equal(state.evidence.status, "pending");
   assert.equal(state.p.current_stage_id, 4);
   assert.equal(state.p.current_pct, 0);
   assert.equal(state.history.length, 0);
@@ -576,13 +619,22 @@ test("a separately marked item can join the final update without another evidenc
   assert.equal(state.queries.some(q => q.sql.startsWith("INSERT INTO project_phase_evidence")), false);
 });
 
-test("individual evidence approval cannot bypass combined update confirmation", async () => {
+test("individual evidence can be reviewed without approving its parent report", async () => {
   const state = setup();
   await controller.submitPhaseUpdate(request(spm, { submitted_item_ids: ["1"] }), response());
   const res = response();
   await controller.approveEvidence(request(opm), res);
-  assert.equal(res.statusCode, 409);
-  assert.equal(state.evidence.status, "pending");
+  assert.equal(res.statusCode, 200);
+  assert.equal(state.evidence.status, "approved");
+  assert.equal(state.update.status, "pending");
+});
+
+test("manual totals, weights, and deductions are rejected at the submission boundary",()=>{
+  for(const field of ["pct","progress","percentage","current_pct","requested_pct","requestedProgress","weight","earned","total","deduction"]) {
+    assert.throws(()=>updateUtility.updateBody({[field]:10}),/calculated/);
+    assert.throws(()=>updateUtility.updateBody({payload:JSON.stringify({[field]:10})}),/calculated/);
+    assert.throws(()=>updateUtility.updateBody({checklist_submissions:[{item_id:"1",[field]:10}]}),/calculated/);
+  }
 });
 
 test("multipart payload accepts issue chips and submitted item arrays", () => {
@@ -593,4 +645,27 @@ test("multipart payload accepts issue chips and submitted item arrays", () => {
   assert.equal(body.checklist_submissions[0].item_id, "1");
   assert.throws(() => updateUtility.updateBody({ submitted_item_ids: ["1", "1"] }), /unique/);
   assert.throws(() => updateUtility.updateBody({ payload: "bad-json" }), /JSON object/);
+});
+
+test("counts alone cannot advance approvals without provenance or valid values",async()=>{
+  for(const invalid of [{reviewed_by:null},{reviewed_at:null},{weight:0}]) {
+    const state=setup({next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+    state.items.forEach(item=>{item.status="approved";Object.assign(item,invalid);});
+    state.evidence.status="approved";
+    const res=response();await controller.advancePhase(request(opm),res);
+    assert.equal(res.statusCode,422);assert.equal(state.p.current_stage_id,4);
+  }
+});
+test("pending general reviews block otherwise completed phase advancement",async()=>{
+  const state=setup({update:{id:"42",status:"pending"},next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+  state.items.forEach(item=>item.status="approved");state.evidence.status="approved";
+  const res=response();await controller.advancePhase(request(opm),res);
+  assert.equal(res.statusCode,409);assert.equal(state.p.current_stage_id,4);
+});
+
+test("handoff requires the current assignment to remain confirmed",async()=>{
+ const state=setup({currentUnconfirmed:true,next:{project_stage_id:5,status:"confirmed",code:"MEP Rough-in"}});
+ state.items.forEach(item=>item.status="approved");state.evidence.status="approved";
+ const res=response();await controller.advancePhase(request(opm),res);
+ assert.equal(res.statusCode,422);assert.equal(state.p.current_stage_id,4);
 });

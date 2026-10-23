@@ -1,6 +1,8 @@
 # Security TODO
 
-Fix these before going live. Nothing here has been fixed yet. Found during the expired-license audit (2026-10-22), by reading the code. Item 1 and the unauthenticated routes in item 2 should be confirmed with a request against a local test database before the fix.
+**Status after merging GitHub `main` (commit 8f4bb37 by markzippz): items 1, 2 and the first point of item 3 are already fixed upstream.** The license routes now require an Administrator, the license and contract updates use a fixed column list with bound parameters, and `authenticate()` checks the JWT, the stored session, the account status and the deleted flag. `tests/license-security.test.mjs` covers this. Keep this file as the record of what was found; the descriptions below are of the code before that fix. Still open: the download route check in item 3 (`/engineer/engineers/:id/documents/:documentType/download` should be self-or-Admin; confirm it).
+
+Found during the expired-license audit (2026-10-22), by reading the code.
 
 ## 1. SQL injection in the license update (HIGH)
 

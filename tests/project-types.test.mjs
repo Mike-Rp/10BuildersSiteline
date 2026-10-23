@@ -20,7 +20,7 @@ const schema = read("../supabase/migrations/20261017000002_thesis_backend_schema
 )
 const integration =
   read("../Thesis-Backend/migrations/003-react-integration.sql") +
-  read("../Thesis-Backend/migrations/004-engineer-license-workflow.sql")
+  read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql")
 
 async function database(t, seedFile) {
   const db = new PGlite({ extensions: { citext } })

@@ -100,4 +100,17 @@ export async function sweepLicensesThrottled(db, ms = 60000) {
     return null;
   }
 }
+/** Runs the sweep now (no throttle) inside a savepoint; a failure is logged and returns null. Used by the cron route. */
+export async function sweepLicensesSafe(db) {
+  await db.query("savepoint license_sweep_safe");
+  try {
+    const result = await sweepLicenses(db);
+    await db.query("release savepoint license_sweep_safe");
+    return result;
+  } catch (error) {
+    await db.query("rollback to savepoint license_sweep_safe");
+    errorlog(error);
+    return null;
+  }
+}
 export const resetSweepThrottle = () => { lastRun = 0; };

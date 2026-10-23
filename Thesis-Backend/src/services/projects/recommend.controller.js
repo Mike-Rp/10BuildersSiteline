@@ -1,3 +1,4 @@
+import { validatePhaseTeam } from "./type-phases.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -109,7 +110,7 @@ export const updatePhaseTeam = async (req, res) => {
     }
     const data = await withTransaction(async (client) => {
       // Prevent overwriting an SPM's already confirmed assignments.
-      const locked = await client.query(`SELECT id, lifecycle_status FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
+      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
       if (!locked.rowCount) throw Object.assign(new Error('Project not found.'), {status:404});
       if(locked.rows[0].lifecycle_status==="archived") throw Object.assign(new Error("Archived projects are read-only."),{status:409});
       const confirmed = await client.query(`SELECT 1 FROM project_phase_team WHERE project_id = $1 AND status = 'confirmed' LIMIT 1`, [project_id]);
@@ -118,6 +119,7 @@ export const updatePhaseTeam = async (req, res) => {
         const ownership = await client.query(`SELECT 1 FROM project_engineers WHERE project_id=$1 AND user_id=$2 AND unassigned_at IS NULL`, [project_id,actor.id]);
         if (!ownership.rowCount) throw Object.assign(new Error('Not assigned to this project.'), {status:403});
       }
+      await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team);
       for (const stage of phase_team) await assertEligibleManager(client, stage.user_id, 'spm');
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
@@ -206,14 +208,15 @@ const getSpm = async (project_type, is_random = false) => {
   const matrix_result = await execute(
     `
     SELECT
-      project_stage_id,
+      pstdl.project_stage_id,
       ps.code,
       jsonb_agg(discipline_id ORDER BY discipline_id ASC) AS disciplines
     FROM project_stage_discipline_links pstdl
     join project_stages ps on ps.id = pstdl.project_stage_id
+    join project_type_stages workflow on workflow.project_type_id=pstdl.project_type_id and workflow.project_stage_id=ps.id
     WHERE pstdl.project_type_id = (SELECT id from project_types where code = $1)
-    GROUP BY pstdl.project_stage_id, ps.sort_order, ps.code
-    ORDER BY ps.sort_order ASC;
+    GROUP BY pstdl.project_stage_id, workflow.sort_order, ps.code
+    ORDER BY workflow.sort_order ASC;
     `,
     [
       project_type

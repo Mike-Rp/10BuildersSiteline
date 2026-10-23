@@ -6,9 +6,9 @@ export const ADMIN_NAV = [
   { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
   { label: "Active sites", icon: "building" },
   { label: "Project intake", icon: "plus" },
-  { label: "Schedule performance", icon: "trend" },
   { label: "Documents", icon: "folder", group: "RESOURCES" },
   { label: "Directory", icon: "users" },
+  { label: "Reports", icon: "doc" },
   { label: "Team", icon: "users", group: "ORGANIZATION" },
   { label: "Archive", icon: "archive" },
   { label: "Settings", icon: "settings" },
@@ -58,3 +58,7 @@ export function adminBreadcrumb(
     return [page, DIRECTORY_TABS.find(([id]) => id === directoryTab)![1]]
   return [page]
 }
+
+// Older notifications may still point to the retired standalone schedule page.
+export const normalizeWorkspacePage = (page: string) =>
+  page.toLowerCase() === "schedule performance" ? "Active sites" : page

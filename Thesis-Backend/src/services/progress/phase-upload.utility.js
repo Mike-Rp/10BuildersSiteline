@@ -15,13 +15,17 @@ export const phaseUpload = (req, res, next) => parser(req, res, error => {
 export function fileType(file) {
   if (!file?.buffer?.length) throw new HttpError(400, "A non-empty file is required.");
   const b = file.buffer;
-  if (b.subarray(0, 5).toString() === "%PDF-") return "application/pdf";
-  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return "image/png";
-  if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return "image/jpeg";
-  if (b.length >= 12 && b.subarray(0, 4).toString() === "RIFF" && b.subarray(8, 12).toString() === "WEBP") {
-    return "image/webp";
-  }
-  throw new HttpError(400, "Supported files: PDF, JPEG, PNG, and WebP.");
+  const extension = file.originalname?.split(".").pop()?.toLowerCase();
+  const types = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg" };
+  if (file.originalname && !types[extension]) throw new HttpError(400, "Supported files: PDF, JPG, JPEG and PNG.");
+  const checked = type => {
+    if (file.originalname && types[extension] !== type) throw new HttpError(400, "The file content does not match its extension.");
+    return type;
+  };
+  if (b.subarray(0, 5).toString() === "%PDF-") return checked("application/pdf");
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return checked("image/png");
+  if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return checked("image/jpeg");
+  throw new HttpError(400, "Supported files: PDF, JPG, JPEG and PNG.");
 }
 
 export const optionalPhaseUpload = (req, res, next) => {

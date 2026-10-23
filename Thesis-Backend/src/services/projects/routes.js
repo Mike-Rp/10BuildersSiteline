@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createProject, updateProject, deleteProject } from "./controller.js";
 import { getProjects, getProjectById } from "./read.controller.js";
 import { upload } from "../../common/utilities/upload.utility.js";
+import { requireRoles } from "../../common/utilities/access.utility.js";
 import { createIntake, uploadContract, uploadSubconContract } from "./intake.controller.js";
 import { getRecommendations, rerunRecommendations, swapOpm, updatePhaseTeam } from "./recommend.controller.js";
 import { createIntakeDraft,getIntakeLog } from "./intake-log.controller.js";
@@ -32,11 +33,11 @@ router.post('/intake', async (req, res) => {
   await createIntake(req, res);
 });
  
-router.post('/intake/upload-contract', upload.single('file'), async (req, res) => {
+router.post('/intake/upload-contract', requireRoles('admin'), upload.single('file'), async (req, res) => {
   await uploadContract(req, res);
 });
  
-router.post('/intake/upload-subcon-contract', upload.single('file'), async (req, res) => {
+router.post('/intake/upload-subcon-contract', requireRoles('admin'), upload.single('file'), async (req, res) => {
   await uploadSubconContract(req, res);
 });
 

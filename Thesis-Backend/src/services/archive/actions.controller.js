@@ -12,7 +12,7 @@ export const closeProject = async (req,res) => {
     const data=await withTransaction(async db=>{
       const p=await phaseProject(db,actor,req.params.id,{active:true});
       if(!(await isProjectOpmOrAdmin(actor,p.id,db))) throw new HttpError(403,"Not responsible for this project.");
-      if(!(await maybeCloseProject(db,p,actor.id))) throw new HttpError(422,"Closeout must be fully approved and all pending reviews resolved.");
+      if(!(await maybeCloseProject(db,p,actor.id))) throw new HttpError(422,"Every project phase must be verified complete, assignments confirmed and blocking reviews resolved before Closeout can finish.");
       return {project_id:p.id,status:"archived"};
     });
     return sendOk(res,"Completed project archived.",1,data);
@@ -107,7 +107,7 @@ export const reassignPhase = async (req,res) => {
       if(p.lifecycle_status==="archived") throw new HttpError(409,"Archived projects are read-only.");
       const found=await db.query("SELECT * FROM project_phase_team WHERE id=$1 FOR UPDATE",[req.params.assignmentId]);
       const old=found.rows[0];
-      if(!["declined","auto_expired"].includes(old.status)) throw new HttpError(409,"Only declined or expired assignments can be reassigned.");
+      if(old.spm_user_id && !["declined","auto_expired"].includes(old.status)) throw new HttpError(409,"Only declined or expired assignments can be reassigned.");
       await assertEligibleManager(db,req.body.new_user_id,"spm");
       const clock=await db.query("SELECT now() AS now");
       const deadline=businessDeadline(clock.rows[0].now);

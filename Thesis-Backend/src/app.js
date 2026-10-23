@@ -5,6 +5,8 @@ import express, { json, urlencoded } from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
+import { handleError, sendError } from './common/utilities/access.utility.js';
+import { loginFailureLimiter } from './common/utilities/rate-limit.utility.js';
 
 import archiveRoutes from "./services/archive/routes.js";
 
@@ -19,6 +21,7 @@ import dashboardRoutes from './services/dashboard/routes.js';
 import engineerRoutes from './services/engineer/routes.js';
 import activityLogRoutes from "./services/activity-logs/routes.js";
 import licenseRoutes from "./services/licenses/routes.js";
+import cronRoutes from "./services/cron/routes.js";
 
 import types from 'pg-types';
  
@@ -59,12 +62,27 @@ const swaggerUiOptions = {
  
 app.use(json({ limit: '2mb' }));
 app.use(urlencoded({ extended: true }));
-app.use(cors());
+// CORS_ORIGINS (comma-separated) restricts browser origins; unset keeps the open default.
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+app.use(corsOrigins.length ? cors({ origin: corsOrigins }) : cors());
+if (process.env.VERCEL) app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Frame-Options', 'DENY');
+  next();
+});
+app.post(/^\/api\/v1\/accounts\/[^/]+\/regenerate-password$/, loginFailureLimiter({ max: 5 }));
+app.post([`${apiURL}/auth`, '/api/v1/auth/login'], loginFailureLimiter());
  
 app.get('/api/v1/health',async(req,res)=>{try{await (await databasePool()).query('select 1');res.json({ok:true,database:true});}catch{res.status(503).json({ok:false,database:false});}});
+app.use(`${apiURL}/cron`, cronRoutes);
 app.use('/api/v1',workspaceRoutes);
 app.use(apiURL+'/archive',archiveRoutes);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+const hostedProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+if (!hostedProduction || process.env.ENABLE_API_DOCS === 'true') {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+}
 app.use(`${apiURL}/accounts`, accountsRoutes);
  
 app.use(`${apiURL}/auth`, authRoutes);
@@ -85,6 +103,17 @@ app.use(`${apiURL}/engineer`, engineerRoutes);
 app.use(`${apiURL}/licenses`, licenseRoutes);
 
 app.use(`${apiURL}/activity-logs`, activityLogRoutes);
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error?.name === 'MulterError') {
+    return sendError(res, error.code === 'LIMIT_FILE_SIZE' ? 'File is too large.' : 'Invalid upload.', 400);
+  }
+  if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500) {
+    return sendError(res, error.status === 413 ? 'Request body too large.' : error.message, error.status);
+  }
+  return handleError(res, error);
+});
  
 
 export default app;
