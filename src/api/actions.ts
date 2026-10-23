@@ -116,6 +116,17 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             await post(base + "/phase-updates/" + pending.id + "/approve", { resolution_note: command.note || "Reviewed." });
             return;
         }
+        case "reject_update": {
+            // Only the report is rejected: no checklist credit changes and no phase advances.
+            const pending = project.workflow?.pendingUpdate;
+            if (!pending)
+                throw new Error("No pending phase update was found.");
+            const reason = command.note?.trim();
+            if (!reason)
+                throw new Error("Enter the reason for rejecting this report. The Site PM will see it.");
+            await post(base + "/phase-updates/" + pending.id + "/reject", { resolution_note: reason });
+            return;
+        }
         case "approve_rework":
         case "decline_rework": {
             const requestId=command.requestId||project.workflow?.pendingRework?.id;

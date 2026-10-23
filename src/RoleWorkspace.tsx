@@ -29,6 +29,7 @@ import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
+import ReportRejectDialog from "./ReportRejectDialog"
 import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
 import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
@@ -260,6 +261,8 @@ export default function RoleWorkspace({
   const [assignmentFilter, setAssignmentFilter] = useState("all")
   const [assignmentId, setAssignmentId] = useState("")
   const [reviewAction, setReviewAction] = useState<WorkflowCommand>()
+  // Ordinary progress report being rejected (separate from checklist evidence and rework decisions).
+  const [reportReject, setReportReject] = useState<{ projectId: string; projectName: string; expectedVersion: number }>()
   const [activityFilter, setActivityFilter] = useState("all")
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
@@ -2283,7 +2286,7 @@ export default function RoleWorkspace({
                       <p>
                         {tab === "rework"
                           ? "Only the selected affected activities require correction. Review the phase and project impact before confirming; dismissing the request leaves approvals unchanged."
-                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving this report grants no activity credit and does not change the project phase."}
+                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving or rejecting this report grants or removes no activity credit and does not change the project phase. A rejection needs a reason, which the Site PM sees."}
                       </p>
                     </div>
                     <div className="role-actions">
@@ -2316,6 +2319,7 @@ export default function RoleWorkspace({
                           </Button>
                         </>
                       ) : (
+                        <>
                         <Button
                           variant="primary"
                           icon="check"
@@ -2332,6 +2336,19 @@ export default function RoleWorkspace({
                         >
                           Approve progress note
                         </Button>
+                        <Button
+                          variant="danger-ghost"
+                          onClick={() =>
+                            setReportReject({
+                              projectId: p.id,
+                              projectName: p.name,
+                              expectedVersion: submission.version,
+                            })
+                          }
+                        >
+                          Reject report
+                        </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -3970,6 +3987,28 @@ export default function RoleWorkspace({
           reject={evidenceReview.type==="reject_checklist"} onClose={()=>setEvidenceReview(undefined)}
           onConfirm={(expectedReviewToken,note)=>act({...evidenceReview,expectedReviewToken,note},
             evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
+      )}
+      {reportReject && (
+        <ReportRejectDialog
+          projectName={reportReject.projectName}
+          onReject={(reason) =>
+            Promise.resolve(
+              onCommand({
+                type: "reject_update",
+                projectId: reportReject.projectId,
+                expectedVersion: reportReject.expectedVersion,
+                note: reason,
+              }),
+            )
+          }
+          onStale={() => void onReload()}
+          onClose={() => setReportReject(undefined)}
+          onDone={() => {
+            setReportReject(undefined)
+            setError("")
+            setMessage("Progress report rejected. The Site PM can submit a new report.")
+          }}
+        />
       )}
       {renewing && (
         <RenewalUploadDialog

@@ -389,6 +389,37 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await downloadApiFile(item.doc.id)).size>0)
   })
 
+  await t.test("an Office PM rejects an ordinary progress report with a reason, without touching checklist credit or the phase",async()=>{
+    let {user,state}=await asUser("karlo.espiritu@10builders.com")
+    const project=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
+    const spm=state.accounts.find(a=>a.id===user.id)
+    await sendApiWorkflow(state,spm,{type:"submit_progress",projectId:project.id,note:"Report that will be rejected"})
+    state=await loadState(user)
+    assert.equal(state.projects.find(p=>p.id===project.id).workflow.pendingUpdate.note,"Report that will be rejected")
+    const opm=await asUser("renz.villaverde@10builders.com")
+    const actor=opm.state.accounts.find(a=>a.id===opm.user.id)
+    const beforeProject=opm.state.projects.find(p=>p.id===project.id)
+    const credit=p=>JSON.stringify([p.progress,p.phase,p.workflow.checklist[p.phase].map(i=>[i.id,i.status])])
+    const before=credit(beforeProject)
+    await assert.rejects(sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"   "}),/reason for rejecting/i)
+    assert.equal(opm.state.projects.find(p=>p.id===project.id).workflow.pendingUpdate.note,"Report that will be rejected","a blank reason changes nothing")
+    await sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"Photos do not show the stated work"})
+    const after=await loadState(opm.user)
+    const rejected=after.projects.find(p=>p.id===project.id)
+    assert.equal(rejected.workflow.pendingUpdate,undefined,"the report is resolved")
+    assert.equal(credit(rejected),before,"no checklist credit, progress or phase change")
+    // The stale screen (still showing the report) now gets a readable "already resolved" message.
+    await assert.rejects(sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"Second click"}),/already|rejected/i)
+    // Another Site PM cannot reject: report decisions stay with the project's Office PM.
+    const other=await asUser("karlo.espiritu@10builders.com")
+    await sendApiWorkflow(other.state,other.state.accounts.find(a=>a.id===other.user.id),{type:"submit_progress",projectId:project.id,note:"Second report"})
+    const loaded=await loadState(other.user)
+    await assert.rejects(sendApiWorkflow(loaded,loaded.accounts.find(a=>a.id===other.user.id),{type:"reject_update",projectId:project.id,note:"Not allowed"}),/Office PM|permission/i)
+    // Leave the queue clean for the tests that follow.
+    const cleanup=await asUser("renz.villaverde@10builders.com")
+    await sendApiWorkflow(cleanup.state,cleanup.state.accounts.find(a=>a.id===cleanup.user.id),{type:"reject_update",projectId:project.id,note:"Cleanup"})
+  })
+
   await t.test("password reset requests require admin reauthentication and force a new password", async () => {
     const { user, state } = await asUser("patricia.domingo@10builders.com")
     const self = state.accounts.find(a => a.id === user.id)

@@ -99,7 +99,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 }
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
-  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
+  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
   projectId?: string
   phase?: string
   doc?: Doc
@@ -125,7 +125,7 @@ export type WorkflowCommand = {
 export const LICENSE_PAUSED_MESSAGE = "Paused until your license renewal is verified"
 export const LICENSE_COMMANDS: ReadonlySet<WorkflowCommand["type"]> = new Set([
   "accept_opm", "upload_registered", "accept_assignment", "select_company", "replace_company", "archive_company",
-  "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "approve_rework",
+  "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "reject_update", "approve_rework",
   "decline_rework", "submit_checklist", "approve_checklist", "reject_checklist", "request_company",
   "archive_company_request", "activate_project", "acknowledge_client_subcon", "report_client_subcon_issue",
 ])
@@ -1516,6 +1516,29 @@ export function applyWorkflow(
       )
       advanceIfReady(next, p, now, false)
       break
+    case "reject_update": {
+      opm()
+      assert(
+        work.pendingUpdate &&
+          work.pendingUpdate.version === command.expectedVersion,
+        "This progress submission changed. Refresh the queue.",
+      )
+      const reason = command.note?.trim()
+      assert(reason, "Enter the reason for rejecting this report. The Site PM will see it.")
+      // Rejects the report only: no checklist credit changes, no progress change, no phase advance.
+      p.history.push({
+        date: day,
+        text: `${work.pendingUpdate.note || "Field update"} — Rejected by ${actor.name}: ${reason}`,
+        progress: p.progress,
+        phase: p.phase,
+        clientVisible: false,
+        authorId: work.pendingUpdate.authorId,
+        evidence: work.pendingUpdate.evidence,
+      })
+      work.pendingUpdate = undefined
+      record("Progress update rejected", actor.name, "approval", "Rework & approvals")
+      break
+    }
     case "approve_rework":
     case "decline_rework": {
       opm()
