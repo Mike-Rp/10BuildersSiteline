@@ -38,14 +38,14 @@ test("empty fields get specific messages", () => {
   })
 })
 
-test("badly formatted emails are rejected, valid emails and built-in usernames pass", () => {
-  for (const bad of ["name@", "@company.com", "name@company", "a b@c.com", "john smith"])
+test("only well formed emails pass: sign-in is by email, so usernames are rejected", () => {
+  for (const bad of ["name@", "@company.com", "name@company", "a b@c.com", "john smith", "Admin", "SPM", "karlo.espiritu"])
     assert.equal(
       validateSignInFields(bad, "x").email,
       "Enter a valid email, like name@company.com.",
       bad,
     )
-  for (const ok of ["name@company.com", "  Karlo.Espiritu@10builders.com ", "Admin", "SPM"])
+  for (const ok of ["name@company.com", "  Karlo.Espiritu@10builders.com "])
     assert.equal(validateSignInFields(ok, "x").email, undefined, ok)
 })
 

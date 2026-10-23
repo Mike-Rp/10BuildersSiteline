@@ -61,18 +61,20 @@ export default function LoginPage({
 
           <div className="login-heading">
             <h1>Log in to your account</h1>
-            <p>Enter the credentials issued by your administrator.</p>
+            <p>Enter the work email and password issued by your administrator.</p>
           </div>
 
           <form className="login-form" onSubmit={submit} noValidate>
             <Field
-              label="Work Email or Username"
+              label="Work Email"
               error={emailError ? `⚠ ${emailError}` : undefined}
             >
               <input
                 type="text"
+                inputMode="email"
                 autoCapitalize="none"
                 spellCheck={false}
+                // "username" is the standard token that lets password managers fill the sign-in identifier, which is an email here.
                 autoComplete="username"
                 placeholder="name@10builders.com"
                 value={email}
