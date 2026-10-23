@@ -166,12 +166,14 @@ export default function LoginPage({
                     required
                   />
                   <Button
+                    type="button"
                     variant="text-button password-toggle"
                     onClick={() => setShowPassword((visible) => !visible)}
                     aria-label={`${showPassword ? "Hide" : "Show"} password`}
+                    aria-pressed={showPassword}
                     disabled={loading || checkingSession}
                   >
-                    {showPassword ? "Hide" : "Show"}
+                    <Icon name={showPassword ? "eye-off" : "eye"} />
                   </Button>
                 </div>
               </Field>
