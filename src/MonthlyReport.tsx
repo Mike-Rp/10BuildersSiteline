@@ -4,6 +4,7 @@ import {Button,Modal} from "./ui"
 import {downloadBlob} from "./panels"
 import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type MonthlyReport as Report} from "./monthly-report"
 import "./monthly-report.css"
+import ReportProjectSearch from "./ReportProjectSearch"
 
 export default function MonthlyReport({projects,initialProjectId,onClose}:{projects:{id:string;name:string}[];initialProjectId:string;onClose:()=>void}) {
   const [projectId,setProjectId]=useState(initialProjectId)
@@ -40,7 +41,7 @@ export default function MonthlyReport({projects,initialProjectId,onClose}:{proje
   return <Modal title="Monthly Project Progress Summary" subtitle={report?.project.name||projects.find(p=>p.id===projectId)?.name} wide onClose={onClose}>
     <div className="monthly-report">
       <div className="monthly-report-controls">
-        <label>Project<select value={projectId} onChange={e=>setProjectId(e.target.value)}>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <ReportProjectSearch projects={projects} value={projectId} onChange={setProjectId} />
         <label>Reporting month<input type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e=>setMonth(e.target.value)}/></label>
         <Button onClick={()=>setRefresh(n=>n+1)} disabled={loading||!month||!projectId}>Refresh</Button>
       </div>

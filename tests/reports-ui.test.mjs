@@ -21,11 +21,14 @@ test("Reports opens the selected authorized project and handles removed access a
     const { default: Reports } = await server.ssrLoadModule("/src/Reports.tsx")
     const render = projects => act(() => root.render(React.createElement(Reports, { projects })))
     await render([{ id: "one", name: "Project One" }, { id: "two", name: "Project Two" }])
+    assert.equal(document.querySelector('select'), null)
     await act(() => {
-      const select = document.querySelector("select")
-      select.value = "two"
-      select.dispatchEvent(new dom.window.Event("change", { bubbles: true }))
+      const search = document.querySelector('input[type="search"]')
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(search, 'two')
+      search.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
     })
+    assert.equal(document.querySelectorAll('.report-project-results button').length, 1)
+    await act(() => document.querySelector('.report-project-results button').click())
     const preview = () => [...document.querySelectorAll("button")].find(b => b.textContent.includes("Preview & export"))
     await act(() => preview().click())
     assert.match(requests.at(-1), /projects\/two\/monthly-report/)

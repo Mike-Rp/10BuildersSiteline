@@ -1,5 +1,6 @@
 import { useState } from "react"
 import MonthlyReport from "./MonthlyReport"
+import ReportProjectSearch from "./ReportProjectSearch"
 import { Button, Empty, Icon } from "./ui"
 import "./reports.css"
 
@@ -15,7 +16,7 @@ export default function Reports({ projects }: { projects: { id: string; name: st
       <section className="report-launcher" aria-label="Monthly construction report">
         <div className="section-title"><h2><Icon name="doc" /> Monthly Project Progress Summary</h2><span>MONTHLY</span></div>
         <p>Verified construction progress, checklist approvals, completed phases, rework, and pending reviews in one report.</p>
-        <label className="report-project">Project<select value={selected} onChange={e => setProjectId(e.target.value)}>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <ReportProjectSearch projects={projects} value={selected} onChange={setProjectId} />
         <div className="role-actions"><Button variant="primary" icon="doc" onClick={() => setOpen(true)}>Preview & export report</Button></div>
         <p>Choose a month in the preview, then export CSV or print / save as PDF.</p>
       </section>
