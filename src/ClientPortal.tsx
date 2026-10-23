@@ -510,7 +510,7 @@ export default function ClientPortal({
         </>
       )
     if (page === "Active sites") return <>
-      <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1><p>Approved progress and information shared with you.</p></div></div>
+      <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1></div></div>
       <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
     </>
     if (!project)
@@ -596,7 +596,6 @@ export default function ClientPortal({
       return (
         <Panel
           title="Recorded project history"
-          subtitle="Updates shared with your account."
           actions={
             <Button variant="primary" icon="download" onClick={report}>
               Download progress report
@@ -609,7 +608,6 @@ export default function ClientPortal({
     return (
       <Panel
         title="Shared site photographs"
-        subtitle="Photographs explicitly made available by the project team."
       >
         {photos()}
       </Panel>

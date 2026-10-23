@@ -11,7 +11,7 @@ export default function Reports({ projects }: { projects: { id: string; name: st
   const [open, setOpen] = useState(false)
   const selected = projects.some(p => p.id === projectId) ? projectId : projects[0]?.id || ""
   return <>
-    <div className="page-heading"><div><h1>Reports</h1><p>Preview and export monthly construction progress for your authorized projects.</p></div></div>
+    <div className="page-heading"><div><h1>Reports</h1></div></div>
     {!projects.length ? <Empty title="No projects available">Reports will appear when you have access to a project.</Empty> : <>
       <section className="report-launcher" aria-label="Monthly construction report">
         <div className="section-title"><h2><Icon name="doc" /> Monthly Project Progress Summary</h2><span>MONTHLY</span></div>

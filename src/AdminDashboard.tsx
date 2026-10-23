@@ -36,7 +36,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
       }}>{blockers.length === 1 ? "Review issue" : "View blockers"}<Icon name="arrow" size={16} /></Button>
     </section>}
     <header className="ao-heading">
-      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Workspace overview<span>.</span></h1><p>Your current workload, open decisions, and latest updates.</p></div>
+      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Workspace overview<span>.</span></h1></div>
       <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
     </header>
     <div className="ao-metrics" aria-label="Workspace totals">

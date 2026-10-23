@@ -12,7 +12,7 @@ export default function MyProfile({ actor, projects, onClose }: {
   const assigned = projects.filter(p => p.opmId === actor.id || p.team.some(t => t.accountId === actor.id))
   // Keep a single dialog mounted so document previews retain keyboard focus correctly.
   if (preview) return <Preview doc={preview} viewer={actor.name} downloadable={false} onClose={() => setPreview(undefined)} />
-  return <Modal title="My profile" subtitle="Identity, qualifications & assignments" onClose={onClose}>
+  return <Modal title="My profile" onClose={onClose}>
     <div className="detail-hero">
       <span className="avatar extra-large">{initials(actor.name)}</span>
       <div><small>{ROLE_NAMES[actor.role]}</small><h2>{actor.name}</h2><p>{actor.email}</p></div>

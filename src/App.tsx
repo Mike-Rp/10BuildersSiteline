@@ -1159,7 +1159,6 @@ function AppInner() {
             <Panel
               key={c.id}
               title={c.name}
-              subtitle="Project-level subcontractor"
               actions={<Status status={c.status} />}
             >
               <div className="approval-content">
@@ -1293,7 +1292,7 @@ function AppInner() {
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
     />}</PasswordResetRequests>
   }
-  function pageHeading(title: string, subtitle: string, action?: ReactNode) {
+  function pageHeading(title: string, action?: ReactNode) {
     return (
       <div className="page-heading">
         <div>
@@ -1306,7 +1305,6 @@ function AppInner() {
             {title}
             <span className="heading-dot">.</span>
           </h1>
-          <p>{subtitle}</p>
         </div>
         {action}
       </div>
@@ -1320,7 +1318,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Active sites",
-            "Project visibility from mobilization through closeout.",
           )}
           <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
             ...p,
@@ -1334,7 +1331,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Project intake",
-            "Plan the project. Find the right people. Set work in motion.",
             <Button
               variant="primary"
               icon="plus"
@@ -1601,7 +1597,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Documents",
-            "Project records and engineer credentials in one place.",
           )}
           {pageTabs(
             "Documents sections",
@@ -1621,7 +1616,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Directory",
-            "Your engineers and verified subcontractor companies.",
             directoryTab === "subcontractors" ? (
               <Button
                 variant="primary"
@@ -1650,7 +1644,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Team & accounts",
-            "Manage access, responsibilities, and the people in your organization.",
             <Button
               variant="primary"
               icon="plus"
@@ -1781,7 +1774,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Archive",
-            "Keep completed work and resolved records within reach.",
           )}
           <div className="notice">
             <Icon name="archive" />
@@ -1921,7 +1913,6 @@ function AppInner() {
         <>
           {pageHeading(
             "Organization settings",
-            "Clear rules for a consistent, accountable operation.",
           )}
           <div className="notice">
             <Icon name="shield" />
@@ -1932,7 +1923,6 @@ function AppInner() {
           </div>
           <Panel
             title="Organization rules"
-            subtitle="Applies across all projects and personnel"
           >
             <SettingsForm
               rules={state.rules}
@@ -1949,7 +1939,6 @@ function AppInner() {
           </Panel>
           <Panel
             title="Notification preferences"
-            subtitle="Choose the updates that appear in your notification inbox."
           >
             <div className="notification-settings">
               {["request", "approval", "progress", "notice"].map((type) => (
@@ -3010,7 +2999,6 @@ function AppInner() {
       {dialog?.kind === "intake" && (
         <Modal
           title={selectedProject ? "Resubmit project" : "New project intake"}
-          subtitle="A strong start for every project."
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3026,7 +3014,6 @@ function AppInner() {
       {dialog?.kind === "sent" && selectedProject && (
         <Modal
           title="Project handed off successfully"
-          subtitle="The first step is complete."
           onClose={() => setDialog(undefined)}
         >
           <div className="success-state">
@@ -3061,7 +3048,6 @@ function AppInner() {
                 ? "Project documents"
                 : "Project details"
             }
-            subtitle="Administrator · Project monitoring"
             wide
             onClose={() => setDialog(undefined)}
           >
@@ -3076,7 +3062,6 @@ function AppInner() {
                 ? "Engineer documents"
                 : "Personnel profile"
             }
-            subtitle="Identity, qualifications & assignments"
             wide
             onClose={() => setDialog(undefined)}
           >
@@ -3141,7 +3126,6 @@ function AppInner() {
       {dialog?.kind === "company" && selectedCompany && (
         <Modal
           title="Subcontractor company"
-          subtitle="Company profile, availability, commitments & documents"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3151,7 +3135,6 @@ function AppInner() {
       {dialog?.kind === "add-company" && (
         <Modal
           title="Add subcontractor company"
-          subtitle="Administrator-verified company directory record"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3168,7 +3151,6 @@ function AppInner() {
       {dialog?.kind === "activity" && (
         <Modal
           title="Workspace activity"
-          subtitle="Requests, approvals, personnel updates and document history."
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3184,7 +3166,6 @@ function AppInner() {
       {dialog?.kind === "search" && (
         <Modal
           title="Search workspace"
-          subtitle="Find projects, people and companies."
           onClose={() => setDialog(undefined)}
         >
           <Search
@@ -3246,7 +3227,6 @@ function AppInner() {
       {dialog?.kind === "help" && (
         <Modal
           title="Welcome to your workspace"
-          subtitle="Built for the work ahead."
           onClose={() => setDialog(undefined)}
         >
           <div className="help-content">

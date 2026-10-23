@@ -468,7 +468,7 @@ export default function RoleWorkspace({
     )
       setPreview(doc)
   }
-  function header(title: string, subtitle: string, action?: ReactNode) {
+  function header(title: string, action?: ReactNode) {
     return (
       <div className="page-heading">
         <div>
@@ -479,7 +479,6 @@ export default function RoleWorkspace({
             {title}
             <span className="heading-dot">.</span>
           </h1>
-          <p>{subtitle}</p>
         </div>
         {action}
       </div>
@@ -701,9 +700,6 @@ export default function RoleWorkspace({
       <>
         {header(
           isOpm ? "Project overview" : "Site overview",
-          isOpm
-            ? "Keep assignments, documentation, and site reviews moving."
-            : `Welcome, ${actor.name.split(" ")[0]}. Your assignments, phase status and deadlines are below.`,
         )}
         {!isOpm && expiryDays !== null && expiryDays <= 30 && <div className="license-expiry-warning" role="alert">
           <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
@@ -868,7 +864,6 @@ export default function RoleWorkspace({
         <div className="role-two-column">
           <Panel
             title="Upcoming deadlines"
-            subtitle="Assignment targets and reviews needing attention."
             actions={
               <Button
                 variant="text-button"
@@ -882,7 +877,6 @@ export default function RoleWorkspace({
           </Panel>
           <Panel
             title="Recent activity"
-            subtitle="Updates scoped to your assigned work."
             actions={
               <Button
                 variant="text-button"
@@ -1185,7 +1179,6 @@ export default function RoleWorkspace({
         <>
           {header(
             "Document repository",
-            "Original project records you are authorized to view.",
           )}
           {repositoryBrowser(projects)}
         </>
@@ -1194,7 +1187,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Project documents",
-          "Choose a project to upload its required documents and browse its records.",
         )}
         {repositoryBrowser(projects.filter((p) => p.opmId === actor.id))}
       </>
@@ -1518,7 +1510,6 @@ export default function RoleWorkspace({
         <>
           {header(
             "Assignment details",
-            "Accept, decline and coordinate this assignment.",
             <Button icon="chevron" onClick={() => setAssignmentId("")}>
               Back to assignments
             </Button>,
@@ -1596,7 +1587,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Assignments",
-          "Your projects by status. Open an assignment to accept, decline or coordinate it.",
         )}
         <IntakeTabs value={assignmentIntakeView} counts={counts} allLabel="All assignments" onChange={setAssignmentIntakeView} />
         {assignmentIntakeView !== "all" && !visible.length && <Empty title={assignmentIntakeView === "action" ? "No available intake actions" : "No intake assignments waiting for others"}>Current and previous construction assignments remain under All assignments. Check any selected status filter.</Empty>}
@@ -2045,9 +2035,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Active sites",
-          isOpm
-            ? "Read-only monitoring, accountable phase owners and site reminders."
-            : "Report progress only while your confirmed phase is active.",
         )}
         <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
@@ -2068,7 +2055,7 @@ export default function RoleWorkspace({
             }}>Open phase workspace</Button> : null
           }} />
         {!isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
-          <Panel title={`${picked.name} - Phase workspace`} subtitle="Existing phase reporting and approval requirements apply.">{progressForm(picked)}</Panel>
+          <Panel title={`${picked.name} - Phase workspace`}>{progressForm(picked)}</Panel>
         </div>}
       </>
     )
@@ -2105,7 +2092,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Rework & approvals",
-          "Human review where it matters. No silent numeric progress changes.",
         )}
         <div className="tabs standalone">
           {[
@@ -2745,7 +2731,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Subcontractor directory",
-          "Verified companies, availability, commitments, and manpower documents.",
           <Button
             icon="plus"
             variant="primary"
@@ -2919,7 +2904,6 @@ export default function RoleWorkspace({
       <>
         {header(
           "Archive",
-          "Read-only records of completed work and resolved responsibilities.",
         )}
         <div className="tabs standalone">
           {(isOpm
@@ -3446,7 +3430,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Confirmation queue",
-              "Track every acceptance needed before a project goes live.",
             )}
             <div className="tabs standalone">
               {[
@@ -3493,7 +3476,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Deadlines & follow-ups",
-              "Business-day assignment windows and three-day review escalation.",
             )}
             <Panel
               title="Upcoming responsibilities"
@@ -3514,7 +3496,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Activity log",
-              "Your project requests, approvals, progress and document history.",
             )}
             <Panel title="Project activity">
               <ListSection
@@ -3533,7 +3514,6 @@ export default function RoleWorkspace({
           <>
             {header(
               "Your preferences",
-              "Personal notifications and current account details.",
             )}
             <Panel
               title="Notification preferences"
@@ -3891,7 +3871,6 @@ export default function RoleWorkspace({
       {dialog?.kind === "company" && company && (
         <Modal
           title="Subcontractor profile"
-          subtitle="Company and workforce records"
           wide
           onClose={() => setDialog(undefined)}
         >
