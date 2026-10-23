@@ -1,6 +1,8 @@
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
+import DashboardWelcome from "./DashboardWelcome"
+import { nextDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
@@ -290,6 +292,7 @@ function AppInner() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [sessionMessage, setSessionMessage] = useState("")
+  const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
   const [checkingSession, setCheckingSession] = useState(true)
   const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
   const [readinessAvailable, setReadinessAvailable] = useState(false)
@@ -603,6 +606,7 @@ function AppInner() {
     setNotifications(false)
     setSessionId(account.id)
     setSessionMessage("")
+    setWelcomeGreeting(account.role === "client" ? undefined : nextDashboardGreeting(account.id, account.name))
     setSignedOut(false)
     setPage("Dashboard")
     try {
@@ -613,6 +617,7 @@ function AppInner() {
   }
   function endSession() {
     clearSession()
+    setWelcomeGreeting(undefined)
     setSignedOut(true)
     setSessionId("")
     apiLogout()
@@ -2852,6 +2857,8 @@ function AppInner() {
         key={actor.id}
         state={state}
         actor={actor}
+        welcomeGreeting={welcomeGreeting}
+        onWelcomeDismiss={() => setWelcomeGreeting(undefined)}
         onCommand={sendWorkflow}
         onReload={reloadWorkspace}
         onRead={(ids) =>
@@ -3080,6 +3087,7 @@ function AppInner() {
               })}
             </span>
           </div>
+          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} onDismiss={() => setWelcomeGreeting(undefined)} />}
           {renderPage()}
         </main>
       </div>
