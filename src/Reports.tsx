@@ -20,19 +20,10 @@ export default function Reports({ projects }: { projects: { id: string; name: st
         <div className="role-actions"><Button variant="primary" icon="doc" onClick={() => setOpen(true)}>Preview & export report</Button></div>
         <p>Choose a month in the preview, then export CSV or print / save as PDF.</p>
       </section>
-      <section aria-label="Report coverage">
-        <h2>What this report covers</h2>
-        <div className="report-coverage">
-          {[
-            ["Construction progress", "Opening and closing verified progress, with earned checklist credit and scope changes."],
-            ["Checklist approvals", "Approval events and distinct approved activities during the selected month."],
-            ["Phase completion", "Phases reaching verified completion, including whether they remain complete at the cutoff."],
-            ["Rework", "Confirmed rework and previously approved credit withdrawn for corrections."],
-            ["Pending reviews", "Evidence, progress reports, and rework requests pending at the reporting cutoff."],
-            ["Reporting scope", "Available metrics follow your role and project access. Missing historical records are shown as unavailable."],
-          ].map(([title, text]) => <article key={title}><h3>{title}</h3><p>{text}</p></article>)}
-        </div>
-      </section>
+      <aside className="report-guidance" aria-label="Report guidance">
+        <p><strong>About this report:</strong> Monthly verified progress, checklist approvals, completed phases, confirmed rework, and pending reviews at the reporting cutoff.</p>
+        <p>Information follows your role and project access. Missing historical records appear as unavailable.</p>
+      </aside>
     </>}
     {open && selected && <MonthlyReport projects={projects} initialProjectId={selected} onClose={() => setOpen(false)} />}
   </>

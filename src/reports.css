@@ -11,8 +11,8 @@
 .report-project-results small { display:block; margin-top:6px; }
 @media(max-width:900px) { .report-project-results { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:600px) { .report-project-results { grid-template-columns:minmax(0,1fr); } }
-.report-coverage { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:16px; }
-.report-coverage article { padding:20px; border:1px solid var(--color-line); border-radius:8px; background:var(--color-surface, white); }
-.report-coverage p,.report-launcher p { line-height:1.6; }
-@media(max-width:1100px) { .report-coverage { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:650px) { .report-coverage { grid-template-columns:minmax(0,1fr); } .report-launcher { padding:18px; } }
+.report-guidance { padding-top:16px; border-top:1px solid var(--color-line); color:var(--color-muted); }
+.report-guidance p { margin:0 0 6px; font-size:14px; line-height:1.6; }
+.report-guidance strong { color:var(--color-primary); }
+.report-launcher p { line-height:1.6; }
+@media(max-width:650px) { .report-launcher { padding:18px; } }
