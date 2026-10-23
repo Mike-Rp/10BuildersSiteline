@@ -592,7 +592,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
       assert.doesNotMatch(r.text, /licen|grace period|expired|INTERNAL-REASON|Previous engineer|took over|reassign|Contributed|renewal/i, `client ${path}`)
     }
     setToken("")
-    const user = await login(EMAIL.client, "Password@123")
+    const user = await login(EMAIL.client, "Password@123", true)
     tokens.client = getToken() // signing in again replaces the earlier session
     const state = await loadState(user)
     assert.deepEqual(state.license, {}, "no license data is loaded for a client")

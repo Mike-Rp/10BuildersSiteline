@@ -64,7 +64,7 @@ async function query(sql,args=[]) {
     }));
   }
   if(sql.startsWith("UPDATE users SET status='active'")) {state.users.find(u=>u.id===args[0]).status="active";return rows([{}]);}
-  if(sql.startsWith("SELECT 1 FROM users_token")) return rows(state.tokens.filter(t=>t.user_id===args[0]));
+  if(sql.startsWith("SELECT token FROM users_token")) return rows(state.tokens.filter(t=>t.user_id===args[0]));
   if(sql.startsWith("INSERT INTO users_token") || sql.startsWith("UPDATE users_token")) {
     state.tokens=[{user_id:args[0],token:args[1]}];return rows([{}]);
   }

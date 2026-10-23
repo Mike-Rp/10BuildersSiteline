@@ -10,6 +10,7 @@ export const setApiBase = (url: string) => {
 }
 
 const TOKEN_KEY = "siteline-api-token"
+export const SESSION_REPLACED_EVENT = "siteline-session-replaced"
 let memoryToken = ""
 
 export function getToken(): string {
@@ -31,9 +32,11 @@ export function setToken(token: string) {
 
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  code?: string
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -67,7 +70,13 @@ async function request(
       0,
     )
   }
-  if (response.status === 401 && token) setToken("")
+  if (response.status === 401 && token && getToken() === token) {
+    const error = await response.clone().json().catch(() => undefined)
+    setToken("")
+    if (error?.error?.code === "SESSION_REPLACED" && typeof window !== "undefined") {
+      window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
+    }
+  }
   return response
 }
 
@@ -80,7 +89,7 @@ export async function api<T = unknown>(
     ...rest,
     body: json === undefined ? rest.body : JSON.stringify(json),
   })
-  let body: Envelope<T> & { error?: { message?: string } } | undefined
+  let body: Envelope<T> & { error?: { message?: string; code?: string } } | undefined
   try {
     body = await response.json()
   } catch {
@@ -92,6 +101,7 @@ export async function api<T = unknown>(
         body?.message ||
         `Request failed (${response.status}).`,
       response.status,
+      body?.error?.code,
     )
   return (body?.data ?? body as unknown) as T
 }
@@ -103,7 +113,7 @@ export async function apiEnvelope(
   init: RequestInit = {},
 ): Promise<unknown> {
   const response = await request(path, init)
-  let body: { error?: { message?: string }; message?: string } | undefined
+  let body: { error?: { message?: string; code?: string }; message?: string } | undefined
   try {
     body = await response.json()
   } catch {
@@ -113,6 +123,7 @@ export async function apiEnvelope(
     throw new ApiError(
       body?.error?.message || body?.message || `Request failed (${response.status}).`,
       response.status,
+      body?.error?.code,
     )
   return body
 }
@@ -137,7 +148,7 @@ export async function apiList<T = Record<string, any>>(
   return out
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, replaceSession = false) {
   const data = await api<{
     token: string
     user: {
@@ -148,7 +159,7 @@ export async function login(email: string, password: string) {
       status: string
       temp_password_issued: boolean
     }
-  }>("/auth/login", { method: "POST", json: { email: email.trim(), password } })
+  }>("/auth/login", { method: "POST", json: { email: email.trim(), password, ...(replaceSession ? { replace_session: true } : {}) } })
   setToken(data.token)
   return data.user
 }

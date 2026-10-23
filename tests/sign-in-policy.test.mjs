@@ -142,6 +142,16 @@ test("guarded sign-in locks after 5 mismatches, even for the correct password, a
   assert.equal(checkLockout(store, email, T0 + LOCKOUT_MS), undefined)
 })
 
+test("a device choice does not count as an incorrect password", async () => {
+  const store = memoryStore()
+  for (let i = 0; i < MAX_FAILED_ATTEMPTS + 2; i++) {
+    await assert.rejects(guardedSignIn(store, "office@example.test", () => {
+      throw new Error("Your account is already logged in on another device.")
+    }, T0), /another device/)
+  }
+  assert.equal(checkLockout(store, "office@example.test", T0), undefined)
+})
+
 test("inactive-account errors do not count towards the lockout", async () => {
   const state = withAccount(initialState(), "a4", { status: "suspended" })
   const email = state.accounts.find((a) => a.id === "a4").email

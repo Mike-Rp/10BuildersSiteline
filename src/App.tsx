@@ -25,6 +25,7 @@ import { stubAccount } from "./api/adapter"
 import {
   api,
   ApiError,
+  SESSION_REPLACED_EVENT,
   login as apiLogin,
   logout as apiLogout,
   tokenUser,
@@ -288,6 +289,7 @@ function AppInner() {
     destructive?: boolean
   }>()
   const [signedOut, setSignedOut] = useState(true)
+  const [sessionMessage, setSessionMessage] = useState("")
   const [checkingSession, setCheckingSession] = useState(true)
   const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
   const [readinessAvailable, setReadinessAvailable] = useState(false)
@@ -362,6 +364,28 @@ function AppInner() {
       cancelled = true
     }
   }, [restoreAttempt])
+  useEffect(() => {
+    const replaced = (event: globalThis.Event) => {
+      endSession()
+      setSessionMessage((event as CustomEvent<string>).detail)
+    }
+    window.addEventListener(SESSION_REPLACED_EVENT, replaced)
+    return () => window.removeEventListener(SESSION_REPLACED_EVENT, replaced)
+  }, [])
+  useEffect(() => {
+    if (signedOut) return
+    const check = () => {
+      if (document.visibilityState !== "hidden") void api("/auth/me").catch(() => {})
+    }
+    const timer = window.setInterval(check, 15000)
+    window.addEventListener("focus", check)
+    document.addEventListener("visibilitychange", check)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener("focus", check)
+      document.removeEventListener("visibilitychange", check)
+    }
+  }, [signedOut])
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(""), 5000)
@@ -548,12 +572,13 @@ function AppInner() {
       setLoadingWorkspaceRole(undefined)
     }
   }
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string, replaceSession = false) {
     const account: Account = await guardedSignIn(signInAttempts,email,async()=>{
     let user: Awaited<ReturnType<typeof apiLogin>>
     try {
-      user = await apiLogin(email, password)
+      user = await apiLogin(email, password, replaceSession)
     } catch (error) {
+      if (error instanceof ApiError && error.code === "ACCOUNT_ALREADY_SIGNED_IN") throw error
       throw new Error(
         error instanceof ApiError &&
           error.status !== 401 &&
@@ -577,6 +602,7 @@ function AppInner() {
     setCredentials(undefined)
     setNotifications(false)
     setSessionId(account.id)
+    setSessionMessage("")
     setSignedOut(false)
     setPage("Dashboard")
     try {
@@ -2708,7 +2734,7 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage onSignIn={signIn} workspaceRole={loadingWorkspaceRole} />
+    return <LoginPage onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)

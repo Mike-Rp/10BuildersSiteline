@@ -73,8 +73,9 @@ export const getCurrentUser = async (req) => {
   const token = extractToken(req);
   if (!token) return null;
 
+  let payload;
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null; // bad signature or expired
   }
@@ -92,7 +93,21 @@ export const getCurrentUser = async (req) => {
         AND COALESCE(u.is_deleted, false) = false`,
     [token]
   );
-  return result.rowCount > 0 ? result.rows[0] : null;
+  if (result.rowCount > 0) return result.rows[0];
+  const userId = payload.details?.id;
+  if (isUuid(userId)) {
+    const current = (await execute(
+      `SELECT t.token FROM users_token t JOIN users u ON u.id=t.user_id
+        WHERE t.user_id=$1 AND u.status='active' AND COALESCE(u.is_deleted,false)=false`, [userId])).rows[0];
+    if (current?.token && current.token !== token) {
+      let otherSession;
+      try { otherSession = jwt.verify(current.token, process.env.JWT_SECRET); } catch { /* No live replacement. */ }
+      if (otherSession?.details?.id === userId && otherSession.jti !== payload.jti) {
+        throw new HttpError(401, "Your account was signed in on another device. This device has been signed out.", "SESSION_REPLACED");
+      }
+    }
+  }
+  return null;
 };
 
 export const requireLogin = async (req, res, next) => {

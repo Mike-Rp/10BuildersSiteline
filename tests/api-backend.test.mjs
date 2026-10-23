@@ -92,7 +92,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
 
   const asUser = async (email) => {
     setToken("")
-    const user = await login(email, "Password@123")
+    const user = await login(email, "Password@123", true) // test role switches explicitly replace the earlier session
     return { user, state: await loadState(user) }
   }
   const names = (state) => state.projects.map((p) => p.name).sort()
@@ -768,7 +768,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual(loaded.projects.find(p=>p.id===project.id).verifiedProgress,trusted)
     await asUser("f.uy@aldenheights-hoa.com")
     assert.ok((await api("/workspace/project-data")).every(p=>!("verifiedProgress" in p)))
-    const clientUser=await login("f.uy@aldenheights-hoa.com","Password@123")
+    const clientUser=await login("f.uy@aldenheights-hoa.com","Password@123",true)
     assert.ok((await loadState(clientUser)).projects.every(p=>!("verifiedProgress" in p)))
   })
 

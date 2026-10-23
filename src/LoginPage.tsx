@@ -1,4 +1,4 @@
-import { api } from "./api/client"
+import { api, ApiError } from "./api/client"
 import { useState, type FormEvent } from "react"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import type { Role } from "./model"
@@ -10,11 +10,13 @@ import LoginBanner from "./LoginBanner"
 export default function LoginPage({
   checkingSession = false,
   workspaceRole,
+  sessionMessage,
   onSignIn,
 }: {
   checkingSession?: boolean
   workspaceRole?: Role
-  onSignIn: (email: string, password: string) => Promise<void>
+  sessionMessage?: string
+  onSignIn: (email: string, password: string, replaceSession?: boolean) => Promise<void>
 }) {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetFirstName, setResetFirstName] = useState("")
@@ -32,6 +34,8 @@ export default function LoginPage({
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [deviceChoice, setDeviceChoice] = useState(false)
+  const [deviceNotice, setDeviceNotice] = useState("")
   const [touched, setTouched] = useState({ email: false, password: false })
   const [submitted, setSubmitted] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
@@ -46,13 +50,25 @@ export default function LoginPage({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (loading || deviceChoice) return
     setError("")
     setSubmitted(true)
     if (fieldErrors.email || fieldErrors.password) return
+    await attemptSignIn(false)
+  }
+  async function attemptSignIn(replaceSession: boolean) {
+    setError("")
+    setDeviceNotice("")
     setLoading(true)
     try {
-      await onSignIn(email.trim(), password)
+      await onSignIn(email.trim(), password, replaceSession)
+      setDeviceChoice(false)
     } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "ACCOUNT_ALREADY_SIGNED_IN") {
+        setDeviceChoice(true)
+        return
+      }
+      setDeviceChoice(false)
       setError(
         reason instanceof Error
           ? reason.message
@@ -64,8 +80,25 @@ export default function LoginPage({
   }
 
   if (workspaceRole) return <WorkspaceSkeleton role={workspaceRole} />
+  const keepCurrentDevice = () => {
+    if (loading) return
+    setDeviceChoice(false)
+    setPassword("")
+    setSubmitted(false)
+    setTouched(current => ({ ...current, password: false }))
+    setDeviceNotice("Your current device will stay signed in.")
+  }
   return (
     <main className="login-page login-redesign">
+      {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
+        <p>Your account is already logged in on another device.</p>
+        <p className="subsection">Choose where you want to continue. Logging in on this device will sign out the other device.</p>
+        {error && <p className="error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <Button disabled={loading} onClick={keepCurrentDevice}>Keep current device signed in</Button>
+          <Button variant="primary" disabled={loading} onClick={() => { void attemptSignIn(true) }}>{loading ? "Signing in…" : "Log in on this device"}</Button>
+        </div>
+      </Modal>}
       {resetOpen && <Modal title="Request a password reset" onClose={() => { if (!resetBusy) setResetOpen(false) }}>
         {resetMessage ? <><p role="status">{resetMessage}</p><Button onClick={() => setResetOpen(false)}>Done</Button></> : <form onSubmit={async event => {
           event.preventDefault(); setResetBusy(true); setResetError("")
@@ -113,6 +146,7 @@ export default function LoginPage({
             </div>
 
             <form className="login-form" onSubmit={submit} noValidate>
+              {(deviceNotice || sessionMessage) && <p className="notice" role="status">{deviceNotice || sessionMessage}</p>}
               <Field
                 label="Work Email"
                 error={emailError ? `⚠ ${emailError}` : undefined}

@@ -460,8 +460,9 @@ export default function RoleWorkspace({
     navigate("Documents")
   }
   function openChecklistApprovals(project?: Project) {
+    const filters: Record<string, string> = project ? { project: project.id } : {}
     updateListQuery(`${actor.role}:review-qa`, current => ({
-      ...current, search: "", filters: project ? { project: project.id } : {}, page: 1,
+      ...current, search: "", filters, page: 1,
     }))
     navigate("Rework & approvals")
     setTab("qa")

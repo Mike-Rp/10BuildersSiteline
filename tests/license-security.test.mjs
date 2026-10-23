@@ -79,10 +79,12 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   const base = `http://127.0.0.1:${apiPort}/api/v1`
   await until(async () => (await fetch(`${base}/health`)).ok)
 
-  const signIn = async (email, password = PASSWORD) => {
+  let failedSignIns = 0
+  const signIn = async (email, password = PASSWORD, replaceSession = true) => {
     const response = await fetch(`${base}/auth`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, replace_session: replaceSession }),
     })
+    if ([401, 403].includes(response.status)) failedSignIns++
     return { response, token: (await response.json()).data?.token }
   }
   const form = (fields, file) => {
@@ -103,6 +105,39 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   assert.ok(license, "seed data has a current license")
   const snapshot = async () => (await db.query("select license_number, license_expiry::text as license_expiry, updated_by from user_licenses where id=$1", [license.id])).rows[0]
   const knownUser = license.user_id
+
+  await t.test("a second device must choose before replacing a live session", async () => {
+    const before = admin
+    const conflict = await signIn(ADMIN, PASSWORD, false)
+    assert.equal(conflict.response.status, 409)
+    assert.equal(conflict.token, undefined)
+    assert.equal((await call("GET", "/auth/me", { token: before })).status, 200, "keeping the current device needs no mutation")
+    const wrong = await signIn(ADMIN, "wrong-password", false)
+    assert.equal(wrong.response.status, 401, "the session conflict is disclosed only after verifying the password")
+    const replacement = await signIn(ADMIN, PASSWORD, true)
+    assert.equal(replacement.response.status, 200)
+    admin = replacement.token
+    assert.notEqual(admin, before)
+    const old = await call("GET", "/auth/me", { token: before })
+    assert.equal(old.status, 401)
+    assert.equal((await old.json()).error.code, "SESSION_REPLACED")
+    assert.equal((await call("POST", "/auth/logout", { token: before })).status, 401)
+    assert.equal((await call("GET", "/auth/me", { token: admin })).status, 200, "the old device cannot sign out the replacement")
+  })
+
+  await t.test("expired sessions do not block a fresh login and concurrent logins require a choice", async () => {
+    const user = (await db.query("select id from users where email=$1", [ADMIN])).rows[0]
+    const expired = jwt.sign({ details: { id: user.id } }, SECRET, { expiresIn: -60 })
+    await db.query("update users_token set token=$2 where user_id=$1", [user.id, expired])
+    const fresh = await signIn(ADMIN, PASSWORD, false)
+    assert.equal(fresh.response.status, 200)
+    admin = fresh.token
+    await call("POST", "/auth/logout", { token: admin })
+    const attempts = await Promise.all([signIn(ADMIN, PASSWORD, false), signIn(ADMIN, PASSWORD, false)])
+    assert.deepEqual(attempts.map(result => result.response.status).sort(), [200, 409])
+    admin = attempts.find(result => result.token).token
+    assert.equal((await call("GET", "/auth/me", { token: admin })).status, 200)
+  })
 
   await t.test("anyone without a login is refused on every license and certification route", async () => {
     const before = await snapshot()
@@ -292,7 +327,8 @@ test("license, certification and intake routes enforce login, roles and safe SQL
 
   await t.test("repeated failed sign-ins are rate limited", async () => {
     let last
-    for (let i = 0; i < 10; i++) last = (await signIn("nobody@10builders.com", "wrong-password")).response.status
+    const remaining = 10 - failedSignIns
+    for (let i = 0; i < remaining; i++) last = (await signIn("nobody@10builders.com", "wrong-password")).response.status
     assert.equal(last, 401)
     const blocked = await signIn("nobody@10builders.com", "wrong-password")
     assert.equal(blocked.response.status, 429)
