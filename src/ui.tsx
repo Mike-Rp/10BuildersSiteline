@@ -82,6 +82,8 @@ export function Icon({ name, size = 20 }: {
         <path d="m16 16 5 5" />
       </>
     ),
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
+    "eye-off": <><path d="m3 3 18 18M10.6 5.1 12 5c6.5 0 10 7 10 7a21 21 0 0 1-3 3.8M6.2 6.2A22 22 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.8-1.6M10 10a3 3 0 0 0 4 4" /></>,
     plus: <path d="M12 5v14M5 12h14" />,
     arrow: <path d="M4 12h15m-5-5 5 5-5 5" />,
     chevron: <path d="m9 5 7 7-7 7" />,

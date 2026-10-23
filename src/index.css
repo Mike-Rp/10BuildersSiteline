@@ -221,6 +221,11 @@ tbody tr:hover { background: var(--surface-subtle); }
 .workspace-footer > span:last-child { display: flex; gap: 6px; align-items: center; }
 .notice { display: flex; gap: 12px; align-items: flex-start; padding: 15px 18px; border: 1px solid var(--color-line); background: var(--surface-subtle); color: var(--color-muted); border-radius: 7px; margin-bottom: 22px; font-size: 14px; }
 .notice > svg { margin-top: 2px; }
+.team-license-notice { margin: 18px 22px; background: #fff8e8; border-color: #e4c47c; color: #694b12; flex-wrap: wrap; }
+.team-license-notice p { min-width: 200px; }
+tr.team-needs-attention > td { background: #fff8e8; }
+tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
+.team-license-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
 .notice p { flex: 1; line-height: 1.7; }
 .notice.neutral { background: var(--surface-subtle); border-color: var(--color-line); color: var(--color-muted); margin: 0 24px 24px; }
 .search-field { display: flex; gap: 9px; align-items: center; color: var(--color-muted); background: white; border: 1px solid var(--color-line); border-radius: 6px; min-width: 230px; padding: 0 11px; }

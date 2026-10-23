@@ -955,13 +955,20 @@ function AppInner() {
       ],
     },
   )
+  const teamAlerts = new Set(adminDashboardOverview(state).items.filter(item => item.category === "licenses").map(item => item.id))
   const teamList = runList(
     "admin:team",
     state.accounts.filter((a) => a.status !== "deactivated"),
     {
       searchText: (a) =>
         `${a.name} ${a.email} ${a.scope.join(" ")} ${a.status}`,
-      filters: [roleFilter_, accountStatusFilter],
+      filters: [roleFilter_, accountStatusFilter, {
+        id: "attention",
+        label: "Attention",
+        allLabel: "All accounts",
+        options: [{ value: "needs-action", label: "Needs attention" }],
+        test: a => teamAlerts.has(a.id),
+      }],
     },
   )
   const activityLogList = runList("admin:activity", state.events, {
@@ -1656,6 +1663,13 @@ function AppInner() {
             title="Organization accounts"
             subtitle={`${state.accounts.filter((a) => a.status !== "deactivated").length} accounts · Admin-provisioned access`}
           >
+            {teamAlerts.size > 0 && (
+              <div className="notice team-license-notice">
+                <Icon name="alert" />
+                <p><strong>{teamAlerts.size} {teamAlerts.size === 1 ? "account needs" : "accounts need"} attention.</strong> Active staff licenses are expiring soon or have expired. This is what the Team badge counts.</p>
+                <Button onClick={() => updateListQuery("admin:team", q => ({ ...q, search: "", filters: { attention: "needs-action" }, page: 1 }))}>View accounts</Button>
+              </div>
+            )}
             <ListToolbar
               list={teamList}
               placeholder="Search name, scope or status"
@@ -1675,7 +1689,7 @@ function AppInner() {
                 </thead>
                 <tbody>
                   {teamList.view.items.map((a) => (
-                      <tr key={a.id}>
+                      <tr key={a.id} className={teamAlerts.has(a.id) ? "team-needs-attention" : undefined}>
                         <td>
                           <button
                             className="person-cell clickable"
@@ -1687,6 +1701,7 @@ function AppInner() {
                             <span>
                               <strong>{a.name}</strong>
                               <small>{a.email}</small>
+                              {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small></span>}
                             </span>
                           </button>
                         </td>
