@@ -33,6 +33,12 @@ const store = new Map<string, ListQuery>()
 const listeners = new Set<() => void>()
 let version = 0
 const DEFAULT = defaultListQuery()
+// Three-column card collections use complete 3 × 3 pages. Table lists keep
+// their existing row counts; two-column project explorers already use 6/12/24.
+const cardPageSize = (key: string) =>
+  ["admin:engineers", "admin:engineer-docs", "admin:companies"].includes(key) ||
+  /^(opm|spm):directory$/.test(key) ? 9 :
+  /^(opm|spm):assignments-/.test(key) ? 6 : undefined
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => {
@@ -48,9 +54,11 @@ export function useListMemory() {
   useSyncExternalStore(subscribe, () => version)
 }
 // A list may start with a different page size (dashboard widgets use 5).
-export const getListQuery = (key: string, pageSize?: number): ListQuery =>
-  store.get(key) ??
-  (pageSize && pageSize !== DEFAULT.pageSize ? { ...DEFAULT, pageSize } : DEFAULT)
+export const getListQuery = (key: string, pageSize?: number): ListQuery => {
+  const fixedSize = cardPageSize(key)
+  const query = store.get(key) ?? { ...DEFAULT, pageSize: pageSize ?? fixedSize ?? DEFAULT.pageSize }
+  return fixedSize ? { ...query, pageSize: fixedSize } : query
+}
 export function updateListQuery(
   key: string,
   change: (query: ListQuery) => ListQuery,
@@ -105,7 +113,7 @@ export function runList<T>(
     narrowed: hasActiveFilters(query),
     status: READY,
     pageSize: options.pageSize,
-    pageSizes: options.pageSizes,
+    pageSizes: cardPageSize(key) ? [cardPageSize(key)!] : options.pageSizes,
   }
 }
 
@@ -125,6 +133,7 @@ export function remoteList<T>(
     query,
     matched: pageItems,
     view: paginateRemote(pageItems, total, query.page, query.pageSize),
+    pageSizes: cardPageSize(key) ? [cardPageSize(key)!] : undefined,
     count: total,
     narrowed: hasActiveFilters(query),
     status,
@@ -302,7 +311,7 @@ export function ListPager<T>({
           · Page {view.page} of {view.pageCount}
         </span>
       </p>
-      <label className="pagination-size">
+      {sizes.length === 1 ? <span>{view.pageSize} cards per page</span> : <label className="pagination-size">
         <span>Rows per page</span>
         <select
           value={view.pageSize}
@@ -316,7 +325,7 @@ export function ListPager<T>({
             </option>
           ))}
         </select>
-      </label>
+      </label>}
       {multiple && (
         <div className="pagination-pages">
           <Button
