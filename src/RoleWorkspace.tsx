@@ -3,6 +3,7 @@ import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
 import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
+import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
@@ -197,6 +198,7 @@ export default function RoleWorkspace({
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
   const [page, setPage] = useState("Dashboard")
+  const [profileOpen, setProfileOpen] = useState(false)
   const [pickedId, setPickedId] = useState(
     () =>
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
@@ -3622,7 +3624,7 @@ export default function RoleWorkspace({
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-person">
-            <span className="avatar">{initials(actor.name)}</span>
+            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
             <span>
               <strong>{actor.name}</strong>
               <small>{ROLE_NAMES[actor.role]}</small>
@@ -3700,7 +3702,7 @@ export default function RoleWorkspace({
                 </div>
               )}
             </div>
-            <span className="avatar">{initials(actor.name)}</span>
+            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
           </div>
         </header>
         <main className="main-content">
@@ -3962,6 +3964,7 @@ export default function RoleWorkspace({
           confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
           onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
+      {profileOpen && <MyProfile actor={actor} projects={projects} onClose={() => setProfileOpen(false)} />}
       {preview && (
         <Preview
           doc={preview}
