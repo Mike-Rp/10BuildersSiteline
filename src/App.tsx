@@ -12,7 +12,7 @@ import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
-import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
+import { persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow, createCompany } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import MonthlyReport from "./MonthlyReport"
@@ -631,7 +631,13 @@ function AppInner() {
       const id=await saveApiProject(project,exists)
       await reloadWorkspace()
       navigate("Project intake");setDialog({kind:"sent",id})
-    }catch(error){setToast((error as Error).message);throw error}
+    }catch(error){
+      if(error instanceof PartialProjectSave){
+        setToast(error.message);await reloadWorkspace().catch(()=>undefined)
+        navigate("Project intake");setDialog({kind:"sent",id:error.id});return
+      }
+      setToast((error as Error).message);throw error
+    }
   }
   function updateCompany(c: Company, message: string) {
     return commit(

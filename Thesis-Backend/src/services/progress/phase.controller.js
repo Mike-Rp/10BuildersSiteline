@@ -225,7 +225,8 @@ const reviewEvidence = decision => async (req, res) => {
       // All phase mutations lock the project first, then the evidence, to serialize approvals and transitions.
       await assertLicenseActive(user, client);
       const {p,evidence}=await reviewableEvidence(client,user,req.params.id,req.params.evidenceId);
-      if(req.body?.expected_review_token!==undefined) {
+      if(typeof req.body?.expected_review_token!=="string" || !req.body.expected_review_token.trim()) throw new HttpError(400,"expected_review_token is required. Open a fresh review preview.");
+      {
         const preview=await evidenceReviewPreview(client,p,evidence);
         if(typeof req.body.expected_review_token!=="string" || req.body.expected_review_token!==preview.review_token) {
           throw new HttpError(409,"The activity or progress totals changed. Close this review and open a fresh preview.");

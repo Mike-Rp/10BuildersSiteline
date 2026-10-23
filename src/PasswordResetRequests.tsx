@@ -28,7 +28,7 @@ export default function PasswordResetRequests({ children }: { children: (request
           setIssued(result.temp_password); setRequests(current => current.filter(item => item.id !== selected.id)); setSelected(undefined); setPassword("")
         } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
       }}>
-        <p>This sets the temporary password to the user's last name followed by 789 and signs out their existing sessions.</p>
+        <p>This generates a random temporary password and signs out their existing sessions.</p>
         <Field label="Your administrator password"><input required type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></Field>
         {error && <p role="alert" className="error">{error}</p>}
         <div className="modal-actions"><Button disabled={busy} onClick={() => { setSelected(undefined); setPassword("") }}>Cancel</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? "Resetting?" : "Reset password"}</Button></div>

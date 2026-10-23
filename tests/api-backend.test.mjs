@@ -64,6 +64,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   // lifecycle workflows are not about licenses, so every engineer starts with a valid one here.
   await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-photo-release.sql"),"utf8"))
 
   const dbPort = await freePort()
   const apiPort = await freePort()
@@ -368,8 +369,10 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,new File(["%PDF-1.4\nChecklist evidence"],"evidence.pdf",{type:"application/pdf"}))
     await sendApiWorkflow(state,actor,{type:"submit_checklist",projectId:project.id,itemId:item.id,doc:{id,name:"evidence.pdf"},note:"Verified on site"})
     const opmSession=await asUser("renz.villaverde@10builders.com")
+    const evidenceId=(await db.query("select id from project_phase_evidence where checklist_item_id=$1 and status='pending'",[item.id])).rows[0].id
+    const reviewPreview=await api("/progress/projects/"+project.id+"/evidence/"+evidenceId+"/review-preview")
     await sendApiWorkflow(opmSession.state,opmSession.state.accounts.find(a=>a.id===opmSession.user.id),
-      {type:"approve_checklist",projectId:project.id,itemId:item.id})
+      {type:"approve_checklist",projectId:project.id,itemId:item.id,expectedReviewToken:reviewPreview.review_token})
     const approved=(await loadState(opmSession.user)).projects.find(p=>p.id===project.id).workflow.checklist[project.phase].find(i=>i.id===item.id)
     assert.equal(approved.status,"approved")
   })
@@ -562,11 +565,16 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(requests.filter(r => r.id === saved.id).length, 1)
     await assert.rejects(api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"wrong"}}), /Administrator password/)
     const reset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
-    assert.equal(reset.temp_password, "Santos789")
+    assert.match(reset.temp_password, /^[a-zA-Z2-9]{10}$/)
+    assert.ok(!reset.temp_password.toLowerCase().includes("santos"))
+    const secondReset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
+    assert.notEqual(secondReset.temp_password, reset.temp_password)
+    await assert.rejects(login("santos.juan@10builders.com", reset.temp_password))
+    await asUser("patricia.domingo@10builders.com") // the rejected login cleared the admin session token
     assert.equal((await api("/accounts/password-reset-requests")).some(r => r.id === saved.id), false)
     setToken("")
     await assert.rejects(login("santos.juan@10builders.com", "Password@123"))
-    const target = await login("santos.juan@10builders.com", "Santos789")
+    const target = await login("santos.juan@10builders.com", secondReset.temp_password)
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
@@ -985,7 +993,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await asUser(opmEmail)
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)
     const blockedEvidence = await evidence(first,"pending",null)
-    const blockedApproval = await api(base+`/evidence/${blockedEvidence.rows[0].id}/approve`,{method:"POST",json:{}})
+    const blockedPreview = await api(base+`/evidence/${blockedEvidence.rows[0].id}/review-preview`)
+    await assert.rejects(api(base+`/evidence/${blockedEvidence.rows[0].id}/approve`,{method:"POST",json:{}}),/expected_review_token/)
+    const blockedApproval = await api(base+`/evidence/${blockedEvidence.rows[0].id}/approve`,{method:"POST",json:{expected_review_token:blockedPreview.review_token}})
     assert.equal(blockedApproval.status,"approved")
     assert.equal(blockedApproval.handoff.advanced,false)
     assert.match(blockedApproval.handoff.reason,/pending/)
@@ -1011,7 +1021,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await evidence(thirdPhaseItem,"rejected")
     const priorEvidence = (await db.query("select id,status from project_phase_evidence where project_id=$1 and project_stage_id=$2 order by id",[id,stages[1].id])).rows
     const finalApprovalEvidence = await evidence(secondPhaseItem,"pending",null)
-    const automatic = await api(base+`/evidence/${finalApprovalEvidence.rows[0].id}/approve`,{method:"POST",json:{}})
+    const finalPreview = await api(base+`/evidence/${finalApprovalEvidence.rows[0].id}/review-preview`)
+    const automatic = await api(base+`/evidence/${finalApprovalEvidence.rows[0].id}/approve`,{method:"POST",json:{expected_review_token:finalPreview.review_token}})
     assert.equal(automatic.handoff.advanced,true)
     assert.equal(automatic.handoff.current_stage,stages[2].code)
     assert.equal((await stage()).current_stage_id,stages[2].id)
@@ -1095,6 +1106,51 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(client.state.projects.every(p=>projectPhaseNames(p).length===expected[p.type]));
     assert.ok((await api("/workspace/project-data")).every(p=>!("checklistProgress" in p)));
   });
+
+  await t.test("a repeated or concurrent intake with the same intake_id creates one project and one OPM confirmation", async () => {
+    const { user, state } = await asUser("patricia.domingo@10builders.com")
+    const commercial = state.projects.find(p => p.type === "Commercial" && p.status === "active")
+    const spm = state.accounts.find(a => a.role === "spm" && a.status === "active")
+    const intakeId = randomUUID()
+    const body = {
+      name: "Idempotent intake", project_type: "Commercial", floor_area_sqm: 1000, floor_count: 2,
+      target_start_date: "2026-12-01", client_name: "Idempotent client", suggested_opm_id: commercial.opmId, intake_id: intakeId,
+      phase_team: state.backendPhases.Commercial.map((p, i) => ({ stage: p.name, user_id: spm.id, is_lead: i === 0 })),
+    }
+    const results = await Promise.all([1, 2, 3].map(() => api("/projects/intake", { method: "POST", json: body })))
+    assert.ok(results.every(r => r.project.id === intakeId && r.confirmation.id === results[0].confirmation.id))
+    assert.equal((await db.query("select count(*)::int n from projects where name='Idempotent intake'")).rows[0].n, 1)
+    assert.equal((await db.query("select count(*)::int n from assignment_confirmations where project_id=$1 and role_context='opm'", [intakeId])).rows[0].n, 1)
+    await assert.rejects(api("/projects/intake", { method: "POST", json: { ...body, intake_id: "not-a-uuid" } }), /intake_id/)
+    assert.ok(user)
+  })
+
+  await t.test("Site PM photos stay internal until the Office PM or Administrator releases them", async () => {
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222])
+    const site = await asUser("karlo.espiritu@10builders.com")
+    const project = site.state.projects.find(p => p.name === "Brookfield Warehouse Ext.")
+    const fileId = randomUUID()
+    await uploadFile(fileId, new File([png], "gate.png", { type: "image/png" }))
+    const command = (payload) => api("/projects/" + project.id + "/workspace-command", { method: "POST", json: payload })
+    await command({ type: "add_photo", doc: { id: fileId, clientVisible: true }, note: "Rebar delivery" })
+    const row = (await db.query("select id,is_client_visible from project_photos where file_ref=$1", ["db://" + fileId])).rows[0]
+    assert.equal(row.is_client_visible, false, "the SPM's clientVisible flag is ignored")
+    await assert.rejects(command({ type: "release_photo", photoId: row.id }), /Office PM or an Administrator/)
+    const client = (await db.query("select id from users where email='f.uy@aldenheights-hoa.com'")).rows[0]
+    await db.query("insert into user_client_project_links(user_id,project_id) values($1,$2) on conflict do nothing", [client.id, project.id])
+    await asUser("f.uy@aldenheights-hoa.com")
+    assert.ok(!(await api("/projects/" + project.id + "/photos")).some(p => p.id === row.id), "client never receives an unreleased photo")
+    assert.ok(!(await api("/workspace/project-data")).some(part => part.photos.some(p => p.id === row.id)))
+    await assert.rejects(command({ type: "release_photo", photoId: row.id }), /permission/)
+    await asUser("renz.villaverde@10builders.com")
+    await command({ type: "release_photo", photoId: row.id })
+    await assert.rejects(command({ type: "release_photo", photoId: row.id }), /already released/)
+    const released = (await db.query("select is_client_visible,released_by from project_photos where id=$1", [row.id])).rows[0]
+    assert.equal(released.is_client_visible, true)
+    assert.ok(released.released_by)
+    await asUser("f.uy@aldenheights-hoa.com")
+    assert.ok((await api("/projects/" + project.id + "/photos")).some(p => p.id === row.id))
+  })
 
   await t.test("the API refuses requests without a session", async () => {
     setToken("")

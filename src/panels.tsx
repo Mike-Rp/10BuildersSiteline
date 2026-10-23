@@ -1045,6 +1045,8 @@ export function IntakeForm({
   const [newClient, setNewClient] = useState(false)
   const [error, setError] = useState("")
   const [run, setRun] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const submitGuard = useRef(false)
   const [ownSubcon, setOwnSubcon] = useState(!!project?.clientSubcon)
   const [agreementPreview, setAgreementPreview] = useState<Doc>()
   const [draft, setDraft] = useState<Project>(
@@ -1180,6 +1182,7 @@ export function IntakeForm({
     setStep(2)
   }
   async function submit() {
+    if (submitGuard.current) return
     let err = validDetails()
     if (
       !draft.docs.some(
@@ -1223,6 +1226,8 @@ export function IntakeForm({
         "Every phase needs an eligible Site PM. Review team capacity and qualifications."
     setError(err)
     if (!err) try {
+      submitGuard.current = true
+      setSubmitting(true)
       await onSubmit({
         ...draft,
         status: "pending",
@@ -1234,6 +1239,7 @@ export function IntakeForm({
         team: draft.team.map((t) => ({ ...t, status: "pending" })),
       })
     } catch(reason) { setError((reason as Error).message) }
+    finally { submitGuard.current = false; setSubmitting(false) }
   }
   const count = headcount(draft.type, draft.area, draft.floors)
   const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
@@ -1725,11 +1731,13 @@ export function IntakeForm({
               variant="primary"
               onClick={submit}
               icon="arrow"
-              disabled={datesBlocked}
+              disabled={datesBlocked || submitting}
             >
-              {project
-                ? "Resubmit to Office PM"
-                : "Confirm & send to Office PM"}
+              {submitting
+                ? "Sending…"
+                : project
+                  ? "Resubmit to Office PM"
+                  : "Confirm & send to Office PM"}
             </Button>
           </div>
         </>

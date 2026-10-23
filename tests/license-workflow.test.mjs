@@ -325,7 +325,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     evidenceByKarlo.push(items[0].id, items[1].id)
     const first = await evidence(items[0])
     assert.equal(first.status, 201, first.text)
-    const approved = await call("renz", "POST", `/progress/projects/${P}/evidence/${first.data.evidence_id ?? first.data.id}/approve`, {})
+    const approved = await call("renz", "POST", `/progress/projects/${P}/evidence/${first.data.evidence_id ?? first.data.id}/approve`, { expected_review_token: (await call("renz", "GET", `/progress/projects/${P}/evidence/${first.data.evidence_id ?? first.data.id}/review-preview`)).data.review_token })
     assert.equal(approved.status, 200, approved.text)
     const second = await evidence(items[1])
     assert.equal(second.status, 201, second.text)

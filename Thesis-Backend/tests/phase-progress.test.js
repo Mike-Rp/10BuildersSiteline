@@ -131,6 +131,7 @@ const request = (actor = spm, body = {}, params = {}) => ({
   actor, body, params: { id: projectId, evidenceId: "7", itemId: "1", ...params },
 });
 
+
 test("required checklist progress rounds percentages and handles no configured items", () => {
   assert.equal(utility.checklistPct(0, 5), 0);
   assert.equal(utility.checklistPct(1, 5), 20);

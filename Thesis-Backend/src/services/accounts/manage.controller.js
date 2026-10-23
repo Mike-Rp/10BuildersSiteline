@@ -330,9 +330,7 @@ export const regeneratePassword = async (req, res) => {
       if (typeof req.body?.adminPassword !== "string" || !(await bcrypt.compare(req.body.adminPassword, admin.password_hash))) throw new HttpError(403, "Administrator password is incorrect.");
       const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
       if (!target) throw new HttpError(404, "Account not found.");
-      const lastName = target.last_name || target.full_name.replace(/\s*\([^)]*\)/g, "").trim().split(/\s+/).pop();
-      const tempPassword = lastName + "789";
-      if (Buffer.byteLength(tempPassword, "utf8") > 72) throw new HttpError(400, "Last name is too long for a temporary password.");
+      const tempPassword = makeTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(
         `UPDATE users SET password_hash = $2, temp_password_issued = true, updated_by = $3, updated_at = now()

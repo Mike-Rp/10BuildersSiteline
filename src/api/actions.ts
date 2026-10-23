@@ -98,10 +98,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             const evidenceId = command.evidenceId || item?.evidenceId;
             if (!evidenceId)
                 throw new Error("No submitted evidence was found.");
+            if (!command.expectedReviewToken) throw new Error("Open a fresh review preview before reviewing evidence.");
             const rejected = command.type === "reject_checklist";
             return await post(base + "/evidence/" + evidenceId + (rejected ? "/reject" : "/approve"), {
                 review_note: command.note,
-                ...(command.expectedReviewToken ? {expected_review_token:command.expectedReviewToken} : {}),
+                expected_review_token:command.expectedReviewToken,
             });
         }
         case "approve_update":
@@ -184,11 +185,24 @@ export async function saveApiProject(project: Project, existing: boolean) {
         floor_count: Number(project.floors), target_start_date: project.start, client_user_id: project.clientId,
         suggested_opm_id: project.opmId, crew_required: headcount(project.type, project.area, project.floors).total,
         phase_team: project.team.map((t, index) => ({ stage: t.phase, user_id: t.accountId, is_lead: index === 0 })),
-        ...(existing ? { draft_project_id: project.id } : {}),
+        ...(existing ? { draft_project_id: project.id } : { intake_id: project.id }),
     });
     const id = result.project.id;
-    await api("/projects/" + id + "/workspace", { method: "PUT", json: project });
+    try {
+        await api("/projects/" + id + "/workspace", { method: "PUT", json: project });
+    }
+    catch (error) {
+        throw new PartialProjectSave(id, (error as Error).message);
+    }
     return id as string;
+}
+// The project and its OPM confirmation exist; only the follow-up workspace details failed to save.
+export class PartialProjectSave extends Error {
+    id: string;
+    constructor(id: string, reason: string) {
+        super("Project sent, some details did not save: " + reason);
+        this.id = id;
+    }
 }
 const changed = (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b);
 export async function persistAdminChanges(before: State, after: State) {

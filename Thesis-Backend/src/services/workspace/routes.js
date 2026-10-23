@@ -488,7 +488,17 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             if (!/image\/(png|jpeg)/.test(f.content_type))
                 throw new HttpError(400, "Choose a JPG or PNG.");
             await db.query("update stored_files set project_id=$2,purpose='photo' where id=$1", [f.id, p.id]);
-            await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5)", [p.id, "db://" + f.id, c.note || "", user.id, !!c.doc.clientVisible]);
+            await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5)", [p.id, "db://" + f.id, c.note || "", user.id, false]); // internal until the Office PM or Administrator releases it
+            break;
+        }
+        case "release_photo": {
+            if (user.role === "spm" || (user.role === "opm" && p.suggested_opm_id !== user.id))
+                throw new HttpError(403, "Only the assigned Office PM or an Administrator can release photos to the client.");
+            if (!isUuid(c.photoId))
+                throw new HttpError(400, "photoId must be a valid id.");
+            const released = await db.query("update project_photos set is_client_visible=true,released_by=$3,released_at=now() where id=$1 and project_id=$2 and not is_client_visible returning id", [c.photoId, p.id, user.id]);
+            if (!released.rowCount)
+                throw new HttpError(404, "Photo not found or already released.");
             break;
         }
         default: throw new HttpError(400, "Unsupported project command.");

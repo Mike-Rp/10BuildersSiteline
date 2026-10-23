@@ -24,7 +24,24 @@ export const createIntake = async (req, res) => {
     const tier = Number(floor_area_sqm) >= 50000 || Number(floor_count) >= 31 ? 'Large'
       : Number(floor_area_sqm) >= 15000 || Number(floor_count) >= 30 ? 'Medium' : 'Small';
     if (req.body?.draft_project_id && !isUuid(req.body.draft_project_id)) return responseError(res,"Invalid draft_project_id.",400);
+    const intakeId = req.body?.intake_id ?? null;
+    if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
+      // A repeat of the same submission returns the project it already created instead of inserting another.
+      const idemKey = intakeId ?? req.body?.draft_project_id ?? null;
+      if (idemKey) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [idemKey]);
+        const prior = await client.query(
+          `SELECT p.id,p.name,p.lifecycle_status FROM projects p
+            WHERE p.id=$1 AND COALESCE(p.is_deleted,false)=false AND p.lifecycle_status NOT IN ('draft','suggested_allocation','confirmed')
+              AND EXISTS (SELECT 1 FROM assignment_confirmations c WHERE c.project_id=p.id AND c.role_context='opm')`, [idemKey]);
+        if (prior.rowCount) {
+          const confirmation = await client.query(
+            `SELECT id,project_id,target_user_id,status FROM assignment_confirmations
+              WHERE project_id=$1 AND role_context='opm' ORDER BY created_at LIMIT 1`, [idemKey]);
+          return {project: prior.rows[0], confirmation: confirmation.rows[0], duplicate: true};
+        }
+      }
       let draft=null;
       if (req.body.draft_project_id) {
         const found=await client.query("SELECT id,client_name,lifecycle_status FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
@@ -67,14 +84,14 @@ export const createIntake = async (req, res) => {
         [name,project_type,company,floor_area_sqm,floor_count,target_start_date,suggested_opm_id,
          suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id,draft.id])
         : await client.query(`INSERT INTO projects
-        (name, project_type_id, client_name, floor_area_sqm, floor_count, target_start_date,
+        (id, name, project_type_id, client_name, floor_area_sqm, floor_count, target_start_date,
          lifecycle_status, suggested_opm_id, suggested_opm_match_score,
          headcount_suggested, headcount_tier, crew_required, crew_assigned, created_by, updated_by)
-        SELECT $1, pt.id, $3, $4, $5, $6, 'sent_to_opm', $7, $8, $9, $10, $11, 0, $12, $12
+        SELECT COALESCE($13::uuid, gen_random_uuid()), $1, pt.id, $3, $4, $5, $6, 'sent_to_opm', $7, $8, $9, $10, $11, 0, $12, $12
         FROM project_types pt WHERE pt.code = $2
         RETURNING id, name, lifecycle_status`,
         [name,project_type,company,floor_area_sqm,floor_count,target_start_date,
-         suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id]);
+         suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id,intakeId]);
       if (!inserted.rowCount) throw Object.assign(new Error('Invalid project_type.'), {status:422});
       const project = inserted.rows[0];
       if(draft) await client.query("DELETE FROM project_phase_team WHERE project_id=$1",[project.id]);
@@ -98,6 +115,7 @@ export const createIntake = async (req, res) => {
         [project.id,suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,actor.id]);
       return {project, confirmation:confirmation.rows[0]};
     });
+    if (result.duplicate) return responseOk(res, 'Project was already submitted.', 1, {project: result.project, confirmation: result.confirmation});
     return responseOk(res, 'Project and pending OPM confirmation created.', 1, result);
   } catch (error) {
     if (error.status) return responseError(res, error.message, error.status);
