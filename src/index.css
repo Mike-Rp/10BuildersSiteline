@@ -1329,7 +1329,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
   .app-shell:not(.role-workspace) .topbar-divider { display: none; }
 }
 .list-toolbar { display: grid; gap: 10px; margin-bottom: 16px; }
+.panel > .list-toolbar { padding: 20px 24px 0; }
+.panel > .pagination { margin: 18px 24px 24px; }
 .list-toolbar-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.list-toolbar .search-field input { min-width: 0; flex: 1; }
 .list-filter { display: grid; gap: 4px; font-size: 14px; color: var(--color-muted); }
 .list-filter select, .list-filter input { min-width: 150px; }
 .list-count { font-size: 14px; color: var(--color-muted); }
@@ -1360,6 +1363,26 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
   .pagination-mini { display: inline; }
 }
 .pagination-size span { white-space: nowrap; }
+@media (max-width: 760px) {
+  .panel > .list-toolbar { padding: 18px 18px 0; }
+  .panel > .pagination { margin: 18px; }
+  .list-toolbar { min-width: 0; }
+  .list-toolbar-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px 12px; }
+  .list-toolbar-controls > * { min-width: 0; max-width: 100%; }
+  .list-toolbar-controls > :not(.list-filter) { grid-column: 1 / -1; }
+  .list-toolbar .search-field { width: 100%; min-width: 0; }
+  .list-filter { min-width: 0; gap: 6px; }
+  .list-filter select, .list-filter input { width: 100%; min-width: 0; min-height: 48px; font-size: 16px; }
+  .list-toolbar-controls > .button { justify-self: start; white-space: normal; text-align: left; }
+  .filter-chip { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+  .deadline-list-item { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 10px 12px; }
+  .deadline-list-item > div { grid-column: 2; min-width: 0; overflow-wrap: anywhere; }
+  .deadline-list-item > .badge { grid-column: 2; justify-self: start; }
+  .deadline-list-item > svg:last-child { display: none; }
+}
+@media (max-width: 480px) {
+  .list-toolbar-controls { grid-template-columns: minmax(0, 1fr); }
+}
 .project-explorer { display: grid; gap: 18px; padding: 18px 24px 24px; }
 .explorer-counters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .explorer-counters > div { background: var(--surface-subtle); border: 1px solid var(--color-line); border-radius: 8px; padding: 12px 16px; }
