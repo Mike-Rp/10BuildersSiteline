@@ -692,6 +692,3 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .notification-dot { width:9px; height:9px; top:5px; right:5px; border:2px solid white; }
 #root .activity-icon { display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1; }
 #root .activity-icon svg { display:block; flex:none; margin:0; }
-#root .license-expiry-warning { display:flex; align-items:center; gap:14px; padding:18px; margin-bottom:20px; border:1px solid var(--warning-border); border-radius:6px; background:var(--amber-soft); color:var(--color-primary); }
-#root .license-expiry-warning > svg { flex-shrink:0; color:var(--color-warning); }
-#root .license-expiry-warning p { margin:5px 0 0; }

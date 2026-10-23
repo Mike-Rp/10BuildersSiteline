@@ -63,7 +63,7 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
   } else if (license.status === "expiring_soon") {
     const days = daysUntil(license.expiry)
     title = days === 0 ? "Your license expires today" : `Your license expires in ${plural(days, "day")}`
-    detail = `PRC license valid until ${expiry}. Have your license updated before it expires to avoid a pause.`
+    detail = `PRC license valid until ${expiry}.`
   } else {
     return null
   }

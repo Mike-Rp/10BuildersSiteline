@@ -726,7 +726,6 @@ export default function RoleWorkspace({
   }
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
-    const expiryDays = actor.expiry ? Math.ceil((new Date(actor.expiry + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
     return (
       <>
@@ -734,10 +733,6 @@ export default function RoleWorkspace({
           isOpm ? "Project overview" : "Site overview",
         )}
         {isOpm && <ChecklistApprovalBanner projects={allActive} actor={actor} onReview={openChecklistApprovals} />}
-        {!isOpm && expiryDays !== null && expiryDays <= 30 && <div className="license-expiry-warning" role="alert">
-          <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
-          <p>License expiry: {actor.expiry}. {expiryDays < 0 ? "Your license has expired." : expiryDays === 0 ? "Your license expires today." : expiryDays + " days remaining."} Contact your administrator to renew your license and keep your account eligible for new assignments.</p></div>
-        </div>}
         <div className="metrics-grid">
           {[
             {
