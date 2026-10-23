@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { api } from "./api/client"
-import { progressLabel, type ProgressTotals } from "./project-progress"
+import type { ProgressTotals } from "./project-progress"
 import { Button, Field, Modal } from "./ui"
 
 type Preview = {
@@ -10,9 +10,9 @@ type Preview = {
   before: { phase: ProgressTotals; project: ProgressTotals }
   after: { phase: ProgressTotals; project: ProgressTotals }
 }
-const measure = (value: ProgressTotals) => value.percentage === null
+const measure = (value: ProgressTotals) => value.earned === null || value.total === null
   ? "Unavailable"
-  : `${value.earned} / ${value.total} · ${progressLabel(value.percentage)}%`
+  : `${value.earned} / ${value.total} points`
 
 export default function EvidenceReview({projectId,evidenceId,reject,onClose,onConfirm}: {
   projectId: string
@@ -42,10 +42,8 @@ export default function EvidenceReview({projectId,evidenceId,reject,onClose,onCo
       <div className="notice subsection">
         <div>
           <strong>{reject ? "Progress remains unchanged" : "Impact if approved"}</strong>
-          {(["phase","project"] as const).map(scope=><div key={scope}>
-            <p>{scope === "phase" ? "Phase" : "Project"}: {measure(preview.before[scope])} → {measure(reject ? preview.before[scope] : preview.after[scope])}</p>
-            {preview.before[scope].reason && <p>{preview.before[scope].reason}</p>}
-          </div>)}
+          <p>Phase: {measure(preview.before.phase)} → {measure(reject ? preview.before.phase : preview.after.phase)}</p>
+          {preview.before.phase.reason && <p>{preview.before.phase.reason}</p>}
         </div>
       </div>
       <Field label={reject ? "Reason for rejection *" : "Review note (optional)"}>

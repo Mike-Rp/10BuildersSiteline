@@ -26,14 +26,17 @@ test("activity review shows trusted impact before confirmation, requires rejecti
       onClose:()=>closed++,onConfirm:async(token,note)=>{confirmations.push({token,note});return saveResult}})))}
     const button=label=>[...document.querySelectorAll("button")].find(el=>el.textContent===label)
     await render(false,"approve")
-    assert.match(document.body.textContent,/20 \/ 30 · 66.7% → 30 \/ 30 · 100%/)
-    assert.match(document.body.textContent,/80 \/ 270 · 29.6% → 90 \/ 270 · 33.3%/)
+    assert.match(document.body.textContent,/20 \/ 30 points → 30 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/Project:|80 \/ 270|90 \/ 270/)
+    assert.doesNotMatch(document.body.textContent,/%/)
     assert.equal(confirmations.length,0)
     await act(async()=>button("Confirm approval").click())
     assert.deepEqual(confirmations,[{token:"trusted-token",note:""}])
     assert.equal(closed,1)
     await render(true,"reject")
-    assert.match(document.body.textContent,/20 \/ 30 · 66.7% → 20 \/ 30 · 66.7%/)
+    assert.match(document.body.textContent,/20 \/ 30 points → 20 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/Project:/)
+    assert.doesNotMatch(document.body.textContent,/%/)
     assert.equal(button("Confirm rejection").disabled,true)
     const input=document.querySelector("textarea")
     await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,"value").set.call(input,"Missing inspection result");input.dispatchEvent(new dom.window.Event("input",{bubbles:true}))})
@@ -48,8 +51,13 @@ test("activity review shows trusted impact before confirmation, requires rejecti
     preview.before.project={earned:null,total:null,percentage:null,reason:"Complete project phase scope is unavailable."}
     preview.after.project=preview.before.project
     await render(false,"unknown-scope")
-    assert.match(document.body.textContent,/Project: Unavailable → Unavailable/)
-    assert.match(document.body.textContent,/Complete project phase scope is unavailable/)
+    assert.match(document.body.textContent,/Phase: 20 \/ 30 points → 30 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/Project:|Complete project phase scope is unavailable/)
+    preview.before.phase={earned:null,total:null,percentage:null,reason:"Complete phase activity scope is unavailable."}
+    preview.after.phase=preview.before.phase
+    await render(false,"unknown-phase-scope")
+    assert.match(document.body.textContent,/Phase: Unavailable → Unavailable/)
+    assert.match(document.body.textContent,/Complete phase activity scope is unavailable/)
     fail=true
     await render(false,"stale")
     assert.match(document.querySelector('[role="alert"]').textContent,/superseded/)
