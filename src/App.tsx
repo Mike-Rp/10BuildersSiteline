@@ -2814,6 +2814,13 @@ function AppInner() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+        <div className="workspace-switch">
+          <span className="workspace-avatar">10</span>
+          <span>
+            <strong>10 Builders</strong>
+            <small>Administrator workspace</small>
+          </span>
+        </div>
         <div className="brand">
           <span className="brand-mark">
             <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -2829,14 +2836,6 @@ function AppInner() {
           <div>
             SITELINE<small>Project operations</small>
           </div>
-        </div>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">10</span>
-          <span>
-            <strong>10 Builders</strong>
-            <small>Administrator workspace</small>
-          </span>
-          <Icon name="down" size={15} />
         </div>
         <nav aria-label="Main navigation">
           {NAV.map((n) => (

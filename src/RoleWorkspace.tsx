@@ -3586,6 +3586,13 @@ export default function RoleWorkspace({
   return (
     <div className="app-shell role-workspace">
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+        <div className="workspace-switch">
+          <span className="workspace-avatar">10</span>
+          <span>
+            <strong>10 Builders</strong>
+            <small>{ROLE_NAMES[actor.role]} workspace</small>
+          </span>
+        </div>
         <div className="brand">
           <span className="brand-mark">
             <Icon name="building" size={28} />
@@ -3593,13 +3600,6 @@ export default function RoleWorkspace({
           <div>
             SITELINE<small>Project operations</small>
           </div>
-        </div>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">10</span>
-          <span>
-            <strong>10 Builders</strong>
-            <small>{ROLE_NAMES[actor.role]} workspace</small>
-          </span>
         </div>
         <nav aria-label="Main navigation">
           {nav.map(([label, icon], i) => (
