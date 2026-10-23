@@ -2,7 +2,7 @@
 // enforced by the backend; these components only show the state and send the requests.
 import { useEffect, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
-import { dateLabel, daysUntil, licenseExpiresDuringProject, validateFile } from "./model"
+import { dateLabel, daysUntil, licenseExpiresDuringProject } from "./model"
 import { LICENSE_PAUSED_MESSAGE } from "./workflows"
 import * as licenses from "./api/licenses"
 import type {
@@ -33,8 +33,8 @@ export function LicenseAssignmentWarning({ expiry, projectEnd }: { expiry?: stri
   )
 }
 
-/** The engineer's own banner: reminder, countdown, the pause message and the upload button. */
-export function LicenseBanner({ license, onUpload }: { license?: LicenseSelf; onUpload: () => void }) {
+/** The engineer's own banner: reminders and directions to the Administrator who updates the license. */
+export function LicenseBanner({ license }: { license?: LicenseSelf }) {
   if (!license || license.status === "missing" || !license.expiry) return null
   const renewal = license.renewal
   const rejected = renewal?.status === "rejected" && license.base !== "valid"
@@ -43,15 +43,13 @@ export function LicenseBanner({ license, onUpload }: { license?: LicenseSelf; on
   let icon = "clock"
   let title = ""
   let detail: ReactNode = null
-  let canUpload = true
   if (license.status === "renewal_under_review") {
     tone = "info"
     icon = "shield"
     title = "Renewal under review"
     detail = license.restricted
-      ? `${LICENSE_PAUSED_MESSAGE}. An Administrator is checking the license you uploaded.`
-      : `An Administrator is checking the license you uploaded. Your current license expires on ${expiry}.`
-    canUpload = false
+      ? `${LICENSE_PAUSED_MESSAGE}. An Administrator is reviewing your license renewal.`
+      : `An Administrator is reviewing your license renewal. Your current license expires on ${expiry}.`
   } else if (license.restricted && license.graceEnded) {
     tone = "red"
     icon = "alert"
@@ -65,7 +63,7 @@ export function LicenseBanner({ license, onUpload }: { license?: LicenseSelf; on
   } else if (license.status === "expiring_soon") {
     const days = daysUntil(license.expiry)
     title = days === 0 ? "Your license expires today" : `Your license expires in ${plural(days, "day")}`
-    detail = `PRC license valid until ${expiry}. Upload your renewed license to avoid a pause.`
+    detail = `PRC license valid until ${expiry}. Have your license updated before it expires to avoid a pause.`
   } else {
     return null
   }
@@ -77,79 +75,14 @@ export function LicenseBanner({ license, onUpload }: { license?: LicenseSelf; on
       <div>
         <strong>{title}</strong>
         <p>{detail}</p>
+        <p>Visit your Administrator with your renewed license. Only an Administrator can upload or update it.</p>
         {rejected && renewal && (
           <p className="license-reason">
-            <strong>Your last upload was not accepted:</strong> {renewal.reviewNote}
+            <strong>Your last renewal was not accepted:</strong> {renewal.reviewNote}
           </p>
         )}
       </div>
-      {canUpload && (
-        <Button variant="primary" icon="upload" onClick={onUpload}>
-          Upload renewed license
-        </Button>
-      )}
     </section>
-  )
-}
-
-export function RenewalUploadDialog({
-  license,
-  onClose,
-  onDone,
-}: {
-  license?: LicenseSelf
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [number, setNumber] = useState(license?.licenseNumber || "")
-  const [expiry, setExpiry] = useState("")
-  const [file, setFile] = useState<File>()
-  const [error, setError] = useState("")
-  const [busy, setBusy] = useState(false)
-  const tomorrow = new Date(Date.now() + 86400000)
-  const min = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!number.trim()) return setError("Enter your license number.")
-    if (!expiry || expiry < min) return setError("Enter the new expiry date. It must be in the future.")
-    if (!file) return setError("Choose your renewed license (PDF, JPG or PNG).")
-    const problem = validateFile(file)
-    if (problem) return setError(problem)
-    setBusy(true)
-    try {
-      await licenses.submitRenewal(number.trim(), expiry, file)
-      onDone()
-    } catch (err) {
-      setError(messageOf(err))
-      setBusy(false)
-    }
-  }
-  return (
-    <Modal title="Upload renewed license" subtitle="An Administrator verifies it before your work resumes." onClose={onClose}>
-      <form className="form-grid" onSubmit={submit}>
-        <Field label="PRC license number *" wide>
-          <input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={120} />
-        </Field>
-        <Field label="New expiry date *" hint="Pick the date from the calendar.">
-          <input type="date" min={min} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
-        </Field>
-        <Field label="Renewed license (PDF, JPG or PNG, up to 10 MB) *" wide>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} />
-        </Field>
-        <p className="license-note wide">Only you and Administrators can see this document.</p>
-        {error && (
-          <p className="error wide" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="modal-actions wide">
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={busy}>
-            {busy ? "Uploading…" : "Submit for review"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   )
 }
 
@@ -216,7 +149,7 @@ export function RenewalQueue({
       {rejecting && (
         <Modal
           title="Reject renewal"
-          subtitle={`${rejecting.full_name} stays paused and can upload again.`}
+          subtitle={`${rejecting.full_name} must visit the admin office with a corrected license for an Administrator to upload.`}
           onClose={() => setRejecting(undefined)}
         >
           <form

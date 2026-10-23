@@ -1,6 +1,6 @@
 // Blocks an Office PM or Site PM whose license has expired from signing, submitting or approving.
 // The check is made in the backend for every protected command, so the UI cannot bypass it.
-// Viewing, signing in and uploading a renewed license are never blocked.
+// Viewing and signing in stay available while an Administrator updates the engineer's license.
 import execute from "./query.utility.js";
 import { HttpError } from "./access.utility.js";
 import { localDay } from "./license-status.utility.js";

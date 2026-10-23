@@ -44,7 +44,7 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
   const result = { reminders: 0, graceEnded: 0, overridesExpired: 0 };
 
   for (const engineer of engineers) {
-    if (underReview.has(engineer.id)) continue; // the engineer already acted; an Administrator is reviewing
+    if (underReview.has(engineer.id)) continue; // an Administrator is already reviewing the renewal
     const state = computeLicenseStatus({ expiry: engineer.license_expiry, today, reminderDays: rules.reminderDays, graceDays: rules.graceDays });
     const key = reminderKeyFor(state, rules.reminderDays);
     if (!key) continue;
@@ -63,8 +63,8 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
       const left = state.graceDaysLeft;
       await notify(db, { title: "License renewal reminder", recipientIds: [engineer.id],
         detail: state.restricted
-          ? `Your PRC license ${when(state)}. ${left} day${left === 1 ? "" : "s"} left in the grace period. Upload your renewed license.`
-          : `Your PRC license ${when(state)}. Upload your renewed license.` });
+          ? `Your PRC license ${when(state)}. ${left} day${left === 1 ? "" : "s"} left in the grace period. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.`
+          : `Your PRC license ${when(state)}. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.` });
       await notify(db, { title: "Engineer license reminder", recipientIds: others, detail: `${engineer.full_name} · license ${when(state)}` });
       result.reminders++;
     }

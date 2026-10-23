@@ -40,7 +40,7 @@ export function adminDashboardOverview(state: State) {
     })),
     ...renewals.map(r => ({
       key: `license-renewal:${r.id}`, id: r.user_id, kind: "account" as const, category: "licenses" as const,
-      title: "License renewal to review", detail: `${r.full_name} uploaded a renewed license`, label: "Review renewal", icon: "doc",
+      title: "License renewal to review", detail: `${r.full_name}'s renewed license is awaiting review`, label: "Review renewal", icon: "doc",
     })),
     ...state.accounts.filter(a => a.role !== "client" && a.status === "active" && !coverIds.has(a.id) && !a.renewalUnderReview &&
       ["Expired", "Grace expired", "Expiring soon"].includes(licenseState(a, state.rules.grace))).map(a => ({

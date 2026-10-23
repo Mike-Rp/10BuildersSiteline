@@ -75,8 +75,8 @@ test("deactivated, suspended and invited accounts cannot sign in", () => {
 })
 
 test("engineers with an expired license can still sign in, even past the grace period", () => {
-  // They must be able to view their projects and upload a renewed license. The backend pauses signing,
-  // submitting and approving instead.
+  // They must be able to view their projects while an Administrator updates their license.
+  // The backend pauses signing, submitting and approving instead.
   for (const expiry of ["2020-01-01", "2000-01-01"]) {
     const state = withAccount(initialState(), "a5", { expiry })
     const account = authenticate(state, emailOf(state, "a5"), DUMMY_CREDENTIALS.a5)

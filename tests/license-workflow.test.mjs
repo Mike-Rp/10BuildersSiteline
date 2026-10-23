@@ -128,8 +128,9 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   const notPaused = (r, label) => assert.notEqual(r.code, "LICENSE_PAUSED", `${label}: ${r.text}`)
   const today = () => localDay()
   const setExpiry = (who, offset) => q("update user_licenses set license_expiry=$2 where user_id=$1 and superseded_at is null", [idOf(who), addDays(today(), offset)])
-  const renewalForm = (expiryOffset = 400) => {
+  const renewalForm = (expiryOffset = 400, who = "rafael") => {
     const f = new FormData()
+    f.append("user_id", idOf(who))
     f.append("license_number", "PRC-RENEWED-1")
     f.append("license_expiry", addDays(today(), expiryOffset))
     f.append("file", PDF(), "renewal.pdf")
@@ -184,7 +185,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.deepEqual([mine.status, mine.restricted, mine.graceDaysLeft, mine.graceDays], ["expired", true, 18, 30])
   })
 
-  await t.test("an expired Site PM can view and renew, but every signing and submitting command is rejected", async () => {
+  await t.test("an expired Site PM can view while an admin renews their license, but every signing and submitting command is rejected", async () => {
     const P = brook.id
     const attempts = [
       ["submit a phase update", "POST", `/progress/projects/${P}/phase-updates`, { note: "x" }],
@@ -200,7 +201,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     ]
     for (const [label, method, path, body, form] of attempts) paused(await call("rafael", method, path, body, form?.()), label)
 
-    // What stays open: reading, history, notes, photos, declining, and uploading the renewal itself.
+    // What stays open: reading, history, notes, photos and declining. License uploads require an admin.
     assert.equal((await call("rafael", "GET", "/workspace")).status, 200)
     assert.equal((await call("rafael", "GET", "/workspace/project-data")).status, 200)
     assert.equal((await call("rafael", "GET", `/progress/projects/${P}/history`)).status, 200)
@@ -214,11 +215,33 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.equal((await q("select status from users where id=$1", [idOf("rafael")]))[0].status, "active")
   })
 
-  await t.test("renewal: under review keeps the pause, a rejection needs a reason, verification lifts it", async () => {
+  await t.test("only admins can submit license updates, including through the old engineer upload route", async () => {
+    const before = await q("select id,license_number,license_expiry,upload_file_ref,superseded_at from user_licenses order by id")
+    const requestsBefore = await q("select id from license_renewal_requests order by id")
+    const files = () => fs.existsSync(backend + "uploads/licenses") ? fs.readdirSync(backend + "uploads/licenses").sort() : []
+    const filesBefore = files()
+    for (const who of ["rafael", "karlo", "renz", "client"]) {
+      for (const route of ["/licenses/renewals", `/engineer/${idOf(who)}/licenses`, `/engineer/${idOf("rafael")}/licenses`]) {
+        const result = await call(who, "POST", route, undefined, renewalForm())
+        assert.equal(result.status, 403, `${who} cannot upload at ${route}: ${result.text}`)
+      }
+    }
+    assert.deepEqual(await q("select id,license_number,license_expiry,upload_file_ref,superseded_at from user_licenses order by id"), before)
+    assert.deepEqual(await q("select id from license_renewal_requests order by id"), requestsBefore)
+    assert.deepEqual(files(), filesBefore, "unauthorized requests never save uploaded files")
+    assert.equal((await call("admin", "POST", "/licenses/renewals", undefined, renewalForm(400, "client"))).status, 404)
+    const missingTarget = renewalForm()
+    missingTarget.delete("user_id")
+    assert.equal((await call("admin", "POST", "/licenses/renewals", undefined, missingTarget)).status, 400)
+  })
+
+  await t.test("admin-submitted renewal: under review keeps the pause, a rejection needs a reason, verification lifts it", async () => {
     const P = brook.id
-    const submit = async () => call("rafael", "POST", "/licenses/renewals", undefined, renewalForm())
+    const submit = async () => call("admin", "POST", "/licenses/renewals", undefined, renewalForm())
     const up = await submit()
     assert.equal(up.status, 201, up.text)
+    const submitted = (await q("select user_id,submitted_by from license_renewal_requests where id=$1", [up.data.id]))[0]
+    assert.deepEqual(submitted, { user_id: idOf("rafael"), submitted_by: idOf("admin") })
     assert.equal((await submit()).status, 409, "only one renewal under review at a time")
     let me = (await call("rafael", "GET", "/licenses/me")).data
     assert.deepEqual([me.status, me.restricted], ["renewal_under_review", true])
@@ -229,7 +252,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.equal((await call("rafael", "GET", `/licenses/renewals/${up.data.id}/file`)).status, 200)
     assert.equal((await call("admin", "GET", `/licenses/renewals/${up.data.id}/file`)).status, 200)
     assert.equal((await call("karlo", "GET", "/licenses/renewals")).status, 403, "the review queue is for Administrators")
-    // Rejection: reason required, engineer sees it, stays restricted, may upload again.
+    // Rejection: reason required, engineer sees it, stays restricted; only the admin may resubmit.
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/reject`, {})).status, 400)
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/reject`, { note: "   " })).status, 400)
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/reject`, { note: "Photo is unreadable" })).status, 200)
@@ -252,6 +275,18 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.deepEqual([me.status, me.restricted], ["valid", false])
     notPaused(await call("rafael", "POST", `/progress/projects/${P}/issues`, { reason: "x" }), "lifted")
     assert.equal((await q("select count(*)::int n from user_licenses where user_id=$1", [idOf("rafael")]))[0].n >= 2, true, "the old license stays as history")
+  })
+
+  await t.test("an admin can upload a license directly for an engineer and is recorded as its author", async () => {
+    const saved = await call("admin", "POST", `/engineer/${idOf("rafael")}/licenses`, undefined, renewalForm(401))
+    assert.equal(saved.status, 201, saved.text)
+    const row = (await q("select user_id,created_by,updated_by,upload_status,upload_file_ref from user_licenses where id=$1", [saved.data.id]))[0]
+    assert.equal(row.user_id, idOf("rafael"))
+    assert.equal(row.created_by, idOf("admin"))
+    assert.equal(row.updated_by, idOf("admin"))
+    assert.equal(row.upload_status, "uploaded")
+    assert.ok(row.upload_file_ref)
+    assert.equal((await call("rafael", "GET", "/licenses/me")).data.restricted, false)
   })
 
   await t.test("an expired Office PM cannot sign, approve or accept, but can view", async () => {
@@ -443,7 +478,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   })
 
   await t.test("a late renewal lifts the pause and the hold, but the reassigned phase stays with the replacement", async () => {
-    const up = await call("diego", "POST", "/licenses/renewals", undefined, renewalForm(500))
+    const up = await call("admin", "POST", "/licenses/renewals", undefined, renewalForm(500, "diego"))
     assert.equal(up.status, 201)
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/verify`, {})).status, 200)
     const me = (await call("diego", "GET", "/licenses/me")).data
@@ -474,7 +509,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
     assert.equal((await q("select suggested_opm_id from projects where id=$1", [brook.id]))[0].suggested_opm_id, idOf("lea"))
     assert.ok((await projectIds("renz")).includes(brook.id), "the original can still view the project")
     // After a late renewal he still cannot approve: the role is no longer his.
-    const up = await call("renz", "POST", "/licenses/renewals", undefined, renewalForm())
+    const up = await call("admin", "POST", "/licenses/renewals", undefined, renewalForm(400, "renz"))
     assert.equal((await call("admin", "POST", `/licenses/renewals/${up.data.id}/verify`, {})).status, 200)
     const approve = await call("renz", "POST", `/progress/projects/${brook.id}/phase-updates/1/approve`, {})
     assert.ok([403, 404].includes(approve.status) && approve.code !== "LICENSE_PAUSED", approve.text)
@@ -498,6 +533,11 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
       sent.push(delta)
     }
     assert.equal(sent.reduce((a, b) => a + b, 0), 5)
+    for (const notice of await notices(idOf("karlo"), "License renewal reminder")) {
+      assert.match(notice.detail, /Visit your Administrator/)
+      assert.match(notice.detail, /Only an Administrator can upload or update it/)
+      assert.doesNotMatch(notice.detail, /Upload your renewed license/)
+    }
     assert.equal((await q("select count(*)::int n from license_reminders_sent where user_id=$1", [idOf("karlo")]))[0].n, 5)
     // Superior (the Office PM of his projects) and the Administrator get one notice per reminder day too.
     const bandNotices = async (who) => (await notices(idOf(who), "Engineer license reminder")).filter((n) => n.detail.startsWith("Karlo")).length

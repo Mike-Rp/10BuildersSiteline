@@ -10,7 +10,7 @@ import {
 import {
   getEngineers, downloadEngineerDocument, prepareContractUpload, uploadContractFile, uploadEmploymentContract,
 } from "./engineers.controller.js";
-import { requireLogin, requireRoles } from "../../common/utilities/access.utility.js";
+import { requireRoles } from "../../common/utilities/access.utility.js";
 import { requireLicenseAdmin } from "../accounts/prc-monitor.controller.js";
 const router = Router();
 
@@ -88,7 +88,7 @@ router.get('/:id/licenses', async (req, res) => {
   await getAccountLicenses(req, res);
 });
 
-router.post('/:id/licenses', requireLogin, uploadLicenseFile, async (req, res) => {
+router.post('/:id/licenses', requireRoles('admin'), uploadLicenseFile, async (req, res) => {
   await addLicense(req, res);
 });
 

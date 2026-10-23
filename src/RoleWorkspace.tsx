@@ -30,7 +30,7 @@ import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
-import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
+import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
 import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
@@ -203,7 +203,6 @@ export default function RoleWorkspace({
   onReload: () => unknown
 }) {
   const isOpm = actor.role === "opm"
-  const [renewing, setRenewing] = useState(false)
   useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
@@ -493,7 +492,7 @@ export default function RoleWorkspace({
           </div>
           {action}
         </div>
-        <LicenseBanner license={state.license?.self} onUpload={() => setRenewing(true)} />
+        <LicenseBanner license={state.license?.self} />
         {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
           <ReassignRequests
             requests={state.license?.requests || []}
@@ -4020,18 +4019,6 @@ export default function RoleWorkspace({
             setReportReject(undefined)
             setError("")
             setMessage("Progress report rejected. The Site PM can submit a new report.")
-          }}
-        />
-      )}
-      {renewing && (
-        <RenewalUploadDialog
-          license={state.license?.self}
-          onClose={() => setRenewing(false)}
-          onDone={() => {
-            setRenewing(false)
-            setError("")
-            setMessage("Renewal uploaded. An Administrator will review it.")
-            void onReload()
           }}
         />
       )}

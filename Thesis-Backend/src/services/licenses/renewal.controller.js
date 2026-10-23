@@ -1,8 +1,8 @@
-// Renewal uploads: an engineer uploads, an Administrator verifies or rejects. Documents are personal data and are
-// readable only by the engineer who uploaded them and by Administrators.
+// Administrators submit and review renewals on behalf of engineers. Documents are personal data and are
+// readable only by the license holder and by Administrators.
 import fs from "node:fs";
 import path from "node:path";
-import { HttpError, handleError, requireUser, sendError, sendOk } from "../../common/utilities/access.utility.js";
+import { HttpError, handleError, isUuid, requireUser, sendError, sendOk } from "../../common/utilities/access.utility.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { localDay, loadLicenseState } from "../../common/utilities/license-status.utility.js";
@@ -31,21 +31,27 @@ export const myLicense = async (req, res) => {
   } catch (error) { return handleError(res, error); }
 };
 
-/** Creates a renewal request that waits for an Administrator. Used by POST /licenses/renewals. */
+/** An Administrator records a renewal for an engineer. Used by POST /licenses/renewals. */
 export async function createRenewalRequest(db, user, body, file) {
+  if (user.role !== "admin") throw new HttpError(403, "Only an Administrator can upload or update licenses.");
+  const userId = body.user_id ?? body.userId;
+  if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
   const number = String(body.license_number ?? body.licenseNumber ?? "").trim();
   const expiry = body.license_expiry ?? body.licenseExpiry;
-  if (!file) throw new HttpError(400, "Upload your renewed license (PDF, JPG or PNG).");
-  if (!number || number.length > 120) throw new HttpError(400, "Enter your license number.");
+  if (!file) throw new HttpError(400, "Upload the renewed license (PDF, JPG or PNG).");
+  if (!number || number.length > 120) throw new HttpError(400, "Enter the engineer's license number.");
   if (!isIsoDate(expiry)) throw new HttpError(400, "Enter the new expiry date (YYYY-MM-DD).");
   if (expiry <= localDay()) throw new HttpError(400, "The new expiry date must be in the future.");
+  const engineer = (await db.query(
+    `select u.full_name from users u join roles r on r.id=u.role_id
+      where u.id=$1 and r.code in ('opm','spm') and not coalesce(u.is_deleted,false)`, [userId])).rows[0];
+  if (!engineer) throw new HttpError(404, "Engineer not found.");
   try {
     const inserted = await db.query(
       `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by)
-       values($1,$2,$3,$4,$1) returning id,status,submitted_at`,
-      [user.id, number, expiry, file.path.replace(/\\/g, "/")]);
-    const name = (await db.query("select full_name from users where id=$1", [user.id])).rows[0]?.full_name;
-    await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id, detail: `${name} uploaded a renewed license (expires ${expiry}).` });
+       values($1,$2,$3,$4,$5) returning id,status,submitted_at`,
+      [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id]);
+    await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id, detail: `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` });
     return inserted.rows[0];
   } catch (error) {
     if (error.code === "23505") throw new HttpError(409, "A renewal is already under review.");
@@ -55,8 +61,11 @@ export async function createRenewalRequest(db, user, body, file) {
 
 export const submitRenewal = async (req, res) => {
   try {
-    const user = await requireUser(req, res, ["opm", "spm"]);
-    if (!user) return;
+    const user = await requireUser(req, res, ["admin"]);
+    if (!user) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return;
+    }
     const data = await withTransaction((db) => createRenewalRequest(db, user, req.body || {}, req.file));
     return sendOk(res, "Renewal uploaded. It will be reviewed by an Administrator.", 1, data, 201);
   } catch (error) {
@@ -80,7 +89,7 @@ export const listRenewals = async (req, res) => {
   } catch (error) { return handleError(res, error); }
 };
 
-/** GET /licenses/renewals/:id/file — the engineer who uploaded it, or an Administrator. */
+/** GET /licenses/renewals/:id/file — the license holder or an Administrator. */
 export const renewalFile = async (req, res) => {
   try {
     const user = await requireUser(req, res);
