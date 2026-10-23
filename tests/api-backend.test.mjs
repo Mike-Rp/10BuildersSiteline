@@ -56,9 +56,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   }
   // Re-running the recovery migration is safe on the original strict status CHECK.
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/004-verified-activity-progress.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/009-engineer-license-workflow.sql"),"utf8"))
   const dummySql=fs.readFileSync(dummy,"utf8")
   await db.exec(dummySql)
   await db.exec(dummySql)
+  // The demo data deliberately includes expired licenses (see tests/license-workflow.test.mjs). These progress and
+  // lifecycle workflows are not about licenses, so every engineer starts with a valid one here.
+  await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
 
   const dbPort = await freePort()
@@ -252,6 +256,60 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual((await db.query("select id,current_stage_id,current_pct,lifecycle_status from projects order by id")).rows,before,"reports and exports do not change workflow records")
   })
 
+  await t.test("overall monthly summary covers exactly the authorized projects, matches each project report and exports its own snapshot", async () => {
+    const month=currentReportMonth()
+    const all=(await db.query("select id,name from projects where not coalesce(is_deleted,false)")).rows
+    for(const [email,projection] of [["patricia.domingo@10builders.com","staff"],["lea.fernandez@10builders.com","staff"],["mikaela.bautista@10builders.com","site"],["maria.santos@rosariabiz.ph","client"]]) {
+      await asUser(email)
+      const {summary,snapshot}=await api(`/reports/monthly-summary?month=${month}`)
+      assert.equal(summary.projection,projection)
+      assert.equal(new Set(summary.rows.map(r=>r.id)).size,summary.rows.length,"each project appears once")
+      const allowed=[]
+      for(const p of all){
+        try{allowed.push({p,report:(await api(`/projects/${p.id}/monthly-report?month=${month}`)).report})}catch(error){assert.match(error.message,/not found/i)}
+      }
+      assert.deepEqual(summary.rows.map(r=>r.id).sort(),allowed.map(a=>a.p.id).sort(),`${email}: summary scope equals per-project report access`)
+      for(const {report} of allowed){
+        const row=summary.rows.find(r=>r.id===report.project.id)
+        assert.equal(row.opening,report.opening.percentage);assert.equal(row.closing,report.closing.percentage);assert.equal(row.change,report.netChange)
+        assert.equal(row.completedPhases?.length??null,report.completedPhases?.length??null)
+        if(projection==="staff")assert.equal(row.approvals,report.approvals?.events??null)
+        if(projection!=="client")assert.deepEqual(row.pending,report.pending)
+        else for(const key of ["approvals","rework","pending"])assert.equal(Object.hasOwn(row,key),false)
+      }
+      const filters={search:summary.rows[0]?.name.slice(0,4)||"",type:"",outstanding:"all"}
+      const csv=(await api("/reports/monthly-summary/export",{method:"POST",json:{snapshot,format:"csv",filters}})).csv
+      const printed=await api("/reports/monthly-summary/export",{method:"POST",json:{snapshot,format:"print",filters}})
+      assert.deepEqual(printed.summary,summary)
+      assert.ok(csv.includes(summary.period.generatedAt))
+      for(const row of summary.rows)assert.equal(csv.includes(`"${row.name}"`),printed.view.rows.some(r=>r.id===row.id),"CSV rows follow the filters")
+      if(projection==="client")assert.doesNotMatch(csv,/Pending|Approval events|Confirmed rework/)
+      await assert.rejects(api("/reports/monthly-summary?month=2099-01"),/future/)
+      await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:snapshot+"x",format:"csv"}}),/Invalid/)
+    }
+    // A project created after the cutoff of a past month is excluded from that month.
+    await asUser("patricia.domingo@10builders.com")
+    const earliest=(await db.query("select min(created_at) as at from projects")).rows[0].at
+    const [y,m]=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila",year:"numeric",month:"2-digit"}).format(new Date(earliest)).split("-").map(Number)
+    const before=m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,"0")}`
+    const old=(await api(`/reports/monthly-summary?month=${before}`)).summary
+    assert.equal(old.rows.length,0);assert.equal(old.inclusion.excludedAfterCutoff,all.length)
+    // Snapshots are not interchangeable between a single report and the summary, or between accounts.
+    const rosaria=all.find(p=>p.name==="Rosaria Business Park").id
+    const single=(await api(`/projects/${rosaria}/monthly-report?month=${month}`)).snapshot
+    await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:single,format:"csv"}}),/Invalid report snapshot/)
+    const adminSummary=await api(`/reports/monthly-summary?month=${month}`)
+    await assert.rejects(api(`/projects/${rosaria}/monthly-report/export`,{method:"POST",json:{snapshot:adminSummary.snapshot,format:"csv"}}),/does not match/)
+    await asUser("maria.santos@rosariabiz.ph")
+    await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:adminSummary.snapshot,format:"csv"}}),/another account/)
+    // Access removed after the preview blocks the export.
+    const clientSummary=await api(`/reports/monthly-summary?month=${month}`)
+    const links=(await db.query("select * from user_client_project_links where project_id=$1",[rosaria])).rows
+    await db.query("delete from user_client_project_links where project_id=$1",[rosaria])
+    try{await assert.rejects(api("/reports/monthly-summary/export",{method:"POST",json:{snapshot:clientSummary.snapshot,format:"csv"}}),/access changed/)}
+    finally{for(const link of links)await db.query("insert into user_client_project_links(user_id,project_id) values($1,$2)",[link.user_id,rosaria])}
+  })
+
   let newProjectId
   await t.test("project intake, confirmations, registered documents and allocation persist", async () => {
     let {user,state}=await asUser("patricia.domingo@10builders.com")
@@ -385,13 +443,119 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await downloadApiFile(item.doc.id)).size>0)
   })
 
+  await t.test("an Office PM rejects an ordinary progress report with a reason, without touching checklist credit or the phase",async()=>{
+    let {user,state}=await asUser("karlo.espiritu@10builders.com")
+    const project=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
+    const spm=state.accounts.find(a=>a.id===user.id)
+    await sendApiWorkflow(state,spm,{type:"submit_progress",projectId:project.id,note:"Report that will be rejected"})
+    state=await loadState(user)
+    assert.equal(state.projects.find(p=>p.id===project.id).workflow.pendingUpdate.note,"Report that will be rejected")
+    const opm=await asUser("renz.villaverde@10builders.com")
+    const actor=opm.state.accounts.find(a=>a.id===opm.user.id)
+    const beforeProject=opm.state.projects.find(p=>p.id===project.id)
+    const credit=p=>JSON.stringify([p.progress,p.phase,p.workflow.checklist[p.phase].map(i=>[i.id,i.status])])
+    const before=credit(beforeProject)
+    await assert.rejects(sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"   "}),/reason for rejecting/i)
+    assert.equal(opm.state.projects.find(p=>p.id===project.id).workflow.pendingUpdate.note,"Report that will be rejected","a blank reason changes nothing")
+    await sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"Photos do not show the stated work"})
+    const after=await loadState(opm.user)
+    const rejected=after.projects.find(p=>p.id===project.id)
+    assert.equal(rejected.workflow.pendingUpdate,undefined,"the report is resolved")
+    assert.equal(credit(rejected),before,"no checklist credit, progress or phase change")
+    // The stale screen (still showing the report) now gets a readable "already resolved" message.
+    await assert.rejects(sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"Second click"}),/already|rejected/i)
+    // Another Site PM cannot reject: report decisions stay with the project's Office PM.
+    const other=await asUser("karlo.espiritu@10builders.com")
+    await sendApiWorkflow(other.state,other.state.accounts.find(a=>a.id===other.user.id),{type:"submit_progress",projectId:project.id,note:"Second report"})
+    const loaded=await loadState(other.user)
+    await assert.rejects(sendApiWorkflow(loaded,loaded.accounts.find(a=>a.id===other.user.id),{type:"reject_update",projectId:project.id,note:"Not allowed"}),/Office PM|permission/i)
+    // Leave the queue clean for the tests that follow.
+    const cleanup=await asUser("renz.villaverde@10builders.com")
+    await sendApiWorkflow(cleanup.state,cleanup.state.accounts.find(a=>a.id===cleanup.user.id),{type:"reject_update",projectId:project.id,note:"Cleanup"})
+  })
+
+  await t.test("a progress report lists every attachment, only its own, and only to people who may open them",async()=>{
+    const png=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,2,0,0,0,144,119,83,222])],{type:"image/png"})
+    const pdf=()=>new Blob(["%PDF-1.4\n1 0 obj\n<< >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"],{type:"application/pdf"})
+    const form=(blob,name,fields={})=>{const f=new FormData();for(const [k,v] of Object.entries(fields))f.append(k,v);f.append("file",blob,name);return f}
+    const siteSession=await asUser("karlo.espiritu@10builders.com")
+    const project=siteSession.state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
+    const base="/progress/projects/"+project.id
+    const upload=async(blob,name)=>{const saved=await api(base+"/phase-files",{method:"POST",body:form(blob,name)});return saved.file?.id||saved.id}
+    const idPhoto=await upload(png(),"site-photo.png"),idSheet=await upload(pdf(),"inspection-sheet.pdf")
+    const officePm=async()=>asUser("renz.villaverde@10builders.com")
+    const pendingFor=async session=>(await loadState(session.user)).projects.find(p=>p.id===project.id).workflow.pendingUpdate
+    const resolve=async note=>{const s=await officePm();await sendApiWorkflow(s.state,s.state.accounts.find(a=>a.id===s.user.id),{type:"reject_update",projectId:project.id,note})}
+
+    // 1) two attachments chosen from earlier uploads
+    await api(base+"/phase-updates",{method:"POST",json:{note:"Two attachments",file_ids:[idPhoto,idSheet]}})
+    let office=await officePm()
+    let pending=await pendingFor(office)
+    assert.deepEqual(pending.attachments.map(d=>[d.id,d.name,d.mime]),[[idPhoto,"site-photo.png","image/png"],[idSheet,"inspection-sheet.pdf","application/pdf"]])
+    assert.ok(pending.attachments.every(d=>d.size>0&&d.uploaded&&d.clientVisible===false))
+    assert.equal(pending.evidence.id,idPhoto,"the first attachment stays available as evidence")
+    // The same list comes from the project's own update list, still with ids and now with metadata.
+    const listed=(await api(base+"/phase-updates")).find(u=>String(u.id)===pending.id)
+    assert.deepEqual(listed.file_ids,[idPhoto,idSheet])
+    assert.deepEqual(listed.files.map(x=>[x.id,x.name,x.content_type]),[[idPhoto,"site-photo.png","image/png"],[idSheet,"inspection-sheet.pdf","application/pdf"]])
+    assert.ok(!JSON.stringify(listed.files).includes("content\":"),"metadata only, never file contents")
+    // Each attachment opens through the authorised route for the Office PM, the Site PM and the Administrator.
+    for(const id of [idPhoto,idSheet]) assert.ok((await downloadApiFile(id)).size>0,"Office PM opens "+id)
+    const admin=await asUser("patricia.domingo@10builders.com")
+    const adminPending=(await loadState(admin.user)).projects.find(p=>p.id===project.id).workflow.pendingUpdate
+    assert.equal(adminPending.attachments.length,2)
+    for(const id of [idPhoto,idSheet]) assert.ok((await downloadApiFile(id)).size>0,"Administrator opens "+id)
+    const owner=await asUser("karlo.espiritu@10builders.com")
+    assert.ok((await downloadApiFile(idPhoto))?.size>0,"the submitting Site PM opens their own file")
+
+    // 2) access restrictions: an unrelated Site PM, a client and a signed-out caller get nothing
+    const outsider=await asUser("mikaela.bautista@10builders.com")
+    assert.equal(outsider.state.projects.some(p=>p.id===project.id),false)
+    assert.equal(await downloadApiFile(idPhoto),undefined,"an unrelated Site PM cannot open it")
+    await assert.rejects(api(base+"/phase-updates"),/not found/i)
+    const client=await asUser("f.uy@aldenheights-hoa.com")
+    assert.equal(await downloadApiFile(idPhoto),undefined,"a client cannot open it")
+    await assert.rejects(api(base+"/phase-updates"),/permission|forbidden/i)
+    for(const p of client.state.projects)assert.equal(p.workflow?.pendingUpdate?.attachments,undefined,"clients never receive report attachments")
+    setToken("")
+    await assert.rejects(api(base+"/phase-files/"+idPhoto),/token|unauthor|401/i)
+    await resolve("Cleanup 1")
+
+    // 3) the file sent with the report itself
+    await asUser("karlo.espiritu@10builders.com")
+    await api(base+"/phase-updates",{method:"POST",body:form(png(),"direct-upload.png",{note:"One attachment sent with the report"})})
+    office=await officePm()
+    pending=await pendingFor(office)
+    assert.deepEqual(pending.attachments.map(d=>d.name),["direct-upload.png"])
+    assert.ok((await downloadApiFile(pending.attachments[0].id)).size>0)
+    await resolve("Cleanup 2")
+
+    // 4) a report with no attachment shows none, and does not borrow checklist evidence
+    const site=await asUser("karlo.espiritu@10builders.com")
+    const item=site.state.projects.find(p=>p.id===project.id).workflow.checklist[project.phase].find(i=>i.status==="missing")
+    const evidenceFile=await upload(pdf(),"checklist-evidence.pdf")
+    await api(base+"/phase-updates",{method:"POST",json:{note:"No attachment, but checklist evidence",checklist_submissions:[{item_id:item.id,file_id:evidenceFile,submission_note:"Evidence"}]}})
+    office=await officePm()
+    pending=await pendingFor(office)
+    assert.equal(pending.attachments,undefined,"checklist evidence is not a report attachment")
+    assert.equal(pending.evidence,undefined)
+    await resolve("Cleanup 3")
+
+    // 5) a file from another project or another person cannot be attached
+    const otherSite=await asUser("bea.concepcion@10builders.com")
+    const meralco=otherSite.state.projects.find(p=>p.name==="Meralco Ave. Fit-out")
+    const foreign=(await api("/progress/projects/"+meralco.id+"/phase-files",{method:"POST",body:form(png(),"other-project.png")}))
+    await asUser("karlo.espiritu@10builders.com")
+    await assert.rejects(api(base+"/phase-updates",{method:"POST",json:{note:"Borrowed file",file_ids:[foreign.file?.id||foreign.id]}}),/belong to you and the selected project/i)
+  })
+
   await t.test("password reset requests require admin reauthentication and force a new password", async () => {
     const { user, state } = await asUser("patricia.domingo@10builders.com")
     const self = state.accounts.find(a => a.id === user.id)
     const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", email:"santos.juan@10builders.com", docs:[]}, false, "Password@123")
     setToken("")
-    await api("/auth/password-reset-request", {method:"POST",json:{name:"Juan",email:"santos.juan@10builders.com"}})
-    await api("/auth/password-reset-request", {method:"POST",json:{name:"Unknown Person",email:"unknown@example.com"}})
+    await api("/auth/password-reset-request", {method:"POST",json:{firstName:"Juan",lastName:"Santos",email:"santos.juan@10builders.com"}})
+    await assert.rejects(api("/auth/password-reset-request", {method:"POST",json:{firstName:"Unknown",lastName:"Person",email:"unknown@example.com"}}), /account details have changed/)
     await assert.rejects(api("/accounts/password-reset-requests"))
     await asUser("patricia.domingo@10builders.com")
     const requests = await api("/accounts/password-reset-requests")

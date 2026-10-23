@@ -234,8 +234,10 @@ export function mapProject(parts: ProjectParts): Project {
         version: 0,
         submittedAt: i.submitted_at ? iso(i.submitted_at) : undefined,
         reviewedAt: i.reviewed_at ? iso(i.reviewed_at) : undefined,
-        note: i.submission_note || undefined,
+        submissionNote: i.submission_note || undefined,
+        reviewNote: i.review_note || undefined,
         submittedBy: i.submitted_by || undefined,
+        submittedByName: i.submitted_by_name || undefined,
         doc:i.file_id?{id:i.file_id,label:i.title,name:i.original_name||"Checklist evidence.pdf",uploaded:true,clientVisible:false,owner:"Site PM",date:day(i.submitted_at),mime:i.content_type}:undefined,
       }),
     )
@@ -258,6 +260,22 @@ export function mapProject(parts: ProjectParts): Project {
   }
   for(const item of items)if(item.file_id)register(item.file_id,"/api/v1/projects/"+id+"/phase-files/"+item.file_id+"")
   const pending = parts.overview && "pending_update" in parts.overview ? parts.overview.pending_update : parts.pending
+  // Every file attached to the report, from the report's own attachment list (never checklist evidence). Each is
+  // downloaded through the authorised project file route, the same one used for checklist files.
+  const attachments: Doc[] = (Array.isArray(pending?.files) ? pending.files : []).map((f: Dto): Doc => {
+    register(f.id, "/api/v1/projects/" + id + "/phase-files/" + f.id)
+    return {
+      id: String(f.id),
+      label: "Progress report attachment",
+      name: f.name || "Attachment",
+      uploaded: true,
+      clientVisible: false,
+      owner: "Site PM",
+      date: day(pending.submitted_at),
+      size: f.byte_size == null ? undefined : Number(f.byte_size),
+      mime: f.content_type || undefined,
+    }
+  })
   if (pending?.id)
     workflow.pendingUpdate = {
       id: String(pending.id),
@@ -270,6 +288,7 @@ export function mapProject(parts: ProjectParts): Project {
       priorProgress: Number(pending.prior_pct ?? 0),
       requestedPhase: pending.requested_stage || parts.overview?.stages?.find((s:Dto)=>s.id===pending.selected_stage_id)?.code || list.current_stage,
       requestedProgress: Number(pending.requested_pct ?? 0),
+      ...(attachments.length ? { attachments, evidence: attachments[0] } : {}),
     }
 
   const rework=parts.overview?.issues?.find((i:Dto)=>i.status==="pending")

@@ -1361,3 +1361,69 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
   .explorer-card { gap: 10px; padding: 14px; }
   .explorer-card-footer { grid-column: 1 / -1; }
 }
+
+/* Expired-license workflow: banners, review queue, override window, reassignment requests. */
+.license-banner { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; padding: 16px 18px; border: 1px solid var(--warning-border); border-radius: var(--radius); background: var(--amber-soft); color: var(--color-ink); }
+.license-banner > div { flex: 1; min-width: 0; }
+.license-banner strong { display: block; font-size: 16px; font-weight: 650; }
+.license-banner p { margin-top: 4px; font-size: 14px; line-height: 1.55; color: var(--color-ink); }
+.license-banner .license-reason { margin-top: 8px; padding: 8px 10px; background: var(--color-surface); border: 1px solid var(--danger-border); border-radius: var(--radius); }
+.license-banner-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--color-surface); color: var(--color-warning); flex: none; }
+.license-banner.red { background: var(--red-soft); border-color: var(--danger-border); }
+.license-banner.red .license-banner-icon { color: var(--color-danger); }
+.license-banner.info { background: var(--green-soft); border-color: var(--color-line); }
+.license-banner.info .license-banner-icon { color: var(--color-steel); }
+.license-banner .button { min-height: 48px; flex: none; }
+.license-warning, .license-warning-inline { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--color-warning); }
+.license-note { font-size: 14px; color: var(--color-muted); line-height: 1.55; }
+.license-list { display: flex; flex-direction: column; }
+.license-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--color-line); }
+.license-row:last-child { border-bottom: 0; }
+.license-row > div:first-child { flex: 1; min-width: 0; }
+.license-row strong { display: block; font-size: 14px; font-weight: 600; }
+.license-row small { display: block; margin-top: 3px; font-size: 14px; color: var(--color-muted); }
+.license-row.red strong { color: var(--color-danger); }
+.license-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.license-assignments { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.license-assignments > span { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 14px; }
+.override-form { display: flex; flex-direction: column; gap: 18px; }
+.override-current { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: var(--surface-subtle); border: 1px solid var(--color-line); border-radius: var(--radius); }
+.override-current small { font-size: 14px; color: var(--color-muted); }
+.override-candidates { border: 1px solid var(--color-line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.override-candidates legend { padding: 0 6px; font-size: 14px; font-weight: 600; color: var(--color-muted); }
+.override-candidates label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: var(--radius); cursor: pointer; min-height: 48px; }
+.override-candidates label.selected { border-color: var(--color-steel); background: var(--green-soft); }
+.override-candidates label > span { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.override-candidates strong { font-size: 14px; font-weight: 600; margin-right: 8px; }
+.override-candidates small { font-size: 14px; color: var(--color-muted); }
+.what-happens ul { margin: 6px 0 0 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.reassign-requests { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.reassign-card { background: var(--color-surface); border: 1px solid var(--warning-border); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.reassign-card header { display: flex; align-items: center; gap: 10px; }
+.reassign-card p { font-size: 14px; line-height: 1.55; }
+.reassign-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.reassign-actions .button { min-height: 48px; min-width: 120px; }
+.engineer-history .history-block, .work-record p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
+.engineer-history .history-block { flex-direction: column; align-items: flex-start; gap: 4px; border-bottom: 1px solid var(--color-line); }
+.engineer-history .history-block p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; }
+.work-record p { justify-content: space-between; border-bottom: 1px solid var(--color-line); }
+@media (max-width: 720px) {
+  .license-banner { flex-direction: column; align-items: stretch; }
+  .license-banner .button, .reassign-actions .button { width: 100%; }
+  .license-row { flex-direction: column; align-items: stretch; }
+  .license-actions { justify-content: flex-start; }
+}
+.phase-assignments > div > .phase-flag, .phase-flag { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; background: var(--red-soft); border: 1px solid var(--danger-border); border-radius: var(--radius); font-size: 14px; color: var(--color-danger); }
+.phase-flag small { color: var(--color-muted); font-size: 14px; }
+.license-profile { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.license-profile .license-assignments strong { font-size: 14px; }
+
+.override-previous { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--surface-subtle); border: 1px solid var(--color-line); border-radius: var(--radius); font-size: 14px; }
+.override-previous p { display: flex; flex-direction: column; gap: 2px; }
+.override-previous small { color: var(--color-muted); font-size: 14px; }
+
+.report-attachments { margin: 12px 0; }
+.report-attachments h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.report-attachments ul { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; }
+.report-attachments li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.report-attachments small { color: var(--color-muted); font-size: 14px; }

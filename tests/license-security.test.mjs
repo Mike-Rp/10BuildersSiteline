@@ -50,7 +50,7 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
-  for (const migration of ["001-phase-checklists.sql", "002-phase-update-confirmation.sql", "003-react-integration.sql", "004-verified-activity-progress.sql"]) {
+  for (const migration of ["001-phase-checklists.sql", "002-phase-update-confirmation.sql", "003-react-integration.sql", "004-verified-activity-progress.sql", "009-engineer-license-workflow.sql"]) {
     await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/" + migration), "utf8"))
   }
   await db.exec(fs.readFileSync(dummy, "utf8"))

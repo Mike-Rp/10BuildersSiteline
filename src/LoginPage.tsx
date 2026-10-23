@@ -17,11 +17,16 @@ export default function LoginPage({
   onSignIn: (email: string, password: string) => Promise<void>
 }) {
   const [resetOpen, setResetOpen] = useState(false)
-  const [resetName, setResetName] = useState("")
+  const [resetFirstName, setResetFirstName] = useState("")
+  const [resetMiddleName, setResetMiddleName] = useState("")
+  const [resetLastName, setResetLastName] = useState("")
+  const [resetStep, setResetStep] = useState<"name" | "confirm" | "contact">("name")
   const [resetEmail, setResetEmail] = useState("")
+  const [resetAccounts, setResetAccounts] = useState<{ name: string; email: string }[]>([])
   const [resetBusy, setResetBusy] = useState(false)
   const [resetMessage, setResetMessage] = useState("")
   const [resetError, setResetError] = useState("")
+  const capitalizeName = (value: string) => value.replace(/(^|[\s'’-])\p{L}/gu, letter => letter.toLocaleUpperCase())
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -64,13 +69,29 @@ export default function LoginPage({
       {resetOpen && <Modal title="Request a password reset" onClose={() => { if (!resetBusy) setResetOpen(false) }}>
         {resetMessage ? <><p role="status">{resetMessage}</p><Button onClick={() => setResetOpen(false)}>Done</Button></> : <form onSubmit={async event => {
           event.preventDefault(); setResetBusy(true); setResetError("")
-          try { await api("/auth/password-reset-request", { method: "POST", json: { name: resetName, email: resetEmail } }); setResetMessage("If your work email matches an account, your request has been sent to the administrator.") }
+          try {
+            const names = { firstName: resetFirstName.trim(), middleName: resetMiddleName.trim(), lastName: resetLastName.trim() }
+            if (resetStep === "name") {
+              const result = await api<{ accounts: { name: string; email: string }[] }>("/auth/password-reset-lookup", { method: "POST", json: names })
+              setResetAccounts(result.accounts)
+              if (result.accounts.length) { setResetEmail(result.accounts.length === 1 ? result.accounts[0].email : ""); setResetStep("confirm") }
+              else setResetStep("contact")
+            } else if (resetStep === "confirm") {
+              await api("/auth/password-reset-request", { method: "POST", json: { ...names, email: resetEmail } })
+              setResetMessage("Your password reset request has been sent to the administrator.")
+            }
+          }
           catch (e) { setResetError((e as Error).message) } finally { setResetBusy(false) }
         }}>
-          <Field label="Full name"><input required autoComplete="name" value={resetName} onChange={e => setResetName(e.target.value)} /></Field>
-          <Field label="Work email"><input required type="email" autoComplete="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} /></Field>
+          {resetStep === "name" && <>
+            <Field label="First name"><input required maxLength={100} autoComplete="given-name" autoCapitalize="words" value={resetFirstName} onChange={e => setResetFirstName(capitalizeName(e.target.value))} /></Field>
+            <Field label="Middle name (optional)"><input maxLength={100} autoComplete="additional-name" autoCapitalize="words" value={resetMiddleName} onChange={e => setResetMiddleName(capitalizeName(e.target.value))} /></Field>
+            <Field label="Last name"><input required maxLength={100} autoComplete="family-name" autoCapitalize="words" value={resetLastName} onChange={e => setResetLastName(capitalizeName(e.target.value))} /></Field>
+          </>}
+          {resetStep === "confirm" && <div><p>{resetAccounts.length > 1 ? "More than one account matches your name. Select your work email." : "Is this your work email?"}</p>{resetAccounts.length > 1 ? <Field label="Your work email"><select required value={resetEmail} onChange={e => setResetEmail(e.target.value)}><option value="" disabled>Select your account</option>{resetAccounts.map(account => <option key={account.email} value={account.email}>{account.email} — {account.name}</option>)}</select></Field> : <p><strong>{resetEmail}</strong></p>}<p>Confirm to send your password reset request to the administrator.</p></div>}
+          {resetStep === "contact" && <div role="status"><h3>Contact your administrator</h3><p>We could not find an account matching your name. Please contact your workplace administrator to verify your registered name and work email and request a password reset.</p></div>}
           {resetError && <p className="error" role="alert">{resetError}</p>}
-          <div className="modal-actions"><Button disabled={resetBusy} onClick={() => setResetOpen(false)}>Cancel</Button><Button type="submit" variant="primary" disabled={resetBusy}>{resetBusy ? "Sending?" : "Send to administrator"}</Button></div>
+          <div className="modal-actions"><Button disabled={resetBusy} onClick={() => setResetOpen(false)}>Cancel</Button>{resetStep !== "name" && <Button disabled={resetBusy} onClick={() => { setResetStep("name"); setResetError(""); setResetEmail("") }}>Edit name</Button>}{resetStep !== "contact" && <Button type="submit" variant="primary" disabled={resetBusy}>{resetBusy ? (resetStep === "name" ? "Searching…" : "Sending…") : resetStep === "name" ? "Find my account" : "Confirm and send to administrator"}</Button>}</div>
         </form>}
       </Modal>}
       <div className="login-card">
@@ -88,18 +109,20 @@ export default function LoginPage({
           <div className="login-content">
             <div className="login-heading">
               <h1>Welcome to SITELINE</h1>
-              <p>Enter the credentials issued by your administrator.</p>
+              <p>Enter the work email and password issued by your administrator.</p>
             </div>
 
             <form className="login-form" onSubmit={submit} noValidate>
               <Field
-                label="Work Email or Username"
+                label="Work Email"
                 error={emailError ? `⚠ ${emailError}` : undefined}
               >
                 <input
                   type="text"
+                  inputMode="email"
                   autoCapitalize="none"
                   spellCheck={false}
+                  // "username" is the standard token that lets password managers fill the sign-in identifier, which is an email here.
                   autoComplete="username"
                   placeholder="name@10builders.com"
                   value={email}
@@ -158,7 +181,7 @@ export default function LoginPage({
                 </small>
               )}
               <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
               </p>
               {error && (
                 <div className="login-error" role="alert">

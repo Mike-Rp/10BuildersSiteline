@@ -6,10 +6,10 @@ import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type M
 import "./monthly-report.css"
 import ReportProjectSearch from "./ReportProjectSearch"
 
-export default function MonthlyReport({projects,initialProjectId,onClose,allowProjectChange=true,onProjectChange}:{projects:{id:string;name:string}[];initialProjectId:string;onClose:()=>void;allowProjectChange?:boolean;onProjectChange?:(id:string)=>void}) {
+export default function MonthlyReport({projects,initialProjectId,initialMonth,onClose,allowProjectChange=true,onProjectChange}:{projects:{id:string;name:string}[];initialProjectId:string;initialMonth?:string;onClose:()=>void;allowProjectChange?:boolean;onProjectChange?:(id:string)=>void}) {
   const [projectId,setProjectId]=useState(initialProjectId)
   const [projectSearchOpen,setProjectSearchOpen]=useState(allowProjectChange)
-  const [month,setMonth]=useState(currentReportMonth)
+  const [month,setMonth]=useState(()=>initialMonth||currentReportMonth())
   const [data,setData]=useState<{report:Report;snapshot:string}>()
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[refresh,setRefresh]=useState(0),[exporting,setExporting]=useState(false)
   const revision=useRef(0),printFrame=useRef<HTMLIFrameElement|null>(null)

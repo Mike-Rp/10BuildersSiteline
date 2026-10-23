@@ -9,9 +9,10 @@ export const isBigintId = (v) => /^\d+$/.test(String(v));
 export const isSmallintId = (v) => /^\d+$/.test(String(v)) && Number(v) > 0 && Number(v) < 32768;
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, errorCode) {
     super(message);
     this.status = status;
+    this.errorCode = errorCode;
   }
 }
 
@@ -28,13 +29,13 @@ const STATUS_TEXTS = {
   503: "Service Unavailable",
 };
 
-export const sendError = (res, message, code = 500) => {
+export const sendError = (res, message, code = 500, errorCode) => {
   const status_text = STATUS_TEXTS[code] || "Internal Server Error";
   return res.status(code).json({
     code,
     status_text,
     message,
-    error: { code: status_text.toUpperCase().replace(/ /g, "_"), message },
+    error: { code: errorCode || status_text.toUpperCase().replace(/ /g, "_"), message },
   });
 };
 
@@ -43,10 +44,13 @@ export const sendOk = (res, message, count, data, code = 200) =>
 
 /** Standard catch block for every handler. */
 export const handleError = (res, error) => {
-  if (error instanceof HttpError) return sendError(res, error.message, error.status);
+  if (error instanceof HttpError) return sendError(res, error.message, error.status, error.errorCode);
   if (error.code === "23503") return sendError(res, "A referenced record does not exist.", 400);
   if (error.code === "23505") return sendError(res, "A record with these values already exists.", 409);
   errorlog(error);
+  // A missing column, table or function means the database is behind the code: say so, without raw SQL.
+  if (["42703", "42P01", "42883"].includes(error.code))
+    return sendError(res, "The database is missing a required update. Ask an administrator to run the pending database migrations, then try again.", 503);
   // Driver and SQL text stays in the server log on hosted deployments.
   const hosted = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
   return sendError(res, hosted ? "Internal server error." : error.message, 500);
@@ -127,7 +131,8 @@ export const requireRoles = (...allowedRoles) => async (req, res, next) => {
   }
 };
 
-export const hasProjectAccess = async (user, projectId, db = null) => {
+// includeFormer: read-only access for an engineer who held a phase or the Office PM role earlier (history stays visible).
+export const hasProjectAccess = async (user, projectId, db = null, { includeFormer = false } = {}) => {
   const run = db ? (sql, params) => db.query(sql, params) : execute;
   if (user.role === "admin") return true;
 
@@ -138,12 +143,14 @@ export const hasProjectAccess = async (user, projectId, db = null) => {
              UNION ALL
              SELECT 1 FROM project_engineers
               WHERE project_id = $1 AND user_id = $2 AND unassigned_at IS NULL`;
+      if (includeFormer) sql += ` UNION ALL SELECT 1 FROM engineer_assignment_history WHERE project_id = $1 AND user_id = $2`;
       break;
     case "spm":
       sql = `SELECT 1 FROM project_phase_team WHERE project_id = $1 AND spm_user_id = $2
              UNION ALL
              SELECT 1 FROM project_engineers
               WHERE project_id = $1 AND user_id = $2 AND unassigned_at IS NULL`;
+      if (includeFormer) sql += ` UNION ALL SELECT 1 FROM engineer_assignment_history WHERE project_id = $1 AND user_id = $2`;
       break;
     case "client":
       sql = `SELECT 1 FROM user_client_project_links WHERE project_id = $1 AND user_id = $2`;

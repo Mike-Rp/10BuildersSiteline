@@ -4,6 +4,7 @@ import { sendError, sendOk, handleError } from "../../common/utilities/access.ut
 import { errorlog } from "../../common/utilities/logger.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { sweepLicenses } from "../accounts/license-sweep.utility.js";
+import { sweepLicensesSafe } from "../licenses/sweep.js";
 
 const router = Router();
 
@@ -26,7 +27,9 @@ const requireCronSecret = (req, res, next) => {
 
 const runLicenseSweep = async (req, res) => {
   try {
-    const result = await withTransaction((db) => sweepLicenses(db));
+    // The account sweep (missing/expiring/expired notices), then the engineer sweep: reminder days, grace-period alerts
+    // and expired reassignment requests. The second never fails the first.
+    const result = await withTransaction(async (db) => ({ ...(await sweepLicenses(db)), engineers: await sweepLicensesSafe(db) }));
     return sendOk(res, "License reminders swept.", 1, result);
   } catch (error) {
     return handleError(res, error);

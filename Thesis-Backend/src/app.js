@@ -20,6 +20,7 @@ import subcontractorsRoutes from './services/subcontractors/routes.js';
 import dashboardRoutes from './services/dashboard/routes.js';
 import engineerRoutes from './services/engineer/routes.js';
 import activityLogRoutes from "./services/activity-logs/routes.js";
+import licenseRoutes from "./services/licenses/routes.js";
 import cronRoutes from "./services/cron/routes.js";
 
 import types from 'pg-types';
@@ -98,6 +99,8 @@ app.use(`${apiURL}/subcontractors`, subcontractorsRoutes);
 app.use(`${apiURL}/dashboard`, dashboardRoutes);
 
 app.use(`${apiURL}/engineer`, engineerRoutes);
+
+app.use(`${apiURL}/licenses`, licenseRoutes);
 
 app.use(`${apiURL}/activity-logs`, activityLogRoutes);
 

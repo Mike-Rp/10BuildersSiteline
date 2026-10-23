@@ -1,4 +1,4 @@
-import { licenseState, type State } from "./model.ts"
+import { dateLabel, licenseState, type State } from "./model.ts"
 import { hasPendingSiteReview } from "./active-sites-review.ts"
 
 export type DashboardCategory = "requests" | "licenses" | "updates" | "intake"
@@ -21,6 +21,10 @@ export function adminDashboardOverview(state: State) {
     ["pending_reviews", "current_assignment", "next_assignment", "next_scope"].includes(p.handoffReadiness.reasonCode || "") && p.handoffReadiness.reason)
     .sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   const blockedIds = new Set(blockers.map(p => p.id))
+  // Expired-license workflow: engineers whose grace period ended need cover; renewals wait for verification.
+  const cover = (state.license?.overview || []).filter(i => i.needsCover)
+  const coverIds = new Set(cover.map(i => i.id))
+  const renewals = state.license?.renewals || []
   const items: DashboardItem[] = [
     ...blockers.map(p => ({ key: `project:${p.id}`, id: p.id, kind: "project" as const, category: "updates" as const,
       title: p.name, detail: p.handoffReadiness!.reason!, label: "Handoff blocked", icon: "alert", blocker: true })),
@@ -28,7 +32,17 @@ export function adminDashboardOverview(state: State) {
       key: `company:${c.id}`, id: c.id, kind: "company" as const, category: "requests" as const,
       title: c.name, detail: "Subcontractor request awaiting approval", label: "Request", icon: "shield",
     })),
-    ...state.accounts.filter(a => a.role !== "client" && a.status === "active" &&
+    ...cover.map(i => ({
+      key: `license-cover:${i.id}`, id: i.id, kind: "account" as const, category: "licenses" as const,
+      title: "Engineer license expired: assignment needs cover",
+      detail: `${i.name} · expired ${i.expiry ? dateLabel(i.expiry) : ""} · Not renewed after the grace period`,
+      label: "Override assignment", icon: "alert",
+    })),
+    ...renewals.map(r => ({
+      key: `license-renewal:${r.id}`, id: r.user_id, kind: "account" as const, category: "licenses" as const,
+      title: "License renewal to review", detail: `${r.full_name} uploaded a renewed license`, label: "Review renewal", icon: "doc",
+    })),
+    ...state.accounts.filter(a => a.role !== "client" && a.status === "active" && !coverIds.has(a.id) && !a.renewalUnderReview &&
       ["Expired", "Grace expired", "Expiring soon"].includes(licenseState(a, state.rules.grace))).map(a => ({
       key: `account:${a.id}`, id: a.id, kind: "account" as const, category: "licenses" as const,
       title: a.name, detail: `License: ${licenseState(a, state.rules.grace)}`, label: "License review", icon: "doc",

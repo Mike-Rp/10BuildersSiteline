@@ -1,5 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
-import { monthlyReport, exportMonthlyReport } from "../reports/controller.js";
+import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
 import { Router } from "express";
@@ -11,11 +11,18 @@ import { getSubcontractors, createSubcontractor } from "../subcontractors/contro
 import subcontractors from "../subcontractors/routes.js";
 import phases from "../progress/phase.routes.js";
 import progress from "../progress/routes.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
+import { sweepLicensesThrottled } from "../licenses/sweep.js";
 import { sweepLicenses, sweepLicensesIfDue } from "../accounts/license-sweep.utility.js";
 const router = Router();
 router.get("/projects/:id/monthly-report", monthlyReport);
 router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
+router.get("/reports/monthly-summary", monthlySummary);
+router.post("/reports/monthly-summary/export", exportMonthlySummary);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+// Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
+const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
+    "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
     if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
     return next();
@@ -78,20 +85,43 @@ async function event(db, user, p, title, detail = "") {
  select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null]);
 }
+const normalizeResetName = value => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+async function findResetAccounts(db, body) {
+    const { firstName, middleName = "", lastName } = body || {};
+    if ([firstName, lastName].some(value => typeof value !== "string" || !value.trim() || value.length > 100) || typeof middleName !== "string" || middleName.length > 100)
+        throw new HttpError(400, "Enter your first and last name. Middle name is optional.");
+    const first = normalizeResetName(firstName), middle = normalizeResetName(middleName), last = normalizeResetName(lastName);
+    const result = await db.query("select id,full_name,email from users where not coalesce(is_deleted,false)");
+    const matches = result.rows.filter(user => {
+        const name = normalizeResetName(user.full_name.replace(/\s*\([^)]*\)/g, ""));
+        if (middle) return name === `${first} ${middle} ${last}`;
+        return name === `${first} ${last}` || (name.startsWith(first + " ") && name.endsWith(" " + last) && name.length > first.length + last.length + 2);
+    });
+    return matches;
+}
+router.post("/auth/password-reset-lookup", async (req, res) => {
+    try {
+        const matches = await withTransaction(db => findResetAccounts(db, req.body));
+        return sendOk(res, "Account lookup complete.", 1, { accounts: matches.map(user => ({ name: user.full_name, email: user.email })) });
+    } catch (error) { return handleError(res, error); }
+});
 router.post("/auth/password-reset-request", async (req, res) => {
     try {
-        const { name, email } = req.body || {};
-        if (typeof name !== "string" || !name.trim() || name.length > 150 || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new HttpError(400, "Enter your name and valid work email.");
+        const { email } = req.body || {};
+        if (typeof email !== "string" || email.length > 254) throw new HttpError(400, "Confirm your work email.");
         await withTransaction(async db => {
-            const found = await db.query("select id,full_name from users where lower(email::text)=$1 and not coalesce(is_deleted,false) for update", [email.trim().toLowerCase()]);
+            const matches = await findResetAccounts(db, req.body);
+            const match = matches.find(user => user.email.toLowerCase() === email.trim().toLowerCase());
+            if (!match) throw new HttpError(409, "Your account details have changed. Please look up your name again or contact your administrator.");
+            const found = await db.query("select id,full_name from users where id=$1 and lower(email::text)=$2 and not coalesce(is_deleted,false) for update", [match.id, email.trim().toLowerCase()]);
             const user = found.rows[0];
-            if (!user) return;
+            if (!user) throw new HttpError(409, "Your account details have changed. Please look up your name again.");
             const pending = await db.query("select 1 from workspace_account_metadata where user_id=$1 and metadata->>'passwordResetRequestedAt' is not null", [user.id]);
             if (pending.rowCount) return;
             await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('passwordResetRequestedAt',now()::text)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata", [user.id]);
             await event(db, user, null, "Password reset requested", user.full_name + " requested a password reset. Review Password reset requests on the dashboard.");
         });
-        return sendOk(res, "If the details match an account, your request has been sent to the administrator.", 1, {});
+        return sendOk(res, "Your request has been sent to the administrator.", 1, {});
     } catch (error) { return handleError(res, error); }
 });
 router.get("/accounts/password-reset-requests", endpoint(["admin"], async db => (await db.query("select u.id,u.full_name,u.email,m.metadata->>'passwordResetRequestedAt' as requested_at from users u join workspace_account_metadata m on m.user_id=u.id where m.metadata->>'passwordResetRequestedAt' is not null and not coalesce(u.is_deleted,false) order by m.metadata->>'passwordResetRequestedAt' asc limit 100")).rows));
@@ -115,9 +145,11 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     await db.query(`update workspace_account_metadata set metadata=metadata||jsonb_build_object('status','deactivated',
  'resignation',(metadata->'resignation')||jsonb_build_object('status','deactivated','deactivatedAt',now()))
  where metadata->>'assignmentHold'='true' and metadata->'resignation'->>'status'='notice' and (metadata->'resignation'->>'effectiveDate')::timestamptz<=now()`);
+    await sweepLicensesThrottled(db);
     const allowed = (await db.query(`select p.id from projects p where not coalesce(p.is_deleted,false) and
  ($1='admin' or p.suggested_opm_id=$2 or exists(select 1 from project_phase_team t where t.project_id=p.id and t.spm_user_id=$2)
  or exists(select 1 from project_engineers e where e.project_id=p.id and e.user_id=$2 and e.unassigned_at is null)
+ or exists(select 1 from engineer_assignment_history h where h.project_id=p.id and h.user_id=$2 and h.ended_at is not null)
  or exists(select 1 from user_client_project_links l where l.project_id=p.id and l.user_id=$2))`, [user.role, user.id])).rows.map(r => r.id);
     const projectMeta = user.role === "client" ? [] : (await db.query("select project_id as id,metadata from workspace_project_metadata where project_id=any($1::uuid[])", [allowed])).rows;
     const accountMeta = (await db.query("select user_id as id,metadata from workspace_account_metadata where $1='admin' or user_id=$2", [user.role, user.id])).rows;
@@ -150,10 +182,15 @@ router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
     return {};
 }));
 router.put("/workspace/settings", endpoint(["admin"], async (db, user, req) => {
-    const rules = req.body;
+    // Merge, so settings this screen does not send (such as the reminder days) are kept.
+    const current = (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules || {};
+    const rules = { ...current, ...req.body };
     for (const k of ["grace", "cap", "response", "idle"])
         if (!Number.isInteger(rules[k]) || rules[k] < 1 || rules[k] > 365)
             throw new HttpError(400, "Invalid rule value.");
+    if (rules.reminderDays !== undefined && (!Array.isArray(rules.reminderDays) || !rules.reminderDays.length || rules.reminderDays.length > 12
+        || rules.reminderDays.some(d => !Number.isInteger(d) || d < 0 || d > 365)))
+        throw new HttpError(400, "Reminder days must be whole numbers from 0 to 365.");
     await db.query("update workspace_settings set rules=$1 where singleton", [JSON.stringify(rules)]);
     await event(db, user, null, "Workspace rules updated");
     return rules;
@@ -312,6 +349,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
     const leader = () => { if (user.role !== "spm" || lead !== user.id)
         throw new HttpError(403, "Only the Lead Site PM can do this."); };
     const meta = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    if (LICENSE_COMMANDS.has(c.type))
+        await assertLicenseActive(user, db);
     switch (c.type) {
         case "upload_registered": {
             opm();

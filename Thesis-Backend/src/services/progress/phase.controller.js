@@ -8,6 +8,7 @@ import {
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
 } from "../../common/utilities/access.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
 import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
@@ -23,6 +24,7 @@ export const authorizePhaseUpload = async (req, res, next) => {
     await withTransaction(async client => {
       const project = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, project);
+      await assertLicenseActive(user, client);
     });
     req.user = user;
     return next();
@@ -121,6 +123,7 @@ export const markChecklistSubmitted = async (req, res) => {
       item_id: req.params.itemId, file_id: req.body?.file_id, submission_note: req.body?.submission_note,
     }] });
     const data = await withTransaction(async client => {
+      await assertLicenseActive(user, client);
       const p = await itemProject(client, user, req.params.id, req.params.itemId, body);
       return submitChecklist(client, p, user, body.checklist_submissions[0]);
     });
@@ -149,6 +152,7 @@ export const reportProjectIssue = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
+      await assertLicenseActive(user, client);
       const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
       if(Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
@@ -219,6 +223,7 @@ const reviewEvidence = decision => async (req, res) => {
     if (decision === "rejected" && !note) return sendError(res, "review_note is required for rejection.", 400);
     const data = await withTransaction(async client => {
       // All phase mutations lock the project first, then the evidence, to serialize approvals and transitions.
+      await assertLicenseActive(user, client);
       const {p,evidence}=await reviewableEvidence(client,user,req.params.id,req.params.evidenceId);
       if(req.body?.expected_review_token!==undefined) {
         const preview=await evidenceReviewPreview(client,p,evidence);
@@ -302,6 +307,7 @@ export const advancePhase = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
+      await assertLicenseActive(user, client);
       const handoff = await transitionPhase(client, p, user.id);
       if (!handoff.advanced) throw new HttpError(handoff.code, handoff.reason);
       return handoff;

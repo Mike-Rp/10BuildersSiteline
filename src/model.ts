@@ -1,3 +1,4 @@
+import type { LicenseData } from "./licenseTypes.ts"
 export const PHASES = [
   "Mobilization",
   "Design",
@@ -196,6 +197,7 @@ export type Account = {
   license: string
   expiry: string
   renewed?: boolean
+  renewalUnderReview?: boolean
   cooldown?: number
   suspendedAt?: string
   eligibleForNewAssignment?: boolean
@@ -316,12 +318,16 @@ export type ChecklistItem = {
   reworkReason?: string
   version: number
   doc?: Doc
-  note?: string
+  // The Site PM's note when uploading the evidence.
+  submissionNote?: string
+  // The Office PM's reason when rejecting it. Kept apart from the submission note.
+  reviewNote?: string
   submittedAt?: string
   reviewedAt?: string
   reviewedBy?: string
   escalated?: boolean
   submittedBy?: string
+  submittedByName?: string
 }
 export type ProgressSubmission = {
   id: string
@@ -334,8 +340,23 @@ export type ProgressSubmission = {
   priorProgress: number
   requestedPhase: string
   requestedProgress: number
+  // The first attachment, kept for code that handles a single file.
   evidence?: Doc
+  // Every file attached to the report (a report can have several).
+  attachments?: Doc[]
   escalated?: boolean
+}
+// All files of a progress report or rework submission, whichever field carries them.
+export function submissionDocs(submission?: Pick<ProgressSubmission, "attachments" | "evidence">): Doc[] {
+  if (!submission) return []
+  if (submission.attachments?.length) return submission.attachments
+  return submission.evidence ? [submission.evidence] : []
+}
+export function fileSizeLabel(bytes?: number) {
+  if (!bytes || bytes < 0) return ""
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 export type SubcontractorSelection = {
   companyId: string
@@ -423,6 +444,7 @@ export type Rules = {
   cap: number
   response: number
   idle: number
+  reminderDays?: number[]
 }
 export type State = {
   backendPhases?: Record<string,PhaseDefinition[]>
@@ -435,6 +457,7 @@ export type State = {
   muted: string[]
   userPreferences?: Record<string, string[]>
   portalReads?: Record<string, string[]>
+  license?: LicenseData
 }
 export const uid = () => crypto.randomUUID()
 export const today = () => new Date().toISOString().slice(0, 10)
@@ -575,21 +598,44 @@ export function validateFile(file: File, spreadsheet = false) {
     return `The file must be ${max} MB or smaller.`
   return ""
 }
+// Whole days from the viewer's LOCAL today to a YYYY-MM-DD date (negative once it has passed).
+export function daysUntil(day: string) {
+  const [y, m, d] = day.slice(0, 10).split("-").map(Number)
+  const now = new Date()
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000)
+}
+// Step 1: an engineer is being assigned and their license ends before the project does.
+export function licenseExpiresDuringProject(expiry?: string, projectEnd?: string) {
+  return Boolean(expiry && projectEnd) && expiry!.slice(0, 10) < projectEnd!.slice(0, 10)
+}
+export function licenseExpired(a: { expiry: string }) {
+  return Boolean(a.expiry) && daysUntil(a.expiry) < 0
+}
+// The grace period starts the day after expiry. The first expired day shows the full period, the last day shows 1.
+export function licenseGrace(a: { expiry: string }, grace = 30) {
+  if (!licenseExpired(a)) return { expired: false, ended: false, daysLeft: null as number | null }
+  const days = daysUntil(a.expiry)
+  const ended = days < -grace
+  return { expired: true, ended, daysLeft: ended ? null : grace + days + 1 }
+}
 export function licenseState(
   a: {
     expiry: string
     renewed?: boolean
+    renewalUnderReview?: boolean
   },
   grace = 7,
+  window = 60,
 ) {
   if (a.renewed) return "Renewed"
+  if (a.renewalUnderReview) return "Renewal under review"
   if (!a.expiry) return "Not on file"
-  const days = Math.ceil((new Date(a.expiry).getTime() - Date.now()) / 86400000)
+  const days = daysUntil(a.expiry)
   return days < -grace
     ? "Grace expired"
     : days < 0
       ? "Expired"
-      : days <= 90
+      : days <= window
         ? "Expiring soon"
         : "Valid"
 }
@@ -667,7 +713,7 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     a.status === "active" &&
     !a.assignmentHold &&
     a.eligibleForNewAssignment !== false &&
-    licenseState(a, state.rules.grace) !== "Grace expired" &&
+    !licenseExpired(a) &&
     workload(state, a.id, excluding) < state.rules.cap &&
     !(a.cooldown && a.cooldown > Date.now())
   )
@@ -734,6 +780,29 @@ export function headcount(type: string, area: string, floors: string) {
     multiplier,
   }
 }
+export const WORK_EMAIL_DOMAIN = "10builders.com"
+const emailPart = (name: string) =>
+  name.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
+
+// lastname.firstname, then lastname.firstname.middleinitial, then a number on the
+// last form that is still free. `accounts` must include deactivated accounts:
+// a company email is never reused.
+export function suggestWorkEmail(
+  names: { first: string; middle?: string; last: string },
+  accounts: Pick<Account, "email">[],
+) {
+  const first = emailPart(names.first), last = emailPart(names.last)
+  if (!first || !last) return ""
+  const initial = emailPart(names.middle || "").charAt(0)
+  const taken = new Set(accounts.map((a) => a.email.trim().toLowerCase()))
+  const address = (local: string) => `${local}@${WORK_EMAIL_DOMAIN}`
+  const base = `${last}.${first}`
+  if (!taken.has(address(base))) return address(base)
+  const withInitial = initial ? `${base}.${initial}` : base
+  if (initial && !taken.has(address(withInitial))) return address(withInitial)
+  for (let n = 2; ; n++) if (!taken.has(address(withInitial + n))) return address(withInitial + n)
+}
+
 export function accountError(
   a: Pick<Account, "id" | "name" | "email" | "role" | "scope" | "projectTypes">,
   state: State,
@@ -795,7 +864,7 @@ export function emptyState(): State {
     projects: [],
     companies: [],
     events: [],
-    rules: { grace: 7, cap: 2, response: 3, idle: 15 },
+    rules: { grace: 30, cap: 2, response: 3, idle: 15 },
     muted: [],
   }
 }

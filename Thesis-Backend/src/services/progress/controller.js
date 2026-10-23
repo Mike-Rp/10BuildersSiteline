@@ -88,7 +88,7 @@ export const getProjectHistory = async (req, res) => {
     if (!user) return;
     const { id } = req.params;
     if (!isUuid(id)) return sendError(res, "Invalid project id.", 400);
-    if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
+    if (!(await hasProjectAccess(user, id, null, { includeFormer: true }))) return sendError(res, "Project not found.", 404);
     const { limit, offset } = paging(req, 50, 200);
  
     const result = await execute(

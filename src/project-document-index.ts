@@ -1,6 +1,7 @@
 import {
   DOC_LABELS,
   projectPhaseNames,
+  submissionDocs,
   type Account,
   type Doc,
   type Project,
@@ -163,13 +164,14 @@ export function projectDocumentIndex(
       )
 
   if (workflow.pendingUpdate)
-    add(
-      workflow.pendingUpdate.evidence,
-      "progress",
-      "progress-updates",
-      "Project Monitoring · Progress update",
-      workflow.pendingUpdate.requestedPhase,
-    )
+    for (const attachment of submissionDocs(workflow.pendingUpdate))
+      add(
+        attachment,
+        "progress",
+        "progress-updates",
+        "Project Monitoring · Progress update",
+        workflow.pendingUpdate.requestedPhase,
+      )
   if (workflow.pendingRework)
     add(
       workflow.pendingRework.evidence,

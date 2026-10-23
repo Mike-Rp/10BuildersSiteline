@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { HttpError,requireUser,handleError,sendOk,isUuid,isBigintId,isProjectOpmOrAdmin } from "../../common/utilities/access.utility.js";
 import { phaseProject,readChecklist,recordPhaseHistory } from "./phase.utility.js";
 import { readVerifiedProgress } from "./verified.utility.js";
@@ -64,6 +65,7 @@ const resolve=confirm=>async(req,res)=>{
     if(!note)throw new HttpError(400,"A resolution reason is required.");
     if(confirm&&user.role!=="opm")throw new HttpError(403,"Only the authorized Office PM can withdraw activity approval.");
     const data=await withTransaction(async db=>{
+      await assertLicenseActive(user,db);
       const review=await loadReview(db,user,req.params.id);
       const {project,request,checklist}=review;
       let impact=null;

@@ -4,9 +4,11 @@ import {
   DOC_LABELS,
   PHASES,
   PROJECT_PHASE_DEFINITIONS,
+  licenseExpired,
   licenseState,
   projectPhaseNames,
   spmCandidates,
+  submissionDocs,
   today,
   uid,
   validateFile,
@@ -98,7 +100,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 }
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
-  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
+  type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
   projectId?: string
   phase?: string
   doc?: Doc
@@ -119,6 +121,15 @@ export type WorkflowCommand = {
   expectedVersion?: number
   company?: Company
 }
+// Commands an Office PM or Site PM signs, submits or approves. They are paused while the license is expired (the
+// backend enforces the same list). Viewing, notes, photos and declining stay available.
+export const LICENSE_PAUSED_MESSAGE = "Paused until your license renewal is verified"
+export const LICENSE_COMMANDS: ReadonlySet<WorkflowCommand["type"]> = new Set([
+  "accept_opm", "upload_registered", "accept_assignment", "select_company", "replace_company", "archive_company",
+  "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "reject_update", "approve_rework",
+  "decline_rework", "submit_checklist", "approve_checklist", "reject_checklist", "request_company",
+  "archive_company_request", "activate_project", "acknowledge_client_subcon", "report_client_subcon_issue",
+])
 export function workflowFor(p: Project): ProjectWorkflow {
   return (
     p.workflow || {
@@ -763,7 +774,7 @@ export function documentAccess(
     ...Object.values(work.checklist).flatMap((items) =>
       items.flatMap((item) => (item.doc ? [item.doc] : [])),
     ),
-    ...(work.pendingUpdate?.evidence ? [work.pendingUpdate.evidence] : []),
+    ...submissionDocs(work.pendingUpdate),
     ...(work.pendingRework?.evidence ? [work.pendingRework.evidence] : []),
   ]
   const doc = available.find((d) => d.id === docId)
@@ -786,7 +797,7 @@ export function documentAccess(
       work.photos.some((d) => d.id === doc.id) ||
       ownEvidence ||
       (work.pendingUpdate?.authorId === actor.id &&
-        work.pendingUpdate.evidence?.id === doc.id) ||
+        submissionDocs(work.pendingUpdate).some((d) => d.id === doc.id)) ||
       (work.pendingRework?.authorId === actor.id &&
         work.pendingRework.evidence?.id === doc.id) ||
       p.history.some(
@@ -812,10 +823,12 @@ export function applyWorkflow(
 ): State {
   const actor = state.accounts.find((a) => a.id === actorId)
   assert(
-    actor &&
-      actor.status === "active" &&
-      licenseState(actor, state.rules.grace) !== "Grace expired",
+    actor && actor.status === "active",
     "This account is not eligible for an active session.",
+  )
+  assert(
+    !LICENSE_COMMANDS.has(command.type) || !licenseExpired(actor),
+    LICENSE_PAUSED_MESSAGE,
   )
   assert(
     actor.role === "opm" || actor.role === "spm",
@@ -1504,6 +1517,29 @@ export function applyWorkflow(
       )
       advanceIfReady(next, p, now, false)
       break
+    case "reject_update": {
+      opm()
+      assert(
+        work.pendingUpdate &&
+          work.pendingUpdate.version === command.expectedVersion,
+        "This progress submission changed. Refresh the queue.",
+      )
+      const reason = command.note?.trim()
+      assert(reason, "Enter the reason for rejecting this report. The Site PM will see it.")
+      // Rejects the report only: no checklist credit changes, no progress change, no phase advance.
+      p.history.push({
+        date: day,
+        text: `${work.pendingUpdate.note || "Field update"} — Rejected by ${actor.name}: ${reason}`,
+        progress: p.progress,
+        phase: p.phase,
+        clientVisible: false,
+        authorId: work.pendingUpdate.authorId,
+        evidence: work.pendingUpdate.evidence,
+      })
+      work.pendingUpdate = undefined
+      record("Progress update rejected", actor.name, "approval", "Rework & approvals")
+      break
+    }
     case "approve_rework":
     case "decline_rework": {
       opm()
@@ -1561,7 +1597,8 @@ export function applyWorkflow(
         item.status = "submitted"
         item.submittedAt = date
         item.submittedBy = actor.id
-        item.note = ""
+        item.submissionNote = command.note?.trim() || undefined
+        item.reviewNote = undefined
         item.escalated = false
         p.history.push({
           date: day,
@@ -1607,7 +1644,7 @@ export function applyWorkflow(
           )
         } else {
           item.status = "missing"
-          item.note = "Rejected by Office PM — resubmit with corrections."
+          item.reviewNote = command.note?.trim() || "Rejected by Office PM — resubmit with corrections."
           item.submittedAt = undefined
           item.escalated = false
           p.history.push({

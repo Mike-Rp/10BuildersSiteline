@@ -146,7 +146,7 @@ test(
       ).set.call(input, value)
       input.dispatchEvent(new w.Event("input", { bubbles: true }))
     }
-    setValue(inputs[0], "Admin")
+    setValue(inputs[0], "admin@10builders.com")
     setValue(inputs[1], "Password")
     await sleep(50)
     w.document
@@ -159,7 +159,7 @@ test(
     )
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, "http://127.0.0.1:39999/api/v1/auth/login")
-    assert.deepEqual(calls[0].body, { email: "Admin", password: "Password" })
+    assert.deepEqual(calls[0].body, { email: "admin@10builders.com", password: "Password" })
     assert.ok(w.document.querySelector("form.login-form"))
     assert.doesNotMatch(
       w.document.body.textContent,

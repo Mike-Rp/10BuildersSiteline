@@ -120,6 +120,8 @@ function setup(options = {}) {
       }
       if (sql.startsWith("INSERT INTO project_phase_update_files")) return result([{}]);
       if (sql.startsWith("UPDATE projects SET name")) return result([{ id: projectId, name: params[2] }]);
+      // License gate and phase-completion bookkeeping: these tests run without license data, so the gate finds none.
+      if (/^(select license_expiry::text|savepoint |release savepoint |rollback to savepoint |update engineer_assignment_history)/i.test(sql)) return result([]);
       throw new Error("Unexpected query: " + sql);
     },
   };
@@ -182,7 +184,8 @@ test("OPM approval advances progress by one fifth and records approved history",
   assert.equal(state.p.current_pct, 20);
   assert.equal(state.history[0][2], 20);
   assert.equal(state.history[0][4], false);
-  assert.match(state.queries[0].sql, /FOR UPDATE OF p/);
+  // The license gate (a read of the engineer's license) runs first; the project lock is the first project query.
+  assert.match(state.queries.find((q) => !/license_expiry/.test(q.sql)).sql, /FOR UPDATE OF p/);
 });
 
 test("a second approval cannot increment progress again", async () => {
@@ -383,6 +386,7 @@ test("confirming a phase locks the project before checking final activation", as
     if (sql.startsWith("UPDATE project_phase_team")) return result([{ stage_id: 4, status: "confirmed" }]);
     if (sql.startsWith("SELECT 1 FROM project_phase_team")) return result([]);
     if (sql.startsWith("UPDATE projects")) return result([{}]);
+    if (/^select license_expiry::text/i.test(sql)) return result([]);
     throw new Error("Unexpected confirmation query: " + sql);
   } };
   const res = response();

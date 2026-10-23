@@ -18,14 +18,12 @@ export const lockedMessage = (minutes: number) =>
   `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
-// Username-shaped input is forwarded to the backend for validation.
-const USERNAME = /^[A-Za-z0-9._-]+$/
 
 export function validateSignInFields(email: string, password: string) {
   const errors: { email?: string; password?: string } = {}
   const value = email.trim()
   if (!value) errors.email = SIGN_IN_MESSAGES.emailRequired
-  else if (value.includes("@") ? !EMAIL.test(value) : !USERNAME.test(value))
+  else if (!EMAIL.test(value))
     errors.email = SIGN_IN_MESSAGES.emailInvalid
   if (!password) errors.password = SIGN_IN_MESSAGES.passwordRequired
   return errors

@@ -200,3 +200,64 @@ test("Active Sites review membership follows current backend queues and ignores 
   assert.equal(hasPendingSiteReview({ ...both, status: "pending" }), false)
   assert.equal(hasPendingSiteReview({ ...both, status: "completed" }), false)
 })
+
+test("checklist items keep the submitter's note and the reviewer's rejection reason apart", () => {
+  const SUBMITTED = "Uploaded the signed inspection sheet"
+  const REJECTED = "Photo is blurry; re-shoot the rebar spacing"
+  const REWORK = "Withdrawn after the slab crack report"
+  const overview = {
+    checklist: {
+      items: [
+        { id: 1, title: "Rejected", status: "rejected", submission_note: SUBMITTED, review_note: REJECTED, evidence_id: 11 },
+        { id: 2, title: "Waiting", status: "pending", submission_note: SUBMITTED, review_note: null, evidence_id: 12 },
+        { id: 3, title: "Approved", status: "approved", submission_note: SUBMITTED, review_note: "Looks good", evidence_id: 13 },
+        { id: 4, title: "Rework", status: "rework_required", submission_note: SUBMITTED, review_note: REWORK, rework_reason: REWORK, evidence_id: 14 },
+        { id: 5, title: "Never submitted", status: "missing" },
+      ],
+    },
+  }
+  const items = mapProject(parts({ overview })).workflow.checklist.Structure
+  const byLabel = Object.fromEntries(items.map((i) => [i.label, i]))
+  assert.equal(byLabel.Rejected.status, "missing")
+  assert.equal(byLabel.Rejected.reviewNote, REJECTED)
+  assert.equal(byLabel.Rejected.submissionNote, SUBMITTED)
+  assert.notEqual(byLabel.Rejected.reviewNote, byLabel.Rejected.submissionNote)
+  assert.equal(byLabel.Waiting.reviewNote, undefined)
+  assert.equal(byLabel.Waiting.submissionNote, SUBMITTED)
+  assert.equal(byLabel["Never submitted"].submissionNote, undefined)
+  assert.equal(byLabel["Never submitted"].reviewNote, undefined)
+  assert.equal(byLabel.Rework.reworkReason, REWORK, "the rework reason keeps its own field")
+  assert.equal(byLabel.Rework.status, "rework_required")
+  // The old mixed-up field is gone.
+  for (const item of items) assert.equal("note" in item, false)
+})
+
+test("a pending report maps every attachment to an authorised file URL, and nothing else", () => {
+  registered.clear()
+  const files = [
+    { id: "11111111-1111-4111-8111-111111111111", name: "site-photo.png", content_type: "image/png", byte_size: 2048 },
+    { id: "22222222-2222-4222-8222-222222222222", name: "inspection sheet.pdf", content_type: "application/pdf", byte_size: 1500000 },
+    { id: "33333333-3333-4333-8333-333333333333", name: "close-up.jpg", content_type: "image/jpeg", byte_size: 900 },
+  ]
+  const pending = { id: 9, submitted_at: "2026-10-16T13:31:05.711Z", prior_stage: "Structure", prior_pct: 60, requested_stage: "Structure", note: "Slab poured", issue_categories: [], files }
+  const checklistFile = "99999999-9999-4999-8999-999999999999"
+  const overview = { pending_update: pending, issues: [], checklist: { items: [{ id: 5, title: "Rebar", status: "pending", file_id: checklistFile, original_name: "rebar.pdf" }] } }
+  const work = mapProject(parts({ overview })).workflow
+  const docs = work.pendingUpdate.attachments
+  assert.deepEqual(docs.map((d) => [d.id, d.name, d.mime, d.size]), files.map((f) => [f.id, f.name, f.content_type, f.byte_size]), "every attachment, in order")
+  assert.ok(docs.every((d) => d.uploaded && d.clientVisible === false))
+  assert.equal(work.pendingUpdate.evidence.id, files[0].id, "the first attachment stays available as evidence")
+  // URLs are the existing authorised project file route, and only the report's own files are registered for it.
+  for (const f of files) assert.equal(registered.get(f.id), "/api/v1/projects/p1/phase-files/" + f.id)
+  assert.equal(registered.get(checklistFile), "/api/v1/projects/p1/phase-files/" + checklistFile, "checklist files keep their own registration")
+  assert.ok(!docs.some((d) => d.id === checklistFile), "checklist evidence is never listed as a report attachment")
+})
+
+test("a report without attachments, or with a malformed list, shows none", () => {
+  for (const files of [undefined, null, [], "nope", {}]) {
+    const pending = { id: 9, submitted_at: "2026-10-16T13:31:05.711Z", prior_stage: "Structure", prior_pct: 60, requested_stage: "Structure", note: "x", issue_categories: [], files }
+    const update = mapProject(parts({ overview: { pending_update: pending, issues: [], checklist: { items: [] } } })).workflow.pendingUpdate
+    assert.equal(update.attachments, undefined, JSON.stringify(files))
+    assert.equal(update.evidence, undefined)
+  }
+})

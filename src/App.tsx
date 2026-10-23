@@ -51,6 +51,16 @@ import {
 } from "./workflows"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import {
+  EngineerHistory,
+  LicenseAssignmentWarning,
+  LicenseProfileBlock,
+  OverrideDialog,
+  PhaseLicenseFlag,
+  RenewalQueue,
+  WorkRecord,
+  type OverrideTarget,
+} from "./LicenseWorkflow"
+import {
   AccountDeactivationForm,
   AccountForm,
   CompanyForm,
@@ -160,6 +170,7 @@ function Status({ status }: { status: string }) {
                 "changes_requested",
                 "invited",
                 "Expiring soon",
+                "Renewal under review",
               ].includes(status)
             ? "amber"
             : [
@@ -285,6 +296,8 @@ function AppInner() {
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
   const [licenseFilter, setLicenseFilter] = useState("all")
+  const [overrideTarget, setOverrideTarget] = useState<OverrideTarget>()
+  const [renewalsOpen, setRenewalsOpen] = useState(false)
   const [activityFilter, setActivityFilter] = useState("all")
   const active = state.projects.filter((p) => p.status === "active")
   const intake = state.projects.filter((p) =>
@@ -491,6 +504,13 @@ function AppInner() {
   }
   function openPendingRequests() {
     navigate("Approvals")
+  }
+  // Needs attention → "Engineer license expired": open the override for the first assignment that still needs cover.
+  function openLicenseCover(userId: string) {
+    const item = state.license?.overview?.find((i) => i.id === userId)
+    const open = item?.assignments.find((a) => !a.pendingOverrideId)
+    if (open) setOverrideTarget({ projectId: open.projectId, stageId: open.stageId })
+    else setDialog({ kind: "account", id: userId })
   }
   function clearSession() {
     resetListMemory()
@@ -822,6 +842,7 @@ function AppInner() {
     "Expiring soon",
     "Expired",
     "Grace expired",
+    "Renewal under review",
     "Not on file",
   ].map((value) => ({ value, label: value }))
   const roleFilter_: FilterDef<Account> = {
@@ -955,7 +976,8 @@ function AppInner() {
       ],
     },
   )
-  const teamAlerts = new Set(adminDashboardOverview(state).items.filter(item => item.category === "licenses").map(item => item.id))
+  const teamLicenseItems = adminDashboardOverview(state).items.filter(item => item.category === "licenses")
+  const teamAlerts = new Set(teamLicenseItems.map(item => item.id))
   const teamList = runList(
     "admin:team",
     state.accounts.filter((a) => a.status !== "deactivated"),
@@ -1295,7 +1317,7 @@ function AppInner() {
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
       onActivity={() => setDialog({ kind: "activity" })}
-      onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : setDialog({ kind: item.kind, id: item.id })}
+      onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
     />}</PasswordResetRequests>
   }
@@ -1318,7 +1340,7 @@ function AppInner() {
     )
   }
   function renderPage() {
-    if (page === "Reports") return <Reports projects={state.projects} />
+    if (page === "Reports") return <Reports />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
       return (
@@ -1666,7 +1688,7 @@ function AppInner() {
             {teamAlerts.size > 0 && (
               <div className="notice team-license-notice">
                 <Icon name="alert" />
-                <p><strong>{teamAlerts.size} {teamAlerts.size === 1 ? "account needs" : "accounts need"} attention.</strong> Active staff licenses are expiring soon or have expired. This is what the Team badge counts.</p>
+                <p><strong>{teamLicenseItems.length} license {teamLicenseItems.length === 1 ? "alert" : "alerts"} across {teamAlerts.size} {teamAlerts.size === 1 ? "account" : "accounts"}.</strong> Review expiring licenses, renewal submissions, or assignments needing cover. This is what the Team badge counts.</p>
                 <Button onClick={() => updateListQuery("admin:team", q => ({ ...q, search: "", filters: { attention: "needs-action" }, page: 1 }))}>View accounts</Button>
               </div>
             )}
@@ -1701,7 +1723,7 @@ function AppInner() {
                             <span>
                               <strong>{a.name}</strong>
                               <small>{a.email}</small>
-                              {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small></span>}
+                              {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small>{teamLicenseItems.filter(item => item.id === a.id).map(item => <small key={item.key}>{item.detail}</small>)}</span>}
                             </span>
                           </button>
                         </td>
@@ -2113,6 +2135,12 @@ function AppInner() {
                   View profile
                 </Button>
               </div>
+              {(() => {
+                const li = state.license?.overview?.find((i) => i.id === p.opmId)
+                const asg = li?.assignments.find((x) => x.projectId === p.id && x.role === "opm")
+                return li?.restricted && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
+              })()}
+              <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === p.opmId)?.expiry} projectEnd={p.end} />
               <div className="phase-assignments">
                 {p.team.map((t) => (
                   <div key={t.phase}>
@@ -2125,7 +2153,10 @@ function AppInner() {
                             "Any discipline"}
                       </small>
                     </span>
-                    <span>{t.accountId ? nameFor(t.accountId) : "Unassigned"}</span>
+                    <span>
+                      {t.accountId ? nameFor(t.accountId) : "Unassigned"}
+                      <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
+                    </span>
                     <Status status={t.accountId ? t.status : "unassigned"} />
                     {t.status !== "confirmed" && p.status !== "completed" ? (
                       <select
@@ -2138,6 +2169,9 @@ function AppInner() {
                           (c) => (
                             <option key={c.account.id} value={c.account.id}>
                               {c.account.name} · {c.matched}/{c.total} tags
+                              {p.end && c.account.expiry && c.account.expiry < p.end
+                                ? ` · license expires ${dateLabel(c.account.expiry)}`
+                                : ""}
                             </option>
                           ),
                         )}
@@ -2148,10 +2182,16 @@ function AppInner() {
                         Locked
                       </span>
                     )}
+                    {(() => {
+                      const li = state.license?.overview?.find((i) => i.id === t.accountId)
+                      const asg = li?.assignments.find((x) => x.projectId === p.id && x.role === "spm" && x.stage?.toLowerCase() === t.phase.toLowerCase())
+                      return li?.restricted && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
+                    })()}
                   </div>
                 ))}
               </div>
             </section>
+            <EngineerHistory projectId={p.id} />
             <section className="detail-section">
               <h3>Project progress & review history</h3>
               {p.history.map((h, i) => (
@@ -2451,14 +2491,6 @@ function AppInner() {
                       ? `Expiry: ${dateLabel(a.expiry)} · Grace period: ${state.rules.grace} days`
                       : "Add a license record and supporting document when applicable."}
                   </p>
-                  {["Grace expired", "Expired"].includes(
-                    licenseState(a, state.rules.grace),
-                  ) && (
-                    <p className="error">
-                      License requires renewal. Login and new assignments remain
-                      subject to eligibility rules.
-                    </p>
-                  )}
                 </div>
                 <Button
                   disabled={a.status === "deactivated"}
@@ -2468,6 +2500,12 @@ function AppInner() {
                   {a.license ? "Renew license" : "Add license"}
                 </Button>
               </div>
+              <LicenseProfileBlock
+                item={state.license?.overview?.find((i) => i.id === a.id)}
+                reviewing={Boolean(a.renewalUnderReview)}
+                onOverride={setOverrideTarget}
+                onReview={() => setRenewalsOpen(true)}
+              />
               {a.certifications && (
                 <div className="tag-list subsection">
                   {a.certifications.map((cert) => (
@@ -2480,6 +2518,7 @@ function AppInner() {
                 missing, expiring or expired.
               </p>
             </section>
+            <WorkRecord userId={a.id} />
             <section className="detail-section">
               <h3>Engineer documents</h3>
               <DocumentList docs={a.docs} onPreview={previewDoc} />
@@ -2782,6 +2821,7 @@ function AppInner() {
         state={state}
         actor={actor}
         onCommand={sendWorkflow}
+        onReload={reloadWorkspace}
         onRead={(ids) =>
           setState((current) => ({
             ...current,
@@ -3116,6 +3156,28 @@ function AppInner() {
             account={selectedAccount}
             onClose={() => setDialog(undefined)}
             onSave={saveAccount}
+          />
+        </Modal>
+      )}
+      {overrideTarget && (
+        <OverrideDialog
+          target={overrideTarget}
+          onClose={() => setOverrideTarget(undefined)}
+          onDone={async () => {
+            setOverrideTarget(undefined)
+            await reloadWorkspace()
+            setToast("Reassignment requested. Nothing moves until the replacement accepts.")
+          }}
+        />
+      )}
+      {renewalsOpen && (
+        <Modal title="License renewals" subtitle="Verify or reject uploaded licenses." onClose={() => setRenewalsOpen(false)} wide>
+          <RenewalQueue
+            renewals={state.license?.renewals || []}
+            onChanged={async () => {
+              await reloadWorkspace()
+              setToast("Renewal reviewed.")
+            }}
           />
         </Modal>
       )}

@@ -1,3 +1,4 @@
+import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
@@ -147,11 +148,13 @@ export async function createAccountRecord(client, actor, body) {
   const roleRow = await client.query("SELECT id FROM roles WHERE code=$1",[role]);
   if (!roleRow.rowCount) throw new HttpError(400,"Role is not configured.");
   const hash = await bcrypt.hash(password,12);
+  // The unique email covers deactivated accounts too: a company email is never reused.
   const inserted = await client.query(
     `INSERT INTO users (id,full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by)
      VALUES ($1,$2,$3,$4,$5,true,$6,'invited',$7,$7)
      RETURNING id,full_name,email,phone,status,date_added::text AS date_added`,
-    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id]);
+    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
+    .catch((error) => { throw error.code === "23505" ? new HttpError(409,"This email is already assigned to another account.") : error; });
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
   return { ...inserted.rows[0],role,temp_password:password };
 }
@@ -410,6 +413,12 @@ export const addLicense = async (req, res) => {
     if (!licenseNumber || !String(licenseNumber).trim()) { cleanup(); return sendError(res, "license_number is required.", 400); }
     if (!licenseExpiry || !/^\d{4}-\d{2}-\d{2}$/.test(licenseExpiry) || Number.isNaN(Date.parse(licenseExpiry))) {
       cleanup(); return sendError(res, "license_expiry is required (YYYY-MM-DD).", 400);
+    }
+
+    // An engineer's own upload never takes effect by itself: it waits for an Administrator to verify it.
+    if (!isAdmin) {
+      const request = await withTransaction((client) => createRenewalRequest(client, user, b, req.file));
+      return sendOk(res, "Renewal uploaded. It will be reviewed by an Administrator.", 1, request, 201);
     }
 
     const data = await withTransaction(async (client) => {

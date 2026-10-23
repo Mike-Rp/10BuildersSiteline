@@ -15,7 +15,7 @@ const db = new PGlite({ extensions: { citext } })
 await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
 await db.exec(fs.readFileSync(here("../supabase/migrations/20261017000002_thesis_backend_schema.sql"), "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
 await db.exec(fs.readFileSync(here("../supabase/seed/dummy-data.sql"), "utf8"))
-for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql"]) {
+for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql","009-engineer-license-workflow.sql"]) {
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/"+migration),"utf8"))
 }
 const dbPort = await free(), apiPort = await free()

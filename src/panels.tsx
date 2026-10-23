@@ -12,6 +12,8 @@ import {
 import { Button, Badge, Empty, Field, Icon, Modal } from "./ui"
 import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
+import { LicenseAssignmentWarning } from "./LicenseWorkflow"
+import { newUploadedDoc } from "./uploadDocument"
 import {
   accountError,
   clientForEmail,
@@ -47,6 +49,7 @@ import {
   type Project,
   type Rules,
   type State,
+  suggestWorkEmail,
 } from "./model"
 
 const INTAKE_PROJECT_TYPES = [
@@ -100,6 +103,7 @@ export function Upload({
   buttonLabel = "Upload document",
   ariaLabel,
   spreadsheet = false,
+  clientVisible = false,
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
@@ -108,6 +112,8 @@ export function Upload({
   buttonLabel?: string
   ariaLabel?: string
   spreadsheet?: boolean
+  // Internal by default. Only the shared site-photo gallery sets this, because that gallery is shared with the Client Portal.
+  clientVisible?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File>()
@@ -148,17 +154,7 @@ export function Upload({
     try {
       const id = uid()
       await saveFile(id, file, spreadsheet)
-      const saved=await onSave({
-        id,
-        label,
-        name: file.name,
-        uploaded: true,
-        clientVisible: false,
-        owner,
-        date: today(),
-        size: file.size,
-        mime: file.type,
-      })
+      const saved=await onSave(newUploadedDoc({ id, label, file, owner, clientVisible }))
       if(saved===false)throw new Error("The server could not save this change. Review the workspace message and try again.")
       clear()
     } catch (e) {
@@ -608,15 +604,17 @@ export function AccountForm({
   )
   const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
   const generatedIdentity = !account && !clientOnly
+  // Once the administrator edits the email, name changes stop overwriting it.
+  const [emailEdited, setEmailEdited] = useState(false)
+  const suggestion = suggestWorkEmail(nameParts, state.accounts)
+  const plainEmail = suggestWorkEmail({ ...nameParts, middle: "" }, [])
   function updateName(part: "first" | "middle" | "last", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
-    const emailPart = (name: string) => name.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
-    const first = emailPart(next.first), last = emailPart(next.last)
     setDraft(current => ({ ...current,
       lastName: next.last.trim(),
       name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
-      email: first && last ? last + "." + first + "@10builders.com" : "",
+      ...(emailEdited ? {} : { email: suggestWorkEmail(next, state.accounts) }),
     }))
     setError("")
   }
@@ -727,16 +725,18 @@ export function AccountForm({
           <input
             required
             type="email"
-            readOnly={generatedIdentity}
             value={draft.email}
             onChange={(e) => {
+              if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
               setError("")
             }}
             placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>
-        {generatedIdentity && <p className="field wide">Email is generated from your last name and first name. Middle name is optional.</p>}
+        {generatedIdentity && <div className="field wide">
+          {emailEdited && <Button onClick={() => { setEmailEdited(false); setDraft(current => ({ ...current, email: suggestion })); setError("") }}>Use suggested email{suggestion ? ` (${suggestion})` : ""}</Button>}
+        </div>}
         <Field label="Contact number">
           <input
             value={draft.phone}
@@ -1498,6 +1498,7 @@ export function IntakeForm({
               ))}
             </select>
           </Field>
+          <LicenseAssignmentWarning expiry={opms.find((a) => a.id === draft.opmId)?.expiry} projectEnd={draft.end} />
           {!opms.length && (
             <p className="error">
               No eligible Office PM. Review cooldowns, license records and the
@@ -1599,6 +1600,7 @@ export function IntakeForm({
                             ? "Assignment required"
                             : "No eligible Site PM currently matches this phase"}
                       </small>
+                      <LicenseAssignmentWarning expiry={current?.account.expiry} projectEnd={draft.end} />
                     </div>
                   </div>
                 )
@@ -2011,14 +2013,23 @@ export function SettingsForm({
   rules: Rules
   onSave: (rules: Rules, label: string) => void
 }) {
+  type NumericRule = "grace" | "cap" | "response" | "idle"
   const [draft, setDraft] = useState(rules)
-  const [confirm, setConfirm] = useState<keyof Rules>()
+  const [confirm, setConfirm] = useState<NumericRule>()
   const [error, setError] = useState("")
-  const labels: Record<keyof Rules, [string, string, number]> = {
+  const [reminders, setReminders] = useState((rules.reminderDays || [60, 30, 14, 7, 0]).join(", "))
+  const parsedReminders = reminders
+    .split(/[s,]+/)
+    .filter(Boolean)
+    .map(Number)
+  const remindersValid =
+    parsedReminders.length > 0 && parsedReminders.length <= 12 && parsedReminders.every((n) => Number.isInteger(n) && n >= 0 && n <= 365)
+  const remindersChanged = reminders.replace(/s/g, "") !== (rules.reminderDays || [60, 30, 14, 7, 0]).join(",")
+  const labels: Record<NumericRule, [string, string, number]> = {
     grace: [
       "License grace period",
-      "Days after license expiry before sign-in is blocked.",
-      0,
+      "Days an engineer keeps their assignments after a license expires. Signing and approving are paused; an Administrator can reassign only after this period.",
+      1,
     ],
     cap: [
       "Active projects per assignee",
@@ -2041,7 +2052,7 @@ export function SettingsForm({
       <div className="settings-rules">
         {(Object.entries(
           labels,
-        ) as [keyof Rules, [string, string, number]][]).map(
+        ) as [NumericRule, [string, string, number]][]).map(
           ([key, [label, desc, min]]) => (
             <div className="rule-row" key={key}>
               <div>
@@ -2083,6 +2094,36 @@ export function SettingsForm({
             </div>
           ),
         )}
+        <div className="rule-row">
+          <div>
+            <h3>License renewal reminders</h3>
+            <p>Days before expiry when the engineer, their superior and the Administrator are reminded. Use 0 for the expiry day.</p>
+          </div>
+          <input
+            aria-label="License renewal reminder days"
+            value={reminders}
+            onChange={(e) => setReminders(e.target.value)}
+          />
+          {remindersChanged && (
+            <>
+              <Button
+                variant="primary"
+                disabled={!remindersValid}
+                onClick={async () => {
+                  const days = [...new Set(parsedReminders)].sort((a, b) => b - a)
+                  await onSave({ ...rules, reminderDays: days }, "License renewal reminders")
+                  setReminders(days.join(", "))
+                }}
+              >
+                Confirm change
+              </Button>
+              <Button onClick={() => setReminders((rules.reminderDays || [60, 30, 14, 7, 0]).join(", "))}>Cancel</Button>
+            </>
+          )}
+          {remindersChanged && !remindersValid && (
+            <p className="error">Enter up to 12 whole numbers from 0 to 365, separated by commas.</p>
+          )}
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
       {confirm && (

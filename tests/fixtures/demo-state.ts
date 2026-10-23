@@ -306,7 +306,7 @@ export function initialState(): State {
     accounts,
     projects,
     companies,
-    rules: { grace: 7, cap: 2, response: 3, idle: 15 },
+    rules: { grace: 30, cap: 2, response: 3, idle: 15 },
     muted: [],
     events: [
       {

@@ -28,6 +28,9 @@ import LeadSubcontractorPanel, {
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
+import { checklistFeedback } from "./checklistFeedback"
+import ReportRejectDialog from "./ReportRejectDialog"
+import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
 import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
@@ -71,6 +74,8 @@ import {
   type Account,
   type Company,
   type Doc,
+  fileSizeLabel,
+  submissionDocs,
   type Event as WorkspaceEvent,
   type Project,
   type State,
@@ -183,6 +188,7 @@ export default function RoleWorkspace({
   onStayActive,
   onResume,
   onPause,
+  onReload,
 }: {
   state: State
   actor: Account
@@ -194,8 +200,10 @@ export default function RoleWorkspace({
   onStayActive: () => void
   onResume: () => void
   onPause: () => void
+  onReload: () => unknown
 }) {
   const isOpm = actor.role === "opm"
+  const [renewing, setRenewing] = useState(false)
   useListMemory()
   const nav = isOpm ? OPM_NAV : SPM_NAV
   const projects = ownedProjects(state, actor)
@@ -255,6 +263,8 @@ export default function RoleWorkspace({
   const [assignmentFilter, setAssignmentFilter] = useState("all")
   const [assignmentId, setAssignmentId] = useState("")
   const [reviewAction, setReviewAction] = useState<WorkflowCommand>()
+  // Ordinary progress report being rejected (separate from checklist evidence and rework decisions).
+  const [reportReject, setReportReject] = useState<{ projectId: string; projectName: string; expectedVersion: number }>()
   const [activityFilter, setActivityFilter] = useState("all")
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
@@ -470,18 +480,32 @@ export default function RoleWorkspace({
   }
   function header(title: string, action?: ReactNode) {
     return (
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            {isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}
+      <>
+        <div className="page-heading">
+          <div>
+            <div className="eyebrow">
+              {isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}
+            </div>
+            <h1>
+              {title}
+              <span className="heading-dot">.</span>
+            </h1>
           </div>
-          <h1>
-            {title}
-            <span className="heading-dot">.</span>
-          </h1>
+          {action}
         </div>
-        {action}
-      </div>
+        <LicenseBanner license={state.license?.self} onUpload={() => setRenewing(true)} />
+        {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
+          <ReassignRequests
+            requests={state.license?.requests || []}
+            onError={setError}
+            onChanged={() => {
+              setError("")
+              setMessage("Reassignment answered.")
+              void onReload()
+            }}
+          />
+        )}
+      </>
     )
   }
   function timeline(p: Project) {
@@ -890,7 +914,7 @@ export default function RoleWorkspace({
             <CompactPager list={dashActivity} />
           </Panel>
         </div>
-
+        <WorkRecord userId={actor.id} />
       </>
     )
   }
@@ -1054,7 +1078,7 @@ export default function RoleWorkspace({
       if (item) return item.status
     }
     if (
-      work.pendingUpdate?.evidence?.id === docId ||
+      submissionDocs(work.pendingUpdate).some((d) => d.id === docId) ||
       work.pendingRework?.evidence?.id === docId
     )
       return "pending"
@@ -1802,8 +1826,15 @@ export default function RoleWorkspace({
                 <div key={item.id} className="qa-checklist-row">
                   <div>
                     <h4>{item.label}</h4>
-                    {item.note && <p className="error">{item.note}</p>}
-                    {item.reworkReason&&<p className="error">Rework: {item.reworkReason}</p>}
+                    {checklistFeedback(item).rejection && (
+                      <p className="error">
+                        <strong>Rejected by Office PM:</strong> {checklistFeedback(item).rejection}
+                      </p>
+                    )}
+                    {checklistFeedback(item).rework && <p className="error">Rework: {checklistFeedback(item).rework}</p>}
+                    {checklistFeedback(item).submission && (
+                      <p className="role-muted">Your submission note: {checklistFeedback(item).submission}</p>
+                    )}
                     {item.doc && (
                       <button
                         className="inline-link"
@@ -1993,6 +2024,7 @@ export default function RoleWorkspace({
               label="Shared site photo (Client-visible)"
               buttonLabel="Upload site photo"
               owner={actor.name}
+              clientVisible
               onSave={async (doc) =>
                 await act(
                   { type: "add_photo", projectId: p.id, doc },
@@ -2140,7 +2172,9 @@ export default function RoleWorkspace({
                             />
                           </div>
                           <p>
-                            Submitted{" "}
+                            {item.submittedBy || item.submittedByName
+                              ? `Evidence submitted by ${item.submittedByName || actorName(item.submittedBy || "")}`
+                              : "Submitted"}{" "}
                             {item.submittedAt
                               ? new Date(item.submittedAt).toLocaleString()
                               : "date unavailable"}
@@ -2241,20 +2275,31 @@ export default function RoleWorkspace({
                     <p className="submission-note">
                       {submission.note || "No additional note provided."}
                     </p>
-                    {submission.evidence && (
-                      <Button
-                        icon="doc"
-                        onClick={() => showDoc(p, submission.evidence!)}
-                      >
-                        View field evidence
-                      </Button>
+                    {submissionDocs(submission).length > 0 ? (
+                      <div className="report-attachments">
+                        <h4>
+                          {tab === "rework" ? "Field evidence" : "Attachments"} ({submissionDocs(submission).length})
+                        </h4>
+                        <ul>
+                          {submissionDocs(submission).map((doc) => (
+                            <li key={doc.id}>
+                              <Button icon="doc" onClick={() => showDoc(p, doc)}>
+                                View {doc.name}
+                              </Button>
+                              {fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      tab !== "rework" && <p className="role-muted">No attachments with this report.</p>
                     )}
                     <div className="notice subsection">
                       <Icon name="shield" />
                       <p>
                         {tab === "rework"
                           ? "Only the selected affected activities require correction. Review the phase and project impact before confirming; dismissing the request leaves approvals unchanged."
-                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving this report grants no activity credit and does not change the project phase."}
+                          : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving or rejecting this report grants or removes no activity credit and does not change the project phase. A rejection needs a reason, which the Site PM sees."}
                       </p>
                     </div>
                     <div className="role-actions">
@@ -2287,6 +2332,7 @@ export default function RoleWorkspace({
                           </Button>
                         </>
                       ) : (
+                        <>
                         <Button
                           variant="primary"
                           icon="check"
@@ -2303,6 +2349,19 @@ export default function RoleWorkspace({
                         >
                           Approve progress note
                         </Button>
+                        <Button
+                          variant="danger-ghost"
+                          onClick={() =>
+                            setReportReject({
+                              projectId: p.id,
+                              projectName: p.name,
+                              expectedVersion: submission.version,
+                            })
+                          }
+                        >
+                          Reject report
+                        </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -3421,7 +3480,7 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
-    if (page === "Reports") return <Reports projects={projects} />
+    if (page === "Reports") return <Reports />
     switch (page) {
       case "Dashboard":
         return dashboard()
@@ -3941,6 +4000,40 @@ export default function RoleWorkspace({
           reject={evidenceReview.type==="reject_checklist"} onClose={()=>setEvidenceReview(undefined)}
           onConfirm={(expectedReviewToken,note)=>act({...evidenceReview,expectedReviewToken,note},
             evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
+      )}
+      {reportReject && (
+        <ReportRejectDialog
+          projectName={reportReject.projectName}
+          onReject={(reason) =>
+            Promise.resolve(
+              onCommand({
+                type: "reject_update",
+                projectId: reportReject.projectId,
+                expectedVersion: reportReject.expectedVersion,
+                note: reason,
+              }),
+            )
+          }
+          onStale={() => void onReload()}
+          onClose={() => setReportReject(undefined)}
+          onDone={() => {
+            setReportReject(undefined)
+            setError("")
+            setMessage("Progress report rejected. The Site PM can submit a new report.")
+          }}
+        />
+      )}
+      {renewing && (
+        <RenewalUploadDialog
+          license={state.license?.self}
+          onClose={() => setRenewing(false)}
+          onDone={() => {
+            setRenewing(false)
+            setError("")
+            setMessage("Renewal uploaded. An Administrator will review it.")
+            void onReload()
+          }}
+        />
       )}
       {reviewAction && (
         <ReworkReview key={`${reviewAction.requestId}-${reviewAction.type}`} requestId={reviewAction.requestId!}

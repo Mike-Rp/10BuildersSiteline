@@ -285,3 +285,33 @@ only when required, accounting for any writes made since the backup.
   repeatability, preserves existing records and tests the old writer bridge.
 - Actual results and remaining lint/display limitations:
   `docs/VERIFIED_PROGRESS_RECOVERY_RESULTS.md`.
+
+
+---
+
+# Expired engineer license workflow
+
+Added by the license-workflow change. **Apply the migration before deploying the backend that uses it.**
+
+## Migration
+`Thesis-Backend/migrations/009-engineer-license-workflow.sql` (additive, safe to run again). From `Thesis-Backend`:
+
+1. Back up the database.
+2. Dry run: `npm run db:license-workflow` (runs in a transaction, prints what would change, rolls back).
+3. Apply: `npm run db:license-workflow -- --apply` (refuses a non-local database unless `CONFIRM_BACKUP=yes`).
+4. Verify (read-only): `select count(*) from engineer_assignment_history;` and `select rules from workspace_settings;` (should include `reminderDays`).
+
+It adds four tables (`license_renewal_requests`, `license_reminders_sent`, `engineer_assignment_history`, `license_overrides`), backfills the current phase and Office PM holders, and adds a default `reminderDays` rule. It changes no existing table or column. Progress approvals, project access and workspace loading read these tables, so deploy the backend only after it is applied.
+
+## Settings
+- The grace period is the existing `grace` rule. The seeds use 30 days; the migration never overwrites a value an Administrator already set. Set it in Settings, or `update workspace_settings set rules = rules || '{"grace":30}'`.
+- Reminder days are `reminderDays` (default 60, 30, 14, 7, 0).
+
+## Reminders
+- Engineer reminders, the grace-end alert and expired reassignment requests run in `services/licenses/sweep.js`: from the daily cron (`/api/v1/cron/license-sweep`, which now runs both sweeps), from the maintenance timer when it is enabled, and at most once a minute when someone loads a workspace.
+- The older account sweep (`services/accounts/license-sweep.utility.js`) now only raises "license missing" and "document pending" reminders. Expiring and expired licenses are handled by the new sweep, so nobody is notified twice.
+
+## Checks after deploy
+- [ ] An Administrator sees the license items in Dashboard → Needs attention.
+- [ ] An expired Site PM or Office PM can sign in and view, and sees "Paused until your license renewal is verified" when signing, submitting or approving.
+- [ ] A renewal upload appears in the Administrator's review list and verifying it lifts the pause.

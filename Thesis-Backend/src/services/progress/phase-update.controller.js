@@ -4,6 +4,7 @@ import {
 } from "../../common/utilities/access.utility.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { phaseProject, assertProjectSpm, readChecklist, recordPhaseHistory } from "./phase.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
@@ -17,6 +18,7 @@ export const submitPhaseUpdate = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
+      await assertLicenseActive(user, client);
       const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const existing = await client.query(
@@ -66,6 +68,7 @@ const resolvePhaseUpdate = decision => async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM confirmation is required.");
+      await assertLicenseActive(user, client);
       const found = await client.query(
         "SELECT * FROM project_phase_updates WHERE id = $1 AND project_id = $2 FOR UPDATE",
         [req.params.updateId, p.id]);
@@ -117,6 +120,10 @@ export const getPhaseUpdates = async (req, res) => {
       const result = await client.query(
         `SELECT u.*, s.code AS selected_stage,
            ARRAY(SELECT file_id FROM project_phase_submission_files WHERE update_id = u.id) AS file_ids,
+           (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'name', f.original_name, 'content_type', f.content_type,
+             'byte_size', f.byte_size) ORDER BY f.uploaded_at, f.id), '[]'::jsonb)
+            FROM project_phase_submission_files sf JOIN project_phase_files f ON f.id = sf.file_id AND f.project_id = u.project_id
+            WHERE sf.update_id = u.id) AS files,
            (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', e.id, 'item_id', e.checklist_item_id,
              'status', e.status, 'file_id', e.file_id, 'submission_note', e.submission_note)), '[]'::jsonb)
             FROM project_phase_evidence e WHERE e.phase_update_id = u.id) AS checklist_submissions
