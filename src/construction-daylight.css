@@ -55,9 +55,9 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .eyebrow { color: var(--color-muted); font-size: var(--text-caption); font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
 
 /* A quiet, architectural frame; navigation is legible rather than compressed. */
-#root .sidebar { width: var(--sidebar-width); padding: 26px 16px 0; background: var(--color-surface); border-right: 1px solid var(--color-line); overflow: hidden; }
+#root .sidebar { width: var(--sidebar-width); height: 100vh; height: 100dvh; padding: 26px 16px max(12px, env(safe-area-inset-bottom, 0px)); background: var(--color-surface); border-right: 1px solid var(--color-line); overflow: hidden; }
 #root .sidebar > :not(nav) { flex-shrink: 0; }
-#root .sidebar > nav { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+#root .sidebar > nav { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
 #root .main-shell { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); }
 #root .brand { padding: 0 10px 26px; gap: 12px; font-size: 25px; letter-spacing: -.9px; font-weight: 750; }
 #root .brand-mark { width: 40px; height: 44px; border-radius: 4px; background: var(--color-primary); color: var(--color-surface); }
@@ -352,11 +352,18 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
   #root .button.icon-button { min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
 }
 
+@media (max-width: 760px) and (max-height: 500px) {
+  #root .sidebar .workspace-switch { display: none; }
+  #root .sidebar .brand { padding-bottom: 12px; }
+  #root .sidebar-bottom { padding-top: 0; }
+  #root .sidebar-person { padding-block: 12px; }
+}
+
 /* Site teams get the same visual system, with extra daylight-friendly touch space. */
 @media (max-width: 760px) {
   :root { --sidebar-width: 264px; }
   html { scroll-padding-top: 155px; }
-  #root .sidebar { width: var(--sidebar-width); padding: 25px 16px 0; }
+  #root .sidebar { width: var(--sidebar-width); padding-top: max(16px, env(safe-area-inset-top, 0px)); }
   #root .main-shell { margin-left: 0; width: 100%; }
   #root .topbar, #root .role-workspace .topbar, #root .client-portal .topbar {
     height: auto; min-height: 76px; flex-wrap: nowrap; padding: 12px 16px; gap: 9px;
