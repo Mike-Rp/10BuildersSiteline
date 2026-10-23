@@ -74,6 +74,8 @@ import {
   type Account,
   type Company,
   type Doc,
+  fileSizeLabel,
+  submissionDocs,
   type Event as WorkspaceEvent,
   type Project,
   type State,
@@ -1076,7 +1078,7 @@ export default function RoleWorkspace({
       if (item) return item.status
     }
     if (
-      work.pendingUpdate?.evidence?.id === docId ||
+      submissionDocs(work.pendingUpdate).some((d) => d.id === docId) ||
       work.pendingRework?.evidence?.id === docId
     )
       return "pending"
@@ -2273,13 +2275,24 @@ export default function RoleWorkspace({
                     <p className="submission-note">
                       {submission.note || "No additional note provided."}
                     </p>
-                    {submission.evidence && (
-                      <Button
-                        icon="doc"
-                        onClick={() => showDoc(p, submission.evidence!)}
-                      >
-                        View field evidence
-                      </Button>
+                    {submissionDocs(submission).length > 0 ? (
+                      <div className="report-attachments">
+                        <h4>
+                          {tab === "rework" ? "Field evidence" : "Attachments"} ({submissionDocs(submission).length})
+                        </h4>
+                        <ul>
+                          {submissionDocs(submission).map((doc) => (
+                            <li key={doc.id}>
+                              <Button icon="doc" onClick={() => showDoc(p, doc)}>
+                                View {doc.name}
+                              </Button>
+                              {fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      tab !== "rework" && <p className="role-muted">No attachments with this report.</p>
                     )}
                     <div className="notice subsection">
                       <Icon name="shield" />

@@ -340,8 +340,23 @@ export type ProgressSubmission = {
   priorProgress: number
   requestedPhase: string
   requestedProgress: number
+  // The first attachment, kept for code that handles a single file.
   evidence?: Doc
+  // Every file attached to the report (a report can have several).
+  attachments?: Doc[]
   escalated?: boolean
+}
+// All files of a progress report or rework submission, whichever field carries them.
+export function submissionDocs(submission?: Pick<ProgressSubmission, "attachments" | "evidence">): Doc[] {
+  if (!submission) return []
+  if (submission.attachments?.length) return submission.attachments
+  return submission.evidence ? [submission.evidence] : []
+}
+export function fileSizeLabel(bytes?: number) {
+  if (!bytes || bytes < 0) return ""
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 export type SubcontractorSelection = {
   companyId: string

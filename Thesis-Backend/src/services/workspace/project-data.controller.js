@@ -129,7 +129,10 @@ export async function getProjectData(req,res) {
     left join project_phase_files f on f.id=e.file_id
     left join users su on su.id=e.submitted_by
     where i.project_id=any($1::uuid[]) order by i.sort_order,i.id`,[ids])).rows:[];
-   const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage
+   const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage,
+    coalesce((select jsonb_agg(jsonb_build_object('id',f.id,'name',f.original_name,'content_type',f.content_type,'byte_size',f.byte_size) order by f.uploaded_at,f.id)
+      from project_phase_submission_files sf join project_phase_files f on f.id=sf.file_id and f.project_id=u.project_id
+      where sf.update_id=u.id),'[]'::jsonb) as files
     from project_phase_updates u join project_stages selected on selected.id=u.selected_stage_id
     left join project_stages prior on prior.id=u.prior_stage_id
     where u.project_id=any($1::uuid[]) and u.status='pending' order by u.id desc`,[ids])).rows:[];

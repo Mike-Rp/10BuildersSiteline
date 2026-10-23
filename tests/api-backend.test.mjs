@@ -420,6 +420,81 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await sendApiWorkflow(cleanup.state,cleanup.state.accounts.find(a=>a.id===cleanup.user.id),{type:"reject_update",projectId:project.id,note:"Cleanup"})
   })
 
+  await t.test("a progress report lists every attachment, only its own, and only to people who may open them",async()=>{
+    const png=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,2,0,0,0,144,119,83,222])],{type:"image/png"})
+    const pdf=()=>new Blob(["%PDF-1.4\n1 0 obj\n<< >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"],{type:"application/pdf"})
+    const form=(blob,name,fields={})=>{const f=new FormData();for(const [k,v] of Object.entries(fields))f.append(k,v);f.append("file",blob,name);return f}
+    const siteSession=await asUser("karlo.espiritu@10builders.com")
+    const project=siteSession.state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
+    const base="/progress/projects/"+project.id
+    const upload=async(blob,name)=>{const saved=await api(base+"/phase-files",{method:"POST",body:form(blob,name)});return saved.file?.id||saved.id}
+    const idPhoto=await upload(png(),"site-photo.png"),idSheet=await upload(pdf(),"inspection-sheet.pdf")
+    const officePm=async()=>asUser("renz.villaverde@10builders.com")
+    const pendingFor=async session=>(await loadState(session.user)).projects.find(p=>p.id===project.id).workflow.pendingUpdate
+    const resolve=async note=>{const s=await officePm();await sendApiWorkflow(s.state,s.state.accounts.find(a=>a.id===s.user.id),{type:"reject_update",projectId:project.id,note})}
+
+    // 1) two attachments chosen from earlier uploads
+    await api(base+"/phase-updates",{method:"POST",json:{note:"Two attachments",file_ids:[idPhoto,idSheet]}})
+    let office=await officePm()
+    let pending=await pendingFor(office)
+    assert.deepEqual(pending.attachments.map(d=>[d.id,d.name,d.mime]),[[idPhoto,"site-photo.png","image/png"],[idSheet,"inspection-sheet.pdf","application/pdf"]])
+    assert.ok(pending.attachments.every(d=>d.size>0&&d.uploaded&&d.clientVisible===false))
+    assert.equal(pending.evidence.id,idPhoto,"the first attachment stays available as evidence")
+    // The same list comes from the project's own update list, still with ids and now with metadata.
+    const listed=(await api(base+"/phase-updates")).find(u=>String(u.id)===pending.id)
+    assert.deepEqual(listed.file_ids,[idPhoto,idSheet])
+    assert.deepEqual(listed.files.map(x=>[x.id,x.name,x.content_type]),[[idPhoto,"site-photo.png","image/png"],[idSheet,"inspection-sheet.pdf","application/pdf"]])
+    assert.ok(!JSON.stringify(listed.files).includes("content\":"),"metadata only, never file contents")
+    // Each attachment opens through the authorised route for the Office PM, the Site PM and the Administrator.
+    for(const id of [idPhoto,idSheet]) assert.ok((await downloadApiFile(id)).size>0,"Office PM opens "+id)
+    const admin=await asUser("patricia.domingo@10builders.com")
+    const adminPending=(await loadState(admin.user)).projects.find(p=>p.id===project.id).workflow.pendingUpdate
+    assert.equal(adminPending.attachments.length,2)
+    for(const id of [idPhoto,idSheet]) assert.ok((await downloadApiFile(id)).size>0,"Administrator opens "+id)
+    const owner=await asUser("karlo.espiritu@10builders.com")
+    assert.ok((await downloadApiFile(idPhoto))?.size>0,"the submitting Site PM opens their own file")
+
+    // 2) access restrictions: an unrelated Site PM, a client and a signed-out caller get nothing
+    const outsider=await asUser("mikaela.bautista@10builders.com")
+    assert.equal(outsider.state.projects.some(p=>p.id===project.id),false)
+    assert.equal(await downloadApiFile(idPhoto),undefined,"an unrelated Site PM cannot open it")
+    await assert.rejects(api(base+"/phase-updates"),/not found/i)
+    const client=await asUser("f.uy@aldenheights-hoa.com")
+    assert.equal(await downloadApiFile(idPhoto),undefined,"a client cannot open it")
+    await assert.rejects(api(base+"/phase-updates"),/permission|forbidden/i)
+    for(const p of client.state.projects)assert.equal(p.workflow?.pendingUpdate?.attachments,undefined,"clients never receive report attachments")
+    setToken("")
+    await assert.rejects(api(base+"/phase-files/"+idPhoto),/token|unauthor|401/i)
+    await resolve("Cleanup 1")
+
+    // 3) the file sent with the report itself
+    await asUser("karlo.espiritu@10builders.com")
+    await api(base+"/phase-updates",{method:"POST",body:form(png(),"direct-upload.png",{note:"One attachment sent with the report"})})
+    office=await officePm()
+    pending=await pendingFor(office)
+    assert.deepEqual(pending.attachments.map(d=>d.name),["direct-upload.png"])
+    assert.ok((await downloadApiFile(pending.attachments[0].id)).size>0)
+    await resolve("Cleanup 2")
+
+    // 4) a report with no attachment shows none, and does not borrow checklist evidence
+    const site=await asUser("karlo.espiritu@10builders.com")
+    const item=site.state.projects.find(p=>p.id===project.id).workflow.checklist[project.phase].find(i=>i.status==="missing")
+    const evidenceFile=await upload(pdf(),"checklist-evidence.pdf")
+    await api(base+"/phase-updates",{method:"POST",json:{note:"No attachment, but checklist evidence",checklist_submissions:[{item_id:item.id,file_id:evidenceFile,submission_note:"Evidence"}]}})
+    office=await officePm()
+    pending=await pendingFor(office)
+    assert.equal(pending.attachments,undefined,"checklist evidence is not a report attachment")
+    assert.equal(pending.evidence,undefined)
+    await resolve("Cleanup 3")
+
+    // 5) a file from another project or another person cannot be attached
+    const otherSite=await asUser("bea.concepcion@10builders.com")
+    const meralco=otherSite.state.projects.find(p=>p.name==="Meralco Ave. Fit-out")
+    const foreign=(await api("/progress/projects/"+meralco.id+"/phase-files",{method:"POST",body:form(png(),"other-project.png")}))
+    await asUser("karlo.espiritu@10builders.com")
+    await assert.rejects(api(base+"/phase-updates",{method:"POST",json:{note:"Borrowed file",file_ids:[foreign.file?.id||foreign.id]}}),/belong to you and the selected project/i)
+  })
+
   await t.test("password reset requests require admin reauthentication and force a new password", async () => {
     const { user, state } = await asUser("patricia.domingo@10builders.com")
     const self = state.accounts.find(a => a.id === user.id)

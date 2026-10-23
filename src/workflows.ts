@@ -8,6 +8,7 @@ import {
   licenseState,
   projectPhaseNames,
   spmCandidates,
+  submissionDocs,
   today,
   uid,
   validateFile,
@@ -773,7 +774,7 @@ export function documentAccess(
     ...Object.values(work.checklist).flatMap((items) =>
       items.flatMap((item) => (item.doc ? [item.doc] : [])),
     ),
-    ...(work.pendingUpdate?.evidence ? [work.pendingUpdate.evidence] : []),
+    ...submissionDocs(work.pendingUpdate),
     ...(work.pendingRework?.evidence ? [work.pendingRework.evidence] : []),
   ]
   const doc = available.find((d) => d.id === docId)
@@ -796,7 +797,7 @@ export function documentAccess(
       work.photos.some((d) => d.id === doc.id) ||
       ownEvidence ||
       (work.pendingUpdate?.authorId === actor.id &&
-        work.pendingUpdate.evidence?.id === doc.id) ||
+        submissionDocs(work.pendingUpdate).some((d) => d.id === doc.id)) ||
       (work.pendingRework?.authorId === actor.id &&
         work.pendingRework.evidence?.id === doc.id) ||
       p.history.some(

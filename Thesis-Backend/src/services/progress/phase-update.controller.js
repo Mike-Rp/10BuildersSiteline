@@ -120,6 +120,10 @@ export const getPhaseUpdates = async (req, res) => {
       const result = await client.query(
         `SELECT u.*, s.code AS selected_stage,
            ARRAY(SELECT file_id FROM project_phase_submission_files WHERE update_id = u.id) AS file_ids,
+           (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'name', f.original_name, 'content_type', f.content_type,
+             'byte_size', f.byte_size) ORDER BY f.uploaded_at, f.id), '[]'::jsonb)
+            FROM project_phase_submission_files sf JOIN project_phase_files f ON f.id = sf.file_id AND f.project_id = u.project_id
+            WHERE sf.update_id = u.id) AS files,
            (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', e.id, 'item_id', e.checklist_item_id,
              'status', e.status, 'file_id', e.file_id, 'submission_note', e.submission_note)), '[]'::jsonb)
             FROM project_phase_evidence e WHERE e.phase_update_id = u.id) AS checklist_submissions
