@@ -18,13 +18,12 @@ export default function Reports({ projects }: { projects: { id: string; name: st
         <p>Verified construction progress, checklist approvals, completed phases, rework, and pending reviews in one report.</p>
         <ReportProjectSearch projects={projects} value={selected} onChange={setProjectId} />
         <div className="role-actions"><Button variant="primary" icon="doc" onClick={() => setOpen(true)}>Preview & export report</Button></div>
-        <p>Choose a month in the preview, then export CSV or print / save as PDF.</p>
+        <p>Choose a month in the preview, then export CSV or print / save as PDF. Use Change project to switch without closing the preview.</p>
       </section>
       <aside className="report-guidance" aria-label="Report guidance">
-        <p><strong>About this report:</strong> Monthly verified progress, checklist approvals, completed phases, confirmed rework, and pending reviews at the reporting cutoff.</p>
         <p>Information follows your role and project access. Missing historical records appear as unavailable.</p>
       </aside>
     </>}
-    {open && selected && <MonthlyReport projects={projects} initialProjectId={selected} onClose={() => setOpen(false)} />}
+    {open && selected && <MonthlyReport projects={projects} initialProjectId={selected} allowProjectChange={false} onProjectChange={setProjectId} onClose={() => setOpen(false)} />}
   </>
 }

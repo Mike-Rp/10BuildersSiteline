@@ -6,8 +6,9 @@ import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type M
 import "./monthly-report.css"
 import ReportProjectSearch from "./ReportProjectSearch"
 
-export default function MonthlyReport({projects,initialProjectId,onClose}:{projects:{id:string;name:string}[];initialProjectId:string;onClose:()=>void}) {
+export default function MonthlyReport({projects,initialProjectId,onClose,allowProjectChange=true,onProjectChange}:{projects:{id:string;name:string}[];initialProjectId:string;onClose:()=>void;allowProjectChange?:boolean;onProjectChange?:(id:string)=>void}) {
   const [projectId,setProjectId]=useState(initialProjectId)
+  const [projectSearchOpen,setProjectSearchOpen]=useState(allowProjectChange)
   const [month,setMonth]=useState(currentReportMonth)
   const [data,setData]=useState<{report:Report;snapshot:string}>()
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[refresh,setRefresh]=useState(0),[exporting,setExporting]=useState(false)
@@ -41,7 +42,10 @@ export default function MonthlyReport({projects,initialProjectId,onClose}:{proje
   return <Modal title="Monthly Project Progress Summary" subtitle={report?.project.name||projects.find(p=>p.id===projectId)?.name} wide onClose={onClose}>
     <div className="monthly-report">
       <div className="monthly-report-controls">
-        <ReportProjectSearch projects={projects} value={projectId} onChange={setProjectId} />
+        {projects.length > 1 && <Button aria-expanded={projectSearchOpen} onClick={()=>setProjectSearchOpen(open=>!open)}>{projectSearchOpen ? "Cancel project change" : "Change project"}</Button>}
+        {projectSearchOpen && <ReportProjectSearch projects={projects} value={projectId} onChange={id=>{
+          setProjectId(id);setProjectSearchOpen(false);onProjectChange?.(id)
+        }} />}
         <label>Reporting month<input type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e=>setMonth(e.target.value)}/></label>
         <Button onClick={()=>setRefresh(n=>n+1)} disabled={loading||!month||!projectId}>Refresh</Button>
       </div>
