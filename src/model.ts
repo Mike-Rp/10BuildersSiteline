@@ -318,7 +318,10 @@ export type ChecklistItem = {
   reworkReason?: string
   version: number
   doc?: Doc
-  note?: string
+  // The Site PM's note when uploading the evidence.
+  submissionNote?: string
+  // The Office PM's reason when rejecting it. Kept apart from the submission note.
+  reviewNote?: string
   submittedAt?: string
   reviewedAt?: string
   reviewedBy?: string

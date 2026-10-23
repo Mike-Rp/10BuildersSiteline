@@ -200,3 +200,34 @@ test("Active Sites review membership follows current backend queues and ignores 
   assert.equal(hasPendingSiteReview({ ...both, status: "pending" }), false)
   assert.equal(hasPendingSiteReview({ ...both, status: "completed" }), false)
 })
+
+test("checklist items keep the submitter's note and the reviewer's rejection reason apart", () => {
+  const SUBMITTED = "Uploaded the signed inspection sheet"
+  const REJECTED = "Photo is blurry; re-shoot the rebar spacing"
+  const REWORK = "Withdrawn after the slab crack report"
+  const overview = {
+    checklist: {
+      items: [
+        { id: 1, title: "Rejected", status: "rejected", submission_note: SUBMITTED, review_note: REJECTED, evidence_id: 11 },
+        { id: 2, title: "Waiting", status: "pending", submission_note: SUBMITTED, review_note: null, evidence_id: 12 },
+        { id: 3, title: "Approved", status: "approved", submission_note: SUBMITTED, review_note: "Looks good", evidence_id: 13 },
+        { id: 4, title: "Rework", status: "rework_required", submission_note: SUBMITTED, review_note: REWORK, rework_reason: REWORK, evidence_id: 14 },
+        { id: 5, title: "Never submitted", status: "missing" },
+      ],
+    },
+  }
+  const items = mapProject(parts({ overview })).workflow.checklist.Structure
+  const byLabel = Object.fromEntries(items.map((i) => [i.label, i]))
+  assert.equal(byLabel.Rejected.status, "missing")
+  assert.equal(byLabel.Rejected.reviewNote, REJECTED)
+  assert.equal(byLabel.Rejected.submissionNote, SUBMITTED)
+  assert.notEqual(byLabel.Rejected.reviewNote, byLabel.Rejected.submissionNote)
+  assert.equal(byLabel.Waiting.reviewNote, undefined)
+  assert.equal(byLabel.Waiting.submissionNote, SUBMITTED)
+  assert.equal(byLabel["Never submitted"].submissionNote, undefined)
+  assert.equal(byLabel["Never submitted"].reviewNote, undefined)
+  assert.equal(byLabel.Rework.reworkReason, REWORK, "the rework reason keeps its own field")
+  assert.equal(byLabel.Rework.status, "rework_required")
+  // The old mixed-up field is gone.
+  for (const item of items) assert.equal("note" in item, false)
+})

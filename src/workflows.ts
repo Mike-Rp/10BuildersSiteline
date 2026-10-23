@@ -1573,7 +1573,8 @@ export function applyWorkflow(
         item.status = "submitted"
         item.submittedAt = date
         item.submittedBy = actor.id
-        item.note = ""
+        item.submissionNote = command.note?.trim() || undefined
+        item.reviewNote = undefined
         item.escalated = false
         p.history.push({
           date: day,
@@ -1619,7 +1620,7 @@ export function applyWorkflow(
           )
         } else {
           item.status = "missing"
-          item.note = "Rejected by Office PM — resubmit with corrections."
+          item.reviewNote = command.note?.trim() || "Rejected by Office PM — resubmit with corrections."
           item.submittedAt = undefined
           item.escalated = false
           p.history.push({

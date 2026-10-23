@@ -28,6 +28,7 @@ import LeadSubcontractorPanel, {
 import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
+import { checklistFeedback } from "./checklistFeedback"
 import { LicenseBanner, ReassignRequests, RenewalUploadDialog, WorkRecord } from "./LicenseWorkflow"
 import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
@@ -1820,8 +1821,15 @@ export default function RoleWorkspace({
                 <div key={item.id} className="qa-checklist-row">
                   <div>
                     <h4>{item.label}</h4>
-                    {item.note && <p className="error">{item.note}</p>}
-                    {item.reworkReason&&<p className="error">Rework: {item.reworkReason}</p>}
+                    {checklistFeedback(item).rejection && (
+                      <p className="error">
+                        <strong>Rejected by Office PM:</strong> {checklistFeedback(item).rejection}
+                      </p>
+                    )}
+                    {checklistFeedback(item).rework && <p className="error">Rework: {checklistFeedback(item).rework}</p>}
+                    {checklistFeedback(item).submission && (
+                      <p className="role-muted">Your submission note: {checklistFeedback(item).submission}</p>
+                    )}
                     {item.doc && (
                       <button
                         className="inline-link"
