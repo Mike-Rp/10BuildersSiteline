@@ -2,7 +2,7 @@ import OverallProjectProgress from "./OverallProjectProgress"
 import type { VerifiedProgress } from "./project-progress"
 import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, phaseDefinitions, timelineStatus, type PhaseDefinition } from "./model"
-import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "./listing"
+
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
 export type SiteCard = {
@@ -45,7 +45,7 @@ export default function ActiveSites({
   const activeProjects = useMemo(() => projects.filter(p => p.status === "active"), [projects])
   const reviewProjects = activeProjects.filter(p => p.needsReview === true)
   const [sort, setSort] = useState("name")
-  const [size, setSize] = useState<number>(DEFAULT_PAGE_SIZE)
+  const size = 9
   const [page, setPage] = useState(1)
   const [recent, setRecent] = useState<string[]>([])
   const definitionsFor = (projectType: string) => phaseDefinitionsByType?.[projectType] ?? phaseDefinitions(projectType)
@@ -323,20 +323,7 @@ export default function ActiveSites({
         </Empty>
       )}
       <nav className="as-pagination" aria-label="Project pagination">
-        <label>
-          Projects per page
-          <select
-            value={size}
-            onChange={(e) => {
-              setSize(Number(e.target.value))
-              setPage(1)
-            }}
-          >
-            {PAGE_SIZES.map((n) => (
-              <option key={n}>{n}</option>
-            ))}
-          </select>
-        </label>
+        <span>9 projects per page</span>
         <span aria-live="polite">
           {filtered.length
             ? `${(current - 1) * size + 1}–${Math.min(current * size, filtered.length)} of ${filtered.length}`
@@ -359,3 +346,4 @@ export default function ActiveSites({
     </section>
   )
 }
+

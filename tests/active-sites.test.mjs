@@ -84,7 +84,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
         field.dispatchEvent(new dom.window.Event("change", { bubbles: true }))
       })
 
-    assert.equal(cards().length, 10)
+    assert.equal(cards().length, 9)
     assert.equal(document.querySelector(".as-card img"), null)
 
     assert.equal(document.querySelector(".as-summary strong").textContent, "15")
@@ -121,12 +121,12 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     await select(1, "Finishes")
     await select(0, "")
     assert.equal(document.querySelectorAll(".as-toolbar select")[1].value, "")
-    assert.equal(cards().length, 10)
+    assert.equal(cards().length, 9)
 
     await act(() => button("Next").click())
 
-    assert.match(cards()[0].textContent, /Building 11/)
-    assert.equal(cards().length, 5)
+    assert.match(cards()[0].textContent, /Building 10/)
+    assert.equal(cards().length, 6)
 
     await select(0, "Commercial")
 
@@ -231,11 +231,6 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     const tab = name => [...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.startsWith(name))
     const count = name => tab(name).querySelector("span").textContent
     const firstPage = () => assert.match(document.querySelector(".as-pagination").textContent, /Page 1 of/)
-    const selectSize = value => act(() => {
-      const field = document.querySelector(".as-pagination select")
-      field.value = String(value)
-      field.dispatchEvent(new dom.window.Event("change", { bubbles: true }))
-    })
     await act(() => root.render(React.createElement(ActiveSites, staffProps())))
     assert.equal(count("All active projects"), "15")
     assert.equal(count("Awaiting review"), "8") // Both pending objects still count as one project.
@@ -266,12 +261,9 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     firstPage()
     assert.match(cards()[0].textContent, /Building 08/)
     await act(() => button("Next").click())
-    await selectSize(25)
     firstPage()
     assert.equal(cards().length, 8)
-    await selectSize(50)
     firstPage()
-    await selectSize(10)
     await act(() => button("Next").click())
     await act(() => {
       const input = document.querySelector('input[type="search"]')
@@ -294,7 +286,6 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     await act(() => tab("All active projects").click())
     firstPage()
     assert.equal(count("All active projects"), "15")
-    await selectSize(25)
     assert.ok(cards().some(card => card.textContent.includes("Building 08")))
     await act(() => tab("All active projects").dispatchEvent(new dom.window.KeyboardEvent("keydown", {key: "ArrowRight", bubbles: true})))
     assert.equal(tab("Awaiting review").getAttribute("aria-selected"), "true")
@@ -346,3 +337,5 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     }
   }
 })
+
+
