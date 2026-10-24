@@ -50,7 +50,7 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
-  for (const migration of ["001-phase-checklists.sql", "002-phase-update-confirmation.sql", "003-react-integration.sql", "004-verified-activity-progress.sql", "009-engineer-license-workflow.sql"]) {
+  for (const migration of ["001-phase-checklists.sql", "002-phase-update-confirmation.sql", "003-react-integration.sql", "004-verified-activity-progress.sql", "009-engineer-license-workflow.sql", "010-id-numbers.sql"]) {
     await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/" + migration), "utf8"))
   }
   await db.exec(fs.readFileSync(dummy, "utf8"))
@@ -301,11 +301,14 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   await t.test("a new account whose license expires in 2 days notifies that Site PM and the admins", async () => {
     await freshAdmin()
     const discipline = (await db.query("select code from disciplines order by code limit 1")).rows[0].code
-    const email = "new.spm@10builders.com"
     const created = await call("POST", "/accounts", { token: admin, headers: json, body: JSON.stringify({
-      full_name: "Newly Created SPM", email, phone: "", role: "spm", scope: { disciplines: [discipline] }, password: "Temp@12345678" }) })
+      first_name: "Newly", middle_name: "Created", last_name: "SPM", phone: "", role: "spm", scope: { disciplines: [discipline] }, password: "Temp@12345678" }) })
     assert.ok([200, 201].includes(created.status), `account created (${created.status})`)
-    const id = (await created.json()).data.id
+    const createdData = (await created.json()).data
+    const id = createdData.id
+    // The sign-in email is generated from the new staff ID, not typed.
+    const email = createdData.email
+    assert.match(email, /^n\.spm\.\d{5,}@10builders\.com$/)
     assert.equal((await db.query("select status from users where id=$1", [id])).rows[0].status, "invited")
 
     const expiry = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)

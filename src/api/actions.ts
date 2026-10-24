@@ -157,21 +157,34 @@ function accountPayload(account: Account) {
         { project_types: account.projectTypes } : account.role === "client" ? { projects: account.scope } : undefined;
     return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope };
 }
+// New staff are sent as name parts; the server assigns the ID number and builds the work email from it.
+// Clients are sent as before, with the email they were given.
+function newAccountPayload(account: Account) {
+    const { email, full_name, ...rest } = accountPayload(account);
+    if (account.role === "client")
+        return { email, full_name, ...rest };
+    return { ...rest, first_name: account.firstName, middle_name: account.middleName || undefined,
+        last_name: account.lastName, suffix: account.suffix || undefined };
+}
 export async function saveApiAccount(account: Account, existing: boolean, password?: string) {
     const previous = existing ? await api<Dto>("/accounts/" + account.id) : undefined;
-    const payload = accountPayload(account);
+    const payload = existing ? accountPayload(account) : newAccountPayload(account);
     if (existing)
-        delete (payload as Partial<typeof payload>).role;
+        delete (payload as Partial<ReturnType<typeof accountPayload>>).role;
     const saved = await api<Dto>(existing ? "/accounts/" + account.id : "/accounts", {
         method: existing ? "PATCH" : "POST", json: { ...payload, ...(!existing && password ? { password } : {}) },
     });
     const id = saved.id || account.id;
     if (existing && account.status !== previous?.status && ["active", "suspended", "invited"].includes(account.status))
         await api("/accounts/" + id + "/status", { method: "PATCH", json: { status: account.status } });
+    // Keep the real email and ID in the workspace copy, not the preview shown while the form was open.
+    const stored = existing ? account : { ...account, email: saved.email ?? account.email,
+        idNumber: saved.id_number ?? account.idNumber, workEmail: saved.work_email ?? account.workEmail };
     await api("/accounts/" + id + "/workspace", {
-        method: "PUT", json: account,
+        method: "PUT", json: stored,
     });
-    return { id, password: saved.temp_password || password };
+    return { id, password: saved.temp_password || password, idNumber: saved.id_number as string | undefined,
+        email: (saved.email ?? account.email) as string, generatedEmail: Boolean(saved.work_email) };
 }
 export async function createCompany(company: Company) {
     const saved = await post("/subcontractors", { company_name: company.name, contact_email: company.email || undefined,

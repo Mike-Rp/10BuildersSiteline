@@ -193,6 +193,11 @@ export type Account = {
   projectTypes: string[]
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
+  idNumber?: string // staff ID like 10B-00012, assigned by the database
+  workEmail?: string // generated 10builders.com address; fixed once created
+  firstName?: string // name parts are sent when an account is created; the database stores full_name
+  middleName?: string
+  suffix?: string
   lastName?: string
   license: string
   expiry: string

@@ -128,6 +128,7 @@ test("migration coverage: PostgreSQL prepares backend static SQL against base + 
   await db.exec(read("Thesis-Backend/migrations/008-monthly-report-history.sql"))
   await db.exec(read("Thesis-Backend/migrations/009-engineer-license-workflow.sql"))
   await db.exec(read("Thesis-Backend/migrations/010-photo-release.sql"))
+  await db.exec(read("Thesis-Backend/migrations/010-id-numbers.sql"))
   const directory=fileURLToPath(new URL("Thesis-Backend/src/",root))
   let count=0;const failures=[]
   for(const file of files(directory)) {

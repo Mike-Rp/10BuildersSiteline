@@ -65,6 +65,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-photo-release.sql"),"utf8"))
+  // Staff ID numbers and generated work emails: account creation now reads and writes these columns.
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-id-numbers.sql"),"utf8"))
 
   const dbPort = await freePort()
   const apiPort = await freePort()
@@ -182,9 +184,15 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const self=state.accounts.find(a=>a.id===user.id)
     await saveApiAccount({...self,phone:"09171234567"},true)
-    const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
+    const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",firstName:"Integration",lastName:"Admin",email:"",docs:[]},false,"Password@123")
     assert.ok(created.id)
-    assert.equal((await api("/accounts/"+created.id)).email,"integration.admin@example.test")
+    // The server assigns the staff ID and builds the work email from its digits.
+    assert.match(created.idNumber,/^10B-\d{5,}$/)
+    assert.equal(created.email,"i.admin."+created.idNumber.slice(4)+"@10builders.com")
+    const stored=await api("/accounts/"+created.id)
+    assert.equal(stored.email,created.email)
+    assert.equal(stored.id_number,created.idNumber)
+    assert.equal(stored.work_email,created.email)
     const fileId=randomUUID()
     await uploadFile(fileId,new File(["%PDF-1.4\nIntegration company document"],"company.pdf",{type:"application/pdf"}))
     const source=state.companies[0]
@@ -555,9 +563,10 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("password reset requests require admin reauthentication and force a new password", async () => {
     const { user, state } = await asUser("patricia.domingo@10builders.com")
     const self = state.accounts.find(a => a.id === user.id)
-    const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", email:"santos.juan@10builders.com", docs:[]}, false, "Password@123")
+    const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", firstName:"Juan", lastName:"Santos", email:"", docs:[]}, false, "Password@123")
+    const santosEmail = saved.email
     setToken("")
-    await api("/auth/password-reset-request", {method:"POST",json:{firstName:"Juan",lastName:"Santos",email:"santos.juan@10builders.com"}})
+    await api("/auth/password-reset-request", {method:"POST",json:{firstName:"Juan",lastName:"Santos",email:santosEmail}})
     await assert.rejects(api("/auth/password-reset-request", {method:"POST",json:{firstName:"Unknown",lastName:"Person",email:"unknown@example.com"}}), /account details have changed/)
     await assert.rejects(api("/accounts/password-reset-requests"))
     await asUser("patricia.domingo@10builders.com")
@@ -569,12 +578,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(!reset.temp_password.toLowerCase().includes("santos"))
     const secondReset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
     assert.notEqual(secondReset.temp_password, reset.temp_password)
-    await assert.rejects(login("santos.juan@10builders.com", reset.temp_password))
+    await assert.rejects(login(santosEmail, reset.temp_password))
     await asUser("patricia.domingo@10builders.com") // the rejected login cleared the admin session token
     assert.equal((await api("/accounts/password-reset-requests")).some(r => r.id === saved.id), false)
     setToken("")
-    await assert.rejects(login("santos.juan@10builders.com", "Password@123"))
-    const target = await login("santos.juan@10builders.com", secondReset.temp_password)
+    await assert.rejects(login(santosEmail, "Password@123"))
+    const target = await login(santosEmail, secondReset.temp_password)
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
@@ -583,8 +592,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("first-login reset and employee resignation persist and revoke access",async()=>{
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const template=state.accounts.find(a=>a.id===user.id)
-    const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",email:"resignation.admin@example.test",docs:[]},false,"Password@123")
-    const invited=await login("resignation.admin@example.test","Password@123")
+    const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",firstName:"Resignation",middleName:"Test",lastName:"Admin",email:"",docs:[]},false,"Password@123")
+    const resignationEmail=saved.email
+    const invited=await login(resignationEmail,"Password@123")
     assert.equal(invited.temp_password_issued,true)
     await assert.rejects(api("/auth/reset-password",{method:"POST",json:{password:"short"}}),/8 to 72/)
     await api("/auth/reset-password",{method:"POST",json:{password:"NewPassword@123"}})
@@ -594,7 +604,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,new File(["%PDF-1.4\nResignation letter"],"resignation.pdf",{type:"application/pdf"}))
     await api("/accounts/"+saved.id+"/resignation",{method:"POST",json:{noticeDays:0,letter:{id,name:"resignation.pdf"}}})
     assert.equal((await loadState(user)).accounts.find(a=>a.id===saved.id).status,"deactivated")
-    await assert.rejects(login("resignation.admin@example.test","NewPassword@123"),/Invalid credentials/)
+    await assert.rejects(login(resignationEmail,"NewPassword@123"),/Invalid credentials/)
     ;({user,state}=await asUser("patricia.domingo@10builders.com"))
     await api("/workspace/preferences",{method:"POST",json:{muted:["notice"]}})
     assert.deepEqual((await loadState(user)).muted,["notice"])

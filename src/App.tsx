@@ -282,6 +282,8 @@ function AppInner() {
   const [notifications, setNotifications] = useState(false)
   const [credentials, setCredentials] = useState<{
     name: string
+    idNumber?: string
+    email?: string
     password: string
   }>()
   const [confirmation, setConfirmation] = useState<{
@@ -647,7 +649,7 @@ function AppInner() {
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
       await reloadWorkspace();setDialog(undefined)
-      if(!exists&&saved.password)setCredentials({name:account.name,password:saved.password})
+      if(!exists&&saved.password)setCredentials({name:account.name,idNumber:saved.idNumber,email:saved.email,password:saved.password})
       setToast(exists?"Account updated":"Account created")
     }catch(error){setToast((error as Error).message);throw error}
   }
@@ -909,7 +911,7 @@ function AppInner() {
     test: (a, value) => licenseState(a, state.rules.grace) === value,
   }
   const accountSearch = (a: Account) =>
-    `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
+    `${a.name} ${a.email} ${a.idNumber ?? ""} ${a.scope.join(" ")} ${a.license}`
   const intakeItems = state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
@@ -1020,7 +1022,7 @@ function AppInner() {
     state.accounts.filter((a) => a.status !== "deactivated"),
     {
       searchText: (a) =>
-        `${a.name} ${a.email} ${a.scope.join(" ")} ${a.status}`,
+        `${a.name} ${a.email} ${a.idNumber ?? ""} ${a.scope.join(" ")} ${a.status}`,
       filters: [roleFilter_, accountStatusFilter, {
         id: "attention",
         label: "Attention",
@@ -1759,7 +1761,7 @@ function AppInner() {
                             <span className="avatar">{initials(a.name)}</span>
                             <span>
                               <strong>{a.name}</strong>
-                              <small>{a.email}</small>
+                              <small>{a.idNumber ? a.idNumber + " · " : ""}{a.email}</small>
                               {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small>{teamLicenseItems.filter(item => item.id === a.id).map(item => <small key={item.key}>{item.detail}</small>)}</span>}
                             </span>
                           </button>
@@ -2377,6 +2379,12 @@ function AppInner() {
                 <small>ADDED</small>
                 <strong>{dateLabel(a.added)}</strong>
               </div>
+              {a.idNumber && (
+                <div>
+                  <small>ID NUMBER</small>
+                  <strong>{a.idNumber}</strong>
+                </div>
+              )}
               <div>
                 <small>DISCIPLINE / SPECIALIZATION</small>
                 <strong>
@@ -3408,6 +3416,22 @@ function AppInner() {
             </span>
             <h3>{credentials.name}</h3>
           </div>
+          {(credentials.idNumber || credentials.email) && (
+            <div className="detail-grid account-detail-grid">
+              {credentials.idNumber && (
+                <div>
+                  <small>ID NUMBER</small>
+                  <strong>{credentials.idNumber}</strong>
+                </div>
+              )}
+              {credentials.email && (
+                <div>
+                  <small>SIGN-IN EMAIL</small>
+                  <strong>{credentials.email}</strong>
+                </div>
+              )}
+            </div>
+          )}
           <div className="password-display">
             <code>{credentials.password}</code>
             <Button

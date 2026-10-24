@@ -14,6 +14,7 @@ import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
+import { emailNamePart, splitTrailingSuffix, SUFFIX_LABELS, WORK_EMAIL_DOMAIN } from "./identity"
 import {
   accountError,
   clientForEmail,
@@ -49,7 +50,6 @@ import {
   type Project,
   type Rules,
   type State,
-  suggestWorkEmail,
 } from "./model"
 
 const INTAKE_PROJECT_TYPES = [
@@ -602,19 +602,26 @@ export function AccountForm({
       docs: [],
     },
   )
-  const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
-  const generatedIdentity = !account && !clientOnly
-  // Once the administrator edits the email, name changes stop overwriting it.
-  const [emailEdited, setEmailEdited] = useState(false)
-  const suggestion = suggestWorkEmail(nameParts, state.accounts)
-  const plainEmail = suggestWorkEmail({ ...nameParts, middle: "" }, [])
-  function updateName(part: "first" | "middle" | "last", value: string) {
+  const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "", suffix: "" })
+  // Staff are named in parts and get an ID number and work email from the server. Clients bring their own email.
+  const generatedIdentity = !account && !clientOnly && draft.role !== "client"
+  // Preview only: the digits are the staff ID, which the database assigns when the account is created.
+  function previewEmail(parts: { first: string; last: string }) {
+    const initial = emailNamePart(parts.first).charAt(0)
+    const last = emailNamePart(splitTrailingSuffix(parts.last).lastName)
+    return initial && last ? initial + "." + last + ".#####@" + WORK_EMAIL_DOMAIN : ""
+  }
+  function updateName(part: "first" | "middle" | "last" | "suffix", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
+    const split = splitTrailingSuffix(next.last)
     setDraft(current => ({ ...current,
-      lastName: next.last.trim(),
-      name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
-      ...(emailEdited ? {} : { email: suggestWorkEmail(next, state.accounts) }),
+      firstName: next.first.trim(),
+      middleName: next.middle.trim(),
+      lastName: split.lastName,
+      suffix: next.suffix || split.suffix,
+      name: [next.first, next.middle, split.lastName, next.suffix || split.suffix].map(value => value.trim()).filter(Boolean).join(" "),
+      email: previewEmail(next),
     }))
     setError("")
   }
@@ -626,7 +633,7 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
+    if (generatedIdentity && (!nameParts.first.trim() || !emailNamePart(nameParts.first) || !emailNamePart(nameParts.last) || !draft.email)) { setError("Enter a first and last name to generate the work email."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
     if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
     const err = clientOnly
@@ -693,13 +700,18 @@ export function AccountForm({
             <select
               value={draft.role}
               disabled={!!account}
-              onChange={(e) =>
+              onChange={(e) => {
+                const role = e.target.value as Account["role"]
+                // Switching to client clears the staff preview so the admin types the client's real email.
                 patch({
-                  role: e.target.value as Account["role"],
+                  role,
                   scope: [],
                   projectTypes: [],
+                  ...(!account && role === "client" ? { email: "" } : {}),
+                  ...(!account && role !== "client" ? { email: previewEmail(nameParts) } : {}),
                 })
-              }
+                setError("")
+              }}
             >
               {Object.entries(ROLE_NAMES).map(([key, name]) => (
                 <option key={key} value={key}>
@@ -713,6 +725,12 @@ export function AccountForm({
           <Field label="First name *"><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
           <Field label="Middle name"><input autoComplete="additional-name" value={nameParts.middle} onChange={e => updateName("middle", e.target.value)} placeholder="Middle name (optional)" /></Field>
           <Field label="Last name *"><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
+          <Field label="Suffix">
+            <select value={nameParts.suffix} onChange={e => updateName("suffix", e.target.value)}>
+              <option value="">None</option>
+              {SUFFIX_LABELS.map(label => <option key={label} value={label}>{label}</option>)}
+            </select>
+          </Field>
         </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"}>
           <input
             required
@@ -721,22 +739,26 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        <Field label="Email address *" wide={generatedIdentity}>
+        {(generatedIdentity || account?.idNumber) && (
+          <Field label="ID number" wide>
+            <input readOnly value={account?.idNumber ?? ""} placeholder="Assigned when you create the account" />
+          </Field>
+        )}
+        <Field label={generatedIdentity || account?.workEmail ? "Work email (generated)" : "Email address *"} wide={generatedIdentity}>
           <input
             required
             type="email"
+            readOnly={generatedIdentity || !!account?.workEmail}
             value={draft.email}
             onChange={(e) => {
-              if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
               setError("")
             }}
-            placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder={generatedIdentity ? "f.lastname.#####@10builders.com" : "name@company.com"}
           />
         </Field>
-        {generatedIdentity && <div className="field wide">
-          {emailEdited && <Button onClick={() => { setEmailEdited(false); setDraft(current => ({ ...current, email: suggestion })); setError("") }}>Use suggested email{suggestion ? ` (${suggestion})` : ""}</Button>}
-        </div>}
+        {generatedIdentity && <p className="field wide">The ID number and the digits in the work email are assigned when the account is created. The email is the first initial, last name and ID digits, and a suffix is left out. Middle name is optional.</p>}
+        {!!account?.workEmail && <p className="field wide">A generated work email is tied to the ID number and does not change when the name is edited.</p>}
         <Field label="Contact number">
           <input
             value={draft.phone}

@@ -65,6 +65,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   await db.exec(read("../supabase/seed/dummy-data.sql"))
   await db.exec(read("../Thesis-Backend/migrations/008-monthly-report-history.sql"))
   await db.exec(read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql")) // backfills the seeded holders
+  await db.exec(read("../Thesis-Backend/migrations/010-id-numbers.sql")) // staff ID numbers used by account creation
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
