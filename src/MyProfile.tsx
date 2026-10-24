@@ -16,7 +16,7 @@ export default function MyProfile({ actor, projects, onClose }: {
     <div className="detail-hero">
       <span className="avatar extra-large">{initials(actor.name)}</span>
       <div><small>{ROLE_NAMES[actor.role]}</small><h2>{actor.name}</h2><p>{actor.email}</p></div>
-      <Badge>{actor.status}</Badge>
+      <Badge tone={actor.status === "active" ? "green" : ""}>{actor.status}</Badge>
     </div>
     <div className="detail-grid account-detail-grid">
       <div><small>CONTACT NUMBER</small><strong>{actor.phone || "Not provided"}</strong></div>
