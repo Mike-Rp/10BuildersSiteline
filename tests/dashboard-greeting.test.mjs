@@ -30,7 +30,7 @@ test("greeting rotation tolerates blocked and malformed browser storage", () => 
   assert.match(nextDashboardGreeting("invalid", "Mikaela", { storage: invalid }).message, /, Mikaela\.$/)
 })
 
-test("welcome lasts ten idle minutes, dismisses on activity, and stays dismissed until the next login", async t => {
+test("welcome lasts ten minutes despite activity, stays gone after expiry, and returns on the next login", async t => {
   const [{ JSDOM }, { createServer }, React] = await Promise.all([import("jsdom"), import("vite"), import("react")])
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
   const previous = new Map()
@@ -83,13 +83,21 @@ test("welcome lasts ten idle minutes, dismisses on activity, and stays dismissed
       const session = dashboard => React.act(() => root.render(React.createElement(Session, { greeting, dashboard, key: event })))
       await session(true)
       assert.ok(document.querySelector(".dashboard-welcome"), "each new login starts a fresh welcome")
+      await advance(5000)
       await React.act(() => window.dispatchEvent(new dom.window.Event("scroll")))
       assert.ok(document.querySelector(".dashboard-welcome"), "reading and scrolling do not dismiss the welcome")
       await React.act(() => window.dispatchEvent(new dom.window.Event(event)))
-      assert.equal(document.querySelector(".dashboard-welcome"), null, `${event} dismisses the welcome`)
+      assert.ok(document.querySelector(".dashboard-welcome"), `${event} does not dismiss the welcome`)
       await session(false)
       await session(true)
-      assert.equal(document.querySelector(".dashboard-welcome"), null, "returning to the dashboard cannot revive a dismissed welcome")
+      assert.ok(document.querySelector(".dashboard-welcome"), "returning before expiry keeps the welcome")
+      await advance(WELCOME_DURATION_MS - 5001)
+      assert.ok(document.querySelector(".dashboard-welcome"), "activity and navigation do not shorten the ten-minute timer")
+      await advance(1)
+      assert.equal(document.querySelector(".dashboard-welcome"), null, "the welcome disappears completely at ten minutes")
+      await session(false)
+      await session(true)
+      assert.equal(document.querySelector(".dashboard-welcome"), null, "returning to the dashboard cannot revive an expired welcome")
     }
   } finally {
     await React.act(() => root.unmount())

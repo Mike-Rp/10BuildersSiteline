@@ -11,12 +11,7 @@ export default function DashboardWelcome({ greeting, onDismiss }: { greeting?: L
       onDismiss?.()
     }
     const timer = setTimeout(dismiss, Math.max(0, greeting.expiresAt - Date.now()))
-    const events = ["click", "keydown", "input"] as const
-    events.forEach(event => window.addEventListener(event, dismiss, true))
-    return () => {
-      clearTimeout(timer)
-      events.forEach(event => window.removeEventListener(event, dismiss, true))
-    }
+    return () => clearTimeout(timer)
   }, [greeting, onDismiss])
   const remaining = greeting ? greeting.expiresAt - Date.now() : 0
   if (!greeting || remaining <= 0 || expiredAt === greeting.expiresAt) return null
