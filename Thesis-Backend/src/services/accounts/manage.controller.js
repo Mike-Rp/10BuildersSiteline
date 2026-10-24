@@ -1,6 +1,7 @@
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
+import { buildWorkEmail, composeFullName, NAME_SUFFIXES, normalizeSuffix, splitTrailingSuffix } from "./work-email.js";
 import fs from "fs";
 import multer from "multer";
 import bcrypt from "bcryptjs";
@@ -131,28 +132,60 @@ export const listAccounts = async (req,res) => {
 
 /* ------------------------------ create ------------------------------ */
 
-// POST /accounts   body: { full_name, email, phone?, role, scope? }
+// Staff (admin, opm, spm) are named in parts and get a generated work email; clients bring their own email.
+const STAFF_ROLES = ["admin", "opm", "spm"];
+function staffName(body) {
+  const part = (snake, camel) => {
+    const value = pick(body, snake, camel);
+    if (value === undefined || value === null || value === "") return "";
+    if (typeof value !== "string" || value.trim().length > 60) throw new HttpError(400, `${snake} must be at most 60 characters.`);
+    return value.trim();
+  };
+  const name = { firstName: part("first_name", "firstName"), middleName: part("middle_name", "middleName"), lastName: part("last_name", "lastName"), suffix: "" };
+  if (!name.firstName || !name.lastName) throw new HttpError(400, "first_name and last_name are required.");
+  const rawSuffix = pick(body, "suffix", "suffix");
+  if (rawSuffix) {
+    name.suffix = normalizeSuffix(rawSuffix) ?? "";
+    if (!name.suffix) throw new HttpError(400, `suffix must be one of: ${NAME_SUFFIXES.join(", ")}.`);
+  } else {
+    // "Santos Jr." typed into last_name: keep the last name clean so the email and sorting stay right.
+    const split = splitTrailingSuffix(name.lastName);
+    name.lastName = split.lastName;
+    name.suffix = split.suffix;
+  }
+  return name;
+}
+
+// POST /accounts   body: { first_name, middle_name?, last_name, suffix?, phone?, role, scope? } for staff,
+//                  { full_name, email, phone?, role: "client", scope? } for clients.
+// A staff email is generated from the new staff ID number, so any email in the body is ignored.
 export async function createAccountRecord(client, actor, body) {
-  const fullName = body.full_name ?? body.fullName ?? body.contact_person;
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
-  const phone = body.phone ?? body.contact_number ?? null;
   const role = body.role;
-  if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
-  if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
-  if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
+  const staff = STAFF_ROLES.includes(role);
+  const name = staff ? staffName(body) : undefined;
+  const fullName = staff ? composeFullName(name) : body.full_name ?? body.fullName ?? body.contact_person;
+  let email = typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
+  const phone = body.phone ?? body.contact_number ?? null;
+  if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
+  if (!staff && (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email))) throw new HttpError(400,"A valid email is required.");
+  if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
   const scope = normalizeScope(role,body.scope);
   const password = body.password ?? makeTempPassword();
   if (typeof password!=="string" || password.length<8 || Buffer.byteLength(password,"utf8")>72) throw new HttpError(400,"Temporary password must be at least 8 characters and at most 72 UTF-8 bytes.");
   const roleRow = await client.query("SELECT id FROM roles WHERE code=$1",[role]);
   if (!roleRow.rowCount) throw new HttpError(400,"Role is not configured.");
   const hash = await bcrypt.hash(password,12);
+  // The ID number comes first so the staff email can carry its digits; the sequence never repeats a number.
+  const idNumber = (await client.query("SELECT '10B-' || public.zero_pad(nextval('public.staff_id_seq'), 5) AS id_number")).rows[0].id_number;
+  const workEmail = staff ? buildWorkEmail(name.firstName, name.lastName, idNumber) : null;
+  if (staff) email = workEmail;
   // The unique email covers deactivated accounts too: a company email is never reused.
   const inserted = await client.query(
-    `INSERT INTO users (id,full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by)
-     VALUES ($1,$2,$3,$4,$5,true,$6,'invited',$7,$7)
-     RETURNING id,full_name,email,phone,status,date_added::text AS date_added`,
-    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
+    `INSERT INTO users (id,full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by,id_number,work_email)
+     VALUES ($1,$2,$3,$4,$5,true,$6,'invited',$7,$7,$8,$9)
+     RETURNING id,full_name,email,phone,status,id_number,work_email,date_added::text AS date_added`,
+    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id,idNumber,workEmail])
     .catch((error) => { throw error.code === "23505" ? new HttpError(409,"This email is already assigned to another account.") : error; });
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
   return { ...inserted.rows[0],role,temp_password:password };
@@ -205,7 +238,7 @@ export const getAccount = async (req, res) => {
     if (!caller) return;
 
     const base = await execute(
-      `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.status,
+      `SELECT u.id, u.full_name, u.email, u.phone, u.id_number, u.work_email, r.code AS role, u.status,
               u.date_added::text AS date_added, u.last_login_at, u.temp_password_issued
          FROM users u JOIN roles r ON r.id = u.role_id
         WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false`, [id]);
@@ -259,9 +292,12 @@ export const updateAccount = async (req, res) => {
 
     const data = await withTransaction(async (client) => {
       const found = await client.query(
-        `SELECT u.id, r.code AS role FROM users u JOIN roles r ON r.id = u.role_id
+        `SELECT u.id, u.work_email, r.code AS role FROM users u JOIN roles r ON r.id = u.role_id
           WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false FOR UPDATE OF u`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Account not found.");
+      // A generated work email is tied to the staff ID and stays fixed, even if the name changes later.
+      if (found.rows[0].work_email && b.email !== undefined && String(b.email).toLowerCase() !== String(found.rows[0].work_email).toLowerCase())
+        throw new HttpError(422, "A generated work email cannot be changed.");
       const scope = normalizeScope(found.rows[0].role, b.scope);
 
       const sets = [];
@@ -279,7 +315,7 @@ export const updateAccount = async (req, res) => {
       }
       if (scope) await writeScope(client, id, scope, actor.id);
 
-      const out = await client.query(`SELECT id, full_name, email, phone FROM users WHERE id = $1`, [id]);
+      const out = await client.query(`SELECT id, full_name, email, phone, id_number, work_email FROM users WHERE id = $1`, [id]);
       return { ...out.rows[0], ...(scope ? { scope: scope.values } : {}) };
     });
     return sendOk(res, "Account updated.", 1, data);

@@ -46,7 +46,7 @@ export function accountListQuery(query = {}) {
     const pattern = "%"+search.trim()+"%";
     params.push(pattern);
     const parameter = "$"+params.length;
-    where.push(`(u.full_name ILIKE ${parameter} OR u.email::text ILIKE ${parameter}
+    where.push(`(u.full_name ILIKE ${parameter} OR u.email::text ILIKE ${parameter} OR u.id_number ILIKE ${parameter}
       OR u.status ILIKE ${parameter} OR EXISTS (SELECT 1 FROM unnest(scopes.scope) AS tag(value) WHERE tag.value ILIKE ${parameter}))`);
   }
   const from = `FROM users u JOIN roles r ON r.id=u.role_id
@@ -58,7 +58,7 @@ export function accountListQuery(query = {}) {
   return {
     countSql:`SELECT count(*)::int AS total ${from} ${filters}`,
     dataSql:`SELECT u.id,u.id AS user_id,u.full_name,u.email,u.phone,u.role_id,r.code AS role,r.label AS role_name,
-      u.status,u.date_added::text AS date_added,u.created_at,u.last_login_at,scopes.scope,
+      u.status,u.id_number,u.work_email,u.date_added::text AS date_added,u.created_at,u.last_login_at,scopes.scope,
       (SELECT count(*)::int FROM user_client_project_links l JOIN projects p ON p.id=l.project_id
         WHERE l.user_id=u.id AND COALESCE(p.is_deleted,false)=false) AS linked_projects_count,
       COALESCE((SELECT array_agg(DISTINCT p.client_name) FILTER (WHERE p.client_name IS NOT NULL)

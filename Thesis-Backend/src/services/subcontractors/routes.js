@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { importWorkers } from "./import.controller.js";
+import { transferWorker, getWorkerIdNumbers } from "./transfer.controller.js";
 import {
   getSubcontractors, getSubcontractorById, createSubcontractor,
   getWorkers, addWorker, updateWorker, replaceWorkerCertifications, getWorkerHistory,
@@ -16,9 +18,12 @@ router.get("/subcontractors/:id/crew.csv", async (req, res) => { await downloadC
 
 router.get("/subcontractors/:id/workers", async (req, res) => { await getWorkers(req, res); });
 router.post("/subcontractors/:id/workers", async (req, res) => { await addWorker(req, res); });
+router.post("/subcontractors/:id/workers/import", async (req, res) => { await importWorkers(req, res); });
 router.patch("/workers/:id", async (req, res) => { await updateWorker(req, res); });
 router.put("/workers/:id/certifications", async (req, res) => { await replaceWorkerCertifications(req, res); });
 router.get("/workers/:id/history", async (req, res) => { await getWorkerHistory(req, res); });
+router.post("/workers/:id/transfer", async (req, res) => { await transferWorker(req, res); });
+router.get("/workers/:id/id-numbers", async (req, res) => { await getWorkerIdNumbers(req, res); });
 
 router.get("/projects/:id/subcontractor-matches", async (req, res) => { await getMatches(req, res); });
 router.post("/projects/:id/subcontractor-requests", async (req, res) => { await createRequest(req, res); });
