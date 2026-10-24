@@ -52,7 +52,63 @@ export function validateImportRows(workers) {
   return { rows, errors };
 }
 
-const rejected = (res, errors) => {
+// The IDs in `rows` that do not belong to this company. The same message for another company's ID and for one
+// that does not exist, so IDs cannot be probed.
+export async function unknownIdProblems(client, companyId, rows) {
+  const wanted = rows.filter((r) => r.idNumber).map((r) => r.idNumber);
+  const current = new Map();
+  if (wanted.length) {
+    const found = await client.query(
+      `SELECT id, id_number, first_name, middle_name, last_name, suffix
+         FROM subcontractor_workers WHERE subcontractor_id = $1 AND id_number = ANY($2::text[])`, [companyId, wanted]);
+    for (const worker of found.rows) current.set(worker.id_number, worker);
+  }
+  const problems = rows.filter((r) => r.idNumber && !current.has(r.idNumber)).map((r) => ({
+    row: r.row,
+    message: `${r.idNumber} is not one of this company's workers. Leave id_number blank for a new worker.`,
+  }));
+  return { current, problems };
+}
+
+// Saves validated rows for one company, inside the caller's transaction. Returns { errors } without saving
+// anything when an ID is not this company's, else { created, updated, unchanged }.
+// The row lock makes two imports into the same company take turns.
+export async function applyImport(client, companyId, rows, userId) {
+  const company = await client.query(
+    `SELECT id FROM subcontractors WHERE id = $1 AND COALESCE(is_deleted,false) = false FOR UPDATE`, [companyId]);
+  if (company.rowCount === 0) throw new HttpError(404, "Subcontractor not found.");
+  const { current, problems } = await unknownIdProblems(client, companyId, rows);
+  if (problems.length) return { errors: problems };
+
+  const created = [];
+  let updated = 0;
+  let unchanged = 0;
+  for (const r of rows) {
+    if (r.idNumber) {
+      const old = current.get(r.idNumber);
+      const same = (old.first_name ?? "") === r.firstName && (old.middle_name ?? "") === r.middleName
+        && (old.last_name ?? "") === r.lastName && (old.suffix ?? "") === r.suffix;
+      if (same) { unchanged++; continue; }
+      await client.query(
+        `UPDATE subcontractor_workers SET full_name = $2, first_name = $3, middle_name = $4, last_name = $5,
+                suffix = $6, updated_by = $7, updated_at = now() WHERE id = $1`,
+        [old.id, r.fullName, r.firstName, r.middleName || null, r.lastName, r.suffix || null, userId]);
+      updated++;
+    } else {
+      // id_number is left out on purpose: a trigger always assigns the next number for this company.
+      const inserted = await client.query(
+        `INSERT INTO subcontractor_workers
+           (id, subcontractor_id, full_name, first_name, middle_name, last_name, suffix, status, availability_status, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'available', $8, $8)
+         RETURNING id_number, first_name, middle_name, last_name, suffix`,
+        [uuidv4(), companyId, r.fullName, r.firstName, r.middleName || null, r.lastName, r.suffix || null, userId]);
+      created.push({ row: r.row, ...inserted.rows[0] });
+    }
+  }
+  return { created, updated, unchanged };
+}
+
+export const rejected = (res, errors) => {
   const shown = errors.slice(0, 10).map((e) => `Row ${e.row}: ${e.message}`).join(" ");
   const message = `The file was not imported. ${shown}${errors.length > 10 ? ` (and ${errors.length - 10} more)` : ""}`;
   return res.status(422).json({
@@ -79,54 +135,7 @@ export const importWorkers = async (req, res) => {
     const { rows, errors } = validateImportRows(workers);
     if (errors.length) return rejected(res, errors);
 
-    const result = await withTransaction(async (client) => {
-      // The row lock makes two imports into the same company take turns.
-      const company = await client.query(
-        `SELECT id FROM subcontractors WHERE id = $1 AND COALESCE(is_deleted,false) = false FOR UPDATE`, [id]);
-      if (company.rowCount === 0) throw new HttpError(404, "Subcontractor not found.");
-
-      const wanted = rows.filter((r) => r.idNumber).map((r) => r.idNumber);
-      const current = new Map();
-      if (wanted.length) {
-        const found = await client.query(
-          `SELECT id, id_number, first_name, middle_name, last_name, suffix
-             FROM subcontractor_workers WHERE subcontractor_id = $1 AND id_number = ANY($2::text[])`, [id, wanted]);
-        for (const worker of found.rows) current.set(worker.id_number, worker);
-        // The same message for another company's ID and for one that does not exist, so IDs cannot be probed.
-        const missing = rows.filter((r) => r.idNumber && !current.has(r.idNumber)).map((r) => ({
-          row: r.row,
-          message: `${r.idNumber} is not one of this company's workers. Leave id_number blank for a new worker.`,
-        }));
-        if (missing.length) return { errors: missing };
-      }
-
-      const created = [];
-      let updated = 0;
-      let unchanged = 0;
-      for (const r of rows) {
-        if (r.idNumber) {
-          const old = current.get(r.idNumber);
-          const same = (old.first_name ?? "") === r.firstName && (old.middle_name ?? "") === r.middleName
-            && (old.last_name ?? "") === r.lastName && (old.suffix ?? "") === r.suffix;
-          if (same) { unchanged++; continue; }
-          await client.query(
-            `UPDATE subcontractor_workers SET full_name = $2, first_name = $3, middle_name = $4, last_name = $5,
-                    suffix = $6, updated_by = $7, updated_at = now() WHERE id = $1`,
-            [old.id, r.fullName, r.firstName, r.middleName || null, r.lastName, r.suffix || null, user.id]);
-          updated++;
-        } else {
-          // id_number is left out on purpose: a trigger always assigns the next number for this company.
-          const inserted = await client.query(
-            `INSERT INTO subcontractor_workers
-               (id, subcontractor_id, full_name, first_name, middle_name, last_name, suffix, status, availability_status, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'available', $8, $8)
-             RETURNING id_number, first_name, middle_name, last_name, suffix`,
-            [uuidv4(), id, r.fullName, r.firstName, r.middleName || null, r.lastName, r.suffix || null, user.id]);
-          created.push({ row: r.row, ...inserted.rows[0] });
-        }
-      }
-      return { created, updated, unchanged };
-    });
+    const result = await withTransaction((client) => applyImport(client, id, rows, user.id));
 
     if (result.errors) return rejected(res, result.errors);
     return sendOk(res, "Workers imported.", result.created.length, result, 201);
