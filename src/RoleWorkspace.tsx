@@ -35,6 +35,7 @@ import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
 import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
 import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import ManpowerImport from "./ManpowerImport"
 import {
   CompactPager,
   ListPager,
@@ -3442,11 +3443,22 @@ export default function RoleWorkspace({
             <Empty title="No active project commitments" />
           )}
         </section>
+        {actor.role === "spm" && (
+          <section className="detail-section">
+            <h3>Manpower list</h3>
+            <ManpowerImport
+              mode="submit"
+              companyId={c.id}
+              companyName={c.name}
+              userId={actor.id}
+            />
+          </section>
+        )}
         <section className="detail-section">
           <h3>Manpower list documents</h3>
           <p className="role-muted subsection">
-            Company-level files only. Individual workers are not stored in the
-            directory.
+            Copies of the original Excel files. Workers are added from an
+            approved manpower list.
           </p>
           {c.manpowerDocuments.map((document) => (
             <div className="document-row" key={document.id}>

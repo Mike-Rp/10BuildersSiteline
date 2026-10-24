@@ -34,6 +34,7 @@ test("an Admin previews a manpower file, fixes problems, confirms, and sees the 
     globalThis.fetch = async (url, init = {}) => {
       const path = String(url).replace("http://api.test", "")
       if (path === `/subcontractors/${COMPANY}/workers` && (init.method ?? "GET") === "GET") return json(200, { code: 200, data: workers })
+      if (path === `/subcontractors/${COMPANY}/manpower-submissions` && (init.method ?? "GET") === "GET") return json(200, { code: 200, data: [] })
       if (path === `/subcontractors/${COMPANY}/workers/import` && init.method === "POST") {
         const body = JSON.parse(init.body); posts.push(body)
         if (rejectNext) { const r = rejectNext; rejectNext = null; return json(422, { code: 422, message: r.message, error: { code: "IMPORT_REJECTED", message: r.message, rows: r.rows } }) }

@@ -5,7 +5,8 @@ import { validateFile } from "./model"
 import { downloadBlob } from "./panels"
 import { describeIssue, type ManpowerImportReport } from "./manpower-import"
 import { filterWorkers, importPayload, limitIssues, previewSentence, rejectionIssues } from "./manpower-ui"
-import { importManpower, loadCompanyWorkers, type CompanyWorker, type ManpowerImportResult } from "./api/manpower"
+import ManpowerApprovals from "./ManpowerApprovals"
+import { importManpower, loadCompanyWorkers, submitManpower, type CompanyWorker, type ManpowerImportResult } from "./api/manpower"
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const CREATED_SHOWN = 100
@@ -105,13 +106,19 @@ function CompanyWorkers({ companyId, companyName, refreshKey }: { companyId: str
   )
 }
 
+// mode "import": an Admin's list is saved straight away. mode "submit": a Site PM's list is sent to an Admin, and
+// the workers and their ID numbers are created only when the Admin approves it.
 export default function ManpowerImport({
   companyId,
   companyName,
+  mode = "import",
+  userId,
   onImported,
 }: {
   companyId: string
   companyName: string
+  mode?: "import" | "submit"
+  userId?: string
   onImported?: () => void
 }) {
   const input = useRef<HTMLInputElement>(null)
@@ -121,10 +128,12 @@ export default function ManpowerImport({
   const [report, setReport] = useState<ManpowerImportReport>()
   const [rejection, setRejection] = useState<{ issues: { row: number; message: string }[]; message: string }>()
   const [result, setResult] = useState<ManpowerImportResult>()
+  const [submitted, setSubmitted] = useState<{ new_count: number; existing_count: number }>()
   const [refreshKey, setRefreshKey] = useState(0)
+  const submitting = mode === "submit"
 
   function reset() {
-    setStep("idle"); setFileName(""); setFileError(""); setReport(undefined); setRejection(undefined); setResult(undefined)
+    setStep("idle"); setFileName(""); setFileError(""); setReport(undefined); setRejection(undefined); setResult(undefined); setSubmitted(undefined)
   }
   async function downloadTemplate() {
     try {
@@ -155,7 +164,8 @@ export default function ManpowerImport({
     if (!report?.ok) return
     setStep("saving"); setRejection(undefined)
     try {
-      setResult(await importManpower(companyId, importPayload(report)))
+      if (submitting) setSubmitted(await submitManpower(companyId, importPayload(report), fileName))
+      else setResult(await importManpower(companyId, importPayload(report)))
       setStep("done")
       setRefreshKey((n) => n + 1)
       onImported?.()
@@ -173,9 +183,19 @@ export default function ManpowerImport({
         <Icon name="alert" size={18} />
         <p>
           Upload the company's manpower list as Excel (.xlsx). Leave <strong>idnumber</strong> blank for a new worker and the
-          system assigns the ID number. Keep an existing worker's ID as it is. If anything in the file is wrong, nothing is imported.
+          system assigns the ID number. Keep an existing worker's ID as it is.{" "}
+          {submitting
+            ? "An Admin reviews the list before any worker is added. If anything in the file is wrong, it is not submitted."
+            : "If anything in the file is wrong, nothing is imported."}
         </p>
       </div>
+      <ManpowerApprovals
+        companyId={companyId}
+        role={submitting ? "spm" : "admin"}
+        userId={userId}
+        refreshKey={refreshKey}
+        onChanged={() => { setRefreshKey((n) => n + 1); onImported?.() }}
+      />
       <div className="manpower-actions">
         <Button icon="download" onClick={downloadTemplate} disabled={saving}>Download template</Button>
         <Button variant="primary" icon="upload" onClick={() => input.current?.click()} disabled={saving}>Upload Excel</Button>
@@ -197,7 +217,7 @@ export default function ManpowerImport({
             <p className="manpower-summary">{previewSentence(report)}.</p>
           ) : (
             <div role="alert" className="manpower-problems">
-              <strong>{report.errors.length} {report.errors.length === 1 ? "problem" : "problems"} to fix. Nothing was imported.</strong>
+              <strong>{report.errors.length} {report.errors.length === 1 ? "problem" : "problems"} to fix. Nothing was {submitting ? "submitted" : "imported"}.</strong>
               <IssueTable issues={report.errors} label="Problems in the file" />
             </div>
           )}
@@ -214,13 +234,31 @@ export default function ManpowerImport({
             </div>
           )}
           {report.ok && !rejection && (
-            <p className="manpower-hint">New workers get their ID number when you confirm.</p>
+            <p className="manpower-hint">
+              {submitting ? "New workers get their ID number when an Admin approves the list." : "New workers get their ID number when you confirm."}
+            </p>
           )}
           <div className="manpower-actions">
             <Button onClick={reset} disabled={saving}>{report.ok ? "Cancel" : "Choose another file"}</Button>
             <Button variant="primary" onClick={confirm} disabled={!report.ok || saving}>
-              {saving ? "Importing…" : "Confirm import"}
+              {submitting ? (saving ? "Submitting…" : "Submit for approval") : saving ? "Importing…" : "Confirm import"}
             </Button>
+          </div>
+        </section>
+      )}
+
+      {step === "done" && submitted && (
+        <section className="manpower-done" aria-live="polite" aria-label="Submission result">
+          <div className="success-state">
+            <span><Icon name="check" size={28} /></span>
+            <h3>Submitted for approval</h3>
+          </div>
+          <p className="manpower-summary">{submitted.new_count} new, {submitted.existing_count} existing workers.</p>
+          <p className="manpower-hint">
+            An Admin will review the list. No worker is added and no ID number is used until it is approved. You will be notified of the decision.
+          </p>
+          <div className="manpower-actions">
+            <Button variant="primary" onClick={reset}>Done</Button>
           </div>
         </section>
       )}
