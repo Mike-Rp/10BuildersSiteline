@@ -36,6 +36,7 @@ import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import PlannedTimeline from "./PlannedTimeline"
+import ManpowerImport from "./ManpowerImport"
 import {
   clientProjectViews,
   clientProgressReport,
@@ -2669,10 +2670,18 @@ function AppInner() {
           )}
         </section>
         <section className="detail-section">
+          <h3>Manpower list import</h3>
+          <ManpowerImport
+            companyId={c.id}
+            companyName={c.name}
+            onImported={() => { void reloadWorkspace() }}
+          />
+        </section>
+        <section className="detail-section">
           <h3>Manpower list documents</h3>
           <p className="section-description">
-            Company-level manpower lists only. Individual worker records are not
-            stored in the directory.
+            Keep a copy of the original Excel file here. To add or update
+            workers, use the import above.
           </p>
           <DocumentList
             docs={c.manpowerDocuments}

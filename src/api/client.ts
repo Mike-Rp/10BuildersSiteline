@@ -33,10 +33,13 @@ export function setToken(token: string) {
 export class ApiError extends Error {
   status: number
   code?: string
-  constructor(message: string, status: number, code?: string) {
+  // Row-numbered problems when the server rejects a spreadsheet import: [{ row, message }].
+  rows?: { row: number; message: string }[]
+  constructor(message: string, status: number, code?: string, rows?: { row: number; message: string }[]) {
     super(message)
     this.status = status
     this.code = code
+    this.rows = rows
   }
 }
 
@@ -89,7 +92,7 @@ export async function api<T = unknown>(
     ...rest,
     body: json === undefined ? rest.body : JSON.stringify(json),
   })
-  let body: Envelope<T> & { error?: { message?: string; code?: string } } | undefined
+  let body: Envelope<T> & { error?: { message?: string; code?: string; rows?: { row: number; message: string }[] } } | undefined
   try {
     body = await response.json()
   } catch {
@@ -102,6 +105,7 @@ export async function api<T = unknown>(
         `Request failed (${response.status}).`,
       response.status,
       body?.error?.code,
+      Array.isArray(body?.error?.rows) ? body?.error?.rows : undefined,
     )
   return (body?.data ?? body as unknown) as T
 }

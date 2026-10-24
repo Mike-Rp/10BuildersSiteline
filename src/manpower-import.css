@@ -1,0 +1,21 @@
+.manpower-import { display: grid; gap: 14px; min-width: 0; }
+.manpower-import .notice { margin-bottom: 0; }
+.manpower-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.manpower-preview, .manpower-done { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); min-width: 0; }
+.manpower-preview h4, .manpower-heading { margin: 0; overflow-wrap: anywhere; }
+.manpower-heading { padding-top: 6px; border-top: 1px solid var(--color-line); }
+.manpower-summary { margin: 0; font-weight: 600; }
+.manpower-hint, .manpower-more { margin: 0; color: var(--color-muted); }
+.manpower-problems { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--red); border-radius: 7px; background: var(--red-soft); color: var(--red); }
+.manpower-problems p { margin: 0; }
+.manpower-warnings { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--amber); border-radius: 7px; background: var(--amber-soft); color: var(--amber); }
+.manpower-issues-table td:first-child, .manpower-issues-table th:first-child { width: 72px; white-space: nowrap; }
+.manpower-issues-table td { overflow-wrap: anywhere; color: var(--color-ink, inherit); }
+.manpower-workers { display: grid; gap: 10px; min-width: 0; }
+.manpower-workers-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+#root .manpower-search { width: 100%; max-width: 420px; }
+.manpower-workers code, .manpower-done code { white-space: nowrap; }
+@media (max-width: 480px) {
+  .manpower-actions > .button { flex: 1 1 100%; justify-content: center; }
+  .manpower-preview, .manpower-done { padding: 12px; }
+}
