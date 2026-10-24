@@ -185,7 +185,6 @@ export default function RoleWorkspace({
   state,
   actor,
   welcomeGreeting,
-  onWelcomeDismiss,
   onCommand,
   onRead,
   onMute,
@@ -199,7 +198,6 @@ export default function RoleWorkspace({
   state: State
   actor: Account
   welcomeGreeting?: LoginGreeting
-  onWelcomeDismiss?: () => void
   onCommand: (command: WorkflowCommand) => Result | Promise<Result>
   onRead: (ids: string[]) => void
   onMute: (type: string) => void
@@ -3784,7 +3782,7 @@ export default function RoleWorkspace({
               {dateLabel(today())}
             </span>
           </div>
-          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} onDismiss={onWelcomeDismiss} />}
+          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
           {error && (
             <div className="role-error" role="alert">
               <Icon name="alert" />
