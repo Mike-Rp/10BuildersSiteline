@@ -1,23 +1,19 @@
-export const WELCOME_DURATION_MS = 10 * 60_000
-export const WELCOME_FADE_MS = 300
-
 const messages = [
   "Welcome back",
   "Good to see you",
-  "Hello",
   "Let’s get started",
   "Here’s to a productive day",
 ]
 type Rotation = { remaining: number[]; last?: number }
 type GreetingStore = Pick<Storage, "getItem" | "setItem">
-export type LoginGreeting = { message: string; expiresAt: number }
+export type LoginGreeting = { message: string }
 const memory = new Map<string, Rotation>()
 
-/** Choose all five greetings in shuffled order before starting another round. */
+/** Choose all four greetings in shuffled order before starting another round. */
 export function nextDashboardGreeting(accountId: string, name: string, options: {
-  now?: number; random?: () => number; storage?: GreetingStore
+  random?: () => number; storage?: GreetingStore
 } = {}): LoginGreeting {
-  const key = `siteline-dashboard-greetings:${accountId}`
+  const key = `siteline-dashboard-greetings:v2:${accountId}`
   const random = options.random || Math.random
   let storage = options.storage
   let rotation = memory.get(key)
@@ -43,5 +39,24 @@ export function nextDashboardGreeting(accountId: string, name: string, options: 
   memory.set(key, rotation)
   try { storage?.setItem(key, JSON.stringify(rotation)) } catch { /* The in-memory rotation remains available. */ }
   const displayName = name.trim()
-  return { message: `${messages[index]}${displayName ? `, ${displayName}` : ""}.`, expiresAt: (options.now ?? Date.now()) + WELCOME_DURATION_MS }
+  return { message: `${messages[index]}${displayName ? `, ${displayName}` : ""}.` }
+}
+
+/** Keep the selected greeting through refreshes; only a new login rotates it. */
+export function sessionDashboardGreeting(accountId: string, name: string, options: {
+  fresh?: boolean; storage?: GreetingStore
+} = {}): LoginGreeting {
+  const key = `siteline-dashboard-session-greeting:${accountId}`
+  let storage = options.storage
+  try {
+    storage ||= sessionStorage
+    if (!options.fresh) {
+      const message = storage.getItem(key)
+      const displayName = name.trim()
+      if (messages.some(prefix => message === `${prefix}${displayName ? `, ${displayName}` : ""}.`)) return { message: message! }
+    }
+  } catch { /* A greeting still appears when browser storage is unavailable. */ }
+  const greeting = nextDashboardGreeting(accountId, name)
+  try { storage?.setItem(key, greeting.message) } catch { /* Keep the greeting in React state. */ }
+  return greeting
 }

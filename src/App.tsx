@@ -2,7 +2,7 @@ import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import DashboardWelcome from "./DashboardWelcome"
-import { nextDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
+import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
@@ -346,6 +346,7 @@ function AppInner() {
       .then((account) => {
         if (cancelled) return
         setSessionId(account.id)
+        setWelcomeGreeting(account.role === "client" ? undefined : sessionDashboardGreeting(account.id, account.name))
         setSignedOut(false)
       })
       .catch((error) => {
@@ -606,7 +607,7 @@ function AppInner() {
     setNotifications(false)
     setSessionId(account.id)
     setSessionMessage("")
-    setWelcomeGreeting(account.role === "client" ? undefined : nextDashboardGreeting(account.id, account.name))
+    setWelcomeGreeting(account.role === "client" ? undefined : sessionDashboardGreeting(account.id, account.name, { fresh: true }))
     setSignedOut(false)
     setPage("Dashboard")
     try {
@@ -2858,7 +2859,6 @@ function AppInner() {
         state={state}
         actor={actor}
         welcomeGreeting={welcomeGreeting}
-        onWelcomeDismiss={() => setWelcomeGreeting(undefined)}
         onCommand={sendWorkflow}
         onReload={reloadWorkspace}
         onRead={(ids) =>
@@ -3087,7 +3087,7 @@ function AppInner() {
               })}
             </span>
           </div>
-          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} onDismiss={() => setWelcomeGreeting(undefined)} />}
+          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
           {renderPage()}
         </main>
       </div>
