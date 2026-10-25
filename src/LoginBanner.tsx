@@ -36,7 +36,7 @@ export default function LoginBanner() {
     if (!desktop || reducedMotion || !visible) return
     const timer = window.setInterval(() => setActive(index => (index + 1) % slides.length), 6000)
     return () => window.clearInterval(timer)
-  }, [active, desktop, reducedMotion, visible])
+  }, [desktop, reducedMotion, visible])
 
   const slide = slides[active]
   return (
@@ -62,12 +62,10 @@ export default function LoginBanner() {
           <h2>{slide.label}</h2>
           <p className="login-banner-description">{slide.description}</p>
         </div>
-        <div className="login-banner-controls">
-          <div className="login-banner-selectors" role="group" aria-label="Choose a banner">
+        <div className="login-banner-footer">
+          <div className="login-banner-indicators" aria-hidden="true">
             {slides.map((item, index) => (
-              <button key={item.image} type="button" className="login-banner-dot" aria-label={`Show slide ${index + 1}: ${item.label}`} aria-current={index === active ? "true" : undefined} onClick={() => setActive(index)}>
-                <span />
-              </button>
+              <span key={item.image} className={`login-banner-indicator${index === active ? " is-active" : ""}`} />
             ))}
           </div>
         </div>
