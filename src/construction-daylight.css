@@ -719,3 +719,50 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .notification-dot { width:9px; height:9px; top:5px; right:5px; border:2px solid white; }
 #root .activity-icon { display:inline-flex; align-items:center; justify-content:center; padding:0; line-height:1; }
 #root .activity-icon svg { display:block; flex:none; margin:0; }
+
+/* Keep supporting workspace text readable on desktop and on site. */
+#root .app-shell {
+  --text-caption: 16px;
+  --color-muted: #52637A;
+}
+#root .app-shell :is(small, label, summary, .badge, .chip, .tag-list > span,
+  .breadcrumb, .global-search-trigger, .workspace-meta, .workspace-footer,
+  .metric-top, .metric-bottom, .summary-pills > span, .panel-header p,
+  .panel-foot, .activity-time, .activity-copy strong, .role-muted,
+  .construction-phase-timeline strong, .role-intake-timeline strong) {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+#root .app-shell :is(.button, .tabs button, .inline-link) { font-size: 16px; }
+#root .app-shell .nav-item { font-size: 16px; line-height: 1.45; min-height: 52px; }
+#root .app-shell .nav-item > span { min-width: 0; overflow-wrap: anywhere; }
+#root .app-shell .nav-item > svg { flex-shrink: 0; }
+#root .app-shell .nav-group-label { font-size: 15px; font-weight: 600; letter-spacing: .6px; }
+#root .app-shell .sidebar-person :is(strong, small) { font-size: 16px; line-height: 1.5; }
+#root .app-shell .sidebar .brand small { font-size: 14px; letter-spacing: .8px; }
+#root .app-shell .eyebrow { font-size: 15px; letter-spacing: .8px; }
+#root .app-shell .metric-card { min-height: 216px; }
+#root .app-shell .metric-top { gap: 12px; align-items: flex-start; min-height: 48px; color: #45566B; font-weight: 600; }
+#root .app-shell .metric-top > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+#root .app-shell .metric-icon { flex-shrink: 0; }
+#root .app-shell .metric-bottom { align-items: flex-start; gap: 12px; min-height: 52px; }
+#root .app-shell .metric-bottom > svg { flex-shrink: 0; margin-top: 5px; }
+#root .app-shell .summary-pills { flex-wrap: wrap; gap: 12px; }
+#root .app-shell .summary-pills > span { max-width: 100%; padding: 12px 18px; }
+#root .app-shell .panel-header > :first-child { min-width: 0; }
+#root .app-shell .panel-header p { overflow-wrap: anywhere; }
+@media (min-width: 1001px) and (max-width: 1190px) {
+  :root { --sidebar-width: 264px; }
+}
+@media (max-width: 760px) {
+  #root .app-shell .metric-card { padding: 20px 16px; }
+  #root .app-shell .metric-top { min-height: 76px; }
+  #root .app-shell .metric-bottom { min-height: 64px; }
+  #root .app-shell .summary-pills > span { padding: 10px 14px; }
+  #root .app-shell .panel-header > .button { white-space: normal; }
+}
+@media (max-width: 400px) {
+  #root .app-shell .metrics-grid { grid-template-columns: minmax(0, 1fr); }
+  #root .app-shell .metric-top { min-height: 0; }
+  #root .app-shell .metric-bottom { min-height: 0; }
+}
