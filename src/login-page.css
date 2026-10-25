@@ -103,13 +103,10 @@
 #root .login-redesign .login-banner-brand { color: #d4e4f4; font-size: 14px; font-weight: 600; letter-spacing: .5px; }
 #root .login-redesign .login-banner-description { color: #e4edf7; font-size: 16px; line-height: 1.6; margin-top: 14px; min-height: 52px; }
 #root .login-redesign .login-banner [aria-roledescription="slide"] { min-height: 128px; }
-#root .login-redesign .login-banner-controls { display: flex; align-items: center; gap: 12px; margin-top: 24px; padding-top: 14px; border-top: 1px solid #ffffff55; }
-#root .login-redesign .login-banner-selectors { display: flex; }
-#root .login-redesign .login-banner-dot { display: grid; place-items: center; width: 44px; height: 44px; padding: 8px; border: 0; background: transparent; }
-#root .login-redesign .login-banner-dot span { width: 24px; height: 4px; border-radius: 3px; background: #ffffff66; }
-#root .login-redesign .login-banner-dot[aria-current="true"] span { background: #fff; }
-#root .login-redesign .login-banner-dot:hover span { background: #dae8f5; }
-#root .login-redesign .login-banner button:focus-visible { outline: 3px solid #fff; outline-offset: 1px; }
+#root .login-redesign .login-banner-footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid #ffffff55; }
+#root .login-redesign .login-banner-indicators { display: flex; align-items: center; gap: 20px; padding: 20px 8px; }
+#root .login-redesign .login-banner-indicator { width: 24px; height: 4px; border-radius: 3px; background: #ffffff66; }
+#root .login-redesign .login-banner-indicator.is-active { background: #fff; }
 @media (prefers-reduced-motion: reduce) {
   #root .login-redesign .login-banner-image { transition: none; }
 }
