@@ -2925,18 +2925,10 @@ function AppInner() {
         </div>
         <div className="brand">
           <span className="brand-mark">
-            <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-              <path
-                d="M6 25V13l10-7 10 7v12M11 25V15l5-3 5 3v10M4 25h24"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-              <path d="M16 12v13" stroke="currentColor" strokeWidth="2.2" />
-            </svg>
+            10
           </span>
           <div>
-            SITELINE<small>Project operations</small>
+            Siteline<small>10 BUILDERS</small>
           </div>
         </div>
         <nav aria-label="Main navigation">

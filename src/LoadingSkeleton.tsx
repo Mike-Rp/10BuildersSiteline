@@ -24,7 +24,7 @@ export default function WorkspaceSkeleton({ role }: { role?: Role }) {
   const admin = role === "admin"
   return <div className="app-shell workspace-skeleton">
     <aside className="sidebar" aria-hidden="true">
-      <div className="brand"><span className="brand-mark"><Icon name="building" size={28} /></span><div>SITELINE<small>Project operations</small></div></div>
+      <div className="brand"><span className="brand-mark">10</span><div>Siteline<small>10 BUILDERS</small></div></div>
       <div className="workspace-switch"><span className="workspace-avatar">10</span><span><strong>10 Builders</strong><small>Loading workspace</small></span></div>
       {admin ? <div>{ADMIN_NAV.map(item => <div key={item.label}>
         {item.group && <div className="nav-group-label">{item.group}</div>}

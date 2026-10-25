@@ -3661,10 +3661,10 @@ export default function RoleWorkspace({
         </div>
         <div className="brand">
           <span className="brand-mark">
-            <Icon name="building" size={28} />
+            10
           </span>
           <div>
-            SITELINE<small>Project operations</small>
+            Siteline<small>10 BUILDERS</small>
           </div>
         </div>
         <nav aria-label="Main navigation">

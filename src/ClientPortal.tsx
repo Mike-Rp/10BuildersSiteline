@@ -618,10 +618,10 @@ export default function ClientPortal({
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
         <div className="brand">
           <span className="brand-mark">
-            <Icon name="building" size={28} />
+            10
           </span>
           <div>
-            SITELINE<small>Client portal</small>
+            Siteline<small>10 BUILDERS</small>
           </div>
         </div>
         <div className="nav-group-label">YOUR PROJECT</div>
