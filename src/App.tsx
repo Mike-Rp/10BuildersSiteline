@@ -3066,10 +3066,6 @@ function AppInner() {
         <main className="main-content">
           <div className="workspace-meta">
             <span>
-              <i className="status-dot green" />
-              10 Builders <span className="mid-dot">/</span> Administrator
-            </span>
-            <span>
               <Icon name="calendar" size={15} />
               {new Date().toLocaleDateString("en-US", {
                 weekday: "long",

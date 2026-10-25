@@ -3762,10 +3762,6 @@ export default function RoleWorkspace({
         <main className="main-content">
           <div className="workspace-meta">
             <span>
-              <i className="status-dot green" />
-              10 Builders / {ROLE_NAMES[actor.role]}
-            </span>
-            <span>
               <Icon name="calendar" size={15} />
               {dateLabel(today())}
             </span>

@@ -112,7 +112,7 @@ kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--
 .popover-heading h3 span { color: var(--color-muted); font-size: 14px; }
 .mobile-menu { display: none!important; }
 .main-content { max-width: 1740px; padding: 23px 35px 20px; margin: 0 auto; }
-.workspace-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 27px; color: var(--color-muted); font-size: 14px; }
+.workspace-meta { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 27px; color: var(--color-muted); font-size: 14px; }
 .workspace-meta > span { display: flex; align-items: center; gap: 7px; }
 .mid-dot { color: var(--color-muted); padding: 0 4px; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 29px; }
