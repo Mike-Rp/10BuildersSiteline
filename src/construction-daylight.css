@@ -25,6 +25,13 @@
   --warning-border: #E8CFAD;
   --danger-border: #E7C0B9;
   --login-headline: #B9CFEA;
+  --chrome-background: #193B59;
+  --chrome-foreground: #FFFFFF;
+  --chrome-muted: #D1DCE7;
+  --chrome-border: #FFFFFF26;
+  --chrome-hover: #FFFFFF14;
+  --chrome-selected: #FFFFFF1A;
+  --chrome-accent: #D5A459;
   --space-unit: 4px;
   --text-caption: 14px;
   --text-body: 16px;
@@ -55,7 +62,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .eyebrow { color: var(--color-muted); font-size: var(--text-caption); font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
 
 /* A quiet, architectural frame; navigation is legible rather than compressed. */
-#root .sidebar { width: var(--sidebar-width); height: 100vh; height: 100dvh; padding: 26px 16px max(12px, env(safe-area-inset-bottom, 0px)); background: var(--color-surface); border-right: 1px solid var(--color-line); overflow: hidden; }
+#root .sidebar { width: var(--sidebar-width); height: 100vh; height: 100dvh; padding: 0 16px max(12px, env(safe-area-inset-bottom, 0px)); background: var(--color-surface); border-right: 1px solid var(--color-line); overflow: hidden; }
 #root .sidebar > :not(nav) { flex-shrink: 0; }
 #root .sidebar > nav { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
 #root .main-shell { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); }
@@ -363,7 +370,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 @media (max-width: 760px) {
   :root { --sidebar-width: 264px; }
   html { scroll-padding-top: 155px; }
-  #root .sidebar { width: var(--sidebar-width); padding-top: max(16px, env(safe-area-inset-top, 0px)); }
+  #root .sidebar { width: var(--sidebar-width); padding-top: env(safe-area-inset-top, 0px); }
   #root .main-shell { margin-left: 0; width: 100%; }
   #root .topbar, #root .role-workspace .topbar, #root .client-portal .topbar {
     height: auto; min-height: 76px; flex-wrap: nowrap; padding: 12px 16px; gap: 9px;
@@ -607,32 +614,43 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
   #root .activation-action .button { width: 100%; min-height: var(--touch-site); white-space: normal; }
 }
 
-/* Blue / white / cool-gray identity. Green, amber and red are semantic status colors only. */
-#root .sidebar { background: var(--color-primary); border-right: 0; color: #fff; }
-#root .sidebar > nav { scrollbar-color: #3E5D8A transparent; }
-#root .brand, #root .brand strong { color: #fff; }
-#root .brand small { color: #C9D6E6; }
-#root .sidebar .brand-mark { background: #fff; color: var(--color-primary); }
-#root .sidebar .workspace-switch { background: #21395F; border-color: #3E5D8A; color: #fff; }
-#root .sidebar .workspace-switch :is(strong, small) { color: #fff; }
-#root .sidebar .workspace-switch small { color: #C9D6E6; }
-#root .sidebar .workspace-avatar { background: var(--color-primary); color: #fff; border-color: #3E5D8A; }
-#root .sidebar .nav-group-label { color: #C9D6E6; }
-#root .sidebar .nav-item { color: #E8EEF6; }
-#root .sidebar .nav-item:hover { background: #21395F; color: #fff; }
-#root .sidebar .nav-item.active { background: var(--color-steel); color: #fff; border-left-color: #fff; }
-#root .sidebar .nav-item.active > i { background: #fff; }
-#root .sidebar .nav-count { color: var(--color-primary); background: #fff; border-color: #fff; font-weight: 700; }
-#root .sidebar-bottom > button { color: #E8EEF6; }
-#root .sidebar-bottom > button:hover { background: #21395F; color: #fff; }
-#root .sidebar-person { border-color: #3E5D8A; }
-#root .sidebar-person :is(strong, small) { color: #fff; }
-#root .sidebar-person small, #root .role-demo-note { color: #C9D6E6; border-color: #3E5D8A; }
-#root .sidebar .avatar { background: #21395F; color: #fff; border-color: #3E5D8A; }
-#root .sidebar .button { background: #21395F; border-color: #3E5D8A; color: #fff; }
-#root .sidebar :is(button, a, summary):focus-visible { outline-color: #fff; }
+/* Matching navy navigation and header frame a white workspace. */
+#root .app-shell, #root .main-shell { background: var(--color-surface); }
+#root .sidebar { background: var(--chrome-background); border-right: 1px solid var(--chrome-border); color: var(--chrome-foreground); }
+#root .sidebar > nav { scrollbar-color: #6C859C transparent; }
+#root .sidebar > .workspace-switch { display: none; }
+#root .sidebar .brand { min-height: 84px; height: 84px; margin-inline: -16px; padding: 12px 26px; border-bottom: 3px solid var(--chrome-accent); gap: 12px; font-size: 23px; letter-spacing: -.6px; color: var(--chrome-foreground); }
+#root .sidebar .brand small { font-size: 12px; letter-spacing: 1px; color: var(--chrome-muted); }
+#root .sidebar .brand-mark { width: 42px; height: 42px; border-radius: 8px; background: var(--chrome-hover); color: var(--chrome-foreground); font-size: 18px; letter-spacing: -.5px; }
+#root .sidebar .nav-group-label { color: var(--chrome-muted); }
+#root .sidebar .nav-item { color: var(--chrome-muted); border-radius: 7px; }
+#root .sidebar .nav-item:hover { background: var(--chrome-hover); color: var(--chrome-foreground); }
+#root .sidebar .nav-item.active { background: var(--chrome-selected); color: var(--chrome-foreground); border-left-color: var(--chrome-accent); }
+#root .sidebar .nav-item.active > i { background: var(--chrome-accent); }
+#root .sidebar .nav-count { color: var(--chrome-background); background: var(--chrome-foreground); border-color: var(--chrome-foreground); font-weight: 700; }
+#root .sidebar-bottom > button { color: var(--chrome-muted); }
+#root .sidebar-bottom > button:hover { background: var(--chrome-hover); color: var(--chrome-foreground); }
+#root .sidebar-person { border-color: var(--chrome-border); }
+#root .sidebar-person :is(strong, small) { color: var(--chrome-foreground); }
+#root .sidebar-person small, #root .role-demo-note { color: var(--chrome-muted); border-color: var(--chrome-border); }
+#root .sidebar .avatar, #root .sidebar .button { background: var(--chrome-hover); color: var(--chrome-foreground); border-color: var(--chrome-border); }
+#root .sidebar .button:hover:not(:disabled) { background: var(--chrome-selected); color: var(--chrome-foreground); border-color: var(--chrome-muted); }
 
-#root .topbar { border-bottom: 1px solid var(--color-line); box-shadow: 0 1px 2px rgba(23,43,77,.05); }
+#root .topbar { background: var(--chrome-background); color: var(--chrome-foreground); border-bottom: 3px solid var(--chrome-accent); box-shadow: none; }
+#root .topbar .breadcrumb { color: var(--chrome-muted); }
+#root .topbar .breadcrumb strong { color: var(--chrome-foreground); font-size: 16px; font-weight: 600; }
+#root .topbar .topbar-divider { background: var(--chrome-border); }
+#root .topbar .global-search-trigger { color: var(--chrome-muted); }
+#root .topbar > .breadcrumb > .button.icon-button,
+#root .topbar > .topbar-actions > .avatar,
+#root .topbar > .topbar-actions > .notification-container > .button { background: var(--chrome-hover); border-color: var(--chrome-border); color: var(--chrome-foreground); }
+#root .topbar > .breadcrumb > .button.icon-button:hover:not(:disabled),
+#root .topbar > .topbar-actions > .avatar:hover,
+#root .topbar > .topbar-actions > .notification-container > .button:hover:not(:disabled) { background: var(--chrome-selected); color: var(--chrome-foreground); border-color: var(--chrome-muted); }
+#root .topbar .notification-dot { background: var(--chrome-accent); border-color: var(--chrome-background); }
+#root .topbar .notification-popover { color: var(--color-ink); }
+#root :is(.sidebar, .topbar) :is(button, a, summary):focus-visible { outline-color: var(--chrome-foreground); }
+#root .topbar .notification-popover :is(button, a, summary):focus-visible { outline-color: var(--color-primary); }
 #root .modal { border-top: 1px solid var(--color-line); box-shadow: 0 20px 60px rgba(23,43,77,.2); }
 #root .modal-header { background: var(--surface-subtle); }
 #root .tabs button.active { border-color: var(--color-steel); color: var(--color-steel); }
