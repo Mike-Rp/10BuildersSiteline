@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
@@ -175,11 +176,9 @@ router.get("/workspace", endpoint(null, async (db, user) => {
         projects: map(projectMeta), accounts: map(accountMeta), companies: map(companyMeta), selections };
 }));
 router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
-    if (!Array.isArray(req.body.muted) || req.body.muted.some(t => typeof t !== "string" || t.length > 100))
+    if (!Array.isArray(req.body.muted) || req.body.muted.length > 4 || req.body.muted.some(t => !["request", "approval", "progress", "notice"].includes(t)))
         throw new HttpError(400, "Invalid notification preferences.");
-    await db.query(`insert into workspace_account_metadata(user_id,metadata) values($1,$2)
- on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata`, [user.id, JSON.stringify({ preferences: { muted: req.body.muted } })]);
-    return {};
+    return updateNotificationPreferences(db, user.id, { muted: [...new Set(req.body.muted)] });
 }));
 router.put("/workspace/settings", endpoint(["admin"], async (db, user, req) => {
     // Merge, so settings this screen does not send (such as the reminder days) are kept.
@@ -203,10 +202,24 @@ router.get("/notifications", endpoint(null, async (db, user, req) => {
  where ($2='admin' or n.recipient_user_id=$1) order by a.id desc limit $3 offset $4`, [user.id, user.role, limit, offset])).rows;
 }));
 router.post("/notifications/read", endpoint(null, async (db, user, req) => {
+    const ids = req.body.ids;
+    if (!Array.isArray(ids) || ids.length > 2000 || ids.some(id => typeof id !== "string" || !/^(\d{1,18}|client-history:[0-9a-f-]{36}:\d{1,18})$/i.test(id)))
+        throw new HttpError(400, "Invalid notification IDs.");
+    const activityIds = ids.filter(id => /^\d+$/.test(id));
     if (user.role === "admin")
-        await db.query("insert into notification_recipients(activity_log_id,recipient_user_id) select id,$1 from activity_log where id=any($2::bigint[]) on conflict do nothing", [user.id, (req.body.ids || []).filter(id => /^\d+$/.test(String(id)))]);
-    await db.query("update notification_recipients set is_read=true,read_at=now() where recipient_user_id=$1 and activity_log_id=any($2::bigint[])", [user.id, (req.body.ids || []).filter(id => /^\d+$/.test(String(id)))]);
-    return {};
+        await db.query("insert into notification_recipients(activity_log_id,recipient_user_id) select id,$1 from activity_log where id=any($2::bigint[]) on conflict do nothing", [user.id, activityIds]);
+    const read = (await db.query("update notification_recipients set is_read=true,read_at=now() where recipient_user_id=$1 and activity_log_id=any($2::bigint[]) returning activity_log_id", [user.id, activityIds])).rows.map(row => String(row.activity_log_id));
+    const noticeIds = ids.filter(id => id.startsWith("client-history:"));
+    if (user.role === "client" && noticeIds.length) {
+        const allowed = (await db.query(`select h.id,h.project_id from project_progress_history h
+ join projects p on p.id=h.project_id join user_client_project_links l on l.project_id=p.id
+ where l.user_id=$1 and h.is_client_visible and p.lifecycle_status in ('active','archived')
+ and not coalesce(p.is_deleted,false) and h.id=any($2::bigint[])`, [user.id, noticeIds.map(id => id.split(":")[2])])).rows;
+        const accepted = allowed.map(row => `client-history:${row.project_id}:${row.id}`).filter(id => noticeIds.includes(id));
+        await updateNotificationPreferences(db, user.id, { readNoticeIds: accepted });
+        read.push(...accepted);
+    }
+    return { ids: read };
 }));
 router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const f = req.file;

@@ -1,5 +1,4 @@
-// The shared Upload component creates internal documents unless told otherwise; only the shared site-photo
-// gallery (which is shared with the Client Portal) uploads client-visible photos.
+// Uploads, including site photos awaiting release, are internal by default.
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import test from "node:test"
@@ -27,18 +26,13 @@ test("the shared Upload component builds its document through that rule and defa
   assert.doesNotMatch(upload, /clientVisible: true/)
 })
 
-test("only the Client-visible site photo gallery uploads with clientVisible", () => {
+test("site photo upload accurately describes pending release and no upload pre-releases photos", () => {
   const screens = ["../src/RoleWorkspace.tsx", "../src/App.tsx", "../src/panels.tsx", "../src/ClientPortal.tsx", "../src/LeadSubcontractorPanel.tsx"]
-  let flagged = 0
   for (const path of screens) {
     const source = read(path)
     for (const match of source.matchAll(/<Upload\b[\s\S]*?\/>/g)) {
-      if (/\bclientVisible\b/.test(match[0])) {
-        flagged++
-        assert.match(match[0], /Shared site photo \(Client-visible\)/, "the only client-visible upload is the shared site photo")
-        assert.match(match[0], /\n\s+clientVisible\n/, "it passes the explicit option")
-      }
+      assert.doesNotMatch(match[0], /\bclientVisible\b/, "uploads cannot claim the photo has already been released")
     }
   }
-  assert.equal(flagged, 1, "exactly one Upload is client-visible")
+  assert.match(read("../src/RoleWorkspace.tsx"), /Site photo \(pending client release\)/)
 })

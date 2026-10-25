@@ -270,6 +270,7 @@ export type Project = {
   clientSubconReview?: ClientSubconReview
   workflow?: ProjectWorkflow
   history: {
+    id?: string
     date: string
     text: string
     progress: number

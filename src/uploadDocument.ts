@@ -2,7 +2,7 @@ import { today, type Doc } from "./model.ts"
 
 /**
  * The document record created by the shared Upload component. Uploads are internal unless the caller says
- * otherwise: only the shared site-photo gallery passes `clientVisible: true`.
+ * otherwise. Site photos also start internal and require an authorized release.
  */
 export function newUploadedDoc(input: {
   id: string

@@ -195,7 +195,7 @@ export function clientProjectViews(
             ? []
             : [
                 {
-                  id: `client-history:${p.id}:${index}`,
+                  id: `client-history:${p.id}:${entry.id ?? index}`,
                   date: entry.date,
                   phase: entry.phase || "Recorded progress",
                   progress: entry.progress,

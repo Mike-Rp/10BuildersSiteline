@@ -8,6 +8,7 @@ import {
   mapAccount,
   mapCompany,
   mapEvent,
+  mapPhoto,
   mapProject,
   peopleFromProjects,
   projectStatus,
@@ -158,8 +159,17 @@ test("companies and notifications map their key fields", () => {
   assert.equal(c.committedUntil, "2026-12-01")
   const e = mapEvent({ id: 5, title: "T", detail: null, type: "request", occurred_at: "2026-10-17T00:00:00Z", is_read: false, related_project_id: "p1" }, "u1")
   assert.deepEqual([e.id, e.type, e.read, e.projectId, e.recipientIds], ["5", "request", false, "p1", ["u1"]])
+  assert.deepEqual(mapEvent({ ...e, is_read: true }, "u1").readBy, ["u1"])
+  assert.equal(mapEvent({ ...e, is_read: false }, "u2").readBy, undefined)
   assert.equal(formatArea(null), "")
   assert.equal(formatArea("18400.00"), "18,400")
+})
+
+test("photo visibility mapping fails closed unless the API explicitly confirms release", () => {
+  const row = { id: "photo", caption: "Photo", created_at: "2026-10-25" }
+  assert.equal(mapPhoto(row, () => {}).clientVisible, false)
+  assert.equal(mapPhoto({ ...row, client_visible: false }, () => {}).clientVisible, false)
+  assert.equal(mapPhoto({ ...row, client_visible: true }, () => {}).clientVisible, true)
 })
 
 test("linked client identity and contact details come from the project link, not a matching name", () => {

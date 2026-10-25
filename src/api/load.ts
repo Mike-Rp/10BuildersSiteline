@@ -59,8 +59,8 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   const [projectData, subcontractors, notifications, workspace] = await Promise.all([
     api<Omit<ProjectParts,"clientId"|"register">[]>("/workspace/project-data"),
     optional(apiList<Dto>("/subcontractors"), []),
-    optional(apiList<Dto>("/notifications"), []),
-    optional(api<Dto>("/workspace"), {}),
+    apiList<Dto>("/notifications"),
+    api<Dto>("/workspace"),
   ])
 
   const projectList=projectData.map(p=>p.list)
@@ -130,7 +130,10 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   }
   loaded.license = license
   if(workspace.rules)loaded.rules=workspace.rules
-  if(workspace.preferences?.muted)loaded.muted=workspace.preferences.muted
+  const preferences = workspace.preferences || {}
+  loaded.muted = preferences.muted || []
+  loaded.userPreferences = { [me.id]: [...loaded.muted] }
+  loaded.portalReads = { [me.id]: preferences.readNoticeIds || [] }
   loaded.backendPhases=workspace.backendPhases
   loaded.referenceDisciplines=workspace.referenceDisciplines
   for(const account of loaded.accounts)for(const doc of account.docs)if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")

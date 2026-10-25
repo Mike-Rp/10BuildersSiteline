@@ -112,7 +112,7 @@ export function Upload({
   buttonLabel?: string
   ariaLabel?: string
   spreadsheet?: boolean
-  // Internal by default. Only the shared site-photo gallery sets this, because that gallery is shared with the Client Portal.
+  // Internal by default, including site photos that still require an authorized release.
   clientVisible?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)

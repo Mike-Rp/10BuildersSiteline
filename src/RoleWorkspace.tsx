@@ -8,6 +8,8 @@ import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
 import ChecklistApprovalBanner from "./ChecklistApprovalBanner"
 import DashboardWelcome from "./DashboardWelcome"
+import SitePhotoGallery from "./SitePhotoGallery"
+import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import type { LoginGreeting } from "./dashboard-greeting"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
@@ -184,6 +186,7 @@ export default function RoleWorkspace({
   state,
   actor,
   welcomeGreeting,
+  notificationSave,
   onCommand,
   onRead,
   onMute,
@@ -197,6 +200,7 @@ export default function RoleWorkspace({
   state: State
   actor: Account
   welcomeGreeting?: LoginGreeting
+  notificationSave?: NotificationSaveState
   onCommand: (command: WorkflowCommand) => Result | Promise<Result>
   onRead: (ids: string[]) => void
   onMute: (type: string) => void
@@ -2029,14 +2033,13 @@ export default function RoleWorkspace({
           <div className="section-title">
             <h3>Site photo gallery</h3>
             <Upload
-              label="Shared site photo (Client-visible)"
+              label="Site photo (pending client release)"
               buttonLabel="Upload site photo"
               owner={actor.name}
-              clientVisible
               onSave={async (doc) =>
                 await act(
                   { type: "add_photo", projectId: p.id, doc },
-                  "Site photo saved.",
+                  "Site photo saved internally. Office PM or Administrator release is required before the client can see it.",
                 )
               }
             />
@@ -2044,9 +2047,9 @@ export default function RoleWorkspace({
           <div className="notice subsection">
             <Icon name="shield" />
             <p>
-              Gallery photographs uploaded here are shared with the authorized
-              Client Portal. Use general field evidence or QA/QC uploads for
-              internal inspection records instead.
+              Gallery photographs stay internal until the assigned Office PM or an
+              Administrator reviews and releases them to the Client Portal.
+              Field evidence and QA/QC uploads remain internal inspection records.
             </p>
           </div>
           <div className="site-photo-list">
@@ -2058,7 +2061,7 @@ export default function RoleWorkspace({
                   <Badge tone={doc.clientVisible ? "green" : ""}>
                     {doc.clientVisible
                       ? "Client-visible gallery"
-                      : "Internal legacy record"}
+                      : "Internal · not released"}
                   </Badge>
                   <small>{dateLabel(doc.date)}</small>
                 </span>
@@ -3242,28 +3245,11 @@ export default function RoleWorkspace({
         </section>
         <section className="detail-section">
           <h3>Site photo gallery</h3>
-          {work.photos.length ? (
-            work.photos.map((doc) => (
-              <button
-                className="assignment-history"
-                key={doc.id}
-                onClick={() => showDoc(p, doc)}
-              >
-                <Icon name="doc" />
-                <span>
-                  <strong>{doc.name}</strong>
-                  <small>
-                    {dateLabel(doc.date)} · {doc.owner}
-                  </small>
-                </span>
-                <Icon name="search" size={18} />
-              </button>
-            ))
-          ) : (
-            <p className="role-muted subsection">
-              No site photos uploaded yet.
-            </p>
-          )}
+          <SitePhotoGallery photos={work.photos} onPreview={doc => showDoc(p, doc)}
+            onRelease={isOpm && p.opmId === actor.id && p.status !== "completed" ? async photoId => {
+              const saved = await act({ type: "release_photo", projectId: p.id, photoId }, "Photo released to the client.")
+              if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
+            } : undefined} />
         </section>
         <section className="detail-section">
           <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
@@ -3605,6 +3591,7 @@ export default function RoleWorkspace({
                       type="checkbox"
                       role="switch"
                       checked={!muted.includes(type)}
+                      disabled={notificationSave?.pending}
                       onChange={() => onMute(type)}
                     />
                   </label>
@@ -3760,6 +3747,7 @@ export default function RoleWorkspace({
           </div>
         </header>
         <main className="main-content">
+          {notificationSave && <NotificationSaveStatus {...notificationSave} />}
           <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
             {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
             <span>

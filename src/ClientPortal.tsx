@@ -1,4 +1,5 @@
 import ClientOverview from "./ClientOverview"
+import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import MonthlyReport from "./MonthlyReport"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
@@ -64,6 +65,7 @@ export default function ClientPortal({
   onReport,
   onRecord,
   onRead,
+  notificationSave,
   paused,
   onResume,
   onPause,
@@ -83,6 +85,7 @@ export default function ClientPortal({
   onReport: (projectId: string) => string
   onRecord: (projectId: string, title: string, detail: string) => void
   onRead: (ids: string[]) => void
+  notificationSave?: NotificationSaveState
   paused: boolean
   onResume: () => void
   onPause: () => void
@@ -480,7 +483,7 @@ export default function ClientPortal({
                   <input
                     type="checkbox"
                     role="switch"
-                    disabled={actor.status !== "active"}
+                    disabled={actor.status !== "active" || notificationSave?.pending}
                     checked={!mutedTypes.includes(type)}
                     onChange={() => onMute(type)}
                   />
@@ -731,6 +734,7 @@ export default function ClientPortal({
           </div>
         </header>
         <main className="main-content">
+          {notificationSave && <NotificationSaveStatus {...notificationSave} />}
           {project && (
             <div className="client-project-toolbar">
               <Field label="Your project">

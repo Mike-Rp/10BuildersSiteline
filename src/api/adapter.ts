@@ -157,7 +157,7 @@ export function mapPhoto(
     label: row.caption || "Site photo",
     name: `${row.caption || "site-photo"}.png`,
     uploaded: true,
-    clientVisible: row.client_visible !== false,
+    clientVisible: row.client_visible === true,
     owner: "Site PM",
     date: day(row.taken_date || row.created_at),
     mime: "image/png",
@@ -203,6 +203,7 @@ export function mapProject(parts: ProjectParts): Project {
     .slice()
     .sort((a, b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at))
     .map((h) => ({
+      ...(h.id != null ? { id: String(h.id) } : {}),
       date: day(h.recorded_at),
       text: h.note || "",
       progress: Number(h.pct ?? 0),
@@ -403,6 +404,7 @@ export function mapEvent(n: Dto, recipientId?: string): Event {
   }
   if (n.related_project_id) event.projectId = n.related_project_id
   if (recipientId) event.recipientIds = [recipientId]
+  if (recipientId && n.is_read) event.readBy = [recipientId]
   return event
 }
 

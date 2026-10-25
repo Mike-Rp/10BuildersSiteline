@@ -166,13 +166,18 @@ test("general note approval and its timer cannot activate the next phase",()=>{
   assert.equal(currentProject(state).phase,"Mobilization")
 })
 
-test("site gallery uploads are shared explicitly, but internal diary and general evidence remain private", () => {
+test("site gallery uploads stay internal until the assigned Office PM releases them; diary and general evidence remain private", () => {
   let state = activeFixture()
   state = execute(state, "a4", {
     type: "add_photo",
     doc: evidence("client-site.png"),
   })
+  const photo = workflowFor(currentProject(state)).photos[0]
+  assert.equal(photo.clientVisible, false)
+  assert.throws(() => execute(state, "a4", { type: "release_photo", photoId: photo.id }), /assigned Office PM/)
+  state = execute(state, "a2", { type: "release_photo", photoId: photo.id })
   assert.equal(workflowFor(currentProject(state)).photos[0].clientVisible, true)
+  assert.throws(() => execute(state, "a2", { type: "release_photo", photoId: photo.id }), /already released/)
   state = execute(state, "a4", {
     type: "add_note",
     note: "Internal coordination note.",

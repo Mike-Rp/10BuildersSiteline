@@ -1126,6 +1126,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   await t.test("Site PM photos stay internal until the Office PM or Administrator releases them", async () => {
+    const existingPhotos = (await db.query("select id,is_client_visible from project_photos")).rows
     const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222])
     const site = await asUser("karlo.espiritu@10builders.com")
     const project = site.state.projects.find(p => p.name === "Brookfield Warehouse Ext.")
@@ -1141,7 +1142,11 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await asUser("f.uy@aldenheights-hoa.com")
     assert.ok(!(await api("/projects/" + project.id + "/photos")).some(p => p.id === row.id), "client never receives an unreleased photo")
     assert.ok(!(await api("/workspace/project-data")).some(part => part.photos.some(p => p.id === row.id)))
+    await assert.rejects(api("/files/" + fileId + "/content"), /permission|not found|shared|access/i, "knowing the file id cannot bypass release")
+    assert.equal(await downloadApiFile(fileId), undefined)
     await assert.rejects(command({ type: "release_photo", photoId: row.id }), /permission/)
+    await asUser("lea.fernandez@10builders.com")
+    await assert.rejects(command({ type: "release_photo", photoId: row.id }), /permission|not found|assigned Office PM/i)
     await asUser("renz.villaverde@10builders.com")
     await command({ type: "release_photo", photoId: row.id })
     await assert.rejects(command({ type: "release_photo", photoId: row.id }), /already released/)
@@ -1150,6 +1155,76 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(released.released_by)
     await asUser("f.uy@aldenheights-hoa.com")
     assert.ok((await api("/projects/" + project.id + "/photos")).some(p => p.id === row.id))
+    assert.ok(await downloadApiFile(fileId), "released image content becomes accessible to the linked client")
+    await asUser("karlo.espiritu@10builders.com")
+    const adminFileId = randomUUID()
+    await uploadFile(adminFileId, new File([png], "admin-review.png", { type: "image/png" }))
+    await command({ type: "add_photo", doc: { id: adminFileId }, note: "Administrator release test" })
+    const adminPhoto = (await db.query("select id from project_photos where file_ref=$1", ["db://" + adminFileId])).rows[0]
+    await asUser("patricia.domingo@10builders.com")
+    await command({ type: "release_photo", photoId: adminPhoto.id })
+    await asUser("f.uy@aldenheights-hoa.com")
+    assert.ok((await api("/projects/" + project.id + "/photos")).some(photo => photo.id === adminPhoto.id))
+    const after = new Map((await db.query("select id,is_client_visible from project_photos")).rows.map(photo => [photo.id, photo.is_client_visible]))
+    assert.ok(existingPhotos.every(photo => after.get(photo.id) === photo.is_client_visible), "historical visibility is never bulk changed")
+  })
+
+  await t.test("notification reads and preferences persist after reload and login for each account independently", async () => {
+    const emails = ["patricia.domingo@10builders.com", "renz.villaverde@10builders.com", "karlo.espiritu@10builders.com"]
+    const people = (await db.query("select id,email from users where email=any($1::text[])", [emails])).rows
+    const activity = (await db.query("insert into activity_log(activity_type_id,title,detail) select id,'Persistent notification test','Account-scoped state' from activity_types where code='notice' returning id")).rows[0]
+    const id = String(activity.id)
+    for (const person of people) await db.query("insert into notification_recipients(activity_log_id,recipient_user_id) values($1,$2)", [id, person.id])
+    for (const [index, email] of emails.entries()) {
+      let { user, state } = await asUser(email)
+      assert.equal(state.events.find(event => event.id === id).read, false, "another user's read does not mark this user's notification")
+      const muted = index === 0 ? ["request"] : index === 1 ? ["approval"] : ["progress"]
+      await api("/workspace/preferences", { method: "POST", json: { muted, userId: people.find(person => person.email !== email).id } })
+      const saved = await api("/notifications/read", { method: "POST", json: { ids: [id] } })
+      assert.deepEqual(saved.ids, [id])
+      state = await loadState(user)
+      assert.deepEqual(state.muted, muted)
+      assert.deepEqual(state.userPreferences[user.id], muted)
+      assert.equal(state.events.find(event => event.id === id).read, true)
+      if (user.role !== "admin") assert.deepEqual(state.events.find(event => event.id === id).readBy, [user.id])
+      ;({ user, state } = await asUser(email))
+      assert.deepEqual(state.userPreferences[user.id], muted, "re-login restores the same account's preferences")
+      assert.equal(state.events.find(event => event.id === id).read, true)
+      await assert.rejects(api("/workspace/preferences", { method: "POST", json: { muted: ["invalid-type"] } }), /Invalid notification preferences/)
+      assert.deepEqual((await loadState(user)).muted, muted, "failed saves do not clear stored preferences")
+    }
+    const privateEvent = (await db.query("insert into activity_log(activity_type_id,title,detail) select id,'Private notification','Not addressed to Site PM' from activity_types where code='notice' returning id")).rows[0]
+    const admin = people.find(person => person.email === emails[0])
+    await db.query("insert into notification_recipients(activity_log_id,recipient_user_id) values($1,$2)", [privateEvent.id, admin.id])
+    await asUser(emails[2])
+    assert.deepEqual((await api("/notifications/read", { method: "POST", json: { ids: [String(privateEvent.id)] } })).ids, [])
+    assert.equal((await db.query("select is_read from notification_recipients where activity_log_id=$1 and recipient_user_id=$2", [privateEvent.id, admin.id])).rows[0].is_read, false)
+  })
+
+  await t.test("client history read IDs are stable, persistent, and scoped to linked visible history", async () => {
+    let { user, state } = await asUser("f.uy@aldenheights-hoa.com")
+    const project = state.projects.find(project => project.status === "active")
+    assert.ok(project)
+    const stage = (await db.query("select current_stage_id from projects where id=$1", [project.id])).rows[0].current_stage_id
+    const addHistory = async (visible, note, projectId = project.id) => (await db.query("insert into project_progress_history(project_id,project_stage_id,pct,note,is_client_visible) values($1,$2,10,$3,$4) returning id", [projectId, stage, note, visible])).rows[0].id
+    const historyId = await addHistory(true, "Visible notification persistence test")
+    const internalId = await addHistory(false, "Internal notification persistence test")
+    const otherProject = (await db.query("select id from projects p where not exists(select 1 from user_client_project_links l where l.project_id=p.id and l.user_id=$1) limit 1", [user.id])).rows[0].id
+    const foreignId = await addHistory(true, "Another client's history", otherProject)
+    const id = `client-history:${project.id}:${historyId}`
+    const rejected = [`client-history:${project.id}:${internalId}`, `client-history:${otherProject}:${foreignId}`, `client-history:${otherProject}:${historyId}`]
+    const saved = await api("/notifications/read", { method: "POST", json: { ids: [id, ...rejected] } })
+    assert.deepEqual(saved.ids, [id])
+    await api("/workspace/preferences", { method: "POST", json: { muted: ["progress"] } })
+    await addHistory(true, "A newer notification must not change the older notification ID")
+    ;({ user, state } = await asUser("f.uy@aldenheights-hoa.com"))
+    assert.ok(state.portalReads[user.id].includes(id))
+    assert.ok(rejected.every(id => !state.portalReads[user.id].includes(id)))
+    assert.deepEqual(state.userPreferences[user.id], ["progress"], "saving preferences preserves read IDs")
+    assert.ok(clientProjectViews(state, user.id).flatMap(project => project.history).some(history => history.id === id))
+    const other = await asUser("maria.santos@rosariabiz.ph")
+    assert.ok(!other.state.portalReads[other.user.id].includes(id))
+    assert.deepEqual(other.state.userPreferences[other.user.id], [])
   })
 
   await t.test("the API refuses requests without a session", async () => {

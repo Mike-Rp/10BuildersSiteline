@@ -2,6 +2,8 @@ import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import DashboardWelcome from "./DashboardWelcome"
+import SitePhotoGallery from "./SitePhotoGallery"
+import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
 import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
@@ -291,6 +293,7 @@ function AppInner() {
     destructive?: boolean
   }>()
   const [signedOut, setSignedOut] = useState(true)
+  const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
   const [sessionMessage, setSessionMessage] = useState("")
   const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
   const [checkingSession, setCheckingSession] = useState(true)
@@ -1289,12 +1292,7 @@ function AppInner() {
               className={`activity-item ${!e.read ? "unread" : ""}`}
               key={e.id}
               onClick={() => {
-                setState((s) => ({
-                  ...s,
-                  events: s.events.map((x) =>
-                    x.id === e.id ? { ...x, read: true } : x,
-                  ),
-                }))
+                notificationSettings.markRead([e.id])
                 if (e.target === "Approvals") {
                   openPendingRequests()
                   setDialog(undefined)
@@ -2031,14 +2029,8 @@ function AppInner() {
                     type="checkbox"
                     role="switch"
                     checked={!state.muted.includes(type)}
-                    onChange={() =>
-                      setState((s) => ({
-                        ...s,
-                        muted: s.muted.includes(type)
-                          ? s.muted.filter((t) => t !== type)
-                          : [...s.muted, type],
-                      }))
-                    }
+                    disabled={notificationSettings.pending}
+                    onChange={() => notificationSettings.toggleMute(type)}
                   />
                 </label>
               ))}
@@ -2230,6 +2222,14 @@ function AppInner() {
               </div>
             </section>
             <EngineerHistory projectId={p.id} />
+            <section className="detail-section">
+              <h3>Site photo gallery</h3>
+              <SitePhotoGallery photos={p.workflow?.photos || []} onPreview={previewDoc}
+                onRelease={p.status !== "completed" ? async photoId => {
+                  const result = await sendWorkflow({ type: "release_photo", projectId: p.id, photoId })
+                  if (!result.ok) throw new Error(result.error || "Photo release failed. Try again.")
+                } : undefined} />
+            </section>
             <section className="detail-section">
               <h3>Project progress & review history</h3>
               {p.history.map((h, i) => (
@@ -2804,46 +2804,9 @@ function AppInner() {
         }}
         readNoticeIds={state.portalReads?.[actor.id] || []}
         mutedTypes={state.userPreferences?.[actor.id] || []}
-        onMute={(type) => {
-          if (
-            actor.status !== "active" ||
-            !["request", "approval", "progress", "notice"].includes(type)
-          )
-            return
-          setState((current) => {
-            const muted = current.userPreferences?.[actor.id] || []
-            return {
-              ...current,
-              userPreferences: {
-                ...current.userPreferences,
-                [actor.id]: muted.includes(type)
-                  ? muted.filter((value) => value !== type)
-                  : [...muted, type],
-              },
-            }
-          })
-        }}
-        onRead={(ids) =>
-          setState((current) => {
-            const allowed = new Set(
-              clientProjectViews(current, actor.id).flatMap((p) =>
-                p.history.map((h) => h.id),
-              ),
-            )
-            return {
-              ...current,
-              portalReads: {
-                ...current.portalReads,
-                [actor.id]: [
-                  ...new Set([
-                    ...(current.portalReads?.[actor.id] || []),
-                    ...ids.filter((id) => allowed.has(id)),
-                  ]),
-                ],
-              },
-            }
-          })
-        }
+        onMute={notificationSettings.toggleMute}
+        onRead={ids => notificationSettings.markRead(ids, true)}
+        notificationSave={notificationSettings}
         paused={signedOut}
         onResume={endSession}
         onPause={endSession}
@@ -2861,33 +2824,9 @@ function AppInner() {
         welcomeGreeting={welcomeGreeting}
         onCommand={sendWorkflow}
         onReload={reloadWorkspace}
-        onRead={(ids) =>
-          setState((current) => ({
-            ...current,
-            events: current.events.map((e) =>
-              ids.includes(e.id)
-                ? {
-                    ...e,
-                    readBy: [...new Set([...(e.readBy || []), actor.id])],
-                  }
-                : e,
-            ),
-          }))
-        }
-        onMute={(type) =>
-          setState((current) => {
-            const muted = current.userPreferences?.[actor.id] || []
-            return {
-              ...current,
-              userPreferences: {
-                ...current.userPreferences,
-                [actor.id]: muted.includes(type)
-                  ? muted.filter((t) => t !== type)
-                  : [...muted, type],
-              },
-            }
-          })
-        }
+        onRead={notificationSettings.markRead}
+        onMute={notificationSettings.toggleMute}
+        notificationSave={notificationSettings}
         paused={signedOut}
         idleWarning={idleWarning}
         onStayActive={() => setIdleWarning(false)}
@@ -3016,12 +2955,7 @@ function AppInner() {
                     </h3>
                     <Button
                       variant="text-button"
-                      onClick={() =>
-                        setState((s) => ({
-                          ...s,
-                          events: s.events.map((e) => ({ ...e, read: true })),
-                        }))
-                      }
+                      onClick={() => notificationSettings.markRead(state.events.map(event => event.id))}
                     >
                       Mark all read
                     </Button>
@@ -3064,6 +2998,7 @@ function AppInner() {
           </div>
         </header>
         <main className="main-content">
+          <NotificationSaveStatus {...notificationSettings} />
           <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
             {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
             <span>
