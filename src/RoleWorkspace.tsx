@@ -3760,13 +3760,13 @@ export default function RoleWorkspace({
           </div>
         </header>
         <main className="main-content">
-          <div className="workspace-meta">
+          <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
+            {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
             <span>
               <Icon name="calendar" size={15} />
               {dateLabel(today())}
             </span>
           </div>
-          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
           {error && (
             <div className="role-error" role="alert">
               <Icon name="alert" />

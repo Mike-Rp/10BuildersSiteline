@@ -3064,7 +3064,8 @@ function AppInner() {
           </div>
         </header>
         <main className="main-content">
-          <div className="workspace-meta">
+          <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
+            {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
             <span>
               <Icon name="calendar" size={15} />
               {new Date().toLocaleDateString("en-US", {
@@ -3075,7 +3076,6 @@ function AppInner() {
               })}
             </span>
           </div>
-          {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
           {renderPage()}
         </main>
       </div>
