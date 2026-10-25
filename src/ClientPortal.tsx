@@ -1,4 +1,7 @@
 import ClientOverview from "./ClientOverview"
+import NotificationDetail from "./NotificationDetail"
+import { notificationAction } from "./notification-action"
+import type { Event as WorkspaceEvent } from "./model"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import MonthlyReport from "./MonthlyReport"
 import { normalizeWorkspacePage } from "./adminNav"
@@ -97,6 +100,7 @@ export default function ClientPortal({
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
   const [mobileNav, setMobileNav] = useState(false)
   const [bell, setBell] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [viewer, setViewer] = useState<Viewer>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [error, setError] = useState("")
@@ -114,6 +118,7 @@ export default function ClientPortal({
         date: item.date,
         phase: item.phase,
         progress: item.progress,
+        text: item.text,
         type: /approved|completed|sign.off/i.test(item.text)
           ? "approval"
           : "progress",
@@ -703,8 +708,9 @@ export default function ClientPortal({
                       key={item.id}
                       onClick={() => {
                         onRead([item.id])
-                        setProjectId(item.projectId)
-                        navigate("Progress History")
+                        setBell(false)
+                        setSelectedNotification({ id: item.id, projectId: item.projectId, title: item.projectName,
+                          detail: item.text, date: item.date, type: item.type, read: true, target: "Progress History" })
                       }}
                     >
                       <span className="activity-icon approval">
@@ -792,6 +798,13 @@ export default function ClientPortal({
           </div>
         </main>
       </div>
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}
+        action={notificationAction(selectedNotification, { id: actor.id, role: "client" }, projects, [], NAV.map(([label]) => label))}
+        onClose={() => setSelectedNotification(undefined)} onOpen={action => {
+          setSelectedNotification(undefined)
+          if (action.kind === "project") { setProjectId(action.id); navigate("Progress History") }
+          else if (action.kind === "page") navigate(action.page)
+        }} />}
       {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {viewedDoc && viewer && (
         <Preview

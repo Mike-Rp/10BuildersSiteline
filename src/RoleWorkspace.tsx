@@ -8,6 +8,8 @@ import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
 import ChecklistApprovalBanner from "./ChecklistApprovalBanner"
 import DashboardWelcome from "./DashboardWelcome"
+import NotificationDetail from "./NotificationDetail"
+import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import type { LoginGreeting } from "./dashboard-greeting"
@@ -218,6 +220,7 @@ export default function RoleWorkspace({
   const navigationCounts = navigationAttention(state, actor)
   const [page, setPage] = useState("Dashboard")
   const [profileOpen, setProfileOpen] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
     () =>
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
@@ -2638,14 +2641,7 @@ export default function RoleWorkspace({
               onClick={() => {
                 onRead([e.id])
                 setBell(false)
-                if (isOpm && e.target === "SPM responses") openSiteResponses()
-                else if (nav.some(([label]) => label === e.target))
-                  navigate(e.target)
-                else if (
-                  e.projectId &&
-                  projects.some((p) => p.id === e.projectId)
-                )
-                  setDialog({ kind: "project", projectId: e.projectId })
+                setSelectedNotification(e)
               }}
             >
               <span className={`activity-icon ${e.type}`}>
@@ -4024,6 +4020,17 @@ export default function RoleWorkspace({
           confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
           onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}
+        action={notificationAction(selectedNotification, actor, projects, state.accounts, [...nav.map(([label]) => label), ...(isOpm ? ["SPM responses"] : [])])}
+        onClose={() => setSelectedNotification(undefined)} onOpen={action => {
+          setSelectedNotification(undefined)
+          if (action.kind === "project") setDialog({ kind: "project", projectId: action.id })
+          else if (action.kind === "profile") setProfileOpen(true)
+          else if (action.kind === "page") {
+            if (action.page === "SPM responses") openSiteResponses()
+            else navigate(action.page)
+          }
+        }} />}
       {profileOpen && <MyProfile actor={actor} projects={projects} onClose={() => setProfileOpen(false)} />}
       {preview && (
         <Preview

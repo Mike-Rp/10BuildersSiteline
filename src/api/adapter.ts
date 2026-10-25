@@ -403,6 +403,8 @@ export function mapEvent(n: Dto, recipientId?: string): Event {
     target: "Dashboard",
   }
   if (n.related_project_id) event.projectId = n.related_project_id
+  const licenseAccount = typeof n.anchor_reference === "string" ? n.anchor_reference.match(/^license:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):/i)?.[1] : undefined
+  if (licenseAccount) event.accountId = licenseAccount
   if (recipientId) event.recipientIds = [recipientId]
   if (recipientId && n.is_read) event.readBy = [recipientId]
   return event

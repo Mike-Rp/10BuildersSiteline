@@ -2,6 +2,8 @@ import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import DashboardWelcome from "./DashboardWelcome"
+import NotificationDetail from "./NotificationDetail"
+import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
 import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
@@ -282,6 +284,7 @@ function AppInner() {
   const [tab, setTab] = useState("closed")
   const [mobileNav, setMobileNav] = useState(false)
   const [notifications, setNotifications] = useState(false)
+  const [selectedNotification, setSelectedNotification] = useState<Event>()
   const [credentials, setCredentials] = useState<{
     name: string
     password: string
@@ -608,6 +611,7 @@ function AppInner() {
     setConfirmation(undefined)
     setCredentials(undefined)
     setNotifications(false)
+    setSelectedNotification(undefined)
     setSessionId(account.id)
     setSessionMessage("")
     setWelcomeGreeting(account.role === "client" ? undefined : sessionDashboardGreeting(account.id, account.name, { fresh: true }))
@@ -621,6 +625,7 @@ function AppInner() {
   }
   function endSession() {
     clearSession()
+    setSelectedNotification(undefined)
     setWelcomeGreeting(undefined)
     setSignedOut(true)
     setSessionId("")
@@ -1293,19 +1298,8 @@ function AppInner() {
               key={e.id}
               onClick={() => {
                 notificationSettings.markRead([e.id])
-                if (e.target === "Approvals") {
-                  openPendingRequests()
-                  setDialog(undefined)
-                } else if (
-                  NAV.some((n) => n.label === e.target) ||
-                  resolveAdminTarget(e.target)
-                ) {
-                  navigate(e.target)
-                  setDialog(undefined)
-                } else if (e.projectId) {
-                  setNotifications(false)
-                  setDialog({ kind: "project", id: e.projectId })
-                } else setDialog(undefined)
+                setNotifications(false)
+                setSelectedNotification(e)
               }}
             >
               <span className={`activity-icon ${e.type}`}>
@@ -3366,6 +3360,18 @@ function AppInner() {
           <Button onClick={() => setIdleWarning(false)}>Stay signed in</Button>
         </div>
       )}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings}
+        action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
+        onClose={() => setSelectedNotification(undefined)} onOpen={action => {
+          setSelectedNotification(undefined)
+          if (action.kind === "project") setDialog({ kind: "project", id: action.id })
+          else if (action.kind === "account") setDialog({ kind: "account", id: action.id })
+          else if (action.kind === "page") {
+            setDialog(undefined)
+            if (action.page === "Approvals") openPendingRequests()
+            else navigate(action.page)
+          }
+        }} />}
       {toast && (
         <div className="toast" role="status">
           <span>

@@ -428,6 +428,7 @@ export type ProjectWorkflow = {
   }[]
 }
 export type Event = {
+  accountId?: string
   id: string
   title: string
   detail: string
