@@ -122,11 +122,13 @@ function AgreementViewer({ doc }: { doc: Doc }) {
 export function AgreementPreviewModal({
   project,
   actor,
+  saving = false,
   onAction,
   onClose,
 }: {
   project: Project
   actor: Account
+  saving?: boolean
   onAction: (command: WorkflowCommand, message?: string) => boolean | Promise<boolean>
   onClose: () => void
 }) {
@@ -247,7 +249,7 @@ export function AgreementPreviewModal({
               <Button
                 variant="primary"
                 icon="check"
-                disabled={!reviewed || !!open || !doc}
+                disabled={saving || !reviewed || !!open || !doc}
                 onClick={async () => {
                   if (
                     await send(
@@ -258,7 +260,7 @@ export function AgreementPreviewModal({
                     setError("")
                   else
                     setError(
-                      "Acknowledgment was not recorded. Check for an open issue or an existing acknowledgment.",
+                      "Acknowledgment could not be confirmed. Review the workspace error before trying again.",
                     )
                 }}
               >
@@ -269,10 +271,11 @@ export function AgreementPreviewModal({
               <div className="issue-form">
                 <Field
                   label="Describe the issue"
-                  hint="Incorrect company details or agreement discrepancy. Admin is notified and acknowledgment is held."
+                  hint="Enter at least 10 characters. Describe incorrect company details or an agreement discrepancy. Admin is notified and acknowledgment is held."
                 >
                   <textarea
                     rows={4}
+                    disabled={saving}
                     value={issue}
                     onChange={(e) => setIssue(e.target.value)}
                   />
@@ -281,6 +284,7 @@ export function AgreementPreviewModal({
                   <Button onClick={() => setReporting(false)}>Cancel</Button>
                   <Button
                     variant="primary"
+                    disabled={saving || issue.trim().length < 10}
                     onClick={async () => {
                       if (
                         await send(
@@ -294,7 +298,7 @@ export function AgreementPreviewModal({
                         setError("")
                       } else
                         setError(
-                          "Describe the issue in at least 10 characters before sending it to Admin.",
+                          "Your issue could not be sent. Your description is still here; review the workspace error and try again.",
                         )
                     }}
                   >

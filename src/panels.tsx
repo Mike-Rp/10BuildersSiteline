@@ -120,6 +120,7 @@ export function Upload({
   const [preview, setPreview] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   // Browsers that ignore "#toolbar=0" (Firefox, Safari, mobile) get page 1 as an image.
   const isPdf =
     !!file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name))
@@ -146,20 +147,24 @@ export function Upload({
     if (preview) URL.revokeObjectURL(preview)
     setFile(undefined)
     setPreview("")
+    setError("")
     if (input.current) input.current.value = ""
   }
   async function confirm() {
-    if (!file || validateFile(file, spreadsheet)) return
+    if (savingRef.current || disabled || !file || validateFile(file, spreadsheet)) return
+    savingRef.current = true
     setSaving(true)
+    setError("")
     try {
       const id = uid()
       await saveFile(id, file, spreadsheet)
       const saved=await onSave(newUploadedDoc({ id, label, file, owner, clientVisible }))
-      if(saved===false)throw new Error("The server could not save this change. Review the workspace message and try again.")
+      if(saved===false)throw new Error("We couldn’t save your upload. Your file is still selected—please try again.")
       clear()
     } catch (e) {
-      setError((e as Error).message)
+      setError(e instanceof Error ? e.message : "Upload failed. Your file is still selected; try again.")
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -183,19 +188,20 @@ export function Upload({
       />
       <Button
         icon="upload"
-        disabled={disabled}
+        disabled={disabled || saving}
         aria-label={ariaLabel}
         onClick={() => input.current?.click()}
       >
         {buttonLabel}
       </Button>
-      {error && (
+      {error && !file && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
       {file && (
-        <Modal title="Confirm document upload" subtitle={label} onClose={clear}>
+        <Modal title="Confirm document upload" subtitle={label} onClose={() => { if (!savingRef.current) clear() }}>
+          {error && <p className="error" role="alert">{error}</p>}
           <div className="upload-file">
             <Icon name="doc" />
             <div>
@@ -243,8 +249,9 @@ export function Upload({
             </object>
           )}
           <div className="modal-actions">
-            <Button onClick={clear}>Back</Button>
+            <Button disabled={saving} onClick={clear}>Back</Button>
             <Button
+              disabled={saving}
               onClick={() => {
                 clear()
                 setTimeout(() => input.current?.click(), 0)
@@ -252,7 +259,7 @@ export function Upload({
             >
               Retry upload
             </Button>
-            <Button variant="primary" disabled={saving} onClick={confirm}>
+            <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
               {saving ? "Saving…" : "Confirm upload"}
             </Button>
           </div>

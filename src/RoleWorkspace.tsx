@@ -253,6 +253,8 @@ export default function RoleWorkspace({
   const [preview, setPreview] = useState<Doc>()
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [query, setQuery] = useState("")
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
@@ -444,14 +446,27 @@ export default function RoleWorkspace({
     ],
   })
   async function act(command: WorkflowCommand, success?: string) {
-    const result = await onCommand(command)
-    if (!result.ok) {
-      setError(result.error || "This action is not available.")
-      return false
-    }
+    // Guard synchronously: a second click can arrive before React renders disabled controls.
+    if (savingRef.current) return false
+    savingRef.current = true
+    setSaving(true)
     setError("")
-    setMessage(result.message || success || "Workspace updated.")
-    return true
+    setMessage("")
+    try {
+      const result = await onCommand(command)
+      if (!result.ok) {
+        setError(result.error || "This action could not be saved. Review your entries and try again.")
+        return false
+      }
+      setMessage(result.message || success || "Workspace updated.")
+      return true
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This action could not be saved. Try again.")
+      return false
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
   function navigate(next: string) {
     setPage(normalizeWorkspacePage(next))
@@ -578,6 +593,7 @@ export default function RoleWorkspace({
               p.status !== "completed" && (
                 <select
                   aria-label={`Reassign ${p.name} ${t.phase}`}
+                  disabled={saving}
                   value=""
                   onChange={async (e) =>
                     await act(
@@ -662,7 +678,7 @@ export default function RoleWorkspace({
               <Button
                 variant="primary"
                 icon="check"
-                disabled={guidance?.action !== "confirm"}
+                disabled={saving || guidance?.action !== "confirm"}
                 onClick={async () => {
                   if (
                     await act(
@@ -1026,7 +1042,7 @@ export default function RoleWorkspace({
                       <Upload
                         label={label}
                         owner={actor.name}
-                        disabled={!p.opmAccepted || p.status !== "pending"}
+                        disabled={saving || !p.opmAccepted || p.status !== "pending"}
                         buttonLabel={`Upload ${label}`}
                         onSave={async (d) =>
                           await act(
@@ -1270,7 +1286,7 @@ export default function RoleWorkspace({
                 <Button
                   variant="primary"
                   icon="check"
-                  disabled={!!block}
+                  disabled={saving || !!block}
                   title={block}
                   onClick={async () =>
                     await act(
@@ -1717,6 +1733,7 @@ export default function RoleWorkspace({
         state={state}
         project={p}
         actor={actor}
+        saving={saving}
         onAction={act}
         onCrew={(companyId) =>
           setDialog({ kind: "company", projectId: p.id, companyId })
@@ -1872,6 +1889,7 @@ export default function RoleWorkspace({
                       owner={actor.name}
                       buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
+                      disabled={saving}
                       onSave={async (doc) =>
                         await act(
                           {
@@ -1953,6 +1971,7 @@ export default function RoleWorkspace({
                 <textarea
                   rows={3}
                   value={note}
+                  disabled={saving}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Report the current conditions, observations, or a site issue."
                 />
@@ -1960,7 +1979,7 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={(!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
+                  disabled={saving || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
                   onClick={async () => {
                     if (
                       await act(
@@ -1998,12 +2017,14 @@ export default function RoleWorkspace({
             <Field label="New site diary note">
               <textarea
                 value={diary}
+                disabled={saving}
                 onChange={(e) => setDiary(e.target.value)}
                 rows={2}
                 placeholder="Add an internal operational note."
               />
             </Field>
             <Button
+              disabled={saving || !diary.trim()}
               onClick={async () => {
                 if (
                   await act(
@@ -2038,6 +2059,7 @@ export default function RoleWorkspace({
             <Upload
               label="Site photo (pending client release)"
               buttonLabel="Upload site photo"
+              disabled={saving}
               owner={actor.name}
               onSave={async (doc) =>
                 await act(
@@ -2090,7 +2112,7 @@ export default function RoleWorkspace({
           renderActions={id => {
             const p = allActive.find(site => site.id === id)!
             return isOpm ? <>
-              <Button icon="bell" onClick={async () => {
+              <Button icon="bell" disabled={saving} onClick={async () => {
                 await act({ type: "request_update", projectId: id }, "Site PM update reminder recorded.")
               }}>Request update</Button>
               {p.workflow?.pendingRework && <Button onClick={() => { navigate("Rework & approvals"); setTab("rework") }}>Review issue</Button>}
@@ -2356,6 +2378,7 @@ export default function RoleWorkspace({
                         <Button
                           variant="primary"
                           icon="check"
+                          disabled={saving}
                           onClick={async () =>
                             await act(
                               {
@@ -3262,6 +3285,7 @@ export default function RoleWorkspace({
           {isOpm && p.status === "active" && (
             <Button
               icon="bell"
+              disabled={saving}
               onClick={async () =>
                 await act(
                   { type: "request_update", projectId: p.id },
@@ -3451,6 +3475,7 @@ export default function RoleWorkspace({
             <div className="modal-actions">
               <Button
                 variant="danger-ghost"
+                disabled={saving}
                 onClick={async () => {
                   if (
                     await act(
@@ -3751,18 +3776,6 @@ export default function RoleWorkspace({
               {dateLabel(today())}
             </span>
           </div>
-          {error && (
-            <div className="role-error" role="alert">
-              <Icon name="alert" />
-              <span>{error}</span>
-              <Button
-                variant="icon-button"
-                icon="close"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              />
-            </div>
-          )}
           {renderPage()}
           <div className="workspace-footer">
             <span>
@@ -3811,6 +3824,7 @@ export default function RoleWorkspace({
         >
           <Field label="Change request note">
             <textarea
+              disabled={saving}
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
               rows={3}
@@ -3829,6 +3843,7 @@ export default function RoleWorkspace({
             <Button onClick={() => setDialog(undefined)}>Cancel</Button>
             <Button
               variant="primary"
+              disabled={saving}
               onClick={async () => {
                 if (
                   await act(
@@ -3864,6 +3879,7 @@ export default function RoleWorkspace({
             <textarea
               rows={3}
               value={declineReason}
+              disabled={saving}
               onChange={(e) => setDeclineReason(e.target.value)}
             />
           </Field>
@@ -3876,6 +3892,7 @@ export default function RoleWorkspace({
             <Button onClick={() => setDialog(undefined)}>Cancel</Button>
             <Button
               variant="danger"
+              disabled={saving || (dialog.phase === "Mobilization" && !declineReason.trim())}
               onClick={async () => {
                 if (
                   await act(
@@ -3937,6 +3954,7 @@ export default function RoleWorkspace({
         >
           <NewCompanyForm
             actor={actor}
+            saving={saving}
             project={
               requestProjects.find((p) => p.id === dialog.projectId) ||
               requestProjects[0]
@@ -4072,16 +4090,16 @@ export default function RoleWorkspace({
           </div>
         </Modal>
       )}
-      {message && (
-        <div className="toast" role="status">
-          <Icon name="check" size={18} />
-          {message}
-          <Button
+      {(saving || error || message) && (
+        <div className={`toast workflow-feedback${saving ? " workflow-feedback-saving" : error ? " workflow-feedback-error" : ""}`} role={error ? "alert" : "status"} aria-atomic="true">
+          <Icon name={saving ? "clock" : error ? "alert" : "check"} size={18} />
+          <span>{saving ? "Saving changes…" : error || message}</span>
+          {!saving && <Button
             icon="close"
             variant="icon-button"
-            aria-label="Dismiss notification"
-            onClick={() => setMessage("")}
-          />
+            aria-label={error ? "Dismiss error" : "Dismiss notification"}
+            onClick={() => { setMessage(""); setError("") }}
+          />}
         </div>
       )}
       {idleWarning && !paused && (
@@ -4110,12 +4128,14 @@ export default function RoleWorkspace({
 }
 function NewCompanyForm({
   actor,
+  saving,
   project,
   projects,
   onSave,
   onClose,
 }: {
   actor: Account
+  saving: boolean
   project?: Project
   projects: Project[]
   onSave: (company: Company, projectId: string) => void
@@ -4148,6 +4168,7 @@ function NewCompanyForm({
     <form
       onSubmit={(e) => {
         e.preventDefault()
+        if (saving) return
         if (!draft.name.trim() || !projectId) {
           setError("Company name and an assigned project are required.")
           return
@@ -4271,8 +4292,8 @@ function NewCompanyForm({
       )}
       <div className="modal-actions">
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="primary" type="submit">
-          Submit for Admin approval
+        <Button variant="primary" type="submit" disabled={saving}>
+          {saving ? "Submitting…" : "Submit for Admin approval"}
         </Button>
       </div>
     </form>

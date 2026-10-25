@@ -297,6 +297,10 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .document-watermark-grid { color: var(--color-ink); opacity: .13; }
 #root .toast { border: 1px solid var(--success-border); border-left: 4px solid var(--color-success); border-radius: 6px; padding: 13px 14px 13px 18px; color: var(--color-ink); background: white; box-shadow: 0 6px 24px #172B4D15; line-height: 1.7; }
 #root .toast > span { color: var(--color-success); }
+#root .toast.workflow-feedback-error { border-color: var(--danger-border); border-left-color: var(--color-danger); }
+#root .toast.workflow-feedback-error > :is(span, svg) { color: var(--color-danger); }
+#root .toast.workflow-feedback-saving { border-color: var(--color-line); border-left-color: var(--color-ink); }
+#root .toast.workflow-feedback-saving > span { color: var(--color-ink); }
 #root .session-warning { background: var(--amber-soft); color: var(--color-warning); border-color: var(--warning-border); }
 #root .session-card { background: var(--color-surface); border-color: var(--color-line); border-radius: 8px; }
 
@@ -624,7 +628,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .sidebar > nav { scrollbar-color: #6C859C transparent; }
 #root .sidebar > .workspace-switch { display: none; }
 #root .sidebar .brand { min-height: 84px; height: 84px; margin-inline: -16px; padding: 12px 26px; border-bottom: 3px solid var(--chrome-accent); gap: 12px; font-size: 23px; letter-spacing: -.6px; color: var(--chrome-foreground); }
-#root .sidebar .brand small { font-size: 12px; letter-spacing: 1px; color: var(--chrome-muted); }
+#root .sidebar .brand small { font-size: 14px; letter-spacing: 1px; color: var(--chrome-muted); }
 #root .sidebar .brand-mark { width: 42px; height: 42px; border-radius: 8px; background: var(--chrome-hover); color: var(--chrome-foreground); font-size: 18px; letter-spacing: -.5px; }
 #root .sidebar .nav-group-label { color: var(--chrome-muted); }
 #root .sidebar .nav-item { color: var(--chrome-muted); border-radius: 7px; }

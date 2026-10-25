@@ -152,6 +152,7 @@ export default function LeadSubcontractorPanel({
   state,
   project,
   actor,
+  saving = false,
   onAction,
   onCrew,
   onNewCompany,
@@ -162,6 +163,7 @@ export default function LeadSubcontractorPanel({
   state: State
   project: Project
   actor: Account
+  saving?: boolean
   onAction: (command: WorkflowCommand, message?: string) => boolean | Promise<boolean>
   onCrew: (companyId: string) => void
   onNewCompany: () => void
@@ -441,6 +443,7 @@ export default function LeadSubcontractorPanel({
                       <div className="subcon-contact-actions">
                         <Button
                           icon="clock"
+                          disabled={saving}
                           onClick={async () =>
                             await command(
                               {
@@ -460,6 +463,7 @@ export default function LeadSubcontractorPanel({
                           <Button
                             variant="primary"
                             icon="check"
+                            disabled={saving}
                             onClick={async () =>
                               await command(
                                 {
@@ -475,6 +479,7 @@ export default function LeadSubcontractorPanel({
                           </Button>
                           <Button
                             variant="danger-ghost"
+                            disabled={saving}
                             onClick={async () =>
                               await command(
                                 {
@@ -560,6 +565,7 @@ export default function LeadSubcontractorPanel({
                   <Button
                     variant="primary"
                     icon="clock"
+                    disabled={saving}
                     onClick={async () =>
                       await command(
                         {
@@ -664,7 +670,7 @@ export default function LeadSubcontractorPanel({
                       <Button
                         className="full-width"
                         icon="clock"
-                        disabled={declined}
+                        disabled={saving || declined}
                         onClick={async () =>
                           await command(
                             {
@@ -768,7 +774,7 @@ export default function LeadSubcontractorPanel({
                         className="full-width"
                         variant="primary"
                         icon="clock"
-                        disabled={declined || !!current}
+                        disabled={saving || declined || !!current}
                         onClick={async () =>
                           await command(
                             {
@@ -967,16 +973,15 @@ export default function LeadSubcontractorPanel({
               <Upload
                 label={DOC_LABELS[6]}
                 owner={actor.name}
-                disabled={!responsesComplete}
+                disabled={saving || !responsesComplete}
                 buttonLabel="Upload signed subcontractor agreement"
                 onSave={async (doc) => {
-                  if (
-                    await command(
-                      { type: "upload_agreement", doc },
-                      "All final checks passed. Project and client access activated.",
-                    )
+                  const saved = await command(
+                    { type: "upload_agreement", doc },
+                    "All final checks passed. Project and client access activated.",
                   )
-                    onActivated()
+                  if (saved) onActivated()
+                  return saved
                 }}
               />
             )}
@@ -1029,6 +1034,7 @@ export default function LeadSubcontractorPanel({
             <Button
               variant="primary"
               icon="check"
+              disabled={saving}
               onClick={async () => {
                 if (
                   await command(
@@ -1040,7 +1046,7 @@ export default function LeadSubcontractorPanel({
                   setActivatedNow(true)
                 } else
                   setActivationError(
-                    "Activation was not applied. A requirement is no longer met or the project is already active.",
+                    "Activation could not be confirmed. Review the workspace error before trying again.",
                   )
               }}
             >
@@ -1079,6 +1085,7 @@ export default function LeadSubcontractorPanel({
         <AgreementPreviewModal
           project={project}
           actor={actor}
+          saving={saving}
           onAction={onAction}
           onClose={() => setAgreementOpen(false)}
         />
