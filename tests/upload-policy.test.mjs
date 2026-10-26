@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { readManpowerFile } from "../Thesis-Backend/src/services/workspace/manpower-import.utility.js"
 import { validateUpload } from "../Thesis-Backend/src/services/workspace/upload-policy.utility.js"
 import { fileType } from "../Thesis-Backend/src/services/progress/phase-upload.utility.js"
-import { validateFile } from "../src/model.ts"
+import { DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB, uploadRequirements, validateFile } from "../src/model.ts"
 
 const workbook = extension => {
   const book=XLSX.utils.book_new()
@@ -60,4 +60,18 @@ test("frontend rejects cross-purpose formats, empty files and unsupported extens
   for(const name of ["report.pdf","photo.png","crew.csv"])
     assert.match(validateFile(new File(["test"],name),true),/files only/)
   assert.equal(validateFile(new File(["test"],"crew.XLSX"),true),"")
+})
+
+test("each PDF permits up to 10 MB, rejects one byte over, and retains the separate Excel limit", () => {
+  const mb = 1024 * 1024
+  assert.equal(DOCUMENT_UPLOAD_LIMIT_MB, 10)
+  assert.equal(MANPOWER_UPLOAD_LIMIT_MB, 15)
+  for (const name of ["report.pdf", "REPORT.PDF", "photo.jpg", "photo.jpeg", "photo.png"]) {
+    assert.equal(validateFile({ name, size: 10 * mb }), "")
+    assert.match(validateFile({ name, size: 10 * mb + 1 }), /10 MB or smaller/)
+  }
+  assert.equal(validateFile({ name: "crew.xlsx", size: 15 * mb }, true), "")
+  assert.match(validateFile({ name: "crew.xlsx", size: 15 * mb + 1 }, true), /15 MB or smaller/)
+  assert.match(uploadRequirements(), /Maximum 10 MB per file/)
+  assert.match(uploadRequirements(true), /Maximum 15 MB per file/)
 })

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Badge, Button, Empty, Field, Modal } from "./ui"
-import { dateLabel } from "./model"
+import { dateLabel, uploadRequirements, validateFile } from "./model"
 import { useExtensionDemo } from "./ExtensionDemoContext"
 import {
   canSeeProject,
@@ -523,12 +523,18 @@ export default function ExtensionWorkflow({
                 }
               />
             </Field>
-            <Field label="Supporting Documents / Site Evidence">
+            <Field label="Supporting Documents / Site Evidence" hint={uploadRequirements()}>
               <input
                 type="file"
                 multiple
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => {
-                  const files = Array.from(e.target.files || []).map((f) => ({
+                  const selected = Array.from(e.target.files || [])
+                  const invalid = selected.map(file => ({ file, message: validateFile(file) })).find(result => result.message)
+                  e.target.value = ""
+                  if (invalid) { setError(`${invalid.file.name}: ${invalid.message}`); return }
+                  setError("")
+                  const files = selected.map((f) => ({
                     id: crypto.randomUUID(),
                     name: f.name,
                     type: f.type || f.name.split(".").pop() || "Unknown",
@@ -541,7 +547,6 @@ export default function ExtensionWorkflow({
                       evidence: [...editing.report.evidence, ...files],
                     },
                   })
-                  e.target.value = ""
                 }}
               />
             </Field>

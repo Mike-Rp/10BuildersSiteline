@@ -593,11 +593,18 @@ export function projectDocs(uploaded = false): Doc[] {
     date: uploaded ? "2026-07-24" : "",
   }))
 }
+export const DOCUMENT_UPLOAD_LIMIT_MB = 10
+export const MANPOWER_UPLOAD_LIMIT_MB = 15
+export function uploadRequirements(spreadsheet = false) {
+  return spreadsheet
+    ? `XLSX or XLS · Maximum ${MANPOWER_UPLOAD_LIMIT_MB} MB per file`
+    : `PDF, JPG, JPEG or PNG · Maximum ${DOCUMENT_UPLOAD_LIMIT_MB} MB per file`
+}
 export function validateFile(file: File, spreadsheet = false) {
   const extensions = spreadsheet
     ? ["xlsx", "xls"]
     : ["pdf", "jpg", "jpeg", "png"]
-  const max = spreadsheet ? 15 : 10
+  const max = spreadsheet ? MANPOWER_UPLOAD_LIMIT_MB : DOCUMENT_UPLOAD_LIMIT_MB
   if (!file.size) return "Choose a non-empty file."
   if (!extensions.includes(file.name.split(".").pop()?.toLowerCase() || ""))
     return `Use ${extensions.join(", ").toUpperCase()} files only.`

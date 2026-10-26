@@ -3,6 +3,7 @@ import ClientSearch from "./ClientSearch"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -37,6 +38,7 @@ import {
   today,
   uid,
   validateFile,
+  uploadRequirements,
   endAfterStart,
   plannedDays,
   addDays,
@@ -53,6 +55,7 @@ import {
   type State,
   suggestWorkEmail,
 } from "./model"
+import "./upload-control.css"
 
 const INTAKE_PROJECT_TYPES = [
   {
@@ -117,6 +120,7 @@ export function Upload({
   // Internal by default, including site photos that still require an authorized release.
   clientVisible?: boolean
 }) {
+  const hintId = useId()
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File>()
   const [preview, setPreview] = useState("")
@@ -153,7 +157,9 @@ export function Upload({
     if (input.current) input.current.value = ""
   }
   async function confirm() {
-    if (savingRef.current || disabled || !file || validateFile(file, spreadsheet)) return
+    if (savingRef.current || disabled || !file) return
+    const validation = validateFile(file, spreadsheet)
+    if (validation) { setError(validation); return }
     savingRef.current = true
     setSaving(true)
     setError("")
@@ -178,26 +184,35 @@ export function Upload({
         ref={input}
         className="hidden"
         type="file"
+        aria-label={ariaLabel || label}
+        aria-describedby={hintId}
+        disabled={disabled || saving}
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
         onChange={(e) => {
           const selected = e.target.files?.[0]
           if (!selected) return
+          if (disabled || savingRef.current) { e.target.value = ""; return }
           const message = validateFile(selected, spreadsheet)
+          clear()
           setError(message)
           if (!message) {
             setFile(selected)
             setPreview(URL.createObjectURL(selected))
-          } else e.target.value = ""
+          }
         }}
       />
-      <Button
-        icon="upload"
-        disabled={disabled || saving}
-        aria-label={ariaLabel}
-        onClick={() => input.current?.click()}
-      >
-        {buttonLabel}
-      </Button>
+      <span className="upload-control">
+        <Button
+          icon="upload"
+          disabled={disabled || saving}
+          aria-label={ariaLabel}
+          aria-describedby={hintId}
+          onClick={() => input.current?.click()}
+        >
+          {buttonLabel}
+        </Button>
+        <span className="upload-limit" id={hintId}>{uploadRequirements(spreadsheet)}</span>
+      </span>
       {error && !file && (
         <p className="error" role="alert">
           {error}
@@ -205,6 +220,7 @@ export function Upload({
       )}
       {file && (
         <Modal title="Confirm document upload" subtitle={label} onClose={() => { if (!savingRef.current) clear() }}>
+          <p className="upload-limit">{uploadRequirements(spreadsheet)}</p>
           {error && <p className="error" role="alert">{error}</p>}
           <div className="upload-file">
             <Icon name="doc" />
