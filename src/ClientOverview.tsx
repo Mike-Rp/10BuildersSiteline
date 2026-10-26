@@ -50,6 +50,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       {project.status === "completed" && <p className="co-completed"><Icon name="check" size={16} /> {project.completedAt ? `Completion recorded ${dateLabel(project.completedAt)}` : "Completed project record"}</p>}
     </section>
     <div className="co-preview-grid">
+      <div className="co-update-stack">
       <section className="co-update" aria-label="Latest project update">
         <div className="co-heading"><h2>Latest project update</h2></div>
         {latest ? <div className="co-update-body">
@@ -59,15 +60,16 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
         </div> : <p className="co-empty">No shared updates yet.</p>}
         <Button variant="text-button co-preview-link" onClick={() => onNavigate("Progress History")}>View progress history <Icon name="arrow" size={16} /></Button>
       </section>
+      <div className="co-shortcuts">
+        <button type="button" onClick={() => onNavigate("Project Documents")}><span className="co-shortcut-icon"><Icon name="folder" /></span><strong>Project documents</strong><Icon name="chevron" size={17} /></button>
+        <button type="button" onClick={onDetails}><span className="co-shortcut-icon"><Icon name="building" /></span><strong>Project details & contacts</strong><Icon name="chevron" size={17} /></button>
+      </div>
+      </div>
       <section className="co-photos" aria-label="Latest site photos">
         <div className="co-heading"><h2>Latest site photos</h2></div>
         {photos}
         <Button variant="text-button co-preview-link" onClick={() => onNavigate("Site Photographs")}>View gallery <Icon name="arrow" size={16} /></Button>
       </section>
-    </div>
-    <div className="co-shortcuts">
-      <button type="button" onClick={() => onNavigate("Project Documents")}><span className="co-shortcut-icon"><Icon name="folder" /></span><strong>Project documents</strong><Icon name="chevron" size={17} /></button>
-      <button type="button" onClick={onDetails}><span className="co-shortcut-icon"><Icon name="building" /></span><strong>Project details & contacts</strong><Icon name="chevron" size={17} /></button>
     </div>
   </div>
 }

@@ -1,6 +1,8 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import ClientOverview from "./ClientOverview"
+import ClientSamplePhotos from "./ClientSamplePhotos"
+import { canShowClientPhotoExamples } from "./client-photo-examples"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
 import { notificationAction } from "./notification-action"
@@ -385,6 +387,7 @@ export default function ClientPortal({
   }
   function photos(compact = false) {
     if (!project) return null
+    if (canShowClientPhotoExamples(actor, project)) return <ClientSamplePhotos key={project.id} compact={compact} projectName={project.name} />
     if (!project.photos.length)
       return (
         compact ? <p className="co-empty">No site photos shared yet.</p> :
@@ -401,8 +404,8 @@ export default function ClientPortal({
           </div>
         </div>
       )
-    const grid = (items: typeof project.photos) => (
-      <div className="client-photos-grid">
+    const grid = (items: typeof project.photos, collage = false) => (
+      <div className={`client-photos-grid ${collage ? `client-photos-collage photos-${items.length}` : ""}`}>
         {items.map((photo) => (
           <ClientPhoto
             key={photo.id}
@@ -414,7 +417,7 @@ export default function ClientPortal({
         ))}
       </div>
     )
-    if (compact) return grid(project.photos.slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0, 2))
+    if (compact) return grid(project.photos.slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0, 3), true)
     const photoView = runList(`client:photos:${project.id}`, project.photos, {
       searchText: (photo) => `${photo.label} ${photo.name}`,
       filters: [
