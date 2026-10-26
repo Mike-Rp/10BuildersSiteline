@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import XLSX from "xlsx";
 import { HttpError } from "../../common/utilities/access.utility.js";
 import { fileType } from "../progress/phase-upload.utility.js";
 
@@ -16,11 +16,13 @@ export async function validateUpload(file, purpose = "document") {
         throw new HttpError(400, "Manpower lists require Excel files (.xlsx or .xls). CSV is not supported.");
     if (/\.xlsx$/i.test(name)) {
         try {
-            const workbook = new ExcelJS.Workbook();
-            await workbook.xlsx.load(buffer);
-            if (!workbook.worksheets.length) throw new Error("No worksheets.");
+            // Use the same reader as the manpower import. Valid SpreadsheetML can use
+            // namespace prefixes and absolute package relationships that ExcelJS rejects.
+            const workbook = XLSX.read(buffer, { type: "buffer", bookFiles: true, sheetRows: 1 });
+            if (!workbook.SheetNames.length || !workbook.keys?.includes("xl/workbook.xml") || !workbook.keys?.includes("[Content_Types].xml"))
+                throw new Error("Not an XLSX workbook package.");
         } catch {
-            throw new HttpError(400, "Choose a valid Excel workbook (.xlsx); renaming a file does not convert it.");
+            throw new HttpError(400, "Choose a valid Excel file (.xlsx). You can use the downloaded manpower template.");
         }
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import XLSX from "xlsx"
+import { readFileSync } from "node:fs"
+import { readManpowerFile } from "../Thesis-Backend/src/services/workspace/manpower-import.utility.js"
 import { validateUpload } from "../Thesis-Backend/src/services/workspace/upload-policy.utility.js"
 import { fileType } from "../Thesis-Backend/src/services/progress/phase-upload.utility.js"
 import { validateFile } from "../src/model.ts"
@@ -38,6 +40,17 @@ test("Excel manpower lists accept real XLSX/XLS and cannot use document rules",a
     await assert.rejects(validateUpload({originalname:name,buffer:Buffer.from("renamed text")},"manpower"),/valid/)
   await assert.rejects(validateUpload({originalname:"crew.xlsx",buffer:Buffer.alloc(15*1024*1024+1)},"manpower"),/15 MB/)
   await assert.rejects(validateUpload({originalname:"crew.xlsx",buffer:workbook("xlsx")},"anything"),/purpose/)
+})
+
+test("valid XLSX namespace prefixes and absolute relationships are accepted for all 800 laborers", async () => {
+  const buffer = readFileSync(new URL("./fixtures/prefixed-manpower.xlsx", import.meta.url))
+  const file = { originalname: "800-laborers-sample.xlsx", buffer }
+  assert.equal(await validateUpload(file, "manpower"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  const workers = readManpowerFile(file)
+  assert.equal(workers.length, 800)
+  assert.equal(new Set(workers.map(worker => worker.workerId)).size, 800)
+  assert.deepEqual(workers[0], { workerId: "W-0001", name: "Juan Santos" })
+  assert.deepEqual(workers[799], { workerId: "W-0800", name: "Diana Villanueva" })
 })
 
 test("frontend rejects cross-purpose formats, empty files and unsupported extensions",()=>{

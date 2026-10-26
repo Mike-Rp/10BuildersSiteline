@@ -202,6 +202,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   await t.test("Excel uploads are restricted to manpower and cannot be linked as project or company documents", async () => {
+    const prefixed = new File([fs.readFileSync(here("./fixtures/prefixed-manpower.xlsx"))], "800-laborers-sample.xlsx")
+    const recognized = await uploadFile(randomUUID(), prefixed, "manpower")
+    assert.equal(recognized.manpowerCount, 800)
     const {state}=await asUser("patricia.domingo@10builders.com")
     const book=XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Worker ID","Laborer Name"],["W-001","Sample Worker"]]),"Manpower")
