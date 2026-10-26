@@ -15,6 +15,8 @@
 *.webp               filter=lfs diff=lfs merge=lfs -text
 # Small login banners must be available in ordinary deployment checkouts.
 public/images/login-*.webp -filter -diff -merge -text
+# Client photo examples must also ship as ordinary files in Vercel checkouts.
+public/images/client-sample-*.webp -filter -diff -merge -text
 *.psd                filter=lfs diff=lfs merge=lfs -text
 *.ai                 filter=lfs diff=lfs merge=lfs -text
 *.sketch             filter=lfs diff=lfs merge=lfs -text

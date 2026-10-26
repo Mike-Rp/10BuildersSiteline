@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { readFile } from "node:fs/promises"
+import { execFileSync } from "node:child_process"
 import { CLIENT_PHOTO_EXAMPLES, canShowClientPhotoExamples } from "../src/client-photo-examples.ts"
 import { initialState } from "./fixtures/demo-state.ts"
 import { clientProjectViews } from "../src/client-access.ts"
@@ -16,6 +17,9 @@ test("sample photos are restricted to the requested active Client with no shared
   for (const photo of CLIENT_PHOTO_EXAMPLES) {
     const bytes = await readFile(new URL(`../public${photo.src}`, import.meta.url))
     assert.ok(bytes.length > 1000)
+    assert.equal(bytes.subarray(0, 4).toString(), "RIFF", "deployable samples must contain real WebP image data")
+    const attribute = execFileSync("git", ["check-attr", "filter", "--", `public${photo.src}`], { cwd: new URL("../", import.meta.url), encoding: "utf8" })
+    assert.match(attribute, /filter: unset/, "sample assets must not deploy as unresolved Git LFS pointers")
     assert.match(photo.alt, /Illustrative construction example/)
   }
 })

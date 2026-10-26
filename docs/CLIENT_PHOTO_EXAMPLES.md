@@ -13,3 +13,5 @@ Built-in image generation was used, with no CLI fallback. The selected PNG outpu
 - `public/images/client-sample-slab.webp`: A landscape documentary photograph across a reinforced concrete ground-level foundation slab and column starter bars, with clean timber formwork, unfinished concrete columns and a cloudy tropical sky at a fictional mixed-use construction site in Metro Manila. Natural daylight, understated colors and rough concrete textures. Illustrative fictional-site sample only.
 
 The layout reference supplied by the user guided the HTML/CSS collage arrangement, not the content of the generated construction photos.
+
+These small WebP assets are explicitly stored as ordinary Git files, like the login banners, so deployment checkouts include the actual images rather than unresolved Git LFS pointers.
