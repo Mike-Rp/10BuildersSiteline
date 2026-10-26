@@ -7,7 +7,7 @@
 #root .client-portal .nav-group-label { margin-top: 24px; }
 #root .client-portal .co-project-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--color-muted); font-size: 14px; }
 #root .client-overview { display: grid; gap: 18px; min-width: 0; }
-#root .client-overview :is(.co-highlights,.co-timeline,.co-update,.co-photos) { min-width: 0; border: 1px solid var(--color-line); border-radius: 12px; background: white; }
+#root .client-overview :is(.co-executive,.co-highlights,.co-update,.co-photos) { min-width: 0; border: 1px solid var(--color-line); border-radius: 12px; background: white; }
 #root .client-overview .co-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 18px 22px; }
 #root .client-overview .co-highlights .co-heading { justify-content: flex-start; padding-bottom: 10px; }
 #root .client-overview :is(h1,h2) { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; margin: 0; }
@@ -20,18 +20,24 @@
 #root .client-overview .co-metrics progress { display: block; width: 100%; height: 8px; margin-top: 10px; }
 #root .client-overview .co-target { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 #root .client-overview .co-completed { display: flex; align-items: center; gap: 8px; padding: 0 22px 18px; font-size: 14px; color: var(--color-success); }
-#root .client-overview .co-timeline .co-heading { padding: 12px 18px 4px; }
-#root .client-overview .co-timeline h2 { font-size: 16px; }
-#root .client-overview .construction-phase-timeline.compact { padding: 10px 18px 18px; }
-#root .client-overview .construction-phase-timeline.compact small { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-#root .client-overview .construction-phase-timeline.compact li { min-width: 95px; }
-#root .client-overview .construction-phase-timeline.compact li > span { width: 18px; height: 18px; margin-bottom: 9px; border-width: 2px; background: #dbe1e9; border-color: #c2cad5; }
-#root .client-overview .construction-phase-timeline.compact li::after { top: 8px; left: calc(50% + 9px); right: calc(-50% + 9px); height: 2px; background: #dbe1e9; }
-#root .client-overview .construction-phase-timeline.compact li.completed > span { background: #198567; border-color: #198567; color: #fff; }
-#root .client-overview .construction-phase-timeline.compact li.completed::after { background: #80c9b0; }
-#root .client-overview .construction-phase-timeline.compact li.current > span { background: #327bbd; border-color: #fff; outline: 2px solid #97bee4; box-shadow: 0 0 0 4px #e8f2fb; }
-#root .client-overview .construction-phase-timeline.compact li strong { font-size: 14px; line-height: 1.4; font-weight: 500; }
-#root .client-overview .construction-phase-timeline.compact li.current strong { color: #245f91; font-weight: 650; }
+#root .client-overview .co-executive { border-top: 3px solid var(--color-steel, #315a85); }
+#root .client-overview .co-summary-intro { color: var(--color-muted); font-size: 14px; margin-top: 4px; }
+#root .client-overview .co-summary-narrative { padding: 0 22px 18px; font-size: 16px; line-height: 1.75; overflow-wrap: anywhere; }
+#root .client-overview .co-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 0 22px 20px; }
+#root .client-overview .co-summary-card { min-width: 0; padding: 0 20px; border-left: 1px solid var(--color-line); }
+#root .client-overview .co-summary-card:first-child { border-left: 0; padding-left: 0; }
+#root .client-overview .co-summary-card:last-child { padding-right: 0; }
+#root .client-overview .co-summary-label { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--color-muted); margin-bottom: 12px; }
+#root .client-overview .co-summary-card > strong { font-size: 16px; }
+#root .client-overview .co-summary-card p { font-size: 14px; line-height: 1.7; margin-top: 10px; color: var(--color-muted); overflow-wrap: anywhere; }
+#root .client-overview .co-summary-card .badge { white-space: normal; font-size: 14px; }
+#root .client-overview .co-summary-card ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+#root .client-overview .co-summary-card li { overflow-wrap: anywhere; }
+#root .client-overview .co-summary-card li strong { display: block; font-size: 15px; }
+#root .client-overview .co-summary-card li small { display: block; font-size: 14px; color: var(--color-muted); }
+#root .client-overview .co-summary-resources { display: flex; gap: 12px 24px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid var(--color-line); background: #f7f9fc; border-radius: 0 0 12px 12px; color: var(--color-muted); }
+#root .client-overview .co-summary-resources > span { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; }
+#root .client-overview .co-summary-resources > span:last-child { margin-left: auto; }
 #root .client-overview .co-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; min-width: 0; }
 #root .client-overview :is(.co-update,.co-photos) { display: flex; flex-direction: column; }
 #root .client-overview .co-update-body { padding: 0 22px 12px; }
@@ -60,6 +66,10 @@
 @media (max-width: 1000px) {
   #root .client-overview .co-preview-grid { grid-template-columns: 1fr; }
   #root .client-overview .co-metrics > div { padding-inline: 16px; }
+  #root .client-overview .co-summary-grid { grid-template-columns: 1fr; gap: 16px; }
+  #root .client-overview .co-summary-card { border-left: 0; border-top: 1px solid var(--color-line); padding: 16px 0 0; }
+  #root .client-overview .co-summary-card:first-child { border-top: 0; padding-top: 0; }
+  #root .client-overview .co-summary-resources > span:last-child { margin-left: 0; width: 100%; }
 }
 @media (max-width: 600px) {
   #root .client-portal .topbar { flex-wrap: nowrap; gap: 8px; padding: 12px 16px; }

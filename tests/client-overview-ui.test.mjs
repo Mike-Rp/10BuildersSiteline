@@ -3,7 +3,7 @@ import test from "node:test"
 import { initialState } from "./fixtures/demo-state.ts"
 import { clientProjectViews } from "../src/client-access.ts"
 
-test("client overview shows phase-local highlights, preserves navigation and notes, and handles missing data", async () => {
+test("client dashboard has an executive summary, removes timelines, and preserves shared records and navigation", async () => {
   const { JSDOM } = await import("jsdom")
   const { createServer } = await import("vite")
   const { default: React, act } = await import("react")
@@ -24,6 +24,14 @@ test("client overview shows phase-local highlights, preserves navigation and not
     const props = { actor, projects: [project], readNoticeIds: [], mutedTypes: [], onMute() {}, onResolve() { throw Error("Unauthorized file") }, onReport() { return "report" }, onRecord() {}, onRead() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} }
     await act(() => root.render(React.createElement(ClientPortal, props)))
     assert.ok(document.querySelector('.client-overview'))
+    assert.match(document.querySelector('[aria-label="Executive summary"]').textContent, /Executive summary/)
+    assert.match(document.querySelector('.co-summary-narrative').textContent, new RegExp(project.name))
+    assert.match(document.querySelector('.co-summary-narrative').textContent, /current phase is 67%/)
+    assert.match(document.querySelector('.co-summary-grid').textContent, /Date not confirmed/)
+    assert.match(document.querySelector('.co-summary-grid').textContent, /Oct 21, 2026/)
+    assert.ok(!document.querySelector('nav button[aria-label="Phase Timeline"]'))
+    assert.ok(!document.querySelector('.construction-phase-timeline'))
+    assert.ok(!document.body.textContent.includes('View timeline'))
     assert.equal(document.querySelector('progress[aria-label="Current phase progress"]').value, 67)
     for (const removed of ["Recorded project completion", "Approved / recorded", "Where should we be today?", "Your view. Your project."]) assert.ok(!document.body.textContent.includes(removed), removed)
     assert.equal(document.querySelector('.client-overview details').open, false)
@@ -44,9 +52,6 @@ test("client overview shows phase-local highlights, preserves navigation and not
     const close = document.querySelector('[aria-modal="true"] button[aria-label="Close dialog"]')
     assert.ok(close)
     await act(() => close.click())
-    await click('View timeline')
-    assert.ok(document.querySelector('.construction-phase-timeline.detailed'))
-    await click('Project Overview')
     await click('View progress history')
     assert.match(document.querySelector('.client-history-list').textContent, /Recorded update/)
     assert.match(document.querySelector('.client-history-list').textContent, /Original retained note/)
@@ -57,6 +62,17 @@ test("client overview shows phase-local highlights, preserves navigation and not
     await click('Project documents')
     assert.equal(document.querySelector('.client-overview'), null)
     assert.ok(document.querySelector('.document-browser'))
+    // Project switching updates the summary without retaining another project's data.
+    const second = { ...project, id: 'client-second', name: 'Authorized second project', progress: Number.NaN, contacts: [], checklist: [], history: [], end: undefined }
+    await act(() => root.render(React.createElement(ClientPortal, { ...props, projects: [project, second] })))
+    const select = document.querySelector('.client-project-toolbar select')
+    await act(() => { select.value = second.id; select.dispatchEvent(new dom.window.Event('change', { bubbles: true })) })
+    await click('Project Overview')
+    assert.match(document.querySelector('.co-summary-narrative').textContent, /Authorized second project/)
+    assert.match(document.querySelector('.co-summary-narrative').textContent, /progress has not been shared/)
+    assert.ok(!document.querySelector('.co-executive').textContent.includes(project.name))
+    assert.ok(!document.querySelector('.co-executive').textContent.includes('NaN'))
+    assert.match(document.querySelector('.co-summary-grid').textContent, /contacts have not been shared/)
     await act(() => root.render(React.createElement(ClientPortal, { ...props, projects: [] })))
     await click('Project Overview')
     assert.equal(document.querySelector('.client-overview'), null)

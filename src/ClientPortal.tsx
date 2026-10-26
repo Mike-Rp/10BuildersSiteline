@@ -11,7 +11,6 @@ import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { downloadDoc, fileFor, Preview } from "./panels"
-import PhaseTimeline from "./PhaseTimeline"
 import { dateLabel, initials, type Account, type Doc } from "./model"
 import {
   clientDocumentIndex,
@@ -30,7 +29,6 @@ type Viewer = {
 const NAV = [
   ["Active sites", "grid"],
   ["Project Overview", "building"],
-  ["Phase Timeline", "activity"],
   ["Project Documents", "folder"],
   ["Progress History", "clock"],
   ["Site Photographs", "doc"],
@@ -110,7 +108,7 @@ export default function ClientPortal({
   const [documentQuery, setDocumentQuery] = useState("")
   useListMemory()
   const project = projects.find((p) => p.id === projectId) || projects[0]
-  const history = project?.history.slice().reverse() || []
+  const history = project?.history.slice().reverse().sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)) || []
   const notices = projects
     .flatMap((p) =>
       p.history.map((item) => ({
@@ -163,7 +161,8 @@ export default function ClientPortal({
   }, [])
   function navigate(next: string) {
     setSiteDetails(false)
-    setPage(normalizeWorkspacePage(next))
+    const target = normalizeWorkspacePage(next)
+    setPage(NAV.some(([label]) => label === target) ? target : "Project Overview")
     setMobileNav(false)
     setBell(false)
     setError("")
@@ -547,28 +546,6 @@ export default function ClientPortal({
         </div>
       )
     if (page === "Project Overview") return overview()
-    if (page === "Phase Timeline")
-      return (
-        <>
-          <Panel
-            title="Read-only phase timeline"
-            subtitle={`${project.phases.length} construction phases. Every next phase depends on prior approvals and a confirmed owner.`}
-          >
-            <PhaseTimeline
-              phase={project.phase}
-              phases={project.phases}
-              completed={project.status === "completed"}
-              detailed
-            />
-          </Panel>
-          <Panel
-            title={`Current phase activity · ${project.phase}`}
-            subtitle="Approval status only. No internal QA/QC files or rejection notes."
-          >
-            {checklist()}
-          </Panel>
-        </>
-      )
     if (page === "Project Documents")
       return (
         <DocumentRepository
@@ -645,7 +622,7 @@ export default function ClientPortal({
               onClick={() => navigate(label)}
             >
               <Icon name={icon} size={19} />
-              <span>{{"Project Overview":"Overview","Phase Timeline":"Timeline","Project Documents":"Documents","Progress History":"Progress history","Site Photographs":"Site photos"}[label] || label}</span>
+              <span>{{"Project Overview":"Overview","Project Documents":"Documents","Progress History":"Progress history","Site Photographs":"Site photos"}[label] || label}</span>
             </button>
           ))}
         </nav>

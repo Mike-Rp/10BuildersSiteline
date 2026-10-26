@@ -1,8 +1,8 @@
-import { useEffect, useRef, type ReactNode } from "react"
+import { type ReactNode } from "react"
 import type { ClientProjectView } from "./client-access"
 import { dateLabel } from "./model"
 import { calendarDay } from "./project-progress"
-import PhaseTimeline from "./PhaseTimeline"
+import { clientExecutiveSummary } from "./client-executive-summary"
 import InfoPopover from "./InfoPopover"
 import { Badge, Button, Icon } from "./ui"
 import "./client-overview.css"
@@ -14,19 +14,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
   onNavigate: (page: string) => void
   onDetails: () => void
 }) {
-  const timeline = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const centerCurrent = () => {
-      const list = timeline.current?.querySelector("ol")
-      const current = list?.querySelector<HTMLElement>("li.current")
-      if (list && current && list.scrollWidth > list.clientWidth) {
-        list.scrollLeft = current.offsetLeft - list.offsetLeft - (list.clientWidth - current.offsetWidth) / 2
-      }
-    }
-    centerCurrent()
-    window.addEventListener("resize", centerCurrent)
-    return () => window.removeEventListener("resize", centerCurrent)
-  }, [project.id, project.phase])
+  const summary = clientExecutiveSummary(project)
   const validProgress = Number.isFinite(project.progress) && project.progress >= 0 && project.progress <= 100
   const endSet = calendarDay(project.end) !== null
   return <div className="client-overview">
@@ -34,8 +22,18 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       <span>{project.type}{project.location ? ` · ${project.location}` : ""}</span>
       <Badge tone="green">{project.status === "completed" ? "Completed" : "Active"}</Badge>
     </div>
+    <section className="co-executive" aria-label="Executive summary">
+      <div className="co-heading"><div><h1>Executive summary</h1><p className="co-summary-intro">A clear view of your project and the latest information shared by your team.</p></div></div>
+      <p className="co-summary-narrative">{summary.narrative}</p>
+      <div className="co-summary-grid">
+        <div className="co-summary-card"><span className="co-summary-label"><Icon name="calendar" size={18} />Schedule update</span><Badge tone={summary.schedule.tone}>{summary.schedule.label}</Badge><p>{summary.schedule.detail}</p></div>
+        <div className="co-summary-card"><span className="co-summary-label"><Icon name="activity" size={18} />Latest shared update</span><strong>{summary.latestDate || "No dated update shared"}</strong><p>{summary.underReview ? `${summary.underReview} current-phase ${summary.underReview === 1 ? "activity is" : "activities are"} awaiting project team review.` : summary.latest ? "See the latest project note below or open your progress history." : "Project updates will appear after your team shares them."}</p></div>
+        <div className="co-summary-card"><span className="co-summary-label"><Icon name="users" size={18} />Your project team</span>{project.contacts.length ? <ul>{project.contacts.map(contact => <li key={contact.role}><strong>{contact.name}</strong><small>{contact.role}</small></li>)}</ul> : <p>Project contacts have not been shared yet.</p>}</div>
+      </div>
+      <div className="co-summary-resources"><span><Icon name="folder" size={17} />{summary.documents} shared {summary.documents === 1 ? "document" : "documents"}</span><span><Icon name="doc" size={17} />{summary.photos} shared site {summary.photos === 1 ? "photo" : "photos"}</span><span>Based on your shared project records</span></div>
+    </section>
     <section className="co-highlights" aria-label="Project highlights">
-      <div className="co-heading"><h1>Project highlights</h1>
+      <div className="co-heading"><h2>Project highlights</h2>
         <InfoPopover title="About your project progress" label="Help: project progress">
           <p>The percentage shown is recorded progress for the current phase, not overall project completion. Your view includes only information shared with your account.</p>
         </InfoPopover>
@@ -51,16 +49,12 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       </div>
       {project.status === "completed" && <p className="co-completed"><Icon name="check" size={16} /> {project.completedAt ? `Completion recorded ${dateLabel(project.completedAt)}` : "Completed project record"}</p>}
     </section>
-    <section ref={timeline} className="co-timeline" aria-label="Construction timeline">
-      <div className="co-heading"><h2>Construction timeline</h2><Button variant="text-button" onClick={() => onNavigate("Phase Timeline")}>View timeline <Icon name="arrow" size={16} /></Button></div>
-      <PhaseTimeline phase={project.phase} phases={project.phases} completed={project.status === "completed"} compact />
-    </section>
     <div className="co-preview-grid">
       <section className="co-update" aria-label="Latest project update">
         <div className="co-heading"><h2>Latest project update</h2></div>
         {latest ? <div className="co-update-body">
-          <div className="co-update-meta"><span>{dateLabel(latest.date)}</span><Badge tone="blue">{latest.phase}</Badge></div>
-          <p>Recorded progress <strong>{latest.progress}%</strong></p>
+          <div className="co-update-meta"><span>{Number.isFinite(Date.parse(latest.date)) ? dateLabel(latest.date) : "Date not shared"}</span><Badge tone="blue">{latest.phase}</Badge></div>
+          <p>Recorded phase progress <strong>{Number.isFinite(latest.progress) && latest.progress >= 0 && latest.progress <= 100 ? `${latest.progress}%` : "Not available"}</strong></p>
           <details key={latest.id}><summary>View recorded note</summary><p>{latest.text || "No note was recorded."}</p></details>
         </div> : <p className="co-empty">No shared updates yet.</p>}
         <Button variant="text-button co-preview-link" onClick={() => onNavigate("Progress History")}>View progress history <Icon name="arrow" size={16} /></Button>
