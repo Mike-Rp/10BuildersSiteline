@@ -1920,7 +1920,17 @@ export function CompanyForm({
   const roster = draft.manpowerDocuments[0]
   const patch = (values: Partial<Company>) => {
     setDraft((company) => ({ ...company, ...values }))
-    setFieldErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !(key in values))))
+    const errors = companyRegistrationErrors({ ...draft, ...values })
+    setFieldErrors(current => {
+      const next = { ...current }
+      for (const key of ["name", "phone", "email"] as const) {
+        if (key in values && key in current) {
+          if (errors[key]) next[key] = errors[key]
+          else delete next[key]
+        }
+      }
+      return next
+    })
     setError("")
   }
   async function template() {
@@ -2019,7 +2029,6 @@ export function CompanyForm({
           Upload an XLSX or XLS file with Worker ID and Laborer Name columns, one laborer per row.
           Use one current list; uploading a replacement updates the count.
         </p>
-        <Button disabled={busy || templateBusy} onClick={template}>{templateBusy ? "Preparing template…" : "Download Excel template"}</Button>
         {roster && <div className="role-actions">
           <p role="status">{roster.name} · {roster.manpowerCount} laborer{roster.manpowerCount === 1 ? "" : "s"} available</p>
           <Button
@@ -2039,6 +2048,9 @@ export function CompanyForm({
             patch({ manpowerDocuments: [document], manpowerCount: document.manpowerCount })
           }}
         />
+        <div className="role-actions">
+          <Button disabled={busy || templateBusy} onClick={template}>{templateBusy ? "Preparing template…" : "Download Excel template"}</Button>
+        </div>
       </section>
       <section className="form-section">
         <h3>Supporting documents</h3>

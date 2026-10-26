@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type ReactElement,
   type ButtonHTMLAttributes,
+  type AriaAttributes,
 } from "react"
 
 export function Icon({ name, size = 20 }: {
@@ -233,18 +234,26 @@ export function Field({
   wide?: boolean
 }) {
   const id = useId()
+  const descriptionId = `${id}-description`
+  const control = isValidElement(children)
+    ? children as ReactElement<{ id?: string } & AriaAttributes>
+    : undefined
   return (
     <div className={`field ${wide ? "wide" : ""}`}>
       <label htmlFor={id}>{label}</label>
-      {isValidElement(children)
-        ? cloneElement(children as ReactElement<{ id?: string }>, { id })
+      {control
+        ? cloneElement(control, {
+            id,
+            ...(error ? { "aria-invalid": true } : {}),
+            ...(error || hint ? { "aria-describedby": [control.props["aria-describedby"], descriptionId].filter(Boolean).join(" ") } : {}),
+          })
         : children}
       {error ? (
-        <small className="field-error" role="alert">
+        <small id={descriptionId} className="field-error" role="alert">
           {error}
         </small>
       ) : (
-        hint && <small>{hint}</small>
+        hint && <small id={descriptionId}>{hint}</small>
       )}
     </div>
   )
