@@ -38,7 +38,7 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
 import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
-import { DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import { CompanyForm, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
   ListPager,
@@ -310,9 +310,6 @@ export default function RoleWorkspace({
   )
   const intakes = projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
-  )
-  const requestProjects = projects.filter(
-    (p) => p.status === "active" || p.status === "pending",
   )
   const tasks = projects.filter((p) =>
     isOpm
@@ -2826,10 +2823,8 @@ export default function RoleWorkspace({
           <Button
             icon="plus"
             variant="primary"
-            disabled={!requestProjects.length}
-            onClick={() =>
-              setDialog({ kind: "new-company", projectId: picked?.id })
-            }
+            disabled={saving}
+            onClick={() => setDialog({ kind: "new-company" })}
           >
             Suggest Company
           </Button>,
@@ -3449,8 +3444,7 @@ export default function RoleWorkspace({
         <section className="detail-section">
           <h3>Manpower list documents</h3>
           <p className="role-muted subsection">
-            Company-level files only. Individual workers are not stored in the
-            directory.
+            Worker IDs and laborer names from the uploaded list determine the available manpower count.
           </p>
           {c.manpowerDocuments.map((document) => (
             <div className="document-row" key={document.id}>
@@ -3952,23 +3946,20 @@ export default function RoleWorkspace({
           wide
           onClose={() => setDialog(undefined)}
         >
-          <NewCompanyForm
-            actor={actor}
+          <CompanyForm
+            owner={actor.name}
+            actorId={actor.id}
+            status="pending"
             saving={saving}
-            project={
-              requestProjects.find((p) => p.id === dialog.projectId) ||
-              requestProjects[0]
-            }
-            projects={requestProjects}
+            project={projects.find(p => p.id === dialog.projectId)}
             onClose={() => setDialog(undefined)}
-            onSave={async (c, projectId) => {
-              if (
-                await act(
-                  { type: "request_company", projectId, company: c },
-                  "Company suggestion sent for Administrator verification.",
-                )
+            onSave={async c => {
+              const saved = await act(
+                { type: "request_company", projectId: c.projectId || undefined, company: c },
+                "Company suggestion sent for Administrator verification.",
               )
-                setDialog(undefined)
+              if (saved) setDialog(undefined)
+              return saved
             }}
           />
         </Modal>
@@ -4124,178 +4115,5 @@ export default function RoleWorkspace({
         </div>
       )}
     </div>
-  )
-}
-function NewCompanyForm({
-  actor,
-  saving,
-  project,
-  projects,
-  onSave,
-  onClose,
-}: {
-  actor: Account
-  saving: boolean
-  project?: Project
-  projects: Project[]
-  onSave: (company: Company, projectId: string) => void
-  onClose: () => void
-}) {
-  const [projectId, setProjectId] = useState(project?.id || "")
-  const [draft, setDraft] = useState<Company>({
-    id: uid(),
-    name: "",
-    contact: "",
-    phone: "",
-    email: "",
-    status: "pending",
-    submittedBy: actor.name,
-    submittedById: actor.id,
-    projectId: project?.id || "",
-    availability: "available",
-    manpowerCount: 0,
-    activeProjectIds: [],
-    manpowerDocuments: [],
-    documents: [],
-    note: "",
-    version: 1,
-  })
-  const [error, setError] = useState("")
-  function patch(values: Partial<Company>) {
-    setDraft((c) => ({ ...c, ...values }))
-  }
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (saving) return
-        if (!draft.name.trim() || !projectId) {
-          setError("Company name and an assigned project are required.")
-          return
-        }
-        onSave(
-          {
-            ...draft,
-            name: draft.name.trim(),
-            projectId,
-          },
-          projectId,
-        )
-      }}
-    >
-      <div className="form-grid">
-        <Field label="Company name *">
-          <input
-            required
-            value={draft.name}
-            onChange={(e) => patch({ name: e.target.value })}
-          />
-        </Field>
-        <Field label="Contact person">
-          <input
-            value={draft.contact}
-            onChange={(e) => patch({ contact: e.target.value })}
-          />
-        </Field>
-        <Field label="Contact number">
-          <input
-            value={draft.phone}
-            onChange={(e) => patch({ phone: e.target.value })}
-          />
-        </Field>
-        <Field label="Company email">
-          <input
-            type="email"
-            value={draft.email}
-            onChange={(e) => patch({ email: e.target.value })}
-          />
-        </Field>
-        <Field label="Related assigned project *">
-          <select
-            required
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-          >
-            <option value="">Choose your project</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Company availability">
-          <select
-            value={draft.availability}
-            onChange={(event) =>
-              patch({
-                availability: event.target.value as Company["availability"],
-              })
-            }
-          >
-            <option value="available">Available</option>
-            <option value="limited">Limited availability</option>
-            <option value="committed">Fully committed</option>
-          </select>
-        </Field>
-        <Field label="Available manpower">
-          <input
-            type="number"
-            min={0}
-            value={draft.manpowerCount}
-            onChange={(event) =>
-              patch({ manpowerCount: Number(event.target.value) })
-            }
-          />
-        </Field>
-      </div>
-      <section className="form-section">
-        <h3>Optional manpower list document</h3>
-        <p>
-          Upload the company-level XLSX or XLS list. SITELINE does not create
-          individual worker records from this file.
-        </p>
-        <Upload
-          spreadsheet
-          label="Company Manpower List"
-          owner={actor.name}
-          buttonLabel="Upload manpower list"
-          onSave={(document) =>
-            patch({
-              manpowerDocuments: [...draft.manpowerDocuments, document],
-            })
-          }
-        />
-        {!!draft.manpowerDocuments.length && (
-          <p>
-            {draft.manpowerDocuments.length} manpower list document
-            {draft.manpowerDocuments.length === 1 ? "" : "s"} attached.
-          </p>
-        )}
-      </section>
-      <section className="form-section">
-        <h3>Optional supporting document</h3>
-        {draft.documents.length ? (
-          <Badge tone="green">{draft.documents[0].name} confirmed</Badge>
-        ) : (
-          <Upload
-            label="Company supporting document"
-            owner={actor.name}
-            onSave={(doc) => patch({ documents: [...draft.documents, doc] })}
-          />
-        )}
-      </section>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="modal-actions">
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={saving}>
-          {saving ? "Submitting…" : "Submit for Admin approval"}
-        </Button>
-      </div>
-    </form>
   )
 }

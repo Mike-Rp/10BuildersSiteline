@@ -1,5 +1,6 @@
 import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
+import { companyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
 import {
   DOC_LABELS,
   PHASES,
@@ -586,7 +587,7 @@ function ensure(p: Project) {
 }
 function event(
   state: State,
-  p: Project,
+  p: Project | undefined,
   actorId: string,
   title: string,
   detail: string,
@@ -598,17 +599,18 @@ function event(
   state.events.unshift({
     id: uid(),
     title,
-    detail: `${p.name} · ${detail}`,
+    detail: p ? `${p.name} · ${detail}` : detail,
     type,
     date: new Date(now).toISOString(),
     read: false,
     actorId,
-    projectId: p.id,
+    projectId: p?.id,
     recipientIds: [
       ...new Set(
         recipients || [
-          p.opmId,
-          ...p.team.map((t) => t.accountId),
+          actorId,
+          p?.opmId || "",
+          ...(p?.team || []).map((t) => t.accountId),
           ...state.accounts.filter((a) => a.role === "admin").map((a) => a.id),
         ],
       ),
@@ -817,6 +819,23 @@ export function documentAccess(
   }
   return { doc, error: "" }
 }
+function companyRequest(state: State, actor: Account, company: Company | undefined, projectId = ""): Company {
+  assert(company, "Company details are required.")
+  const c = structuredClone(company)
+  const errors = companyRegistrationErrors(c)
+  assert(!Object.keys(errors).length, Object.values(errors)[0] || "Check the company details.")
+  assert(!state.companies.some(item => item.id === c.id), "This company request has already been submitted.")
+  c.documents.forEach(requireDoc)
+  c.manpowerDocuments ||= []
+  assert(c.manpowerDocuments.length <= 1, "Upload one current manpower list for this company.")
+  c.manpowerDocuments.forEach(doc => {
+    requireManpowerDoc(doc)
+    assert(Number.isInteger(doc.manpowerCount) && doc.manpowerCount! > 0, "Confirm a manpower list with Worker ID and Laborer Name columns.")
+  })
+  return { ...c, name: c.name.trim(), email: c.email.trim().toLowerCase(), status: "pending", availability: "available",
+    activeProjectIds: [], manpowerCount: c.manpowerDocuments[0]?.manpowerCount || 0, submittedBy: actor.name, submittedById: actor.id, projectId, version: 1 }
+}
+
 export function applyWorkflow(
   state: State,
   actorId: string,
@@ -837,6 +856,23 @@ export function applyWorkflow(
     "This action requires an Office PM or Site PM session.",
   )
   const next = structuredClone(state)
+  if (!command.projectId && ["request_company", "archive_company_request"].includes(command.type)) {
+    assert(actor.role === "spm", "Only Site PMs can request new companies.")
+    if (command.type === "request_company") {
+      const c = companyRequest(next, actor, command.company)
+      next.companies.push(c)
+      event(next, undefined, actor.id, "Subcontractor company suggestion submitted", c.name, "request", "Subcon directory", undefined, now)
+    } else {
+      const c = next.companies.find(item => item.id === command.companyId)
+      assert(c?.status === "pending" && c.submittedById === actor.id, "Only your unresolved company request can be archived.")
+      c.status = "archived"
+      c.archivedAt = new Date(now).toISOString()
+      c.archivedBy = actor.id
+      c.version++
+      event(next, undefined, actor.id, "Pending subcontractor request archived", c.name, "request", "Subcon directory", undefined, now)
+    }
+    return next
+  }
   const p = next.projects.find((p) => p.id === command.projectId)
   assert(p, "Project record not found.")
   assert(
@@ -1720,26 +1756,8 @@ export function applyWorkflow(
         p.status === "active" || p.status === "pending",
         "Company suggestions require an active project or open intake, not an archived record.",
       )
-      const c = command.company ? structuredClone(command.company) : undefined
-      assert(c && c.name.trim(), "Company name is required.")
-      assert(
-        !next.companies.some((x) => x.id === c.id),
-        "This company request has already been submitted.",
-      )
-      c.documents.forEach(requireDoc)
-      c.manpowerDocuments ||= []
-      c.manpowerDocuments.forEach(requireManpowerDoc)
-      c.activeProjectIds ||= []
-      c.manpowerCount = Math.max(0, c.manpowerCount || 0)
-      c.availability ||= "limited"
-      next.companies.push({
-        ...c,
-        status: "pending",
-        submittedBy: actor.name,
-        submittedById: actor.id,
-        projectId: p.id,
-        version: 1,
-      })
+      const c = companyRequest(next, actor, command.company, p.id)
+      next.companies.push(c)
       work.selections.push({ companyId: c.id, status: "selected" })
       record(
         "Subcontractor company suggestion submitted",

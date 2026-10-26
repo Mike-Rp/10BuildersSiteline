@@ -180,6 +180,7 @@ export type Doc = {
   date: string
   size?: number
   mime?: string
+  manpowerCount?: number
 }
 export type Account = {
   id: string

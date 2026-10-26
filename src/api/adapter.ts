@@ -377,10 +377,10 @@ export function mapCompany(
           : "approved",
     submittedBy: "",
     projectId: "",
-    availability: ["available", "limited", "committed"].includes(s.availability)
+    availability: s.availability === "assigned" ? "committed" : ["available", "limited", "committed"].includes(s.availability)
       ? s.availability
       : "available",
-    manpowerCount: Number(s.crew_count ?? 0),
+    manpowerCount: Number(s.available_crew_count ?? s.crew_count ?? 0),
     activeProjectIds,
     manpowerDocuments: [],
     documents: [],

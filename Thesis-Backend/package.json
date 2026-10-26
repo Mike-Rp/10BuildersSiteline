@@ -34,7 +34,8 @@
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^7.0.0",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

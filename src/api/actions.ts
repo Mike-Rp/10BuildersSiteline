@@ -15,6 +15,7 @@ export async function uploadFile(id: string, file: File, purpose: "document" | "
     body.set("purpose", purpose);
     const saved = await api<Dto>("/files", { method: "POST", body });
     registerFileUrl(id, saved.download_url);
+    return saved;
 }
 async function phaseFile(projectId: string, doc: Doc) {
     const blob = await downloadApiFile(doc.id);
@@ -27,6 +28,8 @@ async function phaseFile(projectId: string, doc: Doc) {
 }
 export async function sendApiWorkflow(state: State, actor: Account, command: WorkflowCommand) {
     const id = command.projectId;
+    if (!id && command.type === "request_company") return await post("/subcontractors/registrations", command.company);
+    if (!id && command.type === "archive_company_request") return await post("/subcontractors/" + command.companyId + "/withdraw");
     if (!id)
         throw new Error("Select a project first.");
     const project = state.projects.find(p => p.id === id);
@@ -174,10 +177,7 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
     return { id, password: saved.temp_password || password };
 }
 export async function createCompany(company: Company) {
-    const saved = await post("/subcontractors", { company_name: company.name, contact_email: company.email || undefined,
-        trade: "Structural / Rebar", meta_description: company.note || undefined });
-    await api("/subcontractors/" + saved.id + "/workspace", { method: "PUT", json: { ...company, status: company.status === "pending" ? "pending" : "approved" } });
-    return saved;
+    return await post("/subcontractors/registrations", company);
 }
 export async function saveApiProject(project: Project, existing: boolean) {
     const result = await post("/projects/intake", {

@@ -51,6 +51,7 @@ const DIRECTORY_CTE = `
 WITH crew AS (
   SELECT w.subcontractor_id,
          count(*) FILTER (WHERE w.status = 'active')::int AS crew_count,
+         count(*) FILTER (WHERE w.status = 'active' AND w.availability_status = 'available')::int AS available_crew_count,
          count(*) FILTER (WHERE w.status = 'active' AND ${HAS_LICENSE})::int AS licensed_count,
          count(*) FILTER (WHERE w.status = 'active' AND ${HAS_LICENSE}
                             AND w.license_expiry < current_date)::int AS expired_count,
@@ -92,6 +93,7 @@ dir AS (
          s.contact_email::text AS contact_email, s.meta_description,
          s.committed_until::text AS committed_until,
          COALESCE(c.crew_count, 0) AS crew_count,
+         COALESCE(c.available_crew_count, 0) AS available_crew_count,
          COALESCE(c.licensed_count, 0) AS licensed_count,
          CASE WHEN COALESCE(c.licensed_count, 0) = 0 THEN 'na'
               WHEN c.expired_count > 0 THEN 'expired'
@@ -190,6 +192,7 @@ export const getSubcontractors = async (req, res) => {
       contact_person: r.contact_person_name
         ? { name: r.contact_person_name, role_title: r.contact_person_role } : null,
       crew_count: r.crew_count,
+      available_crew_count: r.available_crew_count,
       licensed_crew_count: r.licensed_count,
       license_status: r.license_status,
       availability: r.availability,
@@ -238,6 +241,7 @@ export const createSubcontractor = async (req, res) => {
   try {
     const user = await requireUser(req, res, WRITE_ROLES);
     if (!user) return;
+    if (user.role === "spm") return sendError(res, "Submit company suggestions through the directory form for Administrator approval.", 403);
     const b = req.body || {};
     if (!b.company_name || !String(b.company_name).trim()) return sendError(res, "company_name is required.", 400);
     if (b.contact_email && !EMAIL_RE.test(b.contact_email)) return sendError(res, "contact_email is not a valid email.", 400);

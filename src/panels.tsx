@@ -14,6 +14,7 @@ import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
+import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, companyRegistrationErrors, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
 import {
   accountError,
   clientForEmail,
@@ -70,7 +71,7 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-async function saveFile(id:string,file:File,spreadsheet=false) { await uploadFile(id,file,spreadsheet ? "manpower" : "document") }
+async function saveFile(id:string,file:File,spreadsheet=false) { return await uploadFile(id,file,spreadsheet ? "manpower" : "document") }
 export async function fileFor(id:string) { return downloadApiFile(id) }
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -157,8 +158,10 @@ export function Upload({
     setError("")
     try {
       const id = uid()
-      await saveFile(id, file, spreadsheet)
-      const saved=await onSave(newUploadedDoc({ id, label, file, owner, clientVisible }))
+      const uploaded = await saveFile(id, file, spreadsheet)
+      const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
+      if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
+      const saved=await onSave(doc)
       if(saved===false)throw new Error("We couldn’t save your upload. Your file is still selected—please try again.")
       clear()
     } catch (e) {
@@ -1875,13 +1878,19 @@ export function LicenseForm({
 }
 export function CompanyForm({
   owner,
+  actorId,
+  project,
+  saving = false,
   status = "approved",
   onSave,
   onClose,
 }: {
   owner: string
+  actorId?: string
+  project?: Project
+  saving?: boolean
   status?: Company["status"]
-  onSave: (company: Company) => void
+  onSave: (company: Company) => unknown | Promise<unknown>
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<Company>({
@@ -1892,7 +1901,8 @@ export function CompanyForm({
     email: "",
     status,
     submittedBy: owner,
-    projectId: "",
+    submittedById: actorId,
+    projectId: project?.id || "",
     availability: "available",
     manpowerCount: 0,
     activeProjectIds: [],
@@ -1902,30 +1912,70 @@ export function CompanyForm({
     version: 1,
   })
   const [error, setError] = useState("")
-  const patch = (values: Partial<Company>) =>
+  const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [templateBusy, setTemplateBusy] = useState(false)
+  const submittingRef = useRef(false)
+  const busy = saving || submitting
+  const roster = draft.manpowerDocuments[0]
+  const patch = (values: Partial<Company>) => {
     setDraft((company) => ({ ...company, ...values }))
+    setFieldErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !(key in values))))
+    setError("")
+  }
+  async function template() {
+    setTemplateBusy(true)
+    try {
+      const XLSX = await import("xlsx")
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+        ["Worker ID", "Laborer Name"], ["W-001", "Juan Dela Cruz"], ["W-002", "Maria Santos"],
+      ]), "Manpower")
+      XLSX.writeFile(workbook, "siteline-manpower-template.xlsx")
+    } catch { setError("We couldn’t prepare the template. Please try again.") }
+    finally { setTemplateBusy(false) }
+  }
   return (
     <form
+      noValidate
       onSubmit={async (event) => {
         event.preventDefault()
-        if (!draft.name.trim()) {
-          setError("Company name is required.")
-          return
+        if (submittingRef.current || saving) return
+        const errors = companyRegistrationErrors(draft)
+        setFieldErrors(errors)
+        if (Object.keys(errors).length) return
+        submittingRef.current = true
+        setSubmitting(true)
+        setError("")
+        try {
+          const saved = await onSave({ ...draft, name: draft.name.trim(), email: draft.email.trim().toLowerCase(), phone: draft.phone,
+            availability: "available", activeProjectIds: [], manpowerCount: roster?.manpowerCount || 0 })
+          if (saved === false) setError("We couldn’t submit this company. Your details are still here—please try again.")
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "We couldn’t submit this company. Please try again.")
+        } finally {
+          submittingRef.current = false
+          setSubmitting(false)
         }
-        try {await onSave({ ...draft, name: draft.name.trim() })}catch(error){setError((error as Error).message)}
       }}
     >
       <div className="form-grid">
-        <Field label="Company name *">
+        <Field label="Company name *" error={fieldErrors.name}>
           <input
             required
+            maxLength={150}
+            disabled={busy}
             value={draft.name}
             onChange={(event) => patch({ name: event.target.value })}
           />
         </Field>
-        <Field label="Company email">
+        <Field label="Company email *" error={fieldErrors.email} hint="Use an @gmail.com address.">
           <input
             type="email"
+            required
+            maxLength={254}
+            pattern={COMPANY_EMAIL_PATTERN}
+            disabled={busy}
             value={draft.email}
             onChange={(event) => patch({ email: event.target.value })}
           />
@@ -1933,66 +1983,54 @@ export function CompanyForm({
         <Field label="Company contact person">
           <input
             value={draft.contact}
+            disabled={busy}
             onChange={(event) => patch({ contact: event.target.value })}
           />
         </Field>
-        <Field label="Contact number">
+        <Field label="Contact number *" error={fieldErrors.phone} hint="Enter exactly 11 digits.">
           <input
+            required type="tel" inputMode="numeric" maxLength={11} pattern={COMPANY_PHONE_PATTERN} disabled={busy}
             value={draft.phone}
-            onChange={(event) => patch({ phone: event.target.value })}
+            onChange={(event) => patch({ phone: event.target.value.replace(/\D/g, "").slice(0, 11) })}
           />
         </Field>
-        <Field label="Company availability">
-          <select
-            value={draft.availability}
-            onChange={(event) =>
-              patch({
-                availability: event.target.value as Company["availability"],
-              })
-            }
-          >
-            <option value="available">Available</option>
-            <option value="limited">Limited availability</option>
-            <option value="committed">Fully committed</option>
-          </select>
+        <Field label="Company availability" hint="Not assigned to a project. Company approval does not assign a project.">
+          <input readOnly value="Available" />
         </Field>
-        <Field label="Available manpower">
+        <Field label="Available manpower" hint="Calculated from the confirmed Excel list. Each laborer needs a unique Worker ID and a name.">
           <input
-            type="number"
-            min={0}
-            value={draft.manpowerCount}
-            onChange={(event) =>
-              patch({ manpowerCount: Number(event.target.value) })
-            }
+            readOnly
+            value={roster?.manpowerCount ?? ""}
+            placeholder="Upload a manpower list first"
           />
         </Field>
         <Field label="Company notes" wide>
           <textarea
             value={draft.note}
+            disabled={busy}
             onChange={(event) => patch({ note: event.target.value })}
           />
         </Field>
       </div>
+      {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
       <section className="form-section">
-        <h3>Manpower list documents</h3>
+        <h3>Manpower list</h3>
         <p>
-          Upload company-level XLSX or XLS manpower lists. Individual workers
-          are not stored in the directory.
+          Upload an XLSX or XLS file with Worker ID and Laborer Name columns, one laborer per row.
+          Use one current list; uploading a replacement updates the count.
         </p>
-        <DocumentList
-          docs={draft.manpowerDocuments}
-          onPreview={() => undefined}
-        />
+        <Button disabled={busy || templateBusy} onClick={template}>{templateBusy ? "Preparing template…" : "Download Excel template"}</Button>
+        {roster && <p role="status">{roster.name} · {roster.manpowerCount} laborer{roster.manpowerCount === 1 ? "" : "s"} available</p>}
         <Upload
           spreadsheet
           label="Company Manpower List"
           owner={owner}
-          buttonLabel="Upload manpower list"
-          onSave={(document) =>
-            patch({
-              manpowerDocuments: [...draft.manpowerDocuments, document],
-            })
-          }
+          disabled={busy}
+          buttonLabel={roster ? "Replace manpower list" : "Upload manpower list"}
+          onSave={(document) => {
+            if (!Number.isInteger(document.manpowerCount) || document.manpowerCount! < 1) throw new Error("We couldn’t read the worker list. Please upload a file with Worker ID and Laborer Name columns.")
+            patch({ manpowerDocuments: [document], manpowerCount: document.manpowerCount })
+          }}
         />
       </section>
       <section className="form-section">
@@ -2001,6 +2039,7 @@ export function CompanyForm({
         <Upload
           label="Company Supporting Document"
           owner={owner}
+          disabled={busy}
           onSave={(document) =>
             patch({ documents: [...draft.documents, document] })
           }
@@ -2012,9 +2051,9 @@ export function CompanyForm({
         </p>
       )}
       <div className="modal-actions">
-        <Button onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="primary">
-          {status === "approved" ? "Add company" : "Submit suggestion"}
+        <Button disabled={busy} onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={busy}>
+          {busy ? "Submitting…" : status === "approved" ? "Add company" : "Submit for Admin approval"}
         </Button>
       </div>
     </form>

@@ -110,7 +110,12 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     me,
     accounts: finalAccounts,
     projects,
-    companies: subcontractors.map((s) => ({...mapCompany(s, projectIdsByName),...(workspace.companies?.[s.id]||{})})),
+    companies: subcontractors.map((s) => {
+      const mapped = mapCompany(s, projectIdsByName), metadata = workspace.companies?.[s.id] || {}
+      return { ...mapped, ...metadata, ...(Array.isArray(metadata.manpowerRoster) ? {
+        manpowerCount: mapped.manpowerCount, availability: mapped.availability, activeProjectIds: mapped.activeProjectIds,
+      } : {}) }
+    }),
     events: notifications.map((n) => mapEvent(n, me.role === "admin" ? undefined : me.id)),
   })
   const license: LicenseData = {}

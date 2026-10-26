@@ -188,7 +188,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const fileId=randomUUID()
     await uploadFile(fileId,new File(["%PDF-1.4\nIntegration company document"],"company.pdf",{type:"application/pdf"}))
     const source=state.companies[0]
-    const saved=await createCompany({...source,id:randomUUID(),name:"Integration Construction",status:"approved",
+    const saved=await createCompany({...source,id:randomUUID(),name:"Integration Construction",status:"approved",email:"integration.construction@gmail.com",phone:"09171234567",
       documents:[{id:fileId,label:"Company Profile",name:"company.pdf",uploaded:true,owner:self.name,date:"2026-10-18",clientVisible:false}],manpowerDocuments:[]})
     assert.ok(saved.id)
     state=await loadState(user)
@@ -204,7 +204,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("Excel uploads are restricted to manpower and cannot be linked as project or company documents", async () => {
     const {state}=await asUser("patricia.domingo@10builders.com")
     const book=XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Worker","Trade"],["Sample","Carpenter"]]),"Manpower")
+    XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Worker ID","Laborer Name"],["W-001","Sample Worker"]]),"Manpower")
     const excel=new File([XLSX.write(book,{type:"buffer",bookType:"xlsx"})],"manpower.xlsx")
     await assert.rejects(uploadFile(randomUUID(),excel),/Supported files/)
     await assert.rejects(uploadFile(randomUUID(),new File(["workers"],"manpower.csv"),"manpower"),/Excel/)
@@ -213,12 +213,65 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,excel,"manpower")
     const doc={id,label:"Manpower list",name:excel.name,uploaded:true,owner:"Administrator",date:"2026-10-22",clientVisible:false}
     const source=state.companies[0]
-    const company=await createCompany({...source,id:randomUUID(),name:"Manpower Format Test",documents:[],manpowerDocuments:[doc]})
+    const company=await createCompany({...source,id:randomUUID(),name:"Manpower Format Test",email:"manpower.format@gmail.com",phone:"09171234567",documents:[],manpowerDocuments:[doc]})
     assert.ok(company.id)
     await assert.rejects(api(`/subcontractors/${company.id}/workspace`,{method:"PUT",json:{...source,name:"Manpower Format Test",status:"approved",documents:[doc],manpowerDocuments:[]}}),/Supported files/)
     const active=state.projects.find(p=>p.status==='active')
     await assert.rejects(api(`/projects/${active.id}/workspace`,{method:"PUT",json:{docs:[doc]}}),/Supported files/)
     assert.equal((await db.query("select metadata->'manpowerDocuments'->0->>'id' as id from workspace_company_metadata where subcontractor_id=$1",[company.id])).rows[0].id,id)
+  })
+
+  await t.test("unassigned company requests validate contacts, derive Excel headcounts, preserve approval, and isolate uploaded lists", async () => {
+    let { user, state } = await asUser("karlo.espiritu@10builders.com")
+    const actor = state.accounts.find(account => account.id === user.id)
+    await assert.rejects(api("/subcontractors", { method: "POST", json: { company_name: "Bypass approval", trade: "Structural / Rebar" } }), /Administrator approval/)
+    const company = { ...state.companies[0], id: randomUUID(), name: "Unassigned Excel Crew", email: " New.Crew@GMAIL.COM ", phone: "09171234567",
+      status: "approved", availability: "committed", manpowerCount: 999, activeProjectIds: [state.projects[0].id], projectId: state.projects[0].id, documents: [], manpowerDocuments: [] }
+    for (const phone of ["123", "091712345678", "0917abc4567"])
+      await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...company, phone } }), /11-digit/)
+    for (const email of ["new@yahoo.com", "new@gmail.com.evil", "new@notgmail.com"])
+      await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...company, email } }), /@gmail.com/)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["Worker ID", "Laborer Name"], ["W-001", "Juan Dela Cruz"], ["W-002", "Maria Santos"], ["W-003", "Pedro Reyes"]]), "Manpower")
+    const id = randomUUID(), excel = new File([XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })], "laborers.xlsx")
+    const uploaded = await uploadFile(id, excel, "manpower")
+    assert.equal(uploaded.manpowerCount, 3)
+    const doc = { id, label: "Company Manpower List", name: excel.name, uploaded: true, clientVisible: false, owner: actor.name, date: "2026-10-26", manpowerCount: 999 }
+    company.manpowerDocuments = [doc]
+    await sendApiWorkflow(state, actor, { type: "request_company", company })
+    state = await loadState(user)
+    let saved = state.companies.find(item => item.id === company.id)
+    assert.equal(saved.status, "pending")
+    assert.equal(saved.projectId, "")
+    assert.equal(saved.availability, "available")
+    assert.equal(saved.email, "new.crew@gmail.com")
+    assert.equal(saved.manpowerCount, 3)
+    assert.deepEqual(saved.activeProjectIds, [])
+    assert.equal(saved.manpowerDocuments[0].manpowerCount, 3)
+    const roster = (await db.query("select * from subcontractor_workers where subcontractor_id=$1", [company.id])).rows
+    assert.equal(roster.length, 3)
+    assert.ok(roster.every(worker => worker.availability_status === "available" && worker.current_project_id === null))
+    const metadata = (await db.query("select metadata from workspace_company_metadata where subcontractor_id=$1", [company.id])).rows[0].metadata
+    assert.deepEqual(metadata.manpowerRoster.map(worker => worker.workerId), ["W-001", "W-002", "W-003"])
+    await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...company, id: randomUUID() } }), /already belongs/)
+    await db.query("update subcontractor_workers set status='inactive' where id=$1", [roster[0].id])
+    assert.equal((await loadState(user)).companies.find(item => item.id === company.id).manpowerCount, 2, "Saved upload metadata must not override current available workers")
+    await db.query("update subcontractor_workers set status='active' where id=$1", [roster[0].id])
+    ;({ user, state } = await asUser("mikaela.bautista@10builders.com"))
+    await assert.rejects(api(`/subcontractors/${company.id}/withdraw`, { method: "POST" }), /not found/)
+    await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...company, id: randomUUID() } }), /file not found/i)
+    ;({ user, state } = await asUser("patricia.domingo@10builders.com"))
+    saved = state.companies.find(item => item.id === company.id)
+    await api(`/subcontractors/${company.id}/workspace`, { method: "PUT", json: { ...saved, status: "approved" } })
+    assert.equal((await loadState(user)).companies.find(item => item.id === company.id).status, "approved")
+    assert.equal((await db.query("select count(*)::int as n from subcontractor_workers where subcontractor_id=$1", [company.id])).rows[0].n, 3, "Approving a company must not import its workers again")
+    ;({ user, state } = await asUser("karlo.espiritu@10builders.com"))
+    await assert.rejects(api(`/subcontractors/${company.id}/withdraw`, { method: "POST" }), /Only pending/)
+    const empty = { ...company, id: randomUUID(), name: "Unassigned Pending Company", manpowerDocuments: [] }
+    const pending = await api("/subcontractors/registrations", { method: "POST", json: empty })
+    await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: empty }), /already been submitted/)
+    await api(`/subcontractors/${pending.id}/withdraw`, { method: "POST" })
+    assert.equal((await loadState(user)).companies.find(item => item.id === pending.id).status, "archived")
   })
 
   await t.test("monthly report permissions, read-only generation and snapshot exports hold for every role", async () => {
@@ -386,7 +439,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     let session=await asUser(lead.email)
     let actor=session.state.accounts.find(a=>a.id===session.user.id)
     await sendApiWorkflow(session.state,actor,{type:"request_company",projectId:p.id,company:{
-      ...session.state.companies[0],id:randomUUID(),name:"Lead Suggested Company",status:"pending",documents:[],manpowerDocuments:[]}})
+      ...session.state.companies[0],id:randomUUID(),name:"Lead Suggested Company",email:"lead.suggested@gmail.com",phone:"09171234567",status:"pending",documents:[],manpowerDocuments:[]}})
     ;({user,state}=await asUser("patricia.domingo@10builders.com"))
     const request=state.companies.find(c=>c.name==="Lead Suggested Company")
     assert.equal(request.status,"pending")

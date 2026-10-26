@@ -3,6 +3,7 @@ import { updateNotificationPreferences } from "./notification-preferences.utilit
 import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
+import { readManpowerFile, registerCompany, withdrawCompanyRequest } from "./manpower-import.utility.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -229,9 +230,22 @@ router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"
     if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
         throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
     const contentType = await validateUpload(f, purpose);
+    const manpowerCount = purpose === "manpower" ? readManpowerFile(f).length : undefined;
     await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
  values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
-    return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content" };
+    return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
+}));
+router.post("/subcontractors/registrations", endpoint(["admin", "spm"], async (db, user, req) => {
+    if (user.role === "spm") await assertLicenseActive(user, db);
+    const saved = await registerCompany(db, user, req.body, file);
+    await event(db, user, null, user.role === "spm" ? "Subcontractor company suggestion submitted" : "Subcontractor company added", req.body.name);
+    return saved;
+}));
+router.post("/subcontractors/:id/withdraw", endpoint(["spm"], async (db, user, req) => {
+    await assertLicenseActive(user, db);
+    const found = await withdrawCompanyRequest(db, user, req.params.id);
+    await event(db, user, null, "Pending subcontractor request archived", found.company_name);
+    return {};
 }));
 router.get("/files/:id/content", async (req, res) => {
     try {
@@ -469,29 +483,12 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "request_company": {
             leader();
-            const b = c.company;
-            if (!b?.name?.trim())
-                throw new HttpError(400, "Company name is required.");
-            const companyId = crypto.randomUUID();
-            for (const [d, purpose] of [...(b.documents || []).map(d => [d, "document"]), ...(b.manpowerDocuments || []).map(d => [d, "manpower"])])
-                if (d.uploaded)
-                    await file(db, user, d.id, purpose);
-            await db.query(`insert into subcontractors(id,company_name,trade_id,contact_email,source,directory_status,created_by,updated_by)
-  select $1,$2,id,$3,'directory','pending',$4,$4 from trades where code='Structural / Rebar'`, [companyId, b.name, b.email || null, user.id]);
-            await db.query("insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2)", [companyId, JSON.stringify({
-                    contact: b.contact || "", phone: b.phone || "", documents: b.documents || [], manpowerDocuments: b.manpowerDocuments || [], note: b.note || "",
-                    projectId: p.id, submittedById: user.id, submittedBy: user.full_name, availability: b.availability || "available", manpowerCount: Number(b.manpowerCount) || 0
-                })]);
+            await registerCompany(db, user, c.company, file, p.id);
             break;
         }
         case "archive_company_request": {
             leader();
-            const m = (await db.query("select metadata from workspace_company_metadata where subcontractor_id=$1", [c.companyId])).rows[0]?.metadata;
-            if (!m || m.projectId !== p.id || m.submittedById !== user.id)
-                throw new HttpError(404, "Your company request was not found.");
-            const changed = await db.query("update subcontractors set directory_status='archived' where id=$1 and directory_status='pending' returning id", [c.companyId]);
-            if (!changed.rowCount)
-                throw new HttpError(409, "Only pending company requests can be withdrawn.");
+            await withdrawCompanyRequest(db, user, c.companyId, p.id);
             break;
         }
         case "add_photo": {
