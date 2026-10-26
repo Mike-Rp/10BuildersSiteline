@@ -2020,7 +2020,14 @@ export function CompanyForm({
           Use one current list; uploading a replacement updates the count.
         </p>
         <Button disabled={busy || templateBusy} onClick={template}>{templateBusy ? "Preparing template…" : "Download Excel template"}</Button>
-        {roster && <p role="status">{roster.name} · {roster.manpowerCount} laborer{roster.manpowerCount === 1 ? "" : "s"} available</p>}
+        {roster && <div className="role-actions">
+          <p role="status">{roster.name} · {roster.manpowerCount} laborer{roster.manpowerCount === 1 ? "" : "s"} available</p>
+          <Button
+            disabled={busy}
+            aria-label="Remove manpower list"
+            onClick={() => patch({ manpowerDocuments: [], manpowerCount: 0 })}
+          >Remove file</Button>
+        </div>}
         <Upload
           spreadsheet
           label="Company Manpower List"
