@@ -13,5 +13,5 @@ export async function blockingReviews(db, projectId) {
   return pending.rowCount > 0;
 }
 
-export const verifiedComplete = totals => !!totals && totals.total > 0 &&
+export const verifiedComplete = totals => !!totals && totals.complete !== false && totals.total > 0 &&
   totals.percentage === 100 && totals.earned === totals.total;

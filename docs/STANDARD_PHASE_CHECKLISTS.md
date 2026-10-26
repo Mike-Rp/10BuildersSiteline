@@ -1,5 +1,12 @@
 # Standard phase checklists: 4–3–4
 
+The construction progress modal now uses standard activity identities and five
+status badges. See [Construction phase progress](CONSTRUCTION_PHASE_PROGRESS.md)
+for the current display policy, additive legacy reconciliation, holds, and tests.
+The optional 007 revision described below is a separate historical rollout;
+it is not required for the current implementation, which retains additional
+legacy mandatory documents as approval gates.
+
 New middle-phase checklist snapshots contain these required activities, each
 with a default value of 10:
 

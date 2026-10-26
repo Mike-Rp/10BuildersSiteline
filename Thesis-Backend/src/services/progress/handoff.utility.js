@@ -7,6 +7,7 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   const blocked = (reason, reasonCode, code = 422) => ({ state: "blocked", advanced: false, reason, reasonCode, code });
   if (project.lifecycle_status !== "active") return { state: "inactive", advanced: false };
   const checklist = await readChecklist(db, project.id, project.current_stage_id, { initialize });
+  if (checklist.construction?.onHold) return blocked("The current phase is explicitly on hold.", "phase_on_hold");
   if (!verifiedComplete(checklist.verified)) return { state: checklist.verified.percentage === null ? "unknown" : "incomplete", advanced: false,
     reason: "All required checklist items must be approved before advancing.", code: 422 };
   const next = await db.query(
@@ -24,6 +25,7 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   const phase = next.rows[0];
   if (phase.status !== "confirmed" || !phase.spm_user_id) return blocked("The next phase SPM must confirm their assignment.", "next_assignment");
   const upcoming = await readChecklist(db, project.id, phase.project_stage_id, { initialize });
+  if (upcoming.construction?.onHold) return blocked("The next phase is explicitly on hold.", "phase_on_hold");
   if (upcoming.verified.percentage === null) return { ...blocked("Configure valid required scope for the next phase before advancing.", "next_scope"), state: initialize || upcoming.items.length ? "blocked" : "unknown" };
   return { state: "ready", phase, upcoming };
 }

@@ -21,19 +21,20 @@ test("project comparison opens a nested phase panel and restores the details con
     const {default: ProjectProgress} = await server.ssrLoadModule("/src/ProjectProgress.tsx")
     const {Modal} = await server.ssrLoadModule("/src/ui.tsx")
     const project = {id: "authorized-project", name: "Authorized project", start: "2026-01-01", end: "2026-01-11",
-      phase: "Structure", phases: ["Mobilization", "Foundation", "Structure"], checklistProgress: [
-        {id:"1",name:"Mobilization",configured:true,required:5,approved:5},
-        {id:"2",name:"Foundation",configured:true,required:15,approved:15},
-        {id:"3",name:"Structure",configured:true,required:80,approved:20},
+      phase: "Structure", phases: ["Mobilization", "Foundation", "Structure", "Closeout"], checklistProgress: [
+        {id:"1",name:"Mobilization",configured:true,required:4,approved:4,status:"Completed"},
+        {id:"2",name:"Foundation",configured:true,required:3,approved:3,status:"Completed"},
+        {id:"3",name:"Structure",configured:true,required:3,approved:1,status:"Ongoing"},
+        {id:"4",name:"Closeout",configured:true,required:4,approved:0,status:"Not Started",locked:true},
       ]}
     const render = value => root.render(React.createElement(Modal, {title:"Project details", onClose:()=>{}, wide:true},
       React.createElement(ProjectProgress, {key:value.id, project:value, reportingDate:"2026-01-06"})))
     await act(() => render(project))
     const outer = document.querySelector('[role="dialog"]')
-    assert.match(outer.textContent, /10 percentage points below date-based baseline/)
-    assert.match(outer.textContent, /40 of 100 required activities approved/)
+    assert.match(outer.textContent, /7.1 percentage points above date-based baseline/)
+    assert.match(outer.textContent, /8 of 14 required activities approved/)
     assert.equal(outer.querySelector('[aria-label="Planned completion"]').getAttribute("aria-valuenow"), "50")
-    assert.equal(outer.querySelector('[aria-label="Actual approved completion"]').getAttribute("aria-valuenow"), "40")
+    assert.equal(outer.querySelector('[aria-label="Actual approved completion"]').getAttribute("aria-valuenow"), "57.1")
     const trigger = [...outer.querySelectorAll("button")].find(el => el.textContent.includes("View phase breakdown"))
     const body = outer.querySelector(".modal-body")
     body.scrollTop = 180
@@ -42,8 +43,13 @@ test("project comparison opens a nested phase panel and restores the details con
     assert.equal(document.querySelectorAll('[role="dialog"]').length, 2)
     const panel = document.querySelector('[aria-label="Progress by construction phase"]')
     assert.match(panel.textContent, /Authorized project/)
-    assert.deepEqual([...panel.querySelectorAll("tbody th")].map(el => el.textContent), project.phases)
-    assert.equal(panel.querySelector('[aria-label="Structure completion"]').getAttribute("aria-valuenow"), "25")
+    assert.deepEqual([...panel.querySelectorAll("tbody th > span")].map(el => el.textContent), project.phases)
+    assert.deepEqual([...panel.querySelectorAll("thead th")].map(el => el.textContent), ["Construction Phase","Approved Activities","Phase Status"])
+    assert.deepEqual([...panel.querySelectorAll("tbody td:first-of-type")].map(el => el.textContent), ["4 / 4","3 / 3","1 / 3","0 / 4"])
+    assert.deepEqual([...panel.querySelectorAll(".pp-status")].map(el => el.textContent), ["Completed","Completed","Ongoing","Not Started"])
+    assert.equal(panel.querySelector('[role="meter"], progress, .pp-track'), null)
+    assert.doesNotMatch(panel.textContent, /%|Unavailable|Awaiting Setup|Required activity list unavailable/)
+    assert.equal(panel.querySelectorAll(".pp-locked").length, 1)
     assert.equal(panel.querySelectorAll(".pp-current").length, 1)
     body.scrollTop = 777
     await act(async () => {

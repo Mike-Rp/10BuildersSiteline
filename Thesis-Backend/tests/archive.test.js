@@ -1,5 +1,6 @@
 import { test,mock } from "node:test";
 import assert from "node:assert/strict";
+import { CLOSEOUT_ACTIVITIES } from "../src/domain/standard-phase-checklist.js";
 const access=await import("../src/common/utilities/access.utility.js");
 const id="11111111-1111-4111-8111-111111111111";
 const other="22222222-2222-4222-8222-222222222222";
@@ -7,7 +8,7 @@ const admin={id,role:"admin"},opm={id,role:"opm"},spm={id,role:"spm"};
 let state;
 function setup(options={}) {
  state={project:{id,current_stage_id:7,current_stage:"Closeout",lifecycle_status:"active",updated_at:"2026-08-01T00:00:00Z"},
-   projects:null,items:[{id:"1",required:true,status:"approved",weight:10,reviewed_by:id,reviewed_at:"2026-10-21"}],pending:false,headcount:14,
+   projects:null,items:CLOSEOUT_ACTIVITIES.map((item,index)=>({...item,id:String(index+1),required:true,status:"approved",reviewed_by:id,reviewed_at:"2026-10-21"})),pending:false,headcount:14,
    mutations:[],events:[],queries:[],due:[],generic:[],stale:false,unresolved:[],declined:false,
    user:{id:other,status:"suspended",is_deleted:false},now:"2026-10-09T08:00:00Z",...options};
  return state;
@@ -19,7 +20,9 @@ async function query(sql,args=[]) {
  if(sql.startsWith("SELECT p.*")) return rows(state.projects ?? [structuredClone(state.project)]);
  if(sql.startsWith("SELECT id FROM project_stages")) return rows([{id:7}]);
  if(sql.startsWith("INSERT INTO project_phase_checklists")) return rows([]);
- if(sql.startsWith("WITH phases AS")) return rows((state.projectIncomplete ? [7,4] : [7]).map(stage=>({project_id:id,phase_id:String(stage),name:stage===7?"Closeout":"Structure",expected:true,configured:true,activity_id:String(stage),required:true,weight:10,status:stage===4?"missing":"approved",approval_valid:stage===7})));
+ if(sql.startsWith("WITH added AS"))return rows([]);
+ if(sql.startsWith("SELECT w.project_stage_id"))return rows(Array.from({length:7},(_,index)=>({project_stage_id:index+1,on_hold:false})));
+ if(sql.startsWith("WITH workflow AS")) return rows((state.projectIncomplete ? [7,4] : [7]).flatMap(stage=>CLOSEOUT_ACTIVITIES.map((item,index)=>({project_id:id,phase_id:String(stage),name:stage===7?"Closeout":"Structure",expected:true,configured:true,activity_id:String(stage*10+index),code:item.code,required:true,weight:10,status:stage===4?"missing":"approved",approval_valid:stage===7,position:stage-1,phase_count:7,on_hold:false,started:false}))));
  if(sql.startsWith("SELECT 1 FROM projects p JOIN project_type_stages"))return rows(state.unconfirmed?[{}]:[]);
  if(sql.startsWith("SELECT i.id")) return rows(state.items);
  if(sql.startsWith("SELECT 1 FROM project_phase_updates")) return rows(state.pending ? [{}] : []);

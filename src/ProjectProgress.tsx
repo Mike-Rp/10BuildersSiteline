@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Button, Empty, Icon, Modal } from "./ui"
 import { dateLabel, localToday, type PhaseProgress } from "./model"
-import { calendarDay, overallChecklistProgress, plannedCompletion, progressGap, progressLabel } from "./project-progress"
+import { calendarDay, constructionPhaseRows, overallChecklistProgress, plannedCompletion, progressGap, progressLabel } from "./project-progress"
 import "./project-progress.css"
 
 type ProgressView = {
@@ -33,6 +33,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     return () => cancelAnimationFrame(frame)
   }, [open])
   const actual = overallChecklistProgress(project.phases, project.checklistProgress)
+  const phaseRows = constructionPhaseRows(project.phases, project.checklistProgress)
   const planned = plannedCompletion(project.start, project.end, reportingDate)
   const gap = progressGap(actual.percentage, planned)
   const date = (value?: string) => calendarDay(value) !== null ? dateLabel(value!) : "Not set"
@@ -69,18 +70,19 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     <Button icon="activity" onClick={event => showBreakdown(event.currentTarget)} aria-haspopup="dialog">View phase breakdown</Button>
     {open && createPortal(<Modal wide title="Progress by construction phase" subtitle={project.name} onClose={() => setOpen(false)}>
       <div className="project-progress pp-breakdown">
-        <p>Approved required activities · equal activity weights across all phases.</p>
-        {actual.percentage === null && <p className="pp-unavailable">Overall completion unavailable until every phase has complete authorized checklist totals. Available phase counts are shown individually.</p>}
-        {actual.rows.length ? <div className="pp-table-scroll"><table className="pp-table">
-          <thead><tr><th scope="col">Phase</th><th scope="col">Approved activities</th><th scope="col">Completion</th><th scope="col">Phase indicator</th></tr></thead>
-          <tbody>{actual.rows.map(row => <tr key={row.name}>
-            <th scope="row">{row.name}</th>
-            <td>{row.required === null ? "Unavailable" : `${row.approved} / ${row.required}`}</td>
-            <td>{bar(`${row.name} completion`, row.percentage, row.percentage === 100 ? "pp-complete" : "pp-actual", "Phase totals unavailable")}</td>
-            <td>{row.name === project.phase && <span className="pp-current">Current phase</span>}</td>
+        <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase.</p>
+        {phaseRows.length ? <div className="pp-table-scroll"><table className="pp-table">
+          <thead><tr><th scope="col">Construction Phase</th><th scope="col">Approved Activities</th><th scope="col">Phase Status</th></tr></thead>
+          <tbody>{phaseRows.map(row => <tr key={row.name}>
+            <th scope="row"><span>{row.name}</span><div className="pp-phase-labels">
+              {row.name === project.phase && <span className="pp-current">Current Phase</span>}
+              {row.locked && <span className="pp-locked"><Icon name="shield" size={14} />Locked</span>}
+            </div></th>
+            <td>{row.approved} / {row.required}</td>
+            <td><span className={`pp-status pp-status-${row.status.toLowerCase().replace(/ /g, "-")}`}>{row.status}</span></td>
           </tr>)}</tbody>
         </table></div> : <Empty title="Phase breakdown unavailable">No authorized stored phase sequence is available for this project.</Empty>}
-        <p className="pp-note">Each activity is counted once using its latest approval state. Zero approved activities does not establish that work has not started.</p>
+        <p className="pp-note">Uploads await Office PM validation. Rejected evidence remains incomplete. Any additional legacy mandatory documents also require approval before completion and handoff.</p>
         <div className="modal-actions"><Button onClick={() => setOpen(false)}>Close phase breakdown</Button></div>
       </div>
     </Modal>, document.body)}

@@ -1,7 +1,8 @@
 import { STANDARD_PHASE_ACTIVITIES, MOBILIZATION_ACTIVITIES, CLOSEOUT_ACTIVITIES } from "../../domain/standard-phase-checklist.js";
 
 // Fixed 4-3-4 policy by workflow position.
-// Only callers creating a NEW snapshot use this query; existing snapshots never change.
+// Also used to append missing standard identities to an active legacy snapshot.
+// Existing names, weights, evidence and additional mandatory documents survive.
 const values = [["first",MOBILIZATION_ACTIVITIES],["middle",STANDARD_PHASE_ACTIVITIES],["last",CLOSEOUT_ACTIVITIES]]
   .flatMap(([kind,items])=>items.map((item,index)=>`('${kind}','${item.code}','${item.title}',${index+1},${item.weight})`)).join(",");
 export const projectChecklistTemplateSql = `

@@ -1,6 +1,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
+import { STANDARD_PHASE_ACTIVITIES } from "../src/domain/standard-phase-checklist.js";
 
 const access = await import("../src/common/utilities/access.utility.js");
 let client;
@@ -59,6 +60,9 @@ function setup(options = {}) {
       state.queries.push({ sql, params });
       const result = rows => ({ rows, rowCount: rows.length });
       if (sql.startsWith("SELECT p.*")) return result([state.p]);
+      if (sql.startsWith("SELECT selected.sort_order")) return result([{locked:Number(params[1])>Number(state.p.current_stage_id),on_hold:false}]);
+      if (sql.startsWith("SELECT w.project_stage_id")) return result(updateUtility.STAGES.map((code,index)=>({project_stage_id:index+1,on_hold:false})));
+      if (sql.startsWith("WITH added AS")) return result([]);
       if (sql.startsWith("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2")) return result(state.currentUnconfirmed ? [] : [{}]);
       if (sql.includes("FROM project_phase_team") && sql.startsWith("SELECT 1")) {
         return result(params[1] === state.phaseOwner ? [{}] : []);
@@ -91,7 +95,7 @@ function setup(options = {}) {
       if (sql.startsWith("INSERT INTO project_phase_checklists")) return result([]);
       if (sql.startsWith("SELECT i.id")) {
         const items = Number(params[1]) === 4 ? state.items : (state.extraStageItems?.[params[1]] ?? state.nextItems ?? []);
-        const rows = items.map(item => ({ weight:10, reviewed_by:opm.id, reviewed_at:"2026-10-21", ...item,
+        const rows = items.map((item,index) => ({ code:STANDARD_PHASE_ACTIVITIES[index]?.code ?? `legacy_${index}`,weight:10, reviewed_by:opm.id, reviewed_at:"2026-10-21", ...item,
           status: String(item.id) === String(state.evidence.checklist_item_id) ? state.evidence.status : item.status,
           evidence_id: state.evidence.id, file_id: state.evidence.file_id, submitted_by: state.evidence.submitted_by, phase_update_id: state.evidence.phase_update_id }));
         return result(rows);
@@ -157,14 +161,13 @@ test("an SPM without a project assignment cannot submit", async () => {
   assert.equal(state.history.length, 0);
 });
 
-test("an assigned SPM can select another stage and submit it for OPM confirmation", async () => {
+test("an assigned SPM cannot submit a future stage before handoff", async () => {
   const state = setup();
   const res = response();
   await controller.submitPhaseUpdate(request(spm, { stage_id: 5 }), res);
-  assert.equal(res.statusCode, 201);
-  assert.equal(res.body.data.status, "pending");
+  assert.equal(res.statusCode, 422);
   assert.equal(state.p.current_stage_id, 4);
-  assert.equal(state.update.selected_stage_id, 5);
+  assert.equal(state.update, null);
   assert.equal(state.history.length, 0);
 });
 
@@ -481,13 +484,13 @@ test("the next SPM must confirm before their phase is activated", async () => {
   assert.equal(state.p.current_stage_id, 4);
 });
 
-test("every dropdown stage can be selected by a project SPM", async () => {
+test("current and previous dropdown stages accept reports while future stages remain locked", async () => {
   for (const [index, stage] of updateUtility.STAGES.entries()) {
     const state = setup();
     const res = response();
     await controller.submitPhaseUpdate(request(spm, { stage }), res);
-    assert.equal(res.statusCode, 201, stage);
-    assert.equal(state.update.selected_stage_id, index + 1);
+    assert.equal(res.statusCode, index < 4 ? 201 : 422, stage);
+    assert.equal(state.update?.selected_stage_id ?? null, index < 4 ? index + 1 : null);
     assert.equal(state.p.current_stage_id, 4);
   }
 });
@@ -531,7 +534,7 @@ test("OPM confirmation records the report without approving its activities", asy
 
 test("confirming a report from another stage cannot change workflow position", async () => {
   const state = setup();
-  await controller.submitPhaseUpdate(request(spm, { stage: "Finishes" }), response());
+  await controller.submitPhaseUpdate(request(spm, { stage: "Foundation" }), response());
   assert.equal(state.p.current_stage_id, 4);
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);

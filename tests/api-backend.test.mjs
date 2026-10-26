@@ -1,5 +1,7 @@
 import { overallChecklistProgress } from "../src/project-progress.ts"
 import { projectPhaseNames } from "../src/model.ts"
+import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
+import { readChecklist } from "../Thesis-Backend/src/services/progress/phase.utility.js"
 // End to end: the Supabase schema + demo data in an in-process Postgres, the real
 // Thesis-Backend (Express) in front of it, and the frontend's own login/loader.
 // Uses the backend bundled in this repository; all writes stay in the test database.
@@ -768,12 +770,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await assert.rejects(apiEnvelope("/accounts?page=1&pageSize=3"), /403|permission|forbidden|allowed|access/i)
   })
 
-  await t.test("project-wide checklist aggregates require complete stored scope, count latest approvals once, and stay staff-only", async () => {
+  await t.test("standard phase aggregates include unstarted scope, count latest approvals once, and stay staff-only", async () => {
     const admin = await asUser("patricia.domingo@10builders.com")
     const project = admin.state.projects.find(p => p.status === "active" && p.team.length > 1)
     assert.ok(project)
     const before = overallChecklistProgress(projectPhaseNames(project), project.checklistProgress)
-    assert.equal(before.percentage, null, "uninitialized future scope cannot be treated as zero")
+    const standardTotal = 8 + 3 * (projectPhaseNames(project).length - 2)
+    assert.equal(before.required, standardTotal, "future phases use standard totals without manual setup")
     await db.query(`insert into project_phase_checklists(project_id,project_stage_id)
       select project_id,project_stage_id from project_phase_team where project_id=$1 on conflict do nothing`, [project.id])
     await db.query(`insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order)
@@ -786,10 +789,10 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     }
     const complete = await reload()
     assert.ok(complete.required > 0)
-    const expected = await db.query(`select count(*)::int as total from project_phase_checklist_items where project_id=$1 and required`, [project.id])
-    assert.equal(complete.required, expected.rows[0].total)
+    assert.equal(complete.required, standardTotal)
     const item = (await db.query(`select i.* from project_phase_checklist_items i where i.project_id=$1 and i.required
-      and not exists(select 1 from project_phase_evidence e where e.checklist_item_id=i.id) order by i.id limit 1`, [project.id])).rows[0]
+      and i.code=any($2::text[]) and not exists(select 1 from project_phase_evidence e where e.checklist_item_id=i.id) order by i.id limit 1`,
+      [project.id,[0,1,2].flatMap(position=>standardActivities(position,3).map(item=>item.code))])).rows[0]
     assert.ok(item)
     const insert = async status => db.query(`insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at)
       values($1,$2,$3,$4,$5,$5,now())`, [project.id,item.project_stage_id,item.id,status,admin.user.id])
@@ -860,7 +863,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await sendApiWorkflow(session.state,session.state.accounts.find(a=>a.id===session.user.id),{
       type:"approve_checklist",projectId:project.id,phase:project.phase,itemId:String(selected[0].id),
       evidenceId:first,expectedReviewToken:preview.review_token,note:"First activity checked separately"})
-    const statuses=()=>db.query("select id::text,status,review_note from project_phase_evidence where id=any($1::bigint[]) order by id",[[first,second]])
+    const statuses=()=>db.query("select id::text,status,review_note from project_phase_evidence where id=any($1::bigint[]) order by project_phase_evidence.id",[[first,second]])
     assert.deepEqual((await statuses()).rows.map(e=>e.status),["approved","pending"])
     assert.equal((await api(base+"/phase-updates")).find(u=>String(u.id)===String(submitted.id)).status,"pending")
     await assert.rejects(api(base+`/evidence/${first}/approve`,{method:"POST",json:{}}),/already reviewed|superseded/)
@@ -1019,6 +1022,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await db.query("update project_phase_team set status='confirmed' where project_id=$1",[id])
     await db.query("insert into project_phase_checklists(project_id,project_stage_id) select $1,unnest($2::smallint[]) on conflict do nothing",[id,stages.map(s=>s.id)])
     await db.query("insert into project_phase_checklist_items(project_id,project_stage_id,code,title,required,sort_order,weight) select $1,t.project_stage_id,t.code,t.title,t.required,t.sort_order,t.weight from phase_checklist_templates t where t.project_stage_id=any($2::smallint[]) on conflict do nothing",[id,stages.map(s=>s.id)])
+    for(const stage of stages)await readChecklist(db,id,stage.id)
     const items=(await db.query("select id,project_stage_id from project_phase_checklist_items where project_id=$1 order by id",[id])).rows
     const first=items.find(i=>i.project_stage_id===stages[0].id),last=items.find(i=>i.project_stage_id===stages.at(-1).id)
     const evidence=async(item,status,reviewer=opmId)=>db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at) values($1,$2,$3,$4,$5,$6,$7) returning id",[id,item.project_stage_id,item.id,status,spmId,reviewer,reviewer?new Date().toISOString():null])
@@ -1028,9 +1032,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await asUser(opmEmail)
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)
     await evidence(first,"approved")
-    await db.query("update project_phase_checklist_items set required=false where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    await evidence(first,"rejected")
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===422)
-    await db.query("update project_phase_checklist_items set required=true where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
+    await evidence(first,"approved")
     await db.query("update project_phase_team set status='pending' where project_id=$1 and project_stage_id=$2",[id,stages[1].id])
     await asUser("patricia.domingo@10builders.com")
     const blockedAdmin=await api("/workspace/project-data")
@@ -1044,7 +1048,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await api("/workspace/project-data")).every(p=>!("handoffReadiness" in p)),"blocker projection is Administrator-only")
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),/confirm/)
     await asUser(spmEmail)
-    const note=await api(base+"/phase-updates",{method:"POST",json:{stage_id:stages[1].id,note:"A note must not move a phase"}})
+    await assert.rejects(api(base+"/phase-updates",{method:"POST",json:{stage_id:stages[1].id,note:"Future phase must remain locked"}}),error=>error.status===422)
+    const note=await api(base+"/phase-updates",{method:"POST",json:{stage_id:stages[0].id,note:"A note must not move a phase"}})
     await db.query("update project_phase_team set status='confirmed' where project_id=$1",[id])
     await asUser(opmEmail)
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)

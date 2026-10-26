@@ -290,6 +290,8 @@ export type PhaseProgress = {
   configured: boolean
   approved: number
   required: number
+  status?: import("../Thesis-Backend/src/domain/construction-phase-progress.js").ConstructionPhaseStatus
+  locked?: boolean
 }
 export type Company = {
   id: string

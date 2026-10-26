@@ -1,8 +1,26 @@
 import type { PhaseProgress } from "./model.ts"
+import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
+import type { ConstructionPhaseStatus } from "../Thesis-Backend/src/domain/construction-phase-progress.js"
 export { activityEarned, phaseProgress, projectProgress, reworkImpact } from "../Thesis-Backend/src/domain/verified-progress.js"
 export type { ProgressTotals, VerifiedActivity, VerifiedPhase, VerifiedProgress } from "../Thesis-Backend/src/domain/verified-progress.js"
 
 const DAY = 86_400_000
+const phaseStatuses: ConstructionPhaseStatus[] = ["Not Started", "Ongoing", "Pending Approval", "Completed", "On Hold"]
+
+export function constructionPhaseRows(phases: string[], source?: PhaseProgress[]) {
+  return phases.map((name, position) => {
+    const required = standardActivities(position, phases.length).length
+    const matches = source?.filter(row => row.name === name) || []
+    const row = matches.length === 1 ? matches[0] : undefined
+    // An older API's aggregate totals cannot establish which requirements were approved.
+    const valid = row?.required === required && Number.isSafeInteger(row.approved) && row.approved >= 0 && row.approved <= required
+    const approved = valid ? row!.approved : 0
+    let status: ConstructionPhaseStatus = valid && row?.status && phaseStatuses.includes(row.status)
+      ? row.status : approved > 0 ? "Ongoing" : "Not Started"
+    if (status === "Completed" && approved !== required) status = approved > 0 ? "Ongoing" : "Not Started"
+    return { name, approved, required, status, locked: row?.locked === true }
+  })
+}
 // Parse calendar dates without local-time/DST offsets; reject rollover dates.
 export function calendarDay(value?: string): number | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null

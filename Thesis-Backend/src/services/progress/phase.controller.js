@@ -14,7 +14,7 @@ import { submitChecklist } from "./phase-submission.utility.js";
 import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
 export { submitPhaseUpdate } from "./phase-update.controller.js";
 import {
-  phaseProject, assertProjectSpm, isProjectSpm, readChecklist, recordPhaseHistory,
+  phaseProject, assertProjectSpm, isProjectSpm, readChecklist, recordPhaseHistory, assertPhaseUnlocked,
 } from "./phase.utility.js";
 
 export const authorizePhaseUpload = async (req, res, next) => {
@@ -40,7 +40,10 @@ export const getPhaseOverview = async (req, res) => {
       const stages = await stageOptions(client, p.project_type_id);
       const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id, p.project_type_id);
       const checklist = await readChecklist(client, p.id, selected.id);
-      const canSubmit = p.lifecycle_status === "active" && await isProjectSpm(client, user, p);
+      const selectedIndex = stages.findIndex(stage => Number(stage.id) === Number(selected.id));
+      const currentIndex = stages.findIndex(stage => Number(stage.id) === Number(p.current_stage_id));
+      const canSubmit = p.lifecycle_status === "active" && selectedIndex <= currentIndex &&
+        !checklist.construction.onHold && await isProjectSpm(client, user, p);
       const owner = await client.query(
         `SELECT t.spm_user_id, u.full_name AS spm_name, t.status
            FROM project_phase_team t JOIN users u ON u.id = t.spm_user_id
@@ -94,6 +97,7 @@ async function itemProject(client, user, projectId, itemId, body = {}) {
   if (!item.rowCount) throw new HttpError(404, "Checklist item not found.");
   const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id);
   if (Number(stage.id) !== Number(item.rows[0].project_stage_id)) throw new HttpError(422, "The checklist item belongs to another stage.");
+  await assertPhaseUnlocked(client, p, stage.id);
   return { ...p, current_stage_id: stage.id, current_stage: stage.code };
 }
 
@@ -183,6 +187,7 @@ async function reviewableEvidence(client,user,projectId,evidenceId) {
   if(evidence.status!=="pending" || String(latest.rows[0]?.id)!==String(evidence.id)) {
     throw new HttpError(409,"Evidence is already reviewed or superseded.");
   }
+  await assertPhaseUnlocked(client, p, evidence.project_stage_id);
   return {p,evidence};
 }
 
@@ -259,6 +264,7 @@ export const uploadPhaseFile = async (req, res) => {
       const p = await phaseProject(client, req.user, req.params.id, { active: true });
       await assertProjectSpm(client, req.user, p);
       const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id);
+      await assertPhaseUnlocked(client, p, stage.id);
       return insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id);
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);

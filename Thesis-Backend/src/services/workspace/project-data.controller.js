@@ -88,13 +88,12 @@ export async function getProjectData(req,res) {
     left join workspace_account_metadata m on m.user_id=u.id
     where l.project_id=any($1::uuid[]) and not coalesce(u.is_deleted,false)
     order by u.full_name,u.id`,[ids])).rows):new Map();
-   // Use the same standard as activation and evidence submission. Never replace
-   // existing snapshots (including older phases with uploaded evidence).
+   // Extend the active checklist with missing standard requirements; retain
+   // legacy mandatory records and every existing evidence reference.
    if(staff) {
     const missing=(await db.query(`select p.id,p.current_stage_id from projects p where p.id=any($1::uuid[])
-     and p.current_stage_id is not null and not exists(select 1 from project_phase_checklists c
-      where c.project_id=p.id and c.project_stage_id=p.current_stage_id)`,[ids])).rows;
-    for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id);
+     and p.current_stage_id is not null and p.lifecycle_status='active' order by p.id for update`,[ids])).rows;
+    for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id,{reconcile:true});
    }
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,t.response_deadline_at,t.responded_at
@@ -145,23 +144,6 @@ export async function getProjectData(req,res) {
     join subcontractors s on s.id=a.subcontractor_id left join trades t on t.id=a.trade_id
     where a.project_id=any($1::uuid[]) and a.status='active' order by a.assigned_at desc`,[ids])).rows;
    const contracts=staff?(await db.query("select * from contracts where project_id=any($1::uuid[])",[ids])).rows:[];
-   // Read only: never create future phase checklists or substitute mutable templates.
-   // One latest evidence row per activity prevents repeated approvals from double counting.
-   const progress=staff?(await db.query(`with phases as (
-     select project_id,project_stage_id from project_phase_team where project_id=any($1::uuid[])
-     union select project_id,project_stage_id from project_phase_checklists where project_id=any($1::uuid[])
-     union select id,current_stage_id from projects where id=any($1::uuid[]) and current_stage_id is not null
-   ) select ph.project_id,s.id::text as id,s.code as name,w.sort_order,
-     (c.project_id is not null and count(i.id) filter(where i.required)>0) as configured,
-     count(i.id) filter(where i.required)::int as required,
-     count(i.id) filter(where i.required and e.status='approved')::int as approved
-     from phases ph join projects p on p.id=ph.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=ph.project_stage_id join project_stages s on s.id=ph.project_stage_id
-     left join project_phase_checklists c on c.project_id=ph.project_id and c.project_stage_id=ph.project_stage_id
-     left join project_phase_checklist_items i on i.project_id=ph.project_id and i.project_stage_id=ph.project_stage_id
-     left join lateral(select status from project_phase_evidence
-       where checklist_item_id=i.id and project_id=i.project_id and project_stage_id=i.project_stage_id
-       order by id desc limit 1)e on true
-     group by ph.project_id,s.id,s.code,w.sort_order,c.project_id order by w.sort_order,s.id`,[ids])).rows:[];
    const verified = staff ? await readVerifiedProgress(db,ids) : new Map();
    // Read the same gates as automatic handoff, only for already-authorized
    // Administrator projects. Do not initialize future scope for a banner read.
@@ -171,13 +153,13 @@ export async function getProjectData(req,res) {
     readiness.set(project.id, { state: result.state, stageId: String(project.current_stage_id),
      reason: result.reason, reasonCode: result.reasonCode });
    }
-   const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
+   const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts].map(group);
    return projects.map(p=>{
-    const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows,progressRows]=grouped.map(rows=>rows.get(p.id)||[]);
+    const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
-     assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:progressRows.map(({id,name,configured,required,approved})=>({id,name,configured,required,approved}))}:{})};
+     assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{})};
    });
   });
   res.set("Cache-Control","private, no-store");

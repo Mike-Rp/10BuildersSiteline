@@ -11,6 +11,7 @@ export type ProgressTotals = {
   total: number | null
   percentage: number | null
   reason: string | null
+  complete?: boolean
 }
 export type VerifiedProgress = {
   project: ProgressTotals
