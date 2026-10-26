@@ -1,4 +1,6 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
+import useSidebarNavigation from "./useSidebarNavigation"
+import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
@@ -285,7 +287,6 @@ function AppInner() {
   const [documentsTab, setDocumentsTab] = useState<DocumentsTab>("project")
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("engineers")
   const [tab, setTab] = useState("closed")
-  const [mobileNav, setMobileNav] = useState(false)
   const [notifications, setNotifications] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<Event>()
   const [credentials, setCredentials] = useState<{
@@ -299,6 +300,7 @@ function AppInner() {
     destructive?: boolean
   }>()
   const [signedOut, setSignedOut] = useState(true)
+  const navigation = useSidebarNavigation(!signedOut && actor.role === "admin")
   const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
   const [sessionMessage, setSessionMessage] = useState("")
   const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
@@ -528,7 +530,7 @@ function AppInner() {
     if (target?.documentsTab) setDocumentsTab(target.documentsTab)
     if (target?.directoryTab) setDirectoryTab(target.directoryTab)
     if (target?.subconTab) setSubconTab(target.subconTab)
-    setMobileNav(false)
+    navigation.closeMobile()
     setNotifications(false)
   }
   function selectDocumentsTab(tab: DocumentsTab) {
@@ -2850,8 +2852,8 @@ function AppInner() {
     )
   const navigationCounts = navigationAttention(state, actor)
   return (
-    <div className="app-shell">
-      <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+    <div className={`app-shell admin-workspace ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+      <aside id="admin-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Administrator navigation" aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>
           <span>
@@ -2867,6 +2869,7 @@ function AppInner() {
             Siteline<small>10 BUILDERS</small>
           </div>
         </div>
+        {navigation.compact && <Button className="admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.closeMobile} />}
         <nav aria-label="Main navigation">
           {NAV.map((n) => (
             <div key={n.label}>
@@ -2886,7 +2889,7 @@ function AppInner() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <button onClick={() => setDialog({ kind: "help" })}>
+          <button onClick={() => { navigation.closeMobile(); setDialog({ kind: "help" }) }}>
             <Icon name="doc" size={18} />
             Workspace guide
             <Icon name="arrow" size={15} />
@@ -2901,33 +2904,39 @@ function AppInner() {
               icon="logout"
               variant="icon-button"
               aria-label="Sign out"
-              onClick={() =>
+              onClick={() => {
+                navigation.closeMobile()
                 setConfirmation({
                   title: "Sign out?",
                   message:
                     "Your records will be available when you sign in again.",
                   action: endSession,
                 })
-              }
+              }}
             />
           </div>
         </div>
       </aside>
-      {mobileNav && (
-        <div
-          className="mobile-nav-backdrop"
-          onClick={() => setMobileNav(false)}
+      {navigation.compact && navigation.expanded && (
+        <button
+          className="mobile-nav-backdrop admin-nav-backdrop"
+          aria-label="Close navigation backdrop"
+          tabIndex={-1}
+          onClick={navigation.closeMobile}
         />
       )}
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
             <Button
-              className="mobile-menu"
+              ref={navigation.toggleRef}
+              className="sidebar-toggle"
               variant="icon-button"
-              icon="menu"
-              aria-label="Open navigation"
-              onClick={() => setMobileNav(!mobileNav)}
+              icon={navigation.expanded ? "close" : "menu"}
+              aria-label={navigation.expanded ? navigation.compact ? "Close navigation" : "Collapse navigation" : navigation.compact ? "Open navigation" : "Expand navigation"}
+              aria-expanded={navigation.expanded}
+              aria-controls="admin-navigation"
+              onClick={navigation.toggle}
             />
             <span>Workspace</span>
             <Icon name="chevron" size={14} />

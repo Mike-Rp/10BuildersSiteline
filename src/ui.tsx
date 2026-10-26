@@ -8,6 +8,7 @@ import {
   type ReactElement,
   type ButtonHTMLAttributes,
   type AriaAttributes,
+  type Ref,
 } from "react"
 
 export function Icon({ name, size = 20 }: {
@@ -177,6 +178,7 @@ export function Button({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLButtonElement>
   variant?: string
   icon?: string
 }) {
