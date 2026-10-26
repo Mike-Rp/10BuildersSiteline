@@ -25,7 +25,7 @@ const server = spawn(process.execPath, ["src/index.js"], { cwd: backend, stdio: 
 for (let i = 0; i < 120; i++) { try { if ((await fetch(`http://127.0.0.1:${apiPort}/api/v1/health`)).ok) break } catch {} await new Promise((r) => setTimeout(r, 250)) }
 
 const runs = [
-  ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Documents", "Directory", "Team", "Archive", "Settings"],
+  ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Documents", "Directory", "Team", "Archive", "Activity log", "Settings"],
   ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Deadlines", "Rework", "Archive", "Activity log", "Preferences"],
   ["karlo.espiritu@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Assignments", "Active sites", "Deadlines", "Document repository", "Subcon directory"],

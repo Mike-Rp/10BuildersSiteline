@@ -1,5 +1,6 @@
-// Writes one notice and the list of people who may see it. Clients are never recipients of license notices.
-export async function notify(db, { title, detail = "", actorId = null, projectId = null, recipientIds = [], type = "notice" }) {
+import { mirrorLegacyNotifications } from "../../services/notifications/notification.utility.js";
+// Legacy event producer bridge until Stage 3 separates events from message creation.
+export async function notify(db, { title, detail = "", actorId = null, projectId = null, recipientIds = [], type = "notice", ...notification }) {
   const ids = [...new Set(recipientIds.filter(Boolean))];
   if (!ids.length) return null;
   const created = await db.query(
@@ -9,6 +10,7 @@ export async function notify(db, { title, detail = "", actorId = null, projectId
   await db.query(
     "insert into notification_recipients(activity_log_id,recipient_user_id) select $1,unnest($2::uuid[]) on conflict do nothing",
     [created.rows[0].id, ids]);
+  await mirrorLegacyNotifications(db, [created.rows[0].id], notification);
   return created.rows[0].id;
 }
 

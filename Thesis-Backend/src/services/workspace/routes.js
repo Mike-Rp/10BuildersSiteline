@@ -1,5 +1,7 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
+import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
+import { mirrorLegacyNotifications, mirrorLegacyReads } from "../notifications/notification.utility.js";
 import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
@@ -82,10 +84,12 @@ async function linkDocument(db, user, p, code, fileId) {
 async function event(db, user, p, title, detail = "") {
     const result = await db.query(`insert into activity_log(activity_type_id,title,detail,actor_user_id,related_project_id)
  select id,$1,$2,$3,$4 from activity_types where code='notice' returning id`, [title, detail, user.id, p?.id || null]);
-    if (result.rowCount)
+    if (result.rowCount) {
         await db.query(`insert into notification_recipients(activity_log_id,recipient_user_id)
  select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null]);
+        await mirrorLegacyNotifications(db, [result.rows[0].id]);
+    }
 }
 const normalizeResetName = value => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 async function findResetAccounts(db, body) {
@@ -210,6 +214,7 @@ router.post("/notifications/read", endpoint(null, async (db, user, req) => {
     if (user.role === "admin")
         await db.query("insert into notification_recipients(activity_log_id,recipient_user_id) select id,$1 from activity_log where id=any($2::bigint[]) on conflict do nothing", [user.id, activityIds]);
     const read = (await db.query("update notification_recipients set is_read=true,read_at=now() where recipient_user_id=$1 and activity_log_id=any($2::bigint[]) returning activity_log_id", [user.id, activityIds])).rows.map(row => String(row.activity_log_id));
+    await mirrorLegacyReads(db, user.id, read);
     const noticeIds = ids.filter(id => id.startsWith("client-history:"));
     if (user.role === "client" && noticeIds.length) {
         const allowed = (await db.query(`select h.id,h.project_id from project_progress_history h
@@ -302,6 +307,11 @@ router.put("/accounts/:id/workspace", endpoint(["admin"], async (db, user, req) 
     if (!isUuid(req.params.id))
         throw new HttpError(400, "Invalid account ID.");
     const b = req.body;
+    if (b.experienceByType !== undefined) {
+        const target = (await db.query("select r.code as role from users u join roles r on r.id=u.role_id where u.id=$1 and not coalesce(u.is_deleted,false)", [req.params.id])).rows[0];
+        if (!target) throw new HttpError(404, "Account not found.");
+        await saveEngineerExperience(db, req.params.id, validateEngineerExperience(b.experienceByType, target.role));
+    }
     if (!Array.isArray(b.docs) || b.docs.length > 100)
         throw new HttpError(400, "Invalid account documents.");
     for (const d of b.docs)

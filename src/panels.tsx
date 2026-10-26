@@ -15,6 +15,7 @@ import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
 import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, companyRegistrationErrors, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { EXPERIENCE_PROJECT_TYPES, normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
   accountError,
   clientForEmail,
@@ -636,6 +637,10 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (["opm", "spm"].includes(draft.role)) {
+      try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { setError((reason as Error).message); return }
+      if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter years of experience for at least one project type. Use 0 for a new engineer."); return }
+    }
     if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
     if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
@@ -708,6 +713,7 @@ export function AccountForm({
                   role: e.target.value as Account["role"],
                   scope: [],
                   projectTypes: [],
+                  experienceByType: undefined,
                 })
               }
             >
@@ -786,6 +792,22 @@ export function AccountForm({
           )}
         </section>
       )}
+      {!clientOnly && ["opm", "spm"].includes(draft.role) && <section className="form-section">
+        <h3>Project experience</h3>
+        <p>Enter whole years for each project type. Use 0 for no experience; leave blank if not recorded.</p>
+        <div className="form-grid">
+          {EXPERIENCE_PROJECT_TYPES.map(type => <Field key={type} label={`${type} experience (years)`}>
+            <input type="number" inputMode="numeric" min={0} max={80} step={1} placeholder="Not recorded"
+              value={draft.experienceByType?.[type] ?? ""}
+              onChange={event => {
+                const experienceByType = { ...draft.experienceByType }
+                if (event.target.value === "") delete experienceByType[type]
+                else experienceByType[type] = Number(event.target.value)
+                patch({ experienceByType }); setError("")
+              }} />
+          </Field>)}
+        </div>
+      </section>}
       {draft.role === "client" && !clientOnly && (
         <section className="form-section">
           <h3>
@@ -1104,14 +1126,14 @@ export function IntakeForm({
       return {
         phase: phase.name,
         accountId:
-          candidates[version % Math.max(1, candidates.length)]?.account.id ||
+          candidates[0]?.account.id ||
           "",
         status: "pending" as const,
         requiredDisciplines: [...phase.disciplines],
         sequence,
       }
     })
-    patch({ opmId: opms[version % Math.max(1, opms.length)]?.id || "", team })
+    patch({ opmId: opms[0]?.id || "", team })
     setRun(version)
   }
   // Date rules apply to new projects only; an existing project's dates are locked here.
@@ -1486,9 +1508,8 @@ export function IntakeForm({
           <div className="notice">
             <Icon name="shield" />
             <p>
-              Recommendations use qualification tags, current workload, active
-              lead assignments and Office PM cooldowns. No synthetic match score
-              is used.
+              Among qualified engineers, more years in this project type rank first.
+              License eligibility, workload limits, active lead assignments and Office PM cooldowns still apply.
             </p>
           </div>
           <Field label="Recommended Office Project Manager *">
@@ -1500,6 +1521,7 @@ export function IntakeForm({
               {opms.map((a) => (
                 <option value={a.id} key={a.id}>
                   {a.name} ·{" "}
+                  {experienceText(a.experienceByType, draft.type)} ·{" "}
                   {a.projectTypes.includes(draft.type)
                     ? "Project-type match"
                     : "No direct type specialization"}{" "}
@@ -1605,7 +1627,7 @@ export function IntakeForm({
                         <option value="">No eligible Site PM selected</option>
                         {candidates.map((c) => (
                           <option key={c.account.id} value={c.account.id}>
-                            {c.account.name}
+                            {c.account.name} · {experienceText(c.account.experienceByType, draft.type)}
                           </option>
                         ))}
                       </select>

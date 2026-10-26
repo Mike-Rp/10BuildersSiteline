@@ -93,6 +93,7 @@ export function mapAccount(
     phone: a.phone ?? "",
     scope,
     projectTypes: types,
+    experienceByType: detail?.experience_by_type ?? a.experience_by_type,
     status: accountStatus(a.status),
     added: day(a.date_added),
     license: license?.license_number ?? "",

@@ -15,6 +15,19 @@ const base = await readFile(
 )
 const parsed = postcss.parse(foundation)
 
+test("notification messages scroll within the viewport while the header stays visible", () => {
+  const declarations = selector => {
+    const out = {}
+    parsed.walkRules(selector, rule => rule.walkDecls(decl => { out[decl.prop] = decl.value }))
+    return out
+  }
+  assert.equal(declarations("#root .notification-popover").overflow, "hidden")
+  assert.match(declarations("#root .notification-popover")["max-height"], /100dvh/)
+  assert.equal(declarations("#root .notification-scroll")["overflow-y"], "auto")
+  assert.equal(declarations("#root .notification-scroll")["min-height"], "0")
+  assert.equal(declarations("#root .notification-popover > .popover-heading")["flex-shrink"], "0")
+})
+
 test("Construction Daylight uses the approved global palette", () => {
   const expected = {
     "--color-canvas": "#f3f5f8",

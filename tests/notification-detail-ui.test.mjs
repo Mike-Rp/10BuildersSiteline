@@ -35,6 +35,14 @@ test("staff notification rows open full previews, mark reads, dismiss by keyboar
     await React.act(() => root.render(React.createElement(Workspace, props)))
     const click = element => { assert.ok(element, "expected an interactive element"); return React.act(() => element.click()) }
     const byText = (container, text) => [...container.querySelectorAll("button")].find(button => button.textContent === text)
+    await click(document.querySelector(".notification-container > button"))
+    assert.ok(document.querySelector('.notification-scroll[role="region"][tabindex="0"]'))
+    assert.equal(document.querySelector(".notification-footer"), null)
+    assert.doesNotMatch(document.querySelector(".notification-popover").textContent, /activity log/i)
+    await click(document.querySelector(".notification-container > button"))
+    await click(document.querySelector('.sidebar [aria-label="Activity log"]'))
+    assert.equal(document.querySelector(".notification-popover"), null)
+    assert.match(document.querySelector(".breadcrumb").textContent, /Activity log/)
     const open = async title => {
       await click(document.querySelector(".notification-container > button"))
       await click([...document.querySelectorAll(".notification-popover .activity-item")].find(button => button.textContent.includes(title)))

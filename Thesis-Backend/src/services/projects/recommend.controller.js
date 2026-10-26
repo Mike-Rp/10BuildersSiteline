@@ -1,4 +1,5 @@
 import { validatePhaseTeam } from "./type-phases.utility.js";
+import { experienceForProjectSql } from "../accounts/experience.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -142,7 +143,7 @@ export const updatePhaseTeam = async (req, res) => {
   }
 };
 
-export const getOpm = async (project_type, is_random = false) => {
+export const getOpm = async (project_type) => {
 
   const query = `
       WITH search_params AS (
@@ -152,6 +153,7 @@ export const getOpm = async (project_type, is_random = false) => {
         SELECT
         upts.user_id as id,
         u.full_name,
+        ${experienceForProjectSql("$1")} AS experience_years,
         array_agg(pt.code) FILTER (WHERE upts.project_type_id IS NOT NULL) AS project_types,
         CASE WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
       FROM user_project_type_specializations upts
@@ -166,6 +168,7 @@ export const getOpm = async (project_type, is_random = false) => {
         SELECT
           m.id,
           m.full_name,
+          m.experience_years,
           m.project_types,
           m.availability,
           (
@@ -182,16 +185,14 @@ export const getOpm = async (project_type, is_random = false) => {
         id AS "MAIN.id",
         full_name AS "MAIN.full_name",
         cast((cast(matching_count as float) / total_requested_tags) * 100 as int) as "MAIN.percentage",
-        availability AS "MAIN.availability"
+        availability AS "MAIN.availability",
+        experience_years AS "MAIN.experience_years"
       FROM ranked_users
       WHERE matching_count > 0 and availability = 'available'
       ORDER BY
-        CASE
-          WHEN matching_count = total_requested_tags AND total_user_tags = total_requested_tags THEN 1
-          ELSE 2
-        END,
         matching_count DESC,
-        total_user_tags ASC
+        experience_years DESC,
+        total_user_tags ASC, full_name ASC, id ASC
     `;
   const result = await execute(query, [project_type]);
 
@@ -199,12 +200,12 @@ export const getOpm = async (project_type, is_random = false) => {
     return null;
   }
 
-  const randomIndex = is_random ? Math.floor(Math.random() * result.rows.length) : 0;
+  const randomIndex = 0; // Refreshing suggestions must not bypass relevant experience priority.
 
   return mapSingle(result.rows[randomIndex], 'id');
 }
 
-const getSpm = async (project_type, is_random = false) => {
+const getSpm = async (project_type) => {
   const matrix_result = await execute(
     `
     SELECT
@@ -235,6 +236,7 @@ const getSpm = async (project_type, is_random = false) => {
           SELECT
             uds.user_id as id,
             u.full_name,
+            ${experienceForProjectSql("$2")} AS experience_years,
             array_agg(pt.id) FILTER (WHERE uds.discipline_id IS NOT NULL) AS disciplines,
             CASE WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
           FROM user_discipline_scopes uds
@@ -249,6 +251,7 @@ const getSpm = async (project_type, is_random = false) => {
           SELECT
             m.id,
             m.full_name,
+            m.experience_years,
             m.disciplines,
             m.availability,
             (
@@ -265,22 +268,20 @@ const getSpm = async (project_type, is_random = false) => {
           id AS "MAIN.id",
           full_name AS "MAIN.full_name",
           cast((cast(matching_count as float) / total_requested_tags) * 100 as int) as "MAIN.percentage",
-          availability AS "MAIN.availability"
+          availability AS "MAIN.availability",
+          experience_years AS "MAIN.experience_years"
         FROM ranked_users
         WHERE matching_count > 0 and availability = 'available'
         ORDER BY
-        CASE
-          WHEN matching_count = total_requested_tags AND total_user_tags = total_requested_tags THEN 1
-          ELSE 2
-        END,
         matching_count DESC,
-        total_user_tags ASC
-      `, [row.disciplines.map(Number)]
+        experience_years DESC,
+        total_user_tags ASC, full_name ASC, id ASC
+      `, [row.disciplines.map(Number), project_type]
     );
 
     const details = mapMultiple(spm_result.rows, 'id');
 
-    const randomIndex = is_random ? Math.floor(Math.random() * details.length) : 0;
+    const randomIndex = 0;
 
     if (spm_result.rowCount > 0) {
       suggestedSpms.push({

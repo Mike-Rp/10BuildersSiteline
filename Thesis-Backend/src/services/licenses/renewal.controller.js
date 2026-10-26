@@ -7,6 +7,7 @@ import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { localDay, loadLicenseState } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
+import { resolveNotifications } from "../notifications/notification.utility.js";
 
 const UPLOAD_ROOT = path.resolve("uploads");
 const isIsoDate = (value) =>
@@ -51,7 +52,9 @@ export async function createRenewalRequest(db, user, body, file) {
       `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by)
        values($1,$2,$3,$4,$5) returning id,status,submitted_at`,
       [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id]);
-    await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id, detail: `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` });
+    await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,
+      subjectType: "license_renewal", subjectId: String(inserted.rows[0].id), link: "/licenses/renewals",
+      detail: `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` });
     return inserted.rows[0];
   } catch (error) {
     if (error.code === "23505") throw new HttpError(409, "A renewal is already under review.");
@@ -135,6 +138,7 @@ async function review(req, res, decision) {
         detail: decision === "verified" ? "Your license renewal was verified. Your work is no longer paused." : `Reason: ${note}`,
         recipientIds: [request.user_id], actorId: user.id,
       });
+      await resolveNotifications(db, { subjectType: "license_renewal", subjectId: String(request.id), reason: `Renewal ${decision}.` });
       return { id: request.id, status: decision, user_id: request.user_id };
     });
     return sendOk(res, decision === "verified" ? "Renewal verified." : "Renewal rejected.", 1, data);

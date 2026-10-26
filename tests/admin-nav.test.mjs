@@ -91,3 +91,9 @@ test("standalone schedule navigation is retired and old targets open Active Site
   assert.equal(normalizeWorkspacePage("Schedule Performance"), "Active sites")
   assert.equal(normalizeWorkspacePage("Documents"), "Documents")
 })
+
+test("Admin has a dedicated activity log navigation tab", () => {
+  assert.equal(labels.filter(label => label === "Activity log").length, 1)
+  assert.equal(ADMIN_NAV.find(item => item.label === "Activity log").icon, "activity")
+  assert.deepEqual(adminBreadcrumb("Activity log", "project", "engineers"), ["Activity log"])
+})

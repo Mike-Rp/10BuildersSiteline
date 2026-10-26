@@ -1,4 +1,5 @@
 import { errorlog } from "../../common/utilities/logger.utility.js";
+import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 
 // Matches licenseState() in the app, which calls a license "Expiring soon" within 90 days.
 export const LICENSE_REMINDER_DAYS = 90;
@@ -73,6 +74,7 @@ export async function sweepLicenses(db, { userId = null } = {}) {
       `INSERT INTO notification_recipients (activity_log_id, recipient_user_id)
        SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`,
       [logged.rows[0].id, recipients]);
+    await mirrorLegacyNotifications(db, [logged.rows[0].id]);
     reminders++;
   }
   return { checked: candidates.rowCount, reminders, skipped };

@@ -1,6 +1,7 @@
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
+import { validateEngineerExperience, saveEngineerExperience } from "./experience.utility.js";
 import fs from "fs";
 import multer from "multer";
 import bcrypt from "bcryptjs";
@@ -142,6 +143,7 @@ export async function createAccountRecord(client, actor, body) {
   if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
   const scope = normalizeScope(role,body.scope);
+  const experience = validateEngineerExperience(body.experience_by_type, role);
   const password = body.password ?? makeTempPassword();
   if (typeof password!=="string" || password.length<8 || Buffer.byteLength(password,"utf8")>72) throw new HttpError(400,"Temporary password must be at least 8 characters and at most 72 UTF-8 bytes.");
   const roleRow = await client.query("SELECT id FROM roles WHERE code=$1",[role]);
@@ -155,6 +157,7 @@ export async function createAccountRecord(client, actor, body) {
     [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
     .catch((error) => { throw error.code === "23505" ? new HttpError(409,"This email is already assigned to another account.") : error; });
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
+  await saveEngineerExperience(client, inserted.rows[0].id, experience);
   return { ...inserted.rows[0],role,temp_password:password };
 }
 
@@ -206,7 +209,8 @@ export const getAccount = async (req, res) => {
 
     const base = await execute(
       `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.status,
-              u.date_added::text AS date_added, u.last_login_at, u.temp_password_issued
+              u.date_added::text AS date_added, u.last_login_at, u.temp_password_issued,
+              (SELECT m.metadata->'experienceByType' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS experience_by_type
          FROM users u JOIN roles r ON r.id = u.role_id
         WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false`, [id]);
     if (base.rowCount === 0) return sendError(res, "Account not found.", 404);
@@ -263,6 +267,7 @@ export const updateAccount = async (req, res) => {
           WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false FOR UPDATE OF u`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Account not found.");
       const scope = normalizeScope(found.rows[0].role, b.scope);
+      const experience = validateEngineerExperience(b.experience_by_type, found.rows[0].role);
 
       const sets = [];
       const params = [id];
@@ -270,7 +275,7 @@ export const updateAccount = async (req, res) => {
       if (fullName !== undefined) set("full_name", String(fullName).trim());
       if (b.email !== undefined) set("email", b.email);
       if (b.phone !== undefined) set("phone", b.phone);
-      if (sets.length === 0 && !scope) throw new HttpError(400, "No editable fields provided.");
+      if (sets.length === 0 && !scope && experience === undefined) throw new HttpError(400, "No editable fields provided.");
 
       if (sets.length > 0) {
         params.push(actor.id);
@@ -278,6 +283,7 @@ export const updateAccount = async (req, res) => {
           `UPDATE users SET ${sets.join(", ")}, updated_by = $${params.length}, updated_at = now() WHERE id = $1`, params);
       }
       if (scope) await writeScope(client, id, scope, actor.id);
+      await saveEngineerExperience(client, id, experience);
 
       const out = await client.query(`SELECT id, full_name, email, phone FROM users WHERE id = $1`, [id]);
       return { ...out.rows[0], ...(scope ? { scope: scope.values } : {}) };

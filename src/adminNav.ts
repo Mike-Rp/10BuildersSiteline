@@ -11,6 +11,7 @@ export const ADMIN_NAV = [
   { label: "Reports", icon: "doc" },
   { label: "Team", icon: "users", group: "ORGANIZATION" },
   { label: "Archive", icon: "archive" },
+  { label: "Activity log", icon: "activity" },
   { label: "Settings", icon: "settings" },
 ]
 

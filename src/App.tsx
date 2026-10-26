@@ -3,6 +3,8 @@ import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
+import NotificationMessages from "./NotificationMessages"
+import { EXPERIENCE_PROJECT_TYPES, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
@@ -1288,16 +1290,16 @@ function AppInner() {
       />
     )
   }
-  function activityList(events: Event[], compact = false) {
+  function activityList(events: Event[], compact = false, markRead = true) {
     return (
       <div className={`activity-list ${compact ? "compact-activity" : ""}`}>
         {events.length ? (
           events.map((e) => (
             <button
-              className={`activity-item ${!e.read ? "unread" : ""}`}
+              className={`activity-item ${markRead && !e.read ? "unread" : ""}`}
               key={e.id}
               onClick={() => {
-                notificationSettings.markRead([e.id])
+                if (markRead) notificationSettings.markRead([e.id])
                 setNotifications(false)
                 setSelectedNotification(e)
               }}
@@ -1327,7 +1329,7 @@ function AppInner() {
                   · {dateLabel(e.date)}
                 </span>
               </span>
-              {!e.read && <i className="unread-dot" />}
+              {markRead && !e.read && <i className="unread-dot" />}
             </button>
           ))
         ) : (
@@ -1346,7 +1348,7 @@ function AppInner() {
       ] }}
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
-      onActivity={() => setDialog({ kind: "activity" })}
+      onActivity={() => navigate("Activity log")}
       onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
     />}</PasswordResetRequests>
@@ -1356,7 +1358,7 @@ function AppInner() {
       <div className="page-heading">
         <div>
           <div className="eyebrow">
-            {["Team", "Settings", "Archive"].includes(page)
+            {["Team", "Settings", "Archive", "Activity log"].includes(page)
               ? "ORGANIZATION"
               : "CONSTRUCTION OPERATIONS"}
           </div>
@@ -1370,6 +1372,18 @@ function AppInner() {
     )
   }
   function renderPage() {
+    if (page === "Activity log") return <>
+      {pageHeading("Activity log")}
+      <Panel title="Workspace activity" subtitle="Browse the activity available to your account.">
+        <ListSection
+          list={activityLogList}
+          placeholder="Search activity"
+          noun="event"
+          render={items => activityList(items, false, false)}
+          empty={activityList([], false, false)}
+        />
+      </Panel>
+    </>
     if (page === "Reports") return <Reports />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
@@ -2363,6 +2377,10 @@ function AppInner() {
         {!docsOnly && (
           <>
             <div className="detail-grid account-detail-grid">
+              {["opm", "spm"].includes(a.role) && <div>
+                <small>PROJECT EXPERIENCE</small>
+                {EXPERIENCE_PROJECT_TYPES.map(type => <p key={type}>{experienceText(a.experienceByType, type)}</p>)}
+              </div>}
               <div>
                 <small>CONTACT NUMBER</small>
                 <strong>{a.phone || "Not provided"}</strong>
@@ -2954,31 +2972,12 @@ function AppInner() {
                       Mark all read
                     </Button>
                   </div>
-                  {activityList(
-                    state.events
-                      .filter(
-                        (e) =>
-                          !state.muted.includes(e.type) &&
-                          [
-                            "request",
-                            "approval",
-                            "progress",
-                            "notice",
-                          ].includes(e.type),
-                      )
-                      .slice(0, 5),
-                    true,
-                  )}
-                  <Button
-                    className="full-width"
-                    onClick={() => {
-                      setNotifications(false)
-                      setDialog({ kind: "activity" })
-                    }}
-                  >
-                    View activity log
-                    <Icon name="arrow" size={15} />
-                  </Button>
+                  <NotificationMessages
+                    key={actor.id}
+                    items={state.events.filter(e => !state.muted.includes(e.type) && ["request", "approval", "progress", "notice"].includes(e.type))}
+                    renderItems={items => activityList(items, true)}
+                    empty={activityList([], true)}
+                  />
                 </div>
               )}
             </div>
@@ -3179,21 +3178,6 @@ function AppInner() {
               try{const saved=await createCompany(company);await reloadWorkspace();setDialog({kind:"company",id:saved.id});setToast("Company added")}
               catch(error){setToast((error as Error).message)}
             }}
-          />
-        </Modal>
-      )}
-      {dialog?.kind === "activity" && (
-        <Modal
-          title="Workspace activity"
-          wide
-          onClose={() => setDialog(undefined)}
-        >
-          <ListSection
-            list={activityLogList}
-            placeholder="Search activity"
-            noun="event"
-            render={(items) => activityList(items)}
-            empty={activityList([])}
           />
         </Modal>
       )}

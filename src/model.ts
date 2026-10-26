@@ -1,4 +1,5 @@
 import type { LicenseData } from "./licenseTypes.ts"
+import { experienceYears, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
 export const PHASES = [
   "Mobilization",
   "Design",
@@ -192,6 +193,7 @@ export type Account = {
   certifications?: string[]
   scope: string[]
   projectTypes: string[]
+  experienceByType?: EngineerExperience
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
   lastName?: string
@@ -735,6 +737,7 @@ export function opmCandidates(
       (a, b) =>
         Number(b.projectTypes.includes(type)) -
           Number(a.projectTypes.includes(type)) ||
+        experienceYears(b.experienceByType, type) - experienceYears(a.experienceByType, type) ||
         workload(state, a.id, excluding) - workload(state, b.id, excluding) ||
         a.name.localeCompare(b.name),
     )
@@ -763,6 +766,7 @@ export function spmCandidates(
     .sort(
       (a, b) =>
         b.matched - a.matched ||
+        experienceYears(b.account.experienceByType, type) - experienceYears(a.account.experienceByType, type) ||
         workload(state, a.account.id, excluding) -
           workload(state, b.account.id, excluding) ||
         a.account.name.localeCompare(b.account.name),

@@ -158,7 +158,8 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
 function accountPayload(account: Account) {
     const scope = account.role === "spm" ? { disciplines: account.scope } : account.role === "opm" ?
         { project_types: account.projectTypes } : account.role === "client" ? { projects: account.scope } : undefined;
-    return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope };
+    return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope,
+      ...(account.experienceByType !== undefined && ["opm", "spm"].includes(account.role) ? { experience_by_type: account.experienceByType } : {}) };
 }
 export async function saveApiAccount(account: Account, existing: boolean, password?: string) {
     const previous = existing ? await api<Dto>("/accounts/" + account.id) : undefined;

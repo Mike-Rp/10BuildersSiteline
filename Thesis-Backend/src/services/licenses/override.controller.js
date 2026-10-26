@@ -7,6 +7,7 @@ import { assertEligibleManager, LICENSE_ELIGIBILITY_SQL } from "../../common/uti
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { loadLicenseState, loadLicenseStates } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
+import { resolveNotifications } from "../notifications/notification.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { readChecklist } from "../progress/phase.utility.js";
 import { closeOpenHistory, ensureOpenHistory, openTookOver } from "./history.js";
@@ -215,9 +216,11 @@ export const createOverride = async (req, res) => {
       const progress = stageId ? ` · verified progress ${summary.approved} of ${summary.required} items (${summary.pct}%)` : "";
       await notify(db, {
         title: stageId ? "Reassigned phase" : "Reassigned project", projectId, actorId: user.id, recipientIds: [toId],
+        subjectType: "license_override", subjectId: String(override.id), link: "/assignments",
         detail: `${project.name}${holder.stage ? " · " + holder.stage : ""}${progress} · ${PREVIOUS_ENGINEER_UNAVAILABLE}`,
       });
       await notify(db, { title: "Reassignment requested", projectId, actorId: user.id, recipientIds: await adminIds(db),
+        subjectType: "license_override", subjectId: String(override.id), link: "/licenses/overrides",
         detail: `${project.name}${holder.stage ? " · " + holder.stage : ""} · waiting for the replacement to accept` });
       return override;
     });
@@ -266,6 +269,7 @@ async function respond(req, res, accept) {
         await db.query("update license_overrides set status='declined', responded_at=now(), response_note=$2 where id=$1", [o.id, note]);
         await notify(db, { title: "Reassignment declined", projectId: o.project_id, actorId: user.id, recipientIds: admins,
           detail: `${label} · ${user.full_name} declined${note ? ": " + note : ""} · choose another engineer` });
+        await resolveNotifications(db, { subjectType: "license_override", subjectId: String(o.id), reason: "Reassignment declined." });
         return { id: o.id, status: "declined" };
       }
       await assertLicenseActive(user, db);
@@ -303,6 +307,7 @@ async function respond(req, res, accept) {
           [o.project_id, user.id]);
       }
       await db.query("update license_overrides set status='accepted', responded_at=now(), response_note=$2 where id=$1", [o.id, note]);
+      await resolveNotifications(db, { subjectType: "license_override", subjectId: String(o.id), reason: "Reassignment accepted." });
       await notify(db, { title: stageCode ? `${user.full_name} took over ${stageCode}` : `${user.full_name} took over as Office PM`, projectId: o.project_id, actorId: user.id,
         recipientIds: [...admins, ...(o.role_code === "spm" ? [project.suggested_opm_id] : [])], detail: project.name });
       await notify(db, { title: stageCode ? `${stageCode} reassigned` : "Project reassigned", projectId: o.project_id, actorId: user.id, recipientIds: [o.from_user_id],

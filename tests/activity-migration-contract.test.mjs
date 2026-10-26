@@ -122,7 +122,7 @@ test("rework evidence links enforce activity, project and phase scope, including
     error=>error.code==="23503")
 })
 
-test("migration coverage: PostgreSQL prepares backend static SQL against base + recovery + monthly-report migration",{timeout:60000},async t=>{
+test("migration coverage: PostgreSQL prepares backend static SQL including the notification dry run",{timeout:60000},async t=>{
   const db=await database(t)
   await migrateActivityProgress(client(db),{apply:true})
   await db.exec(read("Thesis-Backend/migrations/008-monthly-report-history.sql"))
@@ -130,12 +130,21 @@ test("migration coverage: PostgreSQL prepares backend static SQL against base + 
   await db.exec(read("Thesis-Backend/migrations/010-photo-release.sql"))
   const directory=fileURLToPath(new URL("Thesis-Backend/src/",root))
   let count=0;const failures=[]
-  for(const file of files(directory)) {
-    for(const query of queries(fs.readFileSync(file,"utf8"),file)) {
-      try {await db.exec(`PREPARE coverage_${count++} AS ${query.sql}`)}
-      catch(error){failures.push(`${path.relative(directory,file)}:${query.line}: ${error.code}: ${error.message}`)}
+  const {migrateNotifications}=await import("../Thesis-Backend/scripts/migrate-notifications.js")
+  await migrateNotifications(db,{validate:async()=>{
+    for(const file of files(directory)) {
+      for(const query of queries(fs.readFileSync(file,"utf8"),file)) {
+        await db.query("SAVEPOINT prepare_notification_contract")
+        try {await db.exec(`PREPARE coverage_${count++} AS ${query.sql}`)}
+        catch(error){
+          await db.query("ROLLBACK TO SAVEPOINT prepare_notification_contract")
+          failures.push(`${path.relative(directory,file)}:${query.line}: ${error.code}: ${error.message}`)
+        }
+        await db.query("RELEASE SAVEPOINT prepare_notification_contract")
+      }
     }
-  }
+  }})
+  assert.equal((await db.query("select to_regclass('public.notifications') as relation")).rows[0].relation,null,"The notification migration was not applied")
   console.log(`Schema contract: prepared ${count} static backend SQL statements.`)
   assert.deepEqual(failures,[],"A backend query requires an unmigrated or invalid database object")
   assert.ok(count>100)

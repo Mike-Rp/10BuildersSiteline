@@ -78,6 +78,11 @@ for (const label of navLabels) {
   }
   if (document.querySelector('.client-portal .nav-count')) problems.push('Client sidebar exposes a staff review count')
   results.pages[label] = document.getElementById("root").innerHTML.length > 500 ? "ok" : "BLANK"
+  if (label === "Activity log") {
+    if (!document.querySelector("main h1")?.textContent.includes("Activity log")) problems.push("Activity log did not open as a dedicated page")
+    if (!document.querySelector('main input[placeholder="Search activity"]')) problems.push("Activity log search is missing")
+    if (document.querySelector('[role="dialog"]')) problems.push("Activity log unexpectedly opened as a modal")
+  }
   if (["Project intake","Confirmation queue","Assignments"].includes(label)) {
     const group=document.querySelector('.intake-tabs')
     if (!group) problems.push('Intake responsibility grouping is missing')

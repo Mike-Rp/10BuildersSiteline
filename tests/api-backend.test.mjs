@@ -1283,6 +1283,37 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual(other.state.userPreferences[other.user.id], [])
   })
 
+  await t.test("engineer experience persists per project type and prioritizes seven years over five in backend allocation", async () => {
+    const { user } = await asUser("patricia.domingo@10builders.com")
+    const created = {}
+    for (const role of ["opm", "spm"]) for (const years of [5, 7]) {
+      const body = { full_name: `Experience ${role} ${years}`, email: `experience.${role}.${years}@example.test`, role, password: "Password@123",
+        scope: role === "opm" ? { project_types: ["Residential"] } : { disciplines: ["Civil", "Geotechnical", "Structural"] }, experience_by_type: { Residential: years, Commercial: years === 5 ? 50 : 0 } }
+      const account = await api("/accounts", { method: "POST", json: body })
+      created[`${role}${years}`] = account.id
+      await db.query("UPDATE users SET status='active' WHERE id=$1", [account.id])
+      await db.query(`INSERT INTO user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,created_by)
+        SELECT $1,'EXPERIENCE-TEST',current_date+400,'uploaded',upload_file_ref,$2 FROM user_licenses WHERE upload_file_ref IS NOT NULL LIMIT 1`, [account.id, user.id])
+      assert.equal((await api(`/accounts/${account.id}`)).experience_by_type.Residential, years)
+    }
+    const loaded = await loadState(user)
+    assert.equal(loaded.accounts.find(a => a.id === created.spm7).experienceByType.Residential, 7)
+    await api(`/accounts/${created.spm5}`, { method: "PATCH", json: { experience_by_type: { Residential: 6 } } })
+    assert.equal((await api(`/accounts/${created.spm5}`)).experience_by_type.Residential, 6)
+    for (const invalid of [{ Residential: -1 }, { Residential: 2.5 }, { Residential: "7" }, { Other: 7 }])
+      await assert.rejects(api(`/accounts/${created.spm5}`, { method: "PATCH", json: { experience_by_type: invalid } }), /whole years/)
+    await assert.rejects(api(`/accounts/${created.spm5}/workspace`, { method: "PUT", json: { docs: [], experienceByType: { Residential: -1 } } }), /whole years/)
+    await asUser("karlo.espiritu@10builders.com")
+    await assert.rejects(api(`/accounts/${created.spm7}`, { method: "PATCH", json: { experience_by_type: { Residential: 80 } } }), /permission/i)
+    await asUser("patricia.domingo@10builders.com")
+    for (const path of ["recommendations", "recommendations/rerun"]) {
+      const result = await api(`/projects/${path}?project_type=Residential&floor_area_sqm=500&floor_count=2`)
+      assert.equal(result.opm.id, created.opm7)
+      assert.equal(result.opm.experience_years, 7)
+      assert.equal(result.phase_team.find(row => row.stage === "Mobilization").user_id, created.spm7)
+    }
+  })
+
   await t.test("the API refuses requests without a session", async () => {
     setToken("")
     await assert.rejects(api("/projects"), /token/i)

@@ -9,6 +9,7 @@ import EvidenceReview from "./EvidenceReview"
 import ChecklistApprovalBanner from "./ChecklistApprovalBanner"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
+import NotificationMessages from "./NotificationMessages"
 import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
@@ -3734,27 +3735,12 @@ export default function RoleWorkspace({
                       Mark all read
                     </Button>
                   </div>
-                  {activityList(
-                    events
-                      .filter(
-                        (e) =>
-                          !muted.includes(e.type) &&
-                          [
-                            "request",
-                            "approval",
-                            "progress",
-                            "notice",
-                          ].includes(e.type),
-                      )
-                      .slice(0, 8),
-                  )}
-                  <Button
-                    className="full-width"
-                    onClick={() => navigate("Activity log")}
-                  >
-                    Open full activity log
-                    <Icon name="arrow" size={16} />
-                  </Button>
+                  <NotificationMessages
+                    key={actor.id}
+                    items={events.filter(e => !muted.includes(e.type) && ["request", "approval", "progress", "notice"].includes(e.type))}
+                    renderItems={items => activityList(items)}
+                    empty={activityList([])}
+                  />
                 </div>
               )}
             </div>

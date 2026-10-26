@@ -1,5 +1,6 @@
 import ClientOverview from "./ClientOverview"
 import NotificationDetail from "./NotificationDetail"
+import NotificationMessages from "./NotificationMessages"
 import { notificationAction } from "./notification-action"
 import type { Event as WorkspaceEvent } from "./model"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
@@ -702,7 +703,7 @@ export default function ClientPortal({
                       Mark all read
                     </Button>
                   </div>
-                  {notices.slice(0, 8).map((item) => (
+                  <NotificationMessages key={actor.id} items={notices} renderItems={items => <>{items.map((item) => (
                     <button
                       className="activity-item"
                       key={item.id}
@@ -729,10 +730,7 @@ export default function ClientPortal({
                         <i className="unread-dot" />
                       )}
                     </button>
-                  ))}
-                  {notices.length === 0 && (
-                    <Empty title="No shared updates yet" />
-                  )}
+                  ))}</>} empty={<Empty title="No shared updates yet" />} />
                 </div>
               )}
             </div>

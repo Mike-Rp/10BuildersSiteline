@@ -5,6 +5,7 @@
 // Every reminder is recorded in license_reminders_sent, so it is sent once, however often this runs.
 import { computeLicenseStatus, localDay, readLicenseRules } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
+import { resolveNotifications } from "../notifications/notification.utility.js";
 import { errorlog } from "../../common/utilities/logger.utility.js";
 
 /** The reminder due today for this license, or null. */
@@ -74,6 +75,7 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
     `update license_overrides set status='declined', responded_at=now(), response_note='No response before the deadline'
       where status='pending_acceptance' and response_deadline_at < $1 returning id, project_id, project_stage_id, role_code`, [now]);
   for (const o of stale.rows) {
+    await resolveNotifications(db, { subjectType: "license_override", subjectId: String(o.id), reason: "The response deadline expired." });
     const label = (await db.query(
       `select p.name, s.code as stage from projects p left join project_stages s on s.id=$2 where p.id=$1`, [o.project_id, o.project_stage_id])).rows[0];
     await notify(db, { title: "Reassignment request expired", recipientIds: admins, projectId: o.project_id,

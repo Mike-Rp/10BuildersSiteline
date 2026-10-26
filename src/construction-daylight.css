@@ -267,7 +267,14 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .client-photos-grid { gap: 22px; }
 
 /* Shared notifications, document previews and dialogs. */
-#root .notification-popover { border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); box-shadow: 0 12px 38px #172B4D19; }
+#root .notification-popover { display: flex; flex-direction: column; max-height: min(560px, calc(100vh - 110px)); max-height: min(560px, calc(100dvh - 110px)); overflow: hidden; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); box-shadow: 0 12px 38px #172B4D19; }
+#root .notification-popover > .popover-heading { flex-shrink: 0; }
+#root .notification-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+#root .notification-scroll:focus-visible { outline: 2px solid var(--color-steel); outline-offset: -2px; }
+#root .notification-date-heading { padding: 12px 20px; margin: 0; font-size: 14px; color: var(--color-muted); background: var(--color-canvas); border-bottom: 1px solid var(--color-line); }
+#root .notification-history-status { padding: 16px; text-align: center; color: var(--color-muted); font-size: 14px; }
+#root .notification-history-status p { margin: 0 0 8px; }
+#root .notification-history-status .button { min-height: 48px; }
 #root .popover-heading { padding: 19px 21px; border-color: var(--color-line); gap: 15px; }
 #root .activity-item { padding: 19px 23px; gap: 13px; border-color: var(--color-line); background: var(--color-surface); min-height: 88px; }
 #root .activity-item:hover { background: var(--surface-subtle); }
@@ -775,4 +782,11 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
   #root .app-shell .metrics-grid { grid-template-columns: minmax(0, 1fr); }
   #root .app-shell .metric-top { min-height: 0; }
   #root .app-shell .metric-bottom { min-height: 0; }
+}
+/* Keep notifications inside narrow/zoomed viewports instead of shifting off-screen. */
+@media (max-width: 760px) {
+  #root .notification-popover { position: fixed; top: 80px; right: 16px; width: min(410px, calc(100vw - 32px)); }
+}
+@media (max-height: 300px) {
+  #root .notification-popover { position: fixed; inset: 8px 16px auto auto; width: min(410px, calc(100vw - 32px)); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
 }
