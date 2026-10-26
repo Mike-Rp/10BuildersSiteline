@@ -1,4 +1,5 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
+import useSignOutConfirmation from "./useSignOutConfirmation"
 import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
@@ -218,6 +219,7 @@ export default function RoleWorkspace({
   onReload: () => unknown
 }) {
   const isOpm = actor.role === "opm"
+  const signOut = useSignOutConfirmation(onPause)
   useListMemory()
   const roleNav = isOpm ? OPM_NAV : SPM_NAV
   const nav = extensionDemo ? roleNav.filter(([label]) => ["Active sites", "Deadlines"].includes(label)) : roleNav
@@ -3699,7 +3701,7 @@ export default function RoleWorkspace({
               variant="icon-button"
               icon="logout"
               aria-label="Sign out"
-              onClick={onPause}
+              onClick={signOut.request}
             />
           </div>
         </div>
@@ -4088,6 +4090,7 @@ export default function RoleWorkspace({
           />}
         </div>
       )}
+      {signOut.dialog}
       {idleWarning && !paused && (
         <div className="session-warning">
           <Icon name="clock" />

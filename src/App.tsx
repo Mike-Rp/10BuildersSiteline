@@ -1,5 +1,6 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
+import useSignOutConfirmation from "./useSignOutConfirmation"
 import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
@@ -344,6 +345,7 @@ function AppInner() {
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
   const [restoreAttempt, setRestoreAttempt] = useState(0)
+  const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   useEffect(() => {
     if (!tokenUser()) {
       setCheckingSession(false)
@@ -2749,8 +2751,9 @@ function AppInner() {
               <Button variant="primary" onClick={() => setRestoreAttempt((n) => n + 1)}>
                 Retry
               </Button>
-              <Button onClick={() => { setRestoreError(""); endSession() }}>Sign out</Button>
+              <Button onClick={signOut.request}>Sign out</Button>
             </div>
+            {signOut.dialog}
           </div>
         )}
       </main>
@@ -2906,12 +2909,7 @@ function AppInner() {
               aria-label="Sign out"
               onClick={() => {
                 navigation.closeMobile()
-                setConfirmation({
-                  title: "Sign out?",
-                  message:
-                    "Your records will be available when you sign in again.",
-                  action: endSession,
-                })
+                signOut.request()
               }}
             />
           </div>
@@ -3348,6 +3346,7 @@ function AppInner() {
           </div>
         </Modal>
       )}
+      {signOut.dialog}
       {idleWarning && !signedOut && (
         <div className="session-warning">
           <Icon name="clock" />

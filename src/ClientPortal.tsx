@@ -1,5 +1,6 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
+import useSignOutConfirmation from "./useSignOutConfirmation"
 import ClientOverview from "./ClientOverview"
 import ClientSamplePhotos from "./ClientSamplePhotos"
 import { canShowClientPhotoExamples } from "./client-photo-examples"
@@ -102,6 +103,7 @@ export default function ClientPortal({
   const [siteDetails, setSiteDetails] = useState(false)
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
   const navigation = useSidebarNavigation(!paused)
+  const signOut = useSignOutConfirmation(onPause)
   const [bell, setBell] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [viewer, setViewer] = useState<Viewer>()
@@ -642,7 +644,7 @@ export default function ClientPortal({
               variant="icon-button"
               icon="logout"
               aria-label="Sign out"
-              onClick={() => { navigation.closeMobile(); onPause() }}
+              onClick={() => { navigation.closeMobile(); signOut.request() }}
             />
           </div>
         </div>
@@ -817,6 +819,7 @@ export default function ClientPortal({
           />
         </div>
       )}
+      {signOut.dialog}
       {idleWarning && !paused && (
         <div className="session-warning">
           <Icon name="clock" />
