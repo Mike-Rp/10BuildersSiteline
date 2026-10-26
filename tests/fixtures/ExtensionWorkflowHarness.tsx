@@ -1,19 +1,20 @@
 import { useState, type ReactNode } from "react"
-import RoleWorkspace from "./RoleWorkspace"
-import ClientPortal from "./ClientPortal"
-import ActiveSites from "./ActiveSites"
-import ExtensionWorkflow from "./ExtensionWorkflow"
-import ExtensionDemoProvider, { useExtensionDemo } from "./ExtensionDemoContext"
-import { clientProjectViews } from "./client-access"
+// Test-only harness for the approved frontend workflow. Never imported by the app.
+import RoleWorkspace from "../../src/RoleWorkspace"
+import ClientPortal from "../../src/ClientPortal"
+import ActiveSites from "../../src/ActiveSites"
+import ExtensionWorkflow from "../../src/ExtensionWorkflow"
+import ExtensionDemoProvider, { useExtensionDemo } from "../../src/ExtensionDemoContext"
+import { clientProjectViews } from "../../src/client-access"
 import {
   DEMO_ACCOUNTS,
   DEMO_TODAY,
   extensionWorkspace,
   type DemoActor,
-} from "./extension-demo"
-import { Badge, Button, Field, Icon, Modal } from "./ui"
-import { dateLabel, ROLE_NAMES } from "./model"
-import "./extension-demo.css"
+} from "../../src/extension-demo"
+import { Badge, Button, Field, Icon, Modal } from "../../src/ui"
+import { dateLabel, ROLE_NAMES } from "../../src/model"
+import "../../src/extension-demo.css"
 
 function DemoWorkspace({ onExit }: { onExit: () => void }) {
   const demo = useExtensionDemo()!

@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
 test(
-  "complete extension UI across existing role workspaces, revisions, decisions, refresh, isolation and reset without network",
+  "retained extension components work in the test-only harness; the real app never exposes the removed demo",
   { timeout: 60000 },
   async (t) => {
     const dom = new JSDOM('<div id="root"></div>', {
@@ -73,9 +73,9 @@ test(
     try {
       const { default: App } = await server.ssrLoadModule("/src/App.tsx")
       const { default: Demo } = await server.ssrLoadModule(
-        "/src/ExtensionDemo.tsx",
+        "/tests/fixtures/ExtensionWorkflowHarness.tsx",
       )
-      const mount = () => root.render(React.createElement(App))
+      const mount = () => root.render(React.createElement(Demo, null, React.createElement(App)))
       const click = async (label, within = document) => {
         const b = [...within.querySelectorAll("button")].find(
           (b) =>
@@ -334,7 +334,7 @@ test(
         document.body.textContent,
         /Requests appear here after the OPM endorses/,
       )
-      // Unmount/remount the actual App: role preference, decisions and history survive.
+      // Unmount/remount the private test harness: decisions and history survive.
       await switchTo("a5")
       await act(() => root.unmount())
       root = createRoot(document.getElementById("root"))
@@ -384,6 +384,13 @@ test(
         "all tested demo screens avoid backend calls",
       )
       await click("Exit Demo")
+      assert.ok(document.querySelector("form.login-form"))
+      // The old bookmark no longer opens a demo in the actual local app.
+      window.history.replaceState(null, "", "/?extensionDemo=1")
+      await act(() => root.render(React.createElement(App)))
+      assert.ok(document.querySelector("form.login-form"))
+      assert.equal(document.querySelector(".extension-demo-toolbar"), null)
+      assert.equal(document.querySelector(".extension-demo-launch"), null)
       // Verify the explicit production gate independently of Vite's dev SSR default.
       await act(() =>
         root.render(

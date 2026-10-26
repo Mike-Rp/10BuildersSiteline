@@ -1,4 +1,3 @@
-import ExtensionDemo from "./ExtensionDemo"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
@@ -3378,5 +3377,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return <ExtensionDemo><AppInner /></ExtensionDemo>
+  return <AppInner />
 }
