@@ -1,0 +1,19 @@
+#root .schedule-status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--color-line); border-radius: 5px; background: var(--surface-subtle); color: var(--color-muted); font-size: 14px; font-weight: 600; line-height: 1.5; white-space: normal; }
+#root .schedule-status-badge > span { display: inline-flex; flex: none; }
+#root .schedule-status-badge.green { background: var(--green-soft); color: var(--color-success); }
+#root .schedule-status-badge.red { background: var(--red-soft); color: var(--color-danger); }
+#root .project-schedule-details { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 12px 0 18px; color: var(--color-ink); font-size: 14px; line-height: 1.6; }
+#root .project-schedule-details > strong { color: var(--color-danger); font-size: 14px; }
+#root .schedule-delay-notice { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; margin: 12px 0 16px; background: var(--red-soft); border: 1px solid var(--color-line); border-left: 4px solid var(--color-danger); border-radius: 6px; color: var(--color-danger); min-width: 0; }
+#root .schedule-delay-notice > span { display: inline-flex; flex: none; }
+#root .schedule-delay-notice p { margin: 0; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+#root .schedule-delayed-row { width: 100%; min-height: 48px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; text-align: left; border: 0; border-bottom: 1px solid var(--color-line); background: var(--red-soft); color: var(--color-danger); font-size: 14px; }
+#root .schedule-delayed-row strong { flex: 1; font-size: 14px; }
+#root .schedule-delayed-row > span { display: inline-flex; flex: none; }
+#root .schedule-delayed-row:focus-visible { outline: 3px solid var(--color-primary); outline-offset: -3px; }
+#root .schedule-delayed-row:hover { text-decoration: underline; }
+#root .schedule-mobile-workspace button, #root .schedule-mobile-workspace input:not([type="checkbox"]):not([type="radio"]), #root .schedule-mobile-workspace select, #root .schedule-mobile-workspace summary { min-height: 48px; }
+@media (max-width: 640px) {
+  #root .project-schedule-details { align-items: flex-start; flex-direction: column; gap: 8px; }
+  #root .schedule-delay-notice { padding: 14px 12px; }
+}

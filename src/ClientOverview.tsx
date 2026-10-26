@@ -3,6 +3,7 @@ import type { ClientProjectView } from "./client-access"
 import { dateLabel } from "./model"
 import { calendarDay } from "./project-progress"
 import { clientExecutiveSummary } from "./client-executive-summary"
+import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import InfoPopover from "./InfoPopover"
 import { Badge, Button, Icon } from "./ui"
 import "./client-overview.css"
@@ -14,7 +15,8 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
   onNavigate: (page: string) => void
   onDetails: () => void
 }) {
-  const summary = clientExecutiveSummary(project)
+  const today = useScheduleToday()
+  const summary = clientExecutiveSummary(project, today)
   const validProgress = Number.isFinite(project.progress) && project.progress >= 0 && project.progress <= 100
   const endSet = calendarDay(project.end) !== null
   return <div className="client-overview">
@@ -22,6 +24,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       <span>{project.type}{project.location ? ` · ${project.location}` : ""}</span>
       <Badge tone="green">{project.status === "completed" ? "Completed" : "Active"}</Badge>
     </div>
+    <ProjectScheduleDetails project={project} today={today} />
     <section className="co-executive" aria-label="Executive summary">
       <div className="co-heading"><div><h1>Executive summary</h1><p className="co-summary-intro">A clear view of your project and the latest information shared by your team.</p></div></div>
       <p className="co-summary-narrative">{summary.narrative}</p>

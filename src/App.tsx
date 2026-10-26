@@ -1,6 +1,10 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useSignOutConfirmation from "./useSignOutConfirmation"
+import UrgentActionBanner from "./UrgentActionBanner"
+import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
+import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
+import { delayedProjects } from "./domain/schedule-status"
 import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
@@ -261,6 +265,8 @@ const ACCOUNT_UNAVAILABLE_MESSAGE = SIGN_IN_MESSAGES.inactive
 const INVALID_CREDENTIALS_MESSAGE = SIGN_IN_MESSAGES.mismatch
 const signInAttempts = localAttemptStore()
 function AppInner() {
+  const scheduleToday = useScheduleToday()
+  const [activeSitesScheduleFilter, setActiveSitesScheduleFilter] = useState<"" | "delayed">("")
   const [state, setState] = useState<State>(emptyState)
   useListMemory()
   const [sessionId, setSessionId] = useState(() => {
@@ -526,6 +532,7 @@ function AppInner() {
   }
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
+    setActiveSitesScheduleFilter("")
     const target = resolveAdminTarget(next)
     setPage(target ? target.page : normalizeWorkspacePage(next))
     resetListState()
@@ -1346,6 +1353,8 @@ function AppInner() {
   function dashboard() {
     const dashActivity = runList("dash:admin-activity", state.events, { searchText: () => "" }, { pageSize: 5 })
     return <PasswordResetRequests>{(requests, openReset) => <AdminDashboard
+      delayedCount={delayedProjects(active, scheduleToday).length}
+      onDelayedProjects={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }}
       readinessAvailable={readinessAvailable}
       overview={{ ...adminDashboardOverview(state), items: [
         ...requests.map(request => ({ key: "password-reset:" + request.id, id: request.id, kind: "account" as const, category: "requests" as const, title: request.full_name, detail: "Password reset requested: " + request.email, label: "Reset password", icon: "shield" })),
@@ -1358,8 +1367,16 @@ function AppInner() {
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
     />}</PasswordResetRequests>
   }
+  function openAdminPriority(item: UrgentItem) {
+    const source = adminDashboardOverview(state).items.find(entry => entry.key === item.key)
+    if (!source) return
+    if (source.key.startsWith("license-cover:")) openLicenseCover(source.id)
+    else if (source.key.startsWith("license-renewal:")) setRenewalsOpen(true)
+    else setDialog({ kind: source.kind, id: source.id })
+  }
   function pageHeading(title: string, action?: ReactNode) {
     return (
+      <>
       <div className="page-heading">
         <div>
           <div className="eyebrow">
@@ -1374,6 +1391,8 @@ function AppInner() {
         </div>
         {action}
       </div>
+      <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />
+      </>
     )
   }
   function renderPage() {
@@ -1398,7 +1417,7 @@ function AppInner() {
             "Active sites",
           )}
           <ExtensionWorkflow actor={actor} />
-          <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
+          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
             needsReview: hasPendingSiteReview(p),
@@ -2102,6 +2121,7 @@ function AppInner() {
         {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
+            <ProjectScheduleDetails project={p} today={scheduleToday} />
             <div className="detail-stats">
               <div>
                 <small>OVERALL PROGRESS</small>

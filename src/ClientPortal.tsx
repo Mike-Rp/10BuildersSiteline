@@ -2,6 +2,9 @@ import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import { LoadingRoleProvider } from "./LoadingSkeleton"
+import UrgentActionBanner from "./UrgentActionBanner"
+import { clientExecutiveSummary } from "./client-executive-summary"
+import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import ClientOverview from "./ClientOverview"
 import ClientSamplePhotos from "./ClientSamplePhotos"
 import { canShowClientPhotoExamples } from "./client-photo-examples"
@@ -114,6 +117,8 @@ export default function ClientPortal({
   const [documentQuery, setDocumentQuery] = useState("")
   useListMemory()
   const project = projects.find((p) => p.id === projectId) || projects[0]
+  const scheduleToday = useScheduleToday()
+  const scheduleAttention = project ? clientExecutiveSummary(project, scheduleToday).schedule : undefined
   const history = project?.history.slice().reverse().sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)) || []
   const notices = projects
     .flatMap((p) =>
@@ -456,6 +461,7 @@ export default function ClientPortal({
     if (!project) return null
     return <>
       <ExtensionWorkflow actor={{ ...actor, role: "client" }} projectId={project.id} />
+      <ProjectScheduleDetails project={project} today={scheduleToday} />
       <dl className="client-project-facts">
         <div><dt>Project type</dt><dd>{project.type}</dd></div>
         <div><dt>Location</dt><dd>{project.location || "Not set"}</dd></div>
@@ -780,6 +786,10 @@ export default function ClientPortal({
               />
             </div>
           )}
+          {project && scheduleAttention?.tone === "amber" && !["Preferences", "Active sites"].includes(page) && <UrgentActionBanner
+            label="Project schedule attention" title="Your project schedule needs attention" actionLabel="View project contacts"
+            items={[{ key: `client-schedule:${project.id}`, title: project.name, detail: scheduleAttention.detail, status: scheduleAttention.label, urgency: scheduleAttention.label === "Target date passed" ? "overdue" : "soon" }]}
+            onOpen={() => setSiteDetails(true)} onReview={() => setSiteDetails(true)} overdueLabel="target date passed" soonLabel="completion date approaching" />}
           {pageContent()}
           {siteDetails && project && <Modal wide title={project.name} subtitle="Project details" onClose={() => setSiteDetails(false)}>{projectDetails()}</Modal>}
           <div className="workspace-footer">

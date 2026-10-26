@@ -8,7 +8,10 @@ import ProjectClientDetails from "./ProjectClientDetails"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
-import ChecklistApprovalBanner from "./ChecklistApprovalBanner"
+import UrgentActionBanner, { useUrgencyNow } from "./UrgentActionBanner"
+import { staffUrgentItems, type UrgentItem } from "./urgent-actions"
+import { DelayedProjectNotice, DelayedProjectsRow, ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
+import { delayedProjects } from "./domain/schedule-status"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -219,7 +222,10 @@ export default function RoleWorkspace({
   onReload: () => unknown
 }) {
   const isOpm = actor.role === "opm"
+  const scheduleToday = useScheduleToday()
+  const [activeSitesScheduleFilter, setActiveSitesScheduleFilter] = useState<"" | "delayed">("")
   const signOut = useSignOutConfirmation(onPause)
+  const urgencyNow = useUrgencyNow()
   useListMemory()
   const roleNav = isOpm ? OPM_NAV : SPM_NAV
   const nav = extensionDemo ? roleNav.filter(([label]) => ["Active sites", "Deadlines"].includes(label)) : roleNav
@@ -473,6 +479,7 @@ export default function RoleWorkspace({
     }
   }
   function navigate(next: string) {
+    setActiveSitesScheduleFilter("")
     setPage(normalizeWorkspacePage(next))
     setConfirmTab("mine")
     setQuery("")
@@ -496,6 +503,29 @@ export default function RoleWorkspace({
     }))
     navigate("Rework & approvals")
     setTab("qa")
+  }
+  function openUrgentItem(item: UrgentItem) {
+    const priority = staffUrgentItems(state, actor, "Dashboard", urgencyNow).find(entry => entry.key === item.key)
+    const project = projects.find(entry => entry.id === priority?.projectId)
+    if (!priority || !project) return
+    setPickedId(project.id)
+    if (priority.target === "qa") openChecklistApprovals(project)
+    else if (priority.target === "progress" || priority.target === "rework") {
+      updateListQuery(`${actor.role}:review-${priority.target}`, current => ({ ...current, search: "", filters: { project: project.id }, page: 1 }))
+      navigate("Rework & approvals"); setTab(priority.target)
+    } else if (priority.target === "assignment") { navigate("Assignments"); setAssignmentId(project.id) }
+    else if (priority.target === "responses") { openSiteResponses(); setDialog({ kind: "project", projectId: project.id }) }
+    else if (priority.target === "documents") openDocuments(project)
+    else { navigate("Active sites"); setDialog({ kind: "project", projectId: project.id }) }
+  }
+  function urgentBanner() {
+    const items = staffUrgentItems(state, actor, page, urgencyNow)
+    const checklistOnly = items.length > 0 && items.every(item => item.target === "qa")
+    return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : isOpm ? "Priority items need your attention" : "Your response needs attention"}
+      description={checklistOnly ? `${items.length} ${items.length === 1 ? "project has" : "projects have"} submitted checklist evidence awaiting your approval.` : undefined}
+      label="Priority action items"
+      actionLabel={checklistOnly ? "Review approvals" : isOpm ? "Open priority item" : "Review assignment"} onOpen={openUrgentItem}
+      onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
   }
   async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
@@ -531,6 +561,7 @@ export default function RoleWorkspace({
           </div>
           {action}
         </div>
+        {urgentBanner()}
         <LicenseBanner license={state.license?.self} />
         {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
           <ReassignRequests
@@ -763,7 +794,10 @@ export default function RoleWorkspace({
         {header(
           isOpm ? "Project overview" : "Site overview",
         )}
-        {isOpm && <ChecklistApprovalBanner projects={allActive} actor={actor} onReview={openChecklistApprovals} />}
+        {isOpm && delayedProjects(allActive, scheduleToday).length > 0 && <Panel title="Needs your attention">
+          <DelayedProjectsRow count={delayedProjects(allActive, scheduleToday).length} onOpen={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }} />
+        </Panel>}
+        {!isOpm && delayedProjects(allActive, scheduleToday).map(project => <section key={project.id} aria-label={`Project schedule: ${project.name}`}><h2>{project.name}</h2><DelayedProjectNotice project={project} today={scheduleToday} /></section>)}
         <div className="metrics-grid">
           {[
             {
@@ -1509,6 +1543,7 @@ export default function RoleWorkspace({
             <dd>{p.status === "pending" ? "Not started" : p.phase}</dd>
           </div>
         </dl>
+        {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <IntakeGuidance state={state} project={p} actor={actor} />
         {p.status !== "pending" && (
           <div className="assignment-progress">
@@ -2109,7 +2144,7 @@ export default function RoleWorkspace({
           "Active sites",
         )}
         <ExtensionWorkflow actor={actor} />
-        <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
+        <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),
@@ -2129,7 +2164,7 @@ export default function RoleWorkspace({
             }}>Open phase workspace</Button> : null
           }} />
         {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
-          <Panel title={`${picked.name} - Phase workspace`}>{progressForm(picked)}</Panel>
+          <Panel title={`${picked.name} - Phase workspace`}><DelayedProjectNotice project={picked} today={scheduleToday} />{progressForm(picked)}</Panel>
         </div>}
       </>
     )
@@ -2159,6 +2194,11 @@ export default function RoleWorkspace({
       searchText: (p) => `${projectText(p)} ${submitter(p)}`,
       filters: [
         phaseFilterP(submissionItems),
+        {
+          id: "project", label: "Project", allLabel: "All projects",
+          options: submissionItems.map(project => ({ value: project.id, label: project.name })),
+          test: (project, value) => project.id === value,
+        },
         {
           id: "by",
           label: "Submitted by",
@@ -3176,6 +3216,8 @@ export default function RoleWorkspace({
           <Status value={p.status} />
         </div>
         <ProjectClientDetails project={p} accounts={state.accounts} />
+        <ProjectScheduleDetails project={p} today={scheduleToday} />
+        {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
         <div className="detail-stats">
@@ -3652,7 +3694,7 @@ export default function RoleWorkspace({
     }
   }
   return (
-    <div className="app-shell role-workspace">
+    <div className={`app-shell role-workspace${isOpm ? "" : " schedule-mobile-workspace"}`}>
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>

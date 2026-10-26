@@ -1,7 +1,9 @@
 import OverallProjectProgress from "./OverallProjectProgress"
 import type { VerifiedProgress } from "./project-progress"
 import { useId, useMemo, useState, type ReactNode } from "react"
-import { PROJECT_TYPES, dateLabel, phaseDefinitions, timelineStatus, type PhaseDefinition } from "./model"
+import { PROJECT_TYPES, dateLabel, phaseDefinitions, type PhaseDefinition } from "./model"
+import ScheduleStatusBadge, { DelayedProjectNotice, useScheduleToday } from "./ScheduleStatus"
+import { projectScheduleStatus } from "./domain/schedule-status"
 
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
@@ -27,6 +29,9 @@ export default function ActiveSites({
   renderActions,
   reviewAvailable = false,
   phaseDefinitionsByType,
+  initialScheduleFilter = "",
+  showDelayNotice = false,
+  today,
 }: {
   projects: SiteCard[]
 
@@ -35,8 +40,15 @@ export default function ActiveSites({
   renderActions?: (id: string) => ReactNode
   reviewAvailable?: boolean
   phaseDefinitionsByType?: Record<string, PhaseDefinition[]>
+  initialScheduleFilter?: "" | "delayed"
+  showDelayNotice?: boolean
+  today?: string
 }) {
+  const localToday = useScheduleToday()
+  const reportingDate = today ?? localToday
   const [query, setQuery] = useState("")
+  const [scheduleFilter, setScheduleFilter] = useState(initialScheduleFilter)
+  const [layout, setLayout] = useState<"cards" | "list">("cards")
   const [type, setType] = useState("")
   const [phase, setPhase] = useState("")
   const [tab, setTab] = useState<"all" | "review">("all")
@@ -59,6 +71,7 @@ export default function ActiveSites({
         .filter(
           (p) =>
             (selectedTab === "all" || p.needsReview === true) &&
+            (!scheduleFilter || projectScheduleStatus(p, reportingDate).status === "Delayed") &&
             p.name
               .toLocaleLowerCase()
               .includes(query.trim().toLocaleLowerCase()) &&
@@ -77,7 +90,7 @@ export default function ActiveSites({
 
           return a.name.localeCompare(b.name)
         }),
-    [activeProjects, query, type, phase, selectedTab, sort],
+    [activeProjects, query, type, phase, selectedTab, sort, scheduleFilter, reportingDate],
   )
 
   const pages = Math.max(1, Math.ceil(filtered.length / size))
@@ -88,21 +101,12 @@ export default function ActiveSites({
 
   const recorded = activeProjects.filter((p) => Number.isFinite(p.progress))
 
-  const scheduleFor = (p: SiteCard) =>
-    Number.isFinite(p.progress) &&
-    Number.isFinite(Date.parse(p.start)) &&
-    p.end &&
-    Number.isFinite(Date.parse(p.end))
-      ? timelineStatus(p)
-      : null
-
-  const schedules = recorded.map(scheduleFor).filter((s) => s !== null)
-
-  const onSchedule = schedules.filter((s) => s.label === "On schedule").length
+  const schedules = activeProjects.map(p => projectScheduleStatus(p, reportingDate)).filter(s => s.targetEndDate !== null)
+  const onSchedule = schedules.filter(s => s.status === "On schedule").length
 
   const attention = activeProjects.filter(
     (p) =>
-      (reviewAvailable && p.needsReview === true) || ["amber", "red"].includes(scheduleFor(p)?.tone || ""),
+      (reviewAvailable && p.needsReview === true) || projectScheduleStatus(p, reportingDate).status === "Delayed",
   ).length
 
   const open = (id: string) => {
@@ -119,6 +123,7 @@ export default function ActiveSites({
     setQuery("")
     setType("")
     setPhase("")
+    setScheduleFilter("")
     setPage(1)
   }
 
@@ -146,7 +151,7 @@ export default function ActiveSites({
               <span className="as-summary-icon" aria-hidden="true"><Icon name="calendar" size={25} /></span>
               <span>On schedule</span>
               <strong>{onSchedule}</strong>
-              <small>Planned timeline · {schedules.length} dated projects</small>
+              <small>Target date today or later · {schedules.length} dated projects</small>
             </div>
         )}
         {(schedules.length > 0 || reviewAvailable) && (
@@ -154,7 +159,7 @@ export default function ActiveSites({
               <span className="as-summary-icon" aria-hidden="true"><Icon name="alert" size={25} /></span>
               <span>Requiring attention</span>
               <strong>{attention}</strong>
-              <small>{reviewAvailable ? "Timeline delay or pending review" : "Based on planned timeline"}</small>
+              <small>{reviewAvailable ? "Past target date or pending review" : "Past target completion date"}</small>
             </div>
         )}
       </div>
@@ -220,6 +225,9 @@ export default function ActiveSites({
             <option value="end">Target date: earliest first</option>
           </select>
         </label>
+        <div className="as-schedule-filter"><span>Schedule status</span>
+          <Button icon="alert" variant={scheduleFilter ? "primary" : ""} aria-pressed={scheduleFilter === "delayed"} onClick={() => { setScheduleFilter(current => current ? "" : "delayed"); setPage(1) }}>Delayed</Button>
+        </div>
       </div>
       {recent.some((id) => activeProjects.some((p) => p.id === id)) && (
         <div className="as-recent">
@@ -259,9 +267,13 @@ export default function ActiveSites({
           <h2>{selectedTab === "review" ? "Projects awaiting review" : "All active projects"}</h2>
           <p role="status">{filtered.length ? `Showing ${(current - 1) * size + 1}-${Math.min(current * size, filtered.length)} of ${filtered.length} projects` : "0 projects"}</p>
         </div>
-        {(query || type || phase) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
+        <div className="as-layout" role="group" aria-label="Project layout">
+          <Button aria-pressed={layout === "cards"} onClick={() => setLayout("cards")} icon="grid">Cards</Button>
+          <Button aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="doc">List</Button>
+          {(query || type || phase || scheduleFilter) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
+        </div>
       </div>
-      <div className="as-grid">
+      {layout === "cards" ? <div className="as-grid">
         {visible.map((p) => (
           <article className="as-card" key={p.id}>
             <div className="as-card-body">
@@ -273,6 +285,8 @@ export default function ActiveSites({
               </div>
               <h2>{p.name}</h2>
               <p className="as-phase">{p.phase || "Phase not recorded"}</p>
+              <div className="as-schedule"><ScheduleStatusBadge project={p} today={reportingDate} /></div>
+              {showDelayNotice && <DelayedProjectNotice project={p} today={reportingDate} />}
               <div className="as-progress-label">
                 <span>Recorded progress</span>
                 <strong>
@@ -308,15 +322,22 @@ export default function ActiveSites({
             </div>
           </article>
         ))}
-      </div>
+      </div> : <div className="as-list-scroll" role="region" aria-label="Active projects list" tabIndex={0}><table className="as-list">
+        <thead><tr><th>Project</th><th>Current phase</th><th>Schedule status</th><th>Target completion</th><th>Details</th></tr></thead>
+        <tbody>{visible.map(p => {
+          const schedule = projectScheduleStatus(p, reportingDate)
+          return <tr key={p.id}><th scope="row">{p.name}</th><td>{p.phase || "Phase not recorded"}</td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
+        })}</tbody>
+      </table></div>}
       {!visible.length && (
         <Empty
           title={
-            query || type || phase ? "No matching projects" : selectedTab === "review" ? "No projects awaiting review" : "No active sites yet"
+            query || type || phase ? "No matching projects" : scheduleFilter ? "No delayed projects" : selectedTab === "review" ? "No projects awaiting review" : "No active sites yet"
           }
         >
           {query || type || phase
             ? "Try another name or clear the filters."
+            : scheduleFilter ? "No active projects in your access have passed their target completion date."
             : selectedTab === "review"
               ? "No pending progress updates or site issues in your authorized active projects."
               : "Authorized projects will appear here once activated."}
