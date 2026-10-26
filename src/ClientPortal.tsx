@@ -1,4 +1,5 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
+import useSidebarNavigation from "./useSidebarNavigation"
 import ClientOverview from "./ClientOverview"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -98,7 +99,7 @@ export default function ClientPortal({
   const [page, setPage] = useState("Project Overview")
   const [siteDetails, setSiteDetails] = useState(false)
   const [projectId, setProjectId] = useState(projects[0]?.id || "")
-  const [mobileNav, setMobileNav] = useState(false)
+  const navigation = useSidebarNavigation(!paused)
   const [bell, setBell] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [viewer, setViewer] = useState<Viewer>()
@@ -163,7 +164,7 @@ export default function ClientPortal({
     setSiteDetails(false)
     const target = normalizeWorkspacePage(next)
     setPage(NAV.some(([label]) => label === target) ? target : "Project Overview")
-    setMobileNav(false)
+    navigation.closeMobile()
     setBell(false)
     setError("")
   }
@@ -602,8 +603,8 @@ export default function ClientPortal({
     )
   }
   return (
-    <div className="app-shell client-portal">
-      <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+    <div className={`app-shell client-portal ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+      <aside id="client-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Client sidebar" aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="brand">
           <span className="brand-mark">
             10
@@ -612,6 +613,7 @@ export default function ClientPortal({
             Siteline<small>10 BUILDERS</small>
           </div>
         </div>
+        {navigation.compact && <Button className="client-nav-close" variant="icon-button" icon="close" aria-label="Close Client navigation" onClick={navigation.closeMobile} />}
         <div className="nav-group-label">YOUR PROJECT</div>
         <nav aria-label="Client navigation">
           {NAV.map(([label, icon]) => (
@@ -637,26 +639,32 @@ export default function ClientPortal({
               variant="icon-button"
               icon="logout"
               aria-label="Sign out"
-              onClick={onPause}
+              onClick={() => { navigation.closeMobile(); onPause() }}
             />
           </div>
         </div>
       </aside>
-      {mobileNav && (
-        <div
-          className="mobile-nav-backdrop"
-          onClick={() => setMobileNav(false)}
+      {navigation.compact && navigation.expanded && (
+        <button
+          type="button"
+          className="mobile-nav-backdrop client-nav-backdrop"
+          aria-label="Close Client navigation backdrop"
+          tabIndex={-1}
+          onClick={navigation.closeMobile}
         />
       )}
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
             <Button
-              className="mobile-menu"
+              ref={navigation.toggleRef}
+              className="sidebar-toggle"
               variant="icon-button"
-              icon="menu"
-              aria-label="Open Client navigation"
-              onClick={() => setMobileNav(!mobileNav)}
+              icon={navigation.expanded ? "close" : "menu"}
+              aria-label={navigation.expanded ? navigation.compact ? "Close Client navigation" : "Collapse Client navigation" : navigation.compact ? "Open Client navigation" : "Expand Client navigation"}
+              aria-expanded={navigation.expanded}
+              aria-controls="client-navigation"
+              onClick={navigation.toggle}
             />
             <span>Client Portal</span>
             <Icon name="chevron" size={14} />

@@ -1,4 +1,16 @@
 /* Client-only overview. No changes to staff dashboards or shared repository styles. */
+#root .client-portal .sidebar-toggle { display: inline-flex; flex: none; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
+#root .client-portal > .sidebar { transition: transform .18s ease-out; }
+#root .client-portal.sidebar-expanded > .sidebar { transform: translateX(0); visibility: visible; }
+#root .client-portal.sidebar-collapsed > .sidebar { transform: translateX(-100%); visibility: hidden; pointer-events: none; }
+#root .client-portal.sidebar-collapsed > .main-shell { margin-left: 0; width: 100%; }
+#root .client-portal > .main-shell { min-width: 0; }
+#root .client-portal .client-nav-close { position: absolute; top: 18px; right: 12px; min-width: 44px; width: 44px; height: 44px; }
+#root .client-portal .client-nav-backdrop { padding: 0; border: 0; border-radius: 0; }
+@media (max-width: 1000px) {
+  #root .client-portal > .main-shell { margin-left: 0; width: 100%; }
+  #root .client-portal > .sidebar .brand { padding-right: 62px; padding-left: 16px; gap: 8px; }
+}
 #root .client-portal .client-project-toolbar { margin-bottom: 12px; gap: 16px; }
 #root .client-portal .client-project-toolbar > .field { max-width: 680px; min-width: 0; }
 #root .client-portal .client-project-toolbar select { width: 100%; text-overflow: ellipsis; }
