@@ -1,6 +1,7 @@
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useSignOutConfirmation from "./useSignOutConfirmation"
+import { LoadingRoleProvider } from "./LoadingSkeleton"
 import ClientOverview from "./ClientOverview"
 import ClientSamplePhotos from "./ClientSamplePhotos"
 import { canShowClientPhotoExamples } from "./client-photo-examples"
@@ -608,7 +609,7 @@ export default function ClientPortal({
     )
   }
   return (
-    <div className={`app-shell client-portal ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+    <LoadingRoleProvider role="client"><div className={`app-shell client-portal ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
       <aside id="client-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Client sidebar" aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="brand">
           <span className="brand-mark">
@@ -841,7 +842,7 @@ export default function ClientPortal({
           </div>
         </div>
       )}
-    </div>
+    </div></LoadingRoleProvider>
   )
 }
 function ClientPhoto({

@@ -2740,7 +2740,7 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole} />
+  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)} />
   if (signedOut && restoreError)
     return (
       <main className="session-restore" aria-busy={checkingSession}>
