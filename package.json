@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
+    "build:demo": "vite build --mode extension-demo",
     "preview": "vite preview",
     "format": "oxfmt",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",

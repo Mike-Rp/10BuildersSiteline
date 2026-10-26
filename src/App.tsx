@@ -1,3 +1,5 @@
+import ExtensionDemo from "./ExtensionDemo"
+import ExtensionWorkflow from "./ExtensionWorkflow"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
@@ -1392,6 +1394,7 @@ function AppInner() {
           {pageHeading(
             "Active sites",
           )}
+          <ExtensionWorkflow actor={actor} />
           <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
@@ -3375,5 +3378,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return <AppInner />
+  return <ExtensionDemo><AppInner /></ExtensionDemo>
 }

@@ -1,3 +1,4 @@
+import ExtensionWorkflow from "./ExtensionWorkflow"
 import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
@@ -188,6 +189,7 @@ type RoleDialog = {
 export default function RoleWorkspace({
   state,
   actor,
+  extensionDemo = false,
   welcomeGreeting,
   notificationSave,
   onCommand,
@@ -202,6 +204,7 @@ export default function RoleWorkspace({
 }: {
   state: State
   actor: Account
+  extensionDemo?: boolean
   welcomeGreeting?: LoginGreeting
   notificationSave?: NotificationSaveState
   onCommand: (command: WorkflowCommand) => Result | Promise<Result>
@@ -216,10 +219,11 @@ export default function RoleWorkspace({
 }) {
   const isOpm = actor.role === "opm"
   useListMemory()
-  const nav = isOpm ? OPM_NAV : SPM_NAV
+  const roleNav = isOpm ? OPM_NAV : SPM_NAV
+  const nav = extensionDemo ? roleNav.filter(([label]) => ["Active sites", "Deadlines"].includes(label)) : roleNav
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
-  const [page, setPage] = useState("Dashboard")
+  const [page, setPage] = useState(extensionDemo ? isOpm ? "Deadlines" : "Active sites" : "Dashboard")
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -2102,6 +2106,7 @@ export default function RoleWorkspace({
         {header(
           "Active sites",
         )}
+        <ExtensionWorkflow actor={actor} />
         <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
@@ -2109,6 +2114,7 @@ export default function RoleWorkspace({
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
           renderActions={id => {
             const p = allActive.find(site => site.id === id)!
+            if (extensionDemo) return <Button onClick={() => setDialog({ kind: "project", projectId: id })}>View extension requests</Button>
             return isOpm ? <>
               <Button icon="bell" disabled={saving} onClick={async () => {
                 await act({ type: "request_update", projectId: id }, "Site PM update reminder recorded.")
@@ -2120,7 +2126,7 @@ export default function RoleWorkspace({
               requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
             }}>Open phase workspace</Button> : null
           }} />
-        {!isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
+        {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
           <Panel title={`${picked.name} - Phase workspace`}>{progressForm(picked)}</Panel>
         </div>}
       </>
@@ -3149,8 +3155,10 @@ export default function RoleWorkspace({
   }
   function projectDetail(p: Project) {
     const work = workflowFor(p)
+    if (extensionDemo) return <ExtensionWorkflow actor={actor} projectId={p.id} />
     return (
       <>
+        <ExtensionWorkflow actor={actor} projectId={p.id} />
         <div className="detail-hero">
           <span className="project-symbol">
             <Icon name="building" size={28} />
@@ -3549,6 +3557,7 @@ export default function RoleWorkspace({
             {header(
               "Deadlines & follow-ups",
             )}
+            <ExtensionWorkflow actor={actor} />
             <Panel
               title="Upcoming responsibilities"
               subtitle="Timers run while SITELINE is open and are checked again on reload."
@@ -3681,7 +3690,7 @@ export default function RoleWorkspace({
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-person">
-            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
+            <button className="topbar-avatar avatar" aria-label="View my profile" disabled={extensionDemo} onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
             <span>
               <strong>{actor.name}</strong>
               <small>{ROLE_NAMES[actor.role]}</small>
@@ -3744,7 +3753,7 @@ export default function RoleWorkspace({
                 </div>
               )}
             </div>
-            <button className="topbar-avatar avatar" aria-label="View my profile" onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
+            <button className="topbar-avatar avatar" aria-label="View my profile" disabled={extensionDemo} onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
           </div>
         </header>
         <main className="main-content">

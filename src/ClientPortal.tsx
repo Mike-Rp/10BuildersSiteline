@@ -1,3 +1,4 @@
+import ExtensionWorkflow from "./ExtensionWorkflow"
 import ClientOverview from "./ClientOverview"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -443,11 +444,12 @@ export default function ClientPortal({
   }
   function overview() {
     if (!project) return null
-    return <ClientOverview project={project} latest={history[0]} photos={photos(true)} onNavigate={navigate} onDetails={() => setSiteDetails(true)} />
+    return <><ExtensionWorkflow actor={{ ...actor, role: "client" }} projectId={project.id} /><ClientOverview project={project} latest={history[0]} photos={photos(true)} onNavigate={navigate} onDetails={() => setSiteDetails(true)} /></>
   }
   function projectDetails() {
     if (!project) return null
     return <>
+      <ExtensionWorkflow actor={{ ...actor, role: "client" }} projectId={project.id} />
       <dl className="client-project-facts">
         <div><dt>Project type</dt><dd>{project.type}</dd></div>
         <div><dt>Location</dt><dd>{project.location || "Not set"}</dd></div>

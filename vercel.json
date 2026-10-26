@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "npm ci && npm --prefix Thesis-Backend ci --omit=dev",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:demo",
   "outputDirectory": "dist",
   "regions": ["sin1"],
   "functions": {
