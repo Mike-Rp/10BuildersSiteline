@@ -1,4 +1,6 @@
 import { useState } from "react"
+import TradeAllocationPanel, { TradeAllocationOverview } from "./TradeAllocationPanel"
+import { tradeAllocationEnabled } from "./subcontractor-allocation"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { Upload } from "./panels"
 import { AgreementPreviewModal } from "./ClientSubconReview"
@@ -72,6 +74,7 @@ export function SubcontractorAllocationReadOnly({
     : undefined
   const log = current?.contactLog || (current?.contactAt ? [current.contactAt] : [])
   const declined = work.selections.filter((s) => s.status === "declined")
+  if (tradeAllocationEnabled(state, project)) return <TradeAllocationOverview state={state} project={project} />
   const nameOf = (id: string) =>
     state.companies.find((c) => c.id === id)?.name || "Company record unavailable"
   return (
@@ -148,7 +151,12 @@ export function SubcontractorAllocationReadOnly({
     </div>
   )
 }
-export default function LeadSubcontractorPanel({
+export default function LeadSubcontractorPanel(props: Parameters<typeof LegacyLeadSubcontractorPanel>[0]) {
+  return tradeAllocationEnabled(props.state, props.project)
+    ? <TradeAllocationPanel key={props.project.id + ":" + (props.project.subcontractorAllocation?.revision || 0)} {...props} />
+    : <LegacyLeadSubcontractorPanel {...props} />
+}
+function LegacyLeadSubcontractorPanel({
   state,
   project,
   actor,

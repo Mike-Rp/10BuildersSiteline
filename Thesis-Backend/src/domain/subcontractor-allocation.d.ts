@@ -1,0 +1,15 @@
+export type AllocationCandidate = { id: string; name: string; status: string; disciplines: string[]; reviewed: boolean; unavailable: boolean; commitments: number; declined: boolean };
+export type AllocationCoverage = { phase: string; discipline: string; companyId: string };
+export type AllocationPlan = { companyIds: string[]; coverage: AllocationCoverage[] };
+export type AllocationPhase = { name: string; disciplines: string[] };
+export const COMPANY_REQUIREMENTS: Readonly<Record<string, number>>;
+export function requiredCompanies(type: string): number;
+export function eligibility(company?: AllocationCandidate): string;
+export function scopeFor(plan: AllocationPlan, companyId: string): AllocationCoverage[];
+export function requirementsFor(phases: AllocationPhase[]): Omit<AllocationCoverage, "companyId">[];
+export function buildCoverage(phases: AllocationPhase[], companies: AllocationCandidate[]): AllocationCoverage[];
+export function validatePlan(type: string, phases: AllocationPhase[], plan: AllocationPlan, companies: AllocationCandidate[]): true;
+export function protectScope(oldPlan: AllocationPlan, nextPlan: AllocationPlan, protectedIds: string[]): void;
+export function replacementCandidates(plan: AllocationPlan, companyId: string, companies: AllocationCandidate[]): AllocationCandidate[];
+export function replaceCompany<T extends AllocationPlan>(plan: T, companyId: string, replacementId: string): T;
+export function recommendTeam(type: string, phases: AllocationPhase[], companies: AllocationCandidate[]): AllocationPlan | null;

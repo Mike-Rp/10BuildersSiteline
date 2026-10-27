@@ -13,6 +13,7 @@ const SORTS = {
  
 export const LIST_SELECT = `
   p.id, p.name, p.client_name, pt.code AS project_type,
+  coalesce((to_jsonb(p)->>'subcontractor_allocation_version')::int,0) as subcontractor_allocation_version,
   p.floor_area_sqm, p.floor_count, p.target_start_date, p.target_end_date, p.location,
   p.current_stage_id, ps.code AS current_stage, phase_progress.pct AS current_pct,
   phase_progress.approved_count AS checklist_approved_count, phase_progress.required_count AS checklist_required_count,

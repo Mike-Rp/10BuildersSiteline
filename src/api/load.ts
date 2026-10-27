@@ -112,7 +112,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     projects,
     companies: subcontractors.map((s) => {
       const mapped = mapCompany(s, projectIdsByName), metadata = workspace.companies?.[s.id] || {}
-      return { ...mapped, ...metadata, ...(Array.isArray(metadata.manpowerRoster) ? {
+        return { ...mapped, ...metadata, commitmentCount: mapped.commitmentCount, primaryTrade: mapped.primaryTrade, rosterDisciplines: mapped.rosterDisciplines, activeProjectIds: mapped.activeProjectIds, ...(Array.isArray(metadata.manpowerRoster) ? {
         manpowerCount: mapped.manpowerCount, availability: mapped.availability, activeProjectIds: mapped.activeProjectIds,
       } : {}) }
     }),
@@ -140,6 +140,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   loaded.userPreferences = { [me.id]: [...loaded.muted] }
   loaded.portalReads = { [me.id]: preferences.readNoticeIds || [] }
   loaded.backendPhases=workspace.backendPhases
+  loaded.tradeAllocationAvailable=workspace.tradeAllocationAvailable
   loaded.referenceDisciplines=workspace.referenceDisciplines
   for(const account of loaded.accounts)for(const doc of account.docs)if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")
   for(const company of loaded.companies)for(const doc of [...company.documents,...company.manpowerDocuments])if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")

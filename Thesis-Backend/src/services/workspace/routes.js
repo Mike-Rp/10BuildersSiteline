@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
 import { mirrorLegacyNotifications, mirrorLegacyReads } from "../notifications/notification.utility.js";
@@ -26,6 +27,7 @@ router.post("/reports/monthly-summary/export", exportMonthlySummary);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
+    "save_allocation_plan", "auto_allocate_company", "release_allocation_company",
     "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
     if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
@@ -175,7 +177,8 @@ router.get("/workspace", endpoint(null, async (db, user) => {
  (select to_jsonb(l) from user_licenses l where l.user_id=u.id and l.superseded_at is null order by l.created_at desc limit 1) as license,
  array(select c.code from user_certifications x join certification_types c on c.id=x.certification_type_id where x.user_id=u.id) as certifications
  from users u where not coalesce(u.is_deleted,false)`)).rows : [];
-    return { backendPhases, referenceDisciplines, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
+    const tradeAllocationAvailable = (await db.query("select exists(select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='subcontractor_allocation_version') as ready")).rows[0].ready;
+    return { backendPhases, referenceDisciplines, tradeAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
         rules: (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules,
         preferences: accountMeta.find(a => a.id === user.id)?.metadata?.preferences,
         projects: map(projectMeta), accounts: map(accountMeta), companies: map(companyMeta), selections };
@@ -360,6 +363,13 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
         })]);
     return {};
 }));
+router.put("/subcontractors/:id/capabilities", endpoint(["admin"], async (db, user, req) => {
+    if (!isUuid(req.params.id) || !(await db.query("select 1 from subcontractors where id=$1 and not coalesce(is_deleted,false)", [req.params.id])).rowCount)
+        throw new HttpError(404, "Company not found.");
+    const review = await saveCapabilityReview(db, user, req.params.id, req.body);
+    await event(db, user, null, "Company capabilities reviewed", req.params.id + ": " + review.disciplines.join(", "));
+    return review;
+}));
 router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), b = req.body;
     for (const d of b.docs || [])
@@ -403,6 +413,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "contact_company": {
             leader();
+            if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
             const current = (await db.query("select * from project_subcontractor_selections where project_id=$1 and status in ('contacted','accepted')", [p.id])).rows[0];
             if (current)
                 throw new HttpError(409, "This project already has a subcontractor in progress.");
@@ -418,8 +429,15 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "respond_company": {
             leader();
+            if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
             if (typeof c.accepted !== "boolean")
                 throw new HttpError(400, "An explicit company response is required.");
+            if (c.accepted) {
+                await db.query("select id from subcontractors where id=$1 order by id for update", [c.companyId]);
+                const count = (await db.query(`select count(*)::int as n from (${COMMITMENTS_SQL}) x join projects p on p.id=x.project_id
+                    where x.subcontractor_id=$1 and p.id<>$2 and not coalesce(p.is_deleted,false) and p.lifecycle_status<>'archived'`, [c.companyId, p.id])).rows[0].n;
+                if (count >= 2) throw new HttpError(409, "This company already has two project commitments.");
+            }
             const changed = await db.query("update project_subcontractor_selections set status=$3,responded_at=now() where project_id=$1 and subcontractor_id=$2 and status='contacted' returning *", [p.id, c.companyId, c.accepted ? "accepted" : "declined"]);
             if (!changed.rowCount)
                 throw new HttpError(409, "Contact this company before recording its response.");
@@ -427,11 +445,18 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "archive_company": {
             leader();
+            if (usesTradeAllocation(p, meta)) throw new HttpError(409, "Use the allocation plan to replace an uncontacted or declined company.");
             const removed = await db.query("update project_subcontractor_selections set status='archived' where project_id=$1 and subcontractor_id=$2 and status='proposed' returning *", [p.id, c.companyId]);
             if (!removed.rowCount)
                 throw new HttpError(409, "A contacted or accepted company cannot be archived.");
             break;
         }
+        case "save_allocation_plan":
+        case "auto_allocate_company":
+        case "release_allocation_company":
+            leader();
+            await allocationCommand(db, p, meta, user, c);
+            break;
         case "acknowledge_client_subcon":
             leader();
             if (!meta.clientSubcon || !meta.extraDocs?.some(d => d.label === "Client & Subcontractor Agreement") || meta.clientSubconReview?.issues?.some(i => i.status === "open"))
@@ -462,7 +487,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 throw new HttpError(409, "Only an intake under Site PM review can be activated.");
             if (c.type === "upload_agreement")
                 await linkDocument(db, user, p, "subcontractor_agreement", c.doc?.id);
-            else if (!meta.clientSubcon)
+            else if (!meta.clientSubcon || usesTradeAllocation(p, meta))
                 throw new HttpError(409, "Upload the signed subcontractor agreement to activate this project.");
             const client = await db.query("select u.id from user_client_project_links l join users u on u.id=l.user_id join roles r on r.id=u.role_id where l.project_id=$1 and r.code='client' and u.status in ('active','invited') and not coalesce(u.is_deleted,false)", [p.id]);
             if (client.rowCount !== 1)
@@ -470,15 +495,20 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             // Assignment and activation happen only after the database validates prerequisites.
             const required = await db.query("select count(*)::int as n from project_documents d join document_types t on t.id=d.document_type_id where d.project_id=$1 and d.status='uploaded' and t.code=any($2::text[])", [p.id, codes.slice(0, 6)]);
             const team = await db.query("select 1 from project_phase_team where project_id=$1 and status<>'confirmed'", [p.id]);
-            if (required.rows[0].n !== 6 || team.rowCount)
+            if (required.rows[0].n !== 6 || team.rowCount || !(await db.query("select 1 from project_phase_team where project_id=$1", [p.id])).rowCount)
                 throw new HttpError(409, "All six documents and team confirmations are required.");
             const selected = (await db.query("select s.*,c.trade_id from project_subcontractor_selections s join subcontractors c on c.id=s.subcontractor_id where s.project_id=$1 and s.status='accepted'", [p.id])).rows[0];
-            if (meta.clientSubcon && (!meta.clientSubconReview?.acknowledgedAt || meta.clientSubconReview?.issues?.some(i => i.status === "open")))
+            if (!usesTradeAllocation(p, meta) && meta.clientSubcon && (!meta.clientSubconReview?.acknowledgedAt || meta.clientSubconReview?.issues?.some(i => i.status === "open")))
                 throw new HttpError(409, "The client agreement needs acknowledgment with no open issues.");
             if (!selected && !meta.clientSubcon)
                 throw new HttpError(409, "A subcontractor must accept before activation.");
             let assigned = 0;
-            if (selected) {
+            if (usesTradeAllocation(p, meta)) {
+                const ids = await validateAllocationActivation(db, p, meta, c);
+                for (const id of ids) await db.query(`insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count,created_by)
+                    select $1,id,trade_id,0,$3 from subcontractors where id=$2`, [p.id, id, user.id]);
+                assigned = (await db.query("select count(*)::int as n from subcontractor_workers where current_project_id=$1 and availability_status='assigned'", [p.id])).rows[0].n;
+            } else if (selected) {
                 const workers = await db.query("select id from subcontractor_workers where subcontractor_id=$1 and status='active' and availability_status='available' order by id limit $2 for update", [selected.subcontractor_id, p.crew_required || 0]);
                 if (workers.rowCount < (p.crew_required || 0))
                     throw new HttpError(409, "The company has insufficient available workers.");

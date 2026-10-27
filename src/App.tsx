@@ -49,6 +49,8 @@ import {
 import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
+import CompanyCapabilities from "./CompanyCapabilities"
+import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
 import {
   clientProjectViews,
@@ -2145,6 +2147,7 @@ function AppInner() {
               </div>
             </div>
             <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
+            {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
             <div className="phase-timeline">
               {phases.map((phase, i) => (
@@ -2688,6 +2691,11 @@ function AppInner() {
           </div>
         </div>
         <p className="section-description">{c.note}</p>
+        {actor.role === "admin" && <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines || []} onSave={async review => {
+          await api("/subcontractors/" + c.id + "/capabilities", { method: "PUT", json: review })
+          await reloadWorkspace()
+          setToast("Company capabilities reviewed")
+        }} />}
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">

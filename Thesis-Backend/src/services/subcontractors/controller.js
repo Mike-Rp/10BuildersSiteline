@@ -1,4 +1,5 @@
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
+import { COMMITMENTS_SQL } from "../workspace/subcontractor-allocation.utility.js";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -69,6 +70,8 @@ commitments AS (
   SELECT w.subcontractor_id, w.current_project_id
     FROM subcontractor_workers w
    WHERE w.status = 'active' AND w.availability_status = 'assigned' AND w.current_project_id IS NOT NULL
+  UNION
+  SELECT s.subcontractor_id, s.project_id FROM project_subcontractor_selections s WHERE s.status='accepted'
 ),
 load AS (
   SELECT c.subcontractor_id,
@@ -197,6 +200,7 @@ export const getSubcontractors = async (req, res) => {
       license_status: r.license_status,
       availability: r.availability,
       is_busy: r.is_busy,
+      commitment_count: r.project_count,
       assigned_projects: r.assigned_projects,
       committed_until: r.committed_until,
       discipline_rosters: r.disciplines.map((d) => ({ discipline: d, laborers_on_file: laborersByDiscipline.get(d) ?? 0 })),
@@ -335,7 +339,7 @@ export const updateWorker = async (req, res) => {
     const data = await withTransaction(async (client) => {
       const db = (sql, params) => client.query(sql, params);
       const found = await client.query(
-        `SELECT id, availability_status, current_project_id FROM subcontractor_workers WHERE id = $1 FOR UPDATE`, [id]);
+        `SELECT id, subcontractor_id, availability_status, current_project_id FROM subcontractor_workers WHERE id = $1 FOR UPDATE`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Worker not found.");
       const w = found.rows[0];
 
@@ -357,9 +361,20 @@ export const updateWorker = async (req, res) => {
           throw new HttpError(409, "Worker is already assigned to another project. Set them 'available' first.");
         }
         const p = await client.query(
-          `SELECT lifecycle_status FROM projects WHERE id = $1 AND COALESCE(is_deleted,false) = false`, [target]);
+          `SELECT lifecycle_status,coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')::int,0) as allocation_version FROM projects WHERE id = $1 AND COALESCE(is_deleted,false) = false`, [target]);
         if (p.rowCount === 0) throw new HttpError(404, "Project not found.");
         if (p.rows[0].lifecycle_status === "archived") throw new HttpError(422, "Cannot assign to an archived project.");
+        if (p.rows[0].allocation_version === 1) {
+          if (!(await hasProjectAccess(user,target,client))) throw new HttpError(404,"Project not found.");
+          const accepted=await client.query(`select 1 from project_subcontractor_assignments a join project_subcontractor_selections s
+            on s.project_id=a.project_id and s.subcontractor_id=a.subcontractor_id and s.status='accepted'
+            where a.project_id=$1 and a.subcontractor_id=$2 and a.status='active'`,[target,w.subcontractor_id]);
+          if(p.rows[0].lifecycle_status!=="active" || !accepted.rowCount) throw new HttpError(409,"Activate the complete accepted company allocation before recording worker assignments.");
+        }
+        await client.query("select id from subcontractors where id=$1 for update",[w.subcontractor_id]);
+        const commitments=await client.query(`select count(*)::int as n from (${COMMITMENTS_SQL}) c join projects p on p.id=c.project_id
+          where c.subcontractor_id=$1 and p.id<>$2 and not coalesce(p.is_deleted,false) and p.lifecycle_status<>'archived'`,[w.subcontractor_id,target]);
+        if(commitments.rows[0].n>=2) throw new HttpError(409,"This company already has two project commitments.");
         set("availability_status", "assigned");
         set("current_project_id", target);
         if (b.current_project_until !== undefined) set("current_project_until", b.current_project_until);
@@ -568,8 +583,13 @@ export const approveRequest = async (req, res) => {
       if (found.rowCount === 0) throw new HttpError(404, "Request not found.");
       const r = found.rows[0];
       if (!(await isProjectOpmOrAdmin(user, r.project_id, client))) throw new HttpError(404, "Request not found.");
-      const project=await client.query("SELECT lifecycle_status FROM projects WHERE id=$1 FOR UPDATE",[r.project_id]);
+      const project=await client.query("SELECT lifecycle_status,coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')::int,0) as allocation_version FROM projects WHERE id=$1 FOR UPDATE",[r.project_id]);
       if(project.rows[0]?.lifecycle_status==="archived") throw new HttpError(409,"Archived projects are read-only.");
+      if(project.rows[0]?.allocation_version===1) throw new HttpError(409,"Use the Lead Site PM trade allocation and company response workflow for this project.");
+      await client.query("select id from subcontractors where id=$1 for update",[r.subcontractor_id]);
+      const commitments=await client.query(`select count(*)::int as n from (${COMMITMENTS_SQL}) c join projects p on p.id=c.project_id
+        where c.subcontractor_id=$1 and p.id<>$2 and not coalesce(p.is_deleted,false) and p.lifecycle_status<>'archived'`,[r.subcontractor_id,r.project_id]);
+      if(commitments.rows[0].n>=2) throw new HttpError(409,"This company already has two project commitments.");
       if (r.status !== "pending") throw new HttpError(409, `Request is already ${r.status}.`);
 
       const active = await client.query(
@@ -675,6 +695,8 @@ export const releaseAssignment = async (req, res) => {
       const a = found.rows[0];
       if (!(await isProjectOpmOrAdmin(user, a.project_id, client))) throw new HttpError(404, "Assignment not found.");
       if (a.status !== "active") throw new HttpError(409, "Assignment is already released.");
+      const allocation=(await client.query("select metadata->'subcontractorAllocation' as plan from workspace_project_metadata where project_id=$1",[a.project_id])).rows[0]?.plan;
+      if(allocation) throw new HttpError(409,"Use formal release in the project allocation so future phase commitments remain protected.");
 
       await client.query(
         `UPDATE project_subcontractor_assignments

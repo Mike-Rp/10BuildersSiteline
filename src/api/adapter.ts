@@ -303,6 +303,7 @@ export function mapProject(parts: ProjectParts): Project {
     ...(parts.handoffReadiness ? { handoffReadiness: parts.handoffReadiness } : {}),
     id,
     name: list.name,
+    subcontractorAllocationVersion: Number(list.subcontractor_allocation_version || 0),
     type: list.project_type,
     area: formatArea(list.floor_area_sqm),
     floors:
@@ -338,7 +339,7 @@ export function mapProject(parts: ProjectParts): Project {
   Object.assign(project,detail.workspace||{})
   if(detail.workspace?.activation)workflow.activation=detail.workspace.activation
   for(const d of detail.workspace?.extraDocs||[]){project.docs.push(d);register(d.id,"/api/v1/files/"+d.id+"/content")}
-  if(detail.selections?.length)workflow.selections=detail.selections.map((s:Dto)=>({companyId:s.subcontractor_id,status:s.status,contactAt:s.contacted_at,responseAt:s.responded_at}))
+  if(detail.selections?.length)workflow.selections=detail.selections.map((s:Dto)=>({companyId:s.subcontractor_id,status:s.status === "proposed" ? "selected" : s.status,contactAt:s.contacted_at,responseAt:s.responded_at}))
   if (clientAgreement?.subcontractor_name)
     project.clientSubcon = clientAgreement.subcontractor_name
   if (list.lifecycle_status === "archived")
@@ -365,6 +366,9 @@ export function mapCompany(
   return {
     id: s.id,
     name: s.company_name,
+    primaryTrade: s.trade,
+    rosterDisciplines: s.disciplines || [],
+    ...(s.commitment_count == null ? {} : { commitmentCount: Number(s.commitment_count) }),
     contact: typeof person === "string" ? person : person?.name || "",
     phone: s.contact_phone || "",
     email: s.contact_email || "",

@@ -1,0 +1,609 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import fs from "node:fs"
+import net from "node:net"
+import { spawn } from "node:child_process"
+import { randomUUID } from "node:crypto"
+import { fileURLToPath } from "node:url"
+import { PGlite } from "@electric-sql/pglite"
+import { citext } from "@electric-sql/pglite/contrib/citext"
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
+import { api, login, setApiBase, setToken } from "../src/api/client.ts"
+import { loadState } from "../src/api/load.ts"
+import { uploadFile } from "../src/api/actions.ts"
+import {
+  replacementCandidates,
+  replaceCompany,
+} from "../Thesis-Backend/src/domain/subcontractor-allocation.js"
+import { allocationCandidates } from "../src/subcontractor-allocation.ts"
+
+const here = (p) => fileURLToPath(new URL(p, import.meta.url))
+const port = () =>
+  new Promise((resolve) => {
+    const server = net.createServer().listen(0, "127.0.0.1", () => {
+      const n = server.address().port
+      server.close(() => resolve(n))
+    })
+  })
+test(
+  "trade allocation persists through the real API with protected scope, manual consent, capacity and activation gates",
+  { timeout: 120000 },
+  async (t) => {
+    const db = new PGlite({ extensions: { citext } })
+    let socket, child
+    t.after(async () => {
+      if (child) {
+        const exited = new Promise((resolve) => child.once("exit", resolve))
+        child.kill()
+        await exited
+      }
+      if (socket) await socket.stop()
+      await db.close()
+    })
+    await db.exec(
+      "create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;",
+    )
+    await db.exec(
+      fs
+        .readFileSync(
+          here(
+            "../supabase/migrations/20261017000002_thesis_backend_schema.sql",
+          ),
+          "utf8",
+        )
+        .replace(/^create extension if not exists pgcrypto.*$/m, ""),
+    )
+    for (const name of [
+      "001-phase-checklists.sql",
+      "002-phase-update-confirmation.sql",
+      "003-react-integration.sql",
+      "004-verified-activity-progress.sql",
+      "009-engineer-license-workflow.sql",
+      "008-monthly-report-history.sql",
+      "010-photo-release.sql",
+    ])
+      await db.exec(
+        fs.readFileSync(here("../Thesis-Backend/migrations/" + name), "utf8"),
+      )
+    await db.exec(
+      fs.readFileSync(here("../supabase/seed/dummy-data.sql"), "utf8"),
+    )
+    await db.exec(
+      "update user_licenses set license_expiry=current_date+400 where superseded_at is null",
+    )
+    const migration = fs.readFileSync(
+      here(
+        "../Thesis-Backend/migrations/013-trade-subcontractor-allocation.sql",
+      ),
+      "utf8",
+    )
+    await db.exec(migration)
+    await db.exec(migration)
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from projects where subcontractor_allocation_version<>0",
+        )
+      ).rows[0].n,
+      0,
+      "legacy rows must not be enrolled automatically",
+    )
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from pg_indexes where indexname='one_current_subcontractor_selection'",
+        )
+      ).rows[0].n,
+      0,
+    )
+    const source = (
+      await db.query(
+        "select p.*,u.email as lead_email,t.spm_user_id from projects p join project_phase_team t on t.project_id=p.id and t.is_lead join users u on u.id=t.spm_user_id where p.name like 'Alden Heights%' limit 1",
+      )
+    ).rows[0]
+    assert.ok(source)
+    const projectId = randomUUID()
+    // A new intake uses the column default; its data is confined to this disposable database.
+    await db.query(
+      `insert into projects select (jsonb_populate_record(null::projects,to_jsonb(p)||jsonb_build_object('id',$2::text,'name','Trade allocation test intake','lifecycle_status','spm_review','subcontractor_allocation_version',1))).* from projects p where id=$1`,
+      [source.id, projectId],
+    )
+    await db.query(
+      "insert into project_phase_team(project_id,project_stage_id,spm_user_id,is_lead,status) select $2,project_stage_id,spm_user_id,is_lead,'confirmed' from project_phase_team where project_id=$1",
+      [source.id, projectId],
+    )
+    await db.query(
+      "insert into project_documents(project_id,document_type_id,status) select $1,id,'uploaded' from document_types where code=any($2::text[])",
+      [
+        projectId,
+        [
+          "notice_to_proceed",
+          "building_permit",
+          "owner_contract",
+          "registered_plans",
+          "environmental_certificate",
+          "budget_boq",
+        ],
+      ],
+    )
+    await db.query(
+      "insert into user_client_project_links(user_id,project_id) select user_id,$2 from user_client_project_links where project_id=$1",
+      [source.id, projectId],
+    )
+    // The legacy seed may not link an actual client to this intake.
+    if (
+      !(
+        await db.query(
+          "select 1 from user_client_project_links where project_id=$1",
+          [projectId],
+        )
+      ).rows.length
+    )
+      await db.query(
+        "insert into user_client_project_links(user_id,project_id) select u.id,$1 from users u join roles r on r.id=u.role_id where r.code='client' and u.status='active' limit 1",
+        [projectId],
+      )
+    const companyIds = (
+      await db.query(
+        "select id from subcontractors where directory_status='approved' order by company_name limit 3",
+      )
+    ).rows.map((c) => c.id)
+    assert.equal(companyIds.length, 3)
+    // Free only the test partners' legacy reservations so the acceptance scenarios are independent.
+    await db.query(
+      "update project_subcontractor_assignments set status='released' where subcontractor_id=any($1::uuid[])",
+      [companyIds],
+    )
+    await db.query(
+      "update subcontractor_workers set availability_status='available',current_project_id=null where subcontractor_id=any($1::uuid[])",
+      [companyIds],
+    )
+    const dbPort = await port(),
+      apiPort = await port()
+    socket = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
+    await socket.start()
+    child = spawn(process.execPath, ["src/index.js"], {
+      cwd: here("../Thesis-Backend/"),
+      env: {
+        ...process.env,
+        NODE_ENV: "development",
+        DB_SERVER: "127.0.0.1",
+        DB_PORT: String(dbPort),
+        DB_NAME: "postgres",
+        DB_USER: "postgres",
+        DB_PASSWORD: "x",
+        DB_POOL_MAX: "1",
+        PGSSLMODE: "disable",
+        JWT_SECRET: "allocation-test-only-secret-0123456789",
+        PORT: String(apiPort),
+        HOST: "127.0.0.1",
+        ARCHIVE_MAINTENANCE_ENABLED: "false",
+      },
+      stdio: "ignore",
+    })
+    setApiBase(`http://127.0.0.1:${apiPort}/api/v1`)
+    const until = Date.now() + 30000
+    while (true) {
+      try {
+        if ((await fetch(`http://127.0.0.1:${apiPort}/api/v1/health`)).ok) break
+      } catch {}
+      if (Date.now() > until) throw new Error("API did not start")
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    async function as(email) {
+      setToken("")
+      return login(email, "Password@123", true)
+    }
+    let user = await as("patricia.domingo@10builders.com")
+    const disciplines = (
+      await db.query("select code from disciplines order by code")
+    ).rows.map((d) => d.code)
+    for (const id of companyIds) {
+      const fileId = randomUUID()
+      await uploadFile(
+        fileId,
+        new File(
+          [
+            Buffer.from(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6L8AAAAASUVORK5CYII=",
+              "base64",
+            ),
+          ],
+          "company-record.png",
+          { type: "image/png" },
+        ),
+      )
+      await db.query(
+        "insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2) on conflict(subcontractor_id) do update set metadata=excluded.metadata",
+        [
+          id,
+          JSON.stringify({
+            documents: [
+              { id: fileId, uploaded: true, name: "company-record.png" },
+            ],
+          }),
+        ],
+      )
+      await api(`/subcontractors/${id}/capabilities`, {
+        method: "PUT",
+        json: {
+          disciplines,
+          unavailable: false,
+          documentIds: [fileId],
+          note: "Reviewed the supporting company capability records in this test.",
+        },
+      })
+      const saved = (
+        await db.query(
+          "select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1",
+          [id],
+        )
+      ).rows[0].review
+      assert.equal(saved.reviewedById, user.id)
+      assert.notEqual(saved.reviewedAt, "")
+    }
+    await assert.rejects(
+      api(`/projects/${projectId}/workspace-command`, {
+        method: "POST",
+        json: { type: "auto_allocate_company", allocationRevision: 0 },
+      }),
+      /Lead Site PM/,
+    )
+    user = await as(source.lead_email)
+    await assert.rejects(
+      api(`/subcontractors/${companyIds[0]}/capabilities`, {
+        method: "PUT",
+        json: {},
+      }),
+      /permission|allowed|Administrator|Forbidden|access/i,
+    )
+    const command = (json) =>
+      api(`/projects/${projectId}/workspace-command`, { method: "POST", json })
+    await command({ type: "auto_allocate_company", allocationRevision: 0 })
+    let state = await loadState(user),
+      project = state.projects.find((p) => p.id === projectId),
+      plan = project.subcontractorAllocation
+    assert.equal(plan.companyIds.length, 2)
+    assert.equal(project.subcontractorAllocationVersion, 1)
+    assert.equal(
+      project.workflow.selections.filter((s) => s.status === "selected").length,
+      2,
+      "proposed status maps to frontend selected",
+    )
+    const acceptedId = plan.companyIds[0],
+      declinedId = plan.companyIds[1]
+    await assert.rejects(
+      command({
+        type: "respond_company",
+        companyId: acceptedId,
+        accepted: true,
+        allocationRevision: 1,
+        note: "No contact yet",
+      }),
+      /Contact this company first/,
+    )
+    await command({
+      type: "contact_company",
+      companyId: acceptedId,
+      allocationRevision: 1,
+      note: "Contacted representative by phone",
+    })
+    const concurrent = await Promise.allSettled(
+      [1, 2].map(() =>
+        command({
+          type: "respond_company",
+          companyId: acceptedId,
+          accepted: true,
+          allocationRevision: 2,
+          note: "Representative accepted this scope",
+        }),
+      ),
+    )
+    assert.equal(
+      concurrent.filter((r) => r.status === "fulfilled").length,
+      1,
+      "concurrent duplicate acceptance is recorded once",
+    )
+    await command({
+      type: "contact_company",
+      companyId: declinedId,
+      allocationRevision: 3,
+      note: "Contacted second company",
+    })
+    await command({
+      type: "respond_company",
+      companyId: declinedId,
+      accepted: false,
+      allocationRevision: 4,
+      note: "Company declined because of scheduling",
+    })
+    state = await loadState(user)
+    project = state.projects.find((p) => p.id === projectId)
+    plan = project.subcontractorAllocation
+    assert.equal(
+      project.status,
+      "pending",
+      "company acceptance alone must not activate",
+    )
+    assert.equal(
+      state.companies.find((c) => c.id === acceptedId).commitmentCount,
+      1,
+      "accepted intake reserves a slot before activation",
+    )
+    await assert.rejects(
+      command({
+        type: "auto_allocate_company",
+        companyId: acceptedId,
+        allocationRevision: 5,
+      }),
+      /locked/,
+    )
+    const alternative = replacementCandidates(
+      plan,
+      declinedId,
+      allocationCandidates(state, project),
+    )[0]
+    assert.ok(alternative)
+    const changed = replaceCompany(plan, declinedId, alternative.id)
+    await assert.rejects(
+      command({
+        type: "save_allocation_plan",
+        plan: changed,
+        allocationRevision: 2,
+      }),
+      /allocation changed/,
+    )
+    await command({
+      type: "auto_allocate_company",
+      companyId: declinedId,
+      allocationRevision: 5,
+    })
+    state = await loadState(user)
+    project = state.projects.find((p) => p.id === projectId)
+    assert.deepEqual(
+      project.subcontractorAllocation.coverage.filter(
+        (r) => r.companyId === acceptedId,
+      ),
+      plan.coverage.filter((r) => r.companyId === acceptedId),
+    )
+    assert.equal(
+      project.workflow.selections.find((s) => s.companyId === declinedId)
+        .status,
+      "declined",
+    )
+    const replacementId = project.subcontractorAllocation.companyIds.find(
+      (id) => id !== acceptedId,
+    )
+    await command({
+      type: "contact_company",
+      companyId: replacementId,
+      allocationRevision: 6,
+      note: "Replacement contacted",
+    })
+    // A second commitment elsewhere is allowed; a third must be refused even if capacity changed after contact.
+    const otherProjects = (
+      await db.query(
+        "select id from projects where id<>$1 and lifecycle_status<>'archived' order by id limit 2",
+        [projectId],
+      )
+    ).rows.map((p) => p.id)
+    for (const id of otherProjects)
+      await db.query(
+        "insert into project_subcontractor_selections(project_id,subcontractor_id,status) values($1,$2,'accepted') on conflict(project_id,subcontractor_id) do update set status='accepted'",
+        [id, replacementId],
+      )
+    await assert.rejects(
+      command({
+        type: "respond_company",
+        companyId: replacementId,
+        accepted: true,
+        allocationRevision: 7,
+        note: "Accepted after a capacity change",
+      }),
+      /Two project commitments/,
+    )
+    await db.query(
+      "delete from project_subcontractor_selections where project_id=$1 and subcontractor_id=$2",
+      [otherProjects[1], replacementId],
+    )
+    await command({
+      type: "respond_company",
+      companyId: replacementId,
+      accepted: true,
+      allocationRevision: 7,
+      note: "Capacity confirmed and scope accepted",
+    })
+    const docId = randomUUID()
+    await uploadFile(
+      docId,
+      new File(
+        [
+          Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6L8AAAAASUVORK5CYII=",
+            "base64",
+          ),
+        ],
+        "all-company-agreements.png",
+        { type: "image/png" },
+      ),
+    )
+    await assert.rejects(
+      command({
+        type: "upload_agreement",
+        allocationRevision: 7,
+        doc: { id: docId },
+      }),
+      /allocation changed/,
+    )
+    await command({
+      type: "upload_agreement",
+      allocationRevision: 8,
+      doc: { id: docId },
+    })
+    const assignments = (
+      await db.query(
+        "select subcontractor_id,worker_count from project_subcontractor_assignments where project_id=$1 and status='active'",
+        [projectId],
+      )
+    ).rows
+    assert.equal(assignments.length, 2)
+    assert.equal(
+      assignments.every((a) => a.worker_count === 0),
+      true,
+    )
+    assert.equal(
+      (
+        await db.query("select lifecycle_status from projects where id=$1", [
+          projectId,
+        ])
+      ).rows[0].lifecycle_status,
+      "active",
+    )
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from subcontractor_workers where current_project_id=$1",
+          [projectId],
+        )
+      ).rows[0].n,
+      0,
+      "activation must not allocate individual workers",
+    )
+    await assert.rejects(
+      command({
+        type: "release_allocation_company",
+        companyId: acceptedId,
+        allocationRevision: 8,
+        note: "Too early",
+      }),
+      /future phase scope/,
+    )
+    await db.query(
+      "update projects set current_stage_id=(select id from project_stages where code='Design') where id=$1",
+      [projectId],
+    )
+    await command({
+      type: "release_allocation_company",
+      companyId: replacementId,
+      allocationRevision: 8,
+      note: "Mobilization scope is complete; formally released by the Lead.",
+    })
+    assert.equal(
+      (
+        await db.query(
+          "select status from project_subcontractor_selections where project_id=$1 and subcontractor_id=$2",
+          [projectId, replacementId],
+        )
+      ).rows[0].status,
+      "archived",
+    )
+    state = await loadState(user)
+    assert.equal(
+      state.companies.find((c) => c.id === replacementId).commitmentCount,
+      1,
+      "formal release frees this project's slot and keeps the other project's reservation",
+    )
+    await db.exec(migration)
+    assert.equal(
+      (
+        await db.query(
+          "select subcontractor_allocation_version from projects where id=$1",
+          [projectId],
+        )
+      ).rows[0].subcontractor_allocation_version,
+      1,
+      "rerunning migration must retain new plans",
+    )
+    const commercialId = randomUUID()
+    await db.query(
+      `insert into projects select (jsonb_populate_record(null::projects,to_jsonb(p)||jsonb_build_object('id',$2::text,'name','Three-company commercial test','project_type_id',(select id from project_types where code='Commercial'),'lifecycle_status','spm_review','subcontractor_allocation_version',1))).* from projects p where id=$1`,
+      [source.id, commercialId],
+    )
+    await db.query(
+      `insert into project_phase_team(project_id,project_stage_id,spm_user_id,is_lead,status)
+    select $1,pts.project_stage_id,$2,s.code='Mobilization','confirmed' from project_type_stages pts join project_stages s on s.id=pts.project_stage_id
+    where pts.project_type_id=(select id from project_types where code='Commercial')`,
+      [commercialId, source.spm_user_id],
+    )
+    await db.query(
+      "insert into project_documents(project_id,document_type_id,status) select $2,document_type_id,'uploaded' from project_documents where project_id=$1 and document_type_id in(select id from document_types where code<>'subcontractor_agreement')",
+      [projectId, commercialId],
+    )
+    await db.query(
+      "insert into user_client_project_links(user_id,project_id) select user_id,$2 from user_client_project_links where project_id=$1",
+      [projectId, commercialId],
+    )
+    const commercialCommand = (json) =>
+      api(`/projects/${commercialId}/workspace-command`, {
+        method: "POST",
+        json,
+      })
+    await commercialCommand({
+      type: "auto_allocate_company",
+      allocationRevision: 0,
+    })
+    state = await loadState(user)
+    const commercial = state.projects.find((p) => p.id === commercialId)
+    assert.equal(commercial.subcontractorAllocation.companyIds.length, 3)
+    let revision = 1
+    for (const id of commercial.subcontractorAllocation.companyIds) {
+      await commercialCommand({
+        type: "contact_company",
+        companyId: id,
+        allocationRevision: revision++,
+        note: "Commercial scope reviewed with representative",
+      })
+      await commercialCommand({
+        type: "respond_company",
+        companyId: id,
+        accepted: true,
+        allocationRevision: revision++,
+        note: "Company accepted commercial scope",
+      })
+    }
+    const commercialDoc = randomUUID()
+    await uploadFile(
+      commercialDoc,
+      new File(
+        [
+          Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6L8AAAAASUVORK5CYII=",
+            "base64",
+          ),
+        ],
+        "commercial-agreements.png",
+        { type: "image/png" },
+      ),
+    )
+    await commercialCommand({
+      type: "upload_agreement",
+      allocationRevision: revision,
+      doc: { id: commercialDoc },
+    })
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from project_subcontractor_assignments where project_id=$1 and status='active'",
+          [commercialId],
+        )
+      ).rows[0].n,
+      3,
+      "activation must assign every accepted company, not just the first",
+    )
+    const clientEmail = (
+      await db.query(
+        "select u.email from users u join user_client_project_links l on l.user_id=u.id where l.project_id=$1 limit 1",
+        [projectId],
+      )
+    ).rows[0].email
+    user = await as(clientEmail)
+    const clientState = await loadState(user)
+    assert.equal(
+      clientState.projects.find((p) => p.id === projectId)
+        .subcontractorAllocation,
+      undefined,
+      "internal scopes and responses must not leak to clients",
+    )
+    assert.equal(clientState.companies.length, 0)
+  },
+)

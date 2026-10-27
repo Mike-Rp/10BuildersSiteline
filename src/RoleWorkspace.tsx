@@ -3258,6 +3258,9 @@ export default function RoleWorkspace({
             <SubcontractorAllocationReadOnly state={state} project={p} />
           </section>
         )}
+        {!isOpm && p.subcontractorAllocation && <section className="detail-section">
+          {actor.id === leadId(p) && p.status === "active" ? subcontractorAllocation(p) : <SubcontractorAllocationReadOnly state={state} project={p} />}
+        </section>}
         <section className="detail-section">
           <h3>Progress history</h3>
           {p.history

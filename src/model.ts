@@ -238,6 +238,9 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  subcontractorAllocationVersion?: number
+  subcontractorAllocation?: import("./subcontractor-allocation").SavedAllocation
+  subcontractorAllocationHistory?: { action: string; byId: string; by: string; at: string; companyId?: string; note?: string; accepted?: boolean }[]
   handoffReadiness?: { state: "blocked" | "incomplete" | "unknown" | "inactive" | "final" | "ready"; stageId: string; reason?: string; reasonCode?: string }
   handoffBlocker?: string
   checklistProgress?: PhaseProgress[]
@@ -294,6 +297,10 @@ export type PhaseProgress = {
   locked?: boolean
 }
 export type Company = {
+  primaryTrade?: string
+  rosterDisciplines?: string[]
+  commitmentCount?: number
+  capabilityReview?: { disciplines: string[]; unavailable: boolean; note: string; documentIds: string[]; reviewedAt: string; reviewedById: string; reviewedBy: string }
   id: string
   name: string
   contact: string
@@ -455,6 +462,7 @@ export type Rules = {
 }
 export type State = {
   backendPhases?: Record<string,PhaseDefinition[]>
+  tradeAllocationAvailable?: boolean
   referenceDisciplines?: string[]
   accounts: Account[]
   projects: Project[]

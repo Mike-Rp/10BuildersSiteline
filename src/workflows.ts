@@ -1,6 +1,7 @@
 import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import { companyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { allocationCandidates, allocationConsented, allocationPhases, canReleaseCompany, eligibility, protectScope, recommendTeam, replacementCandidates, replaceCompany, scopeFor, validatePlan, type AllocationPlan } from "./subcontractor-allocation.ts"
 import {
   DOC_LABELS,
   PHASES,
@@ -103,6 +104,9 @@ export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
   type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
     | "release_photo"
+    | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company"
+  plan?: AllocationPlan
+  allocationRevision?: number
   photoId?: string
   projectId?: string
   phase?: string
@@ -132,6 +136,7 @@ export const LICENSE_COMMANDS: ReadonlySet<WorkflowCommand["type"]> = new Set([
   "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "reject_update", "approve_rework",
   "decline_rework", "submit_checklist", "approve_checklist", "reject_checklist", "request_company",
   "archive_company_request", "activate_project", "acknowledge_client_subcon", "report_client_subcon_issue",
+  "save_allocation_plan", "auto_allocate_company", "release_allocation_company",
 ])
 export function workflowFor(p: Project): ProjectWorkflow {
   return (
@@ -241,6 +246,7 @@ export function clientSubconAcknowledged(p: Project) {
   )
 }
 export function consentComplete(state: State, p: Project) {
+  if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) return allocationConsented(state, p)
   if (p.clientSubcon) return clientSubconAcknowledged(p)
   // Only the contacted/accepted company counts; un-actioned "selected" rows are suggestions.
   const selections = activeSubcontractors(p).filter(
@@ -334,7 +340,7 @@ export function activationChecks(state: State, p: Project) {
   const agreement = p.docs.some((d) => d.label === DOC_LABELS[6] && d.uploaded)
   const clientReady =
     !!client && ["active", "invited", "pending-setup"].includes(client.status)
-  const own = !!p.clientSubcon
+  const own = !!p.clientSubcon && !p.subcontractorAllocation && p.subcontractorAllocationVersion !== 1
   return [
     {
       id: "office",
@@ -359,7 +365,7 @@ export function activationChecks(state: State, p: Project) {
     },
     {
       id: "subcontractors",
-      label: p.clientSubcon
+      label: own
         ? "Client-provided subcontractor assignment acknowledged"
         : "All selected subcontractors approved and accepted",
       passed: consentComplete(state, p),
@@ -897,7 +903,60 @@ export function applyWorkflow(
     type = "request",
     target = "Assignments",
   ) => event(next, p, actor.id, title, detail, type, target, undefined, now)
+  if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) {
+    assert(!["select_company", "replace_company", "archive_company", "activate_project"].includes(command.type), "Use the trade allocation plan and signed agreement workflow.")
+    if (command.type === "upload_agreement") assert(command.allocationRevision === p.subcontractorAllocation?.revision, "The allocation changed. Refresh the project.")
+  }
   switch (command.type) {
+    case "save_allocation_plan":
+    case "auto_allocate_company": {
+      assertLead(p, actor)
+      assert(p.status === "pending" && allocationReady(p), "Complete documents and team confirmations before allocation.")
+      const previous = p.subcontractorAllocation, candidates = allocationCandidates(next, p)
+      assert(command.allocationRevision === (previous?.revision || 0), "The allocation changed. Refresh the project.")
+      assert(previous || !work.selections.some(s => ["accepted", "contacted"].includes(s.status)), "Existing contacted and accepted allocations retain their original workflow.")
+      let proposed = command.plan
+      if (command.type === "auto_allocate_company") {
+        if (!previous) proposed = recommendTeam(p.type, allocationPhases(next, p), candidates) || undefined
+        else {
+          const id = command.companyId || "", current = candidates.find(c => c.id === id)
+          assert(previous.companyIds.includes(id), "Choose a company in this allocation.")
+          assert(!work.selections.some(s => s.companyId === id && ["accepted", "contacted"].includes(s.status)), "Contacted and accepted company scopes are locked.")
+          const best = replacementCandidates(previous, id, candidates)[0]
+          if (!eligibility(current) && scopeFor(previous, id).every(r => current!.disciplines.includes(r.discipline)) && (!best || current!.commitments <= best.commitments)) break
+          assert(best, "No eligible replacement covers this entire scope. Allocation remains pending.")
+          proposed = replaceCompany(previous, id, best.id)
+        }
+      }
+      assert(proposed, "No complete eligible team is available. Ask Admin to review capabilities.")
+      validatePlan(p.type, allocationPhases(next, p), proposed, candidates.map(c => previous?.companyIds.includes(c.id) ? { ...c, declined: false, commitments: 0, unavailable: false } : c))
+      if (previous) protectScope(previous, proposed, work.selections.filter(s => ["contacted", "accepted"].includes(s.status)).map(s => s.companyId))
+      for (const selection of work.selections) if (!proposed.companyIds.includes(selection.companyId) && selection.status === "selected") selection.status = "replaced"
+      for (const id of proposed.companyIds) {
+        const selection = work.selections.find(s => s.companyId === id)
+        if (!selection) work.selections.push({ companyId: id, status: "selected" })
+        else if (["replaced", "archived"].includes(selection.status)) selection.status = "selected"
+      }
+      p.subcontractorAllocation = { ...proposed, version: 1, revision: (previous?.revision || 0) + 1, requirements: allocationPhases(next, p) }
+      p.subcontractorAllocationVersion = 1
+      p.subcontractorAllocationHistory = [...(p.subcontractorAllocationHistory || []), { action: "Allocation scope saved", byId: actor.id, by: actor.name, at: date }]
+      record("Trade allocation proposed", proposed.companyIds.join(", "))
+      break
+    }
+    case "release_allocation_company": {
+      assertLead(p, actor)
+      const plan = p.subcontractorAllocation, id = command.companyId || "", selection = work.selections.find(s => s.companyId === id)
+      assert(plan && command.allocationRevision === plan.revision, "The allocation changed. Refresh the project.")
+      assert(selection?.status === "accepted" && canReleaseCompany(p, id), "Current or future company scope must finish before formal release.")
+      assert(command.note?.trim(), "Record the reason for formal release.")
+      selection.status = "archived"; plan.revision++
+      const company = next.companies.find(c => c.id === id)!
+      company.activeProjectIds = company.activeProjectIds.filter(projectId => projectId !== p.id)
+      if (company.commitmentCount !== undefined) company.commitmentCount = Math.max(0, company.commitmentCount - 1)
+      p.subcontractorAllocationHistory = [...(p.subcontractorAllocationHistory || []), { action: command.type, companyId: id, byId: actor.id, by: actor.name, at: date, note: command.note }]
+      record("Company formally released", command.note)
+      break
+    }
     case "view_document": {
       const { doc, error } = documentAccess(p, actor, command.doc?.id)
       assert(doc && !error, error)
@@ -1287,6 +1346,29 @@ export function applyWorkflow(
     case "contact_company":
     case "respond_company": {
       assertLead(p, actor)
+      if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) {
+        const plan = p.subcontractorAllocation, id = command.companyId || ""
+        assert(plan && plan.companyIds.includes(id), "Save a complete allocation plan first.")
+        assert(command.allocationRevision === plan.revision, "The allocation changed. Refresh the project.")
+        assert(p.status === "pending" && allocationReady(p), "Complete intake documents and team confirmations first.")
+        const company = next.companies.find(c => c.id === id), candidate = allocationCandidates(next, p).find(c => c.id === id), selection = work.selections.find(s => s.companyId === id)
+        assert(company && selection, "Company is missing from this plan.")
+        assert(command.note?.trim(), "Record contact or response details.")
+        if (command.type === "contact_company" || command.accepted === true) {
+          assert(!eligibility(candidate), eligibility(candidate))
+          assert(scopeFor(plan, id).every(row => candidate!.disciplines.includes(row.discipline)), "Verified capabilities no longer cover this scope.")
+        }
+        if (command.type === "contact_company") { assert(selection.status === "selected", "This company was already contacted or responded."); selection.status = "contacted"; selection.contactAt = date }
+        else {
+          assert(selection.status === "contacted" && typeof command.accepted === "boolean", "Contact the company and record its actual response.")
+          selection.status = command.accepted ? "accepted" : "declined"; selection.responseAt = date
+          if (command.accepted && !company.activeProjectIds.includes(p.id)) { company.activeProjectIds.push(p.id); if (company.commitmentCount !== undefined) company.commitmentCount++ }
+        }
+        plan.revision++
+        p.subcontractorAllocationHistory = [...(p.subcontractorAllocationHistory || []), { action: command.type, companyId: id, byId: actor.id, by: actor.name, at: date, note: command.note, accepted: command.accepted }]
+        record(command.type.replace(/_/g, " "), command.note)
+        break
+      }
       assert(
         !p.clientSubcon,
         "This project uses the client-provided subcontractor assigned by Admin. Allocation is not available.",
@@ -1411,7 +1493,7 @@ export function applyWorkflow(
     case "upload_agreement": {
       assertLead(p, actor)
       assert(
-        !p.clientSubcon,
+        !p.clientSubcon || !!p.subcontractorAllocation,
         "Client-provided subcontractor projects are activated with Activate Project. No second agreement upload is needed.",
       )
       requireDoc(command.doc)

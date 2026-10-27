@@ -323,7 +323,9 @@ const respondToPhase = (newStatus) => async (req, res) => {
                       WHERE t.project_id = $1 AND t.status = 'confirmed' ORDER BY w.sort_order LIMIT 1)),
                     current_pct = CASE WHEN current_stage_id IS NULL THEN 0 ELSE current_pct END,
                     updated_by = $2, updated_at = now()
-              WHERE id = $1 AND lifecycle_status = 'spm_review' AND EXISTS (SELECT 1 FROM project_documents d JOIN document_types t ON t.id=d.document_type_id WHERE d.project_id=$1 AND t.code='subcontractor_agreement' AND d.status='uploaded')
+              WHERE id = $1 AND lifecycle_status = 'spm_review'
+              AND coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')::int,0)=0
+              AND EXISTS (SELECT 1 FROM project_documents d JOIN document_types t ON t.id=d.document_type_id WHERE d.project_id=$1 AND t.code='subcontractor_agreement' AND d.status='uploaded')
               AND EXISTS (SELECT 1 FROM project_subcontractor_assignments a WHERE a.project_id=$1 AND a.status='active')
               AND (SELECT count(*) FROM subcontractor_workers w WHERE w.current_project_id=$1 AND w.status='active' AND w.availability_status='assigned')>=crew_required`,
             [id, user.id]

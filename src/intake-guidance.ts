@@ -1,5 +1,6 @@
 import { licenseState, type Account, type Project, type State } from "./model.ts"
 import { activationChecks, assignmentBlock, isAssigned, leadConfirmed, leadId, registeredComplete, teamConfirmed } from "./workflows.ts"
+import { requiredCompanies, tradeAllocationEnabled } from "./subcontractor-allocation.ts"
 
 export type IntakeView = "all" | "action" | "waiting"
 export type IntakeGuidance = {
@@ -59,12 +60,13 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   const clientReady = checks.find(check => check.id === "client")?.passed === true
   // Client readiness is also a gate on signed-agreement upload, not just activation.
   const mine = actor.role === "spm" && actor.id === lead
+  const tradeBased = tradeAllocationEnabled(state, p)
   if (!checks.find(check => check.id === "subcontractors")?.passed)
-    return step(p.clientSubcon ? "Client subcontractor review" : "Subcontractor coordination", person(lead, "Lead Site PM"),
-      p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
+    return step(tradeBased ? "Company team coordination" : p.clientSubcon ? "Client subcontractor review" : "Subcontractor coordination", person(lead, "Lead Site PM"),
+      tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
   if (!clientReady) return step("Client account prerequisite", "Administrator",
     "The linked client record is missing or unavailable. Review the existing account and intake details; activation remains blocked.", false, "view", "View details")
-  if (p.clientSubcon && checks.every(check => check.passed)) return step("Ready for Lead activation", person(lead, "Lead Site PM"),
+  if (!tradeBased && p.clientSubcon && checks.every(check => check.passed)) return step("Ready for Lead activation", person(lead, "Lead Site PM"),
     "All existing activation checks pass. The project Lead can open the existing activation controls.", mine, "coordinate", "Review activation")
   if (!checks.find(check => check.id === "agreement")?.passed) return step("Signed agreement", person(lead, "Lead Site PM"),
     "Lead Site PM must upload the signed Site PM–Subcontractor Agreement through the existing activation workflow.", mine, "coordinate", "Open agreement requirements")
