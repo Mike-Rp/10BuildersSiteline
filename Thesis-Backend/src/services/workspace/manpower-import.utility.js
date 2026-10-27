@@ -24,6 +24,14 @@ export function readManpowerFile(file) {
 export async function registerCompany(db, user, company, loadFile, projectId = "") {
     const errors = companyRegistrationErrors(company);
     if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
+    let proposedDisciplines;
+    if (company.proposedDisciplines !== undefined) {
+        if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can propose company trades.");
+        const catalog = (await db.query("select code from disciplines")).rows.map(row => row.code);
+        if (!Array.isArray(company.proposedDisciplines) || new Set(company.proposedDisciplines).size !== company.proposedDisciplines.length || company.proposedDisciplines.some(value => typeof value !== "string" || !catalog.includes(value)))
+            throw new HttpError(400, "Choose proposed trades from the configured discipline catalog.");
+        proposedDisciplines = company.proposedDisciplines;
+    }
     if (!Array.isArray(company.manpowerDocuments || []) || (company.manpowerDocuments || []).length > 1)
         throw new HttpError(400, "Upload one current manpower list for this company.");
     if (!Array.isArray(company.documents || []) || (company.documents || []).length > 20)
@@ -60,6 +68,7 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
         contact: typeof company.contact === "string" ? company.contact.trim() : "", phone: company.phone,
         documents, manpowerDocuments, manpowerRoster: roster, note: typeof company.note === "string" ? company.note.trim() : "",
         projectId, submittedById: user.id, submittedBy: user.full_name, availability: "available", activeProjectIds: [], manpowerCount: workers.length,
+        ...(proposedDisciplines === undefined ? {} : { proposedDisciplines }),
     })]);
     for (const doc of [...documents, ...manpowerDocuments]) await db.query("update stored_files set purpose='company' where id=$1", [doc.id]);
     return { id: companyId, status, manpowerCount: workers.length };

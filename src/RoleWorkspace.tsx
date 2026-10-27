@@ -77,6 +77,7 @@ import { projectDocumentIndexFor } from "./project-document-index"
 import {
   dateLabel,
   DOC_LABELS,
+  DISCIPLINES,
   initials,
   licenseState,
   projectPhaseDisciplines,
@@ -2852,7 +2853,7 @@ export default function RoleWorkspace({
         company.submittedBy === actor.name,
     )
     const directoryList = runList(`${actor.role}:directory`, directoryItems, {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")}`,
       filters: [
         {
           id: "availability",
@@ -2908,6 +2909,10 @@ export default function RoleWorkspace({
               </div>
               <h3>{company.name}</h3>
               <p>{company.email || "Company email not supplied"}</p>
+              <div className="capability-card-summary">
+                <span>{company.capabilityReview ? "Verified trades" : company.proposedDisciplines?.length ? "Proposed trades · Review required" : "Trades not reviewed yet"}</span>
+                <div className="capability-card-tags">{(company.capabilityReview?.disciplines || company.proposedDisciplines || []).map(trade => <span key={trade}>{trade}</span>)}</div>
+              </div>
               <div className="company-meta">
                 <span>
                   <Icon name="users" size={17} />
@@ -2923,7 +2928,7 @@ export default function RoleWorkspace({
                 </span>
               </div>
               <div className="card-bottom">
-                <span>View company details</span>
+                <span>View company details & trades</span>
                 <Icon name="arrow" size={16} />
               </div>
             </button>
@@ -3488,7 +3493,10 @@ export default function RoleWorkspace({
             <strong>{c.manpowerCount}</strong>
           </div>
         </div>
-        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines || []} role={actor.role} onPreview={setPreview} onSave={actor.role === "spm" ? async review => {
+        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines ?? DISCIPLINES} role={actor.role} onPreview={setPreview} onCancel={() => setDialog(undefined)} onUpload={actor.role === "spm" ? async document => {
+          await api("/subcontractors/" + c.id + "/supporting-documents", { method: "POST", json: { doc: document } })
+          await onReload()
+        } : undefined} onSave={actor.role === "spm" ? async review => {
           await api("/subcontractors/" + c.id + "/capabilities", { method: "PUT", json: review })
           await onReload()
         } : undefined} />
@@ -3997,6 +4005,8 @@ export default function RoleWorkspace({
           <CompanyForm
             owner={actor.name}
             actorId={actor.id}
+            role={actor.role}
+            disciplines={state.referenceDisciplines ?? DISCIPLINES}
             status="pending"
             saving={saving}
             project={projects.find(p => p.id === dialog.projectId)}

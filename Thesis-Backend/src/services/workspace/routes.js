@@ -376,6 +376,27 @@ router.put("/subcontractors/:id/capabilities", endpoint(["spm"], async (db, user
     await event(db, user, null, "Company capabilities reviewed", req.params.id + ": " + review.disciplines.join(", "));
     return review;
 }));
+router.post("/subcontractors/:id/supporting-documents", endpoint(["spm"], async (db, user, req) => {
+    if (!isUuid(req.params.id)) throw new HttpError(400, "Invalid company ID.");
+    const company = (await db.query("select directory_status from subcontractors where id=$1 and not coalesce(is_deleted,false) for update", [req.params.id])).rows[0];
+    const metadata = (await db.query("select metadata from workspace_company_metadata where subcontractor_id=$1", [req.params.id])).rows[0]?.metadata || {};
+    if (!company || (company.directory_status !== "approved" && !(company.directory_status === "pending" && metadata.submittedById === user.id)))
+        throw new HttpError(404, "Approved company or your pending company request not found.");
+    if (!isUuid(req.body.doc?.id)) throw new HttpError(400, "Upload and confirm a supporting company document first.");
+    const existing = metadata.documents?.find(document => document.id === req.body.doc.id);
+    if (existing) return existing;
+    const stored = await file(db, user, req.body.doc.id);
+    const locked = (await db.query("select purpose,project_id,user_id from stored_files where id=$1 for update", [stored.id])).rows[0];
+    if (locked.purpose !== "upload" || locked.project_id) throw new HttpError(409, "This file is already linked to another record. Upload a new supporting document.");
+    if ((metadata.documents || []).length >= 20) throw new HttpError(400, "Use 20 supporting documents or fewer.");
+    const document = { id: stored.id, label: "Company supporting document", name: stored.original_name, uploaded: true, clientVisible: false,
+        owner: user.full_name, date: new Date().toISOString().slice(0,10), size: stored.byte_size, mime: stored.content_type };
+    metadata.documents = [...(metadata.documents || []), document];
+    await db.query("insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2) on conflict(subcontractor_id) do update set metadata=excluded.metadata", [req.params.id, JSON.stringify(metadata)]);
+    await db.query("update stored_files set purpose='company' where id=$1", [stored.id]);
+    await event(db, user, null, "Company supporting document added", req.params.id + ": " + document.name);
+    return document;
+}));
 router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), b = req.body;
     for (const d of b.docs || [])

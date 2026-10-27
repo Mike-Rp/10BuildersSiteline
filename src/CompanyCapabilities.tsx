@@ -1,6 +1,8 @@
 import { useRef, useState } from "react"
 import { Button, Field, Icon } from "./ui"
 import type { Company, Doc, Role } from "./model"
+import CompanyTradePicker from "./CompanyTradePicker"
+import { Upload } from "./panels"
 import "./TradeAllocationPanel.css"
 
 export default function CompanyCapabilities({
@@ -9,15 +11,19 @@ export default function CompanyCapabilities({
   role,
   onSave,
   onPreview,
+  onUpload,
+  onCancel,
 }: {
   company: Company
   disciplines: string[]
   role: Role
   onSave?: (review: NonNullable<Company["capabilityReview"]>) => Promise<void>
   onPreview?: (doc: Doc) => void
+  onUpload?: (doc: Doc) => Promise<void>
+  onCancel?: () => void
 }) {
   const review = company.capabilityReview
-  const [selected, setSelected] = useState(review?.disciplines || [])
+  const [selected, setSelected] = useState(review?.disciplines || company.proposedDisciplines || [])
   const [documents, setDocuments] = useState(review?.documentIds || [])
   const [note, setNote] = useState(review?.note || "")
   const [unavailable, setUnavailable] = useState(review?.unavailable || false)
@@ -25,6 +31,10 @@ export default function CompanyCapabilities({
     [error, setError] = useState("")
   const locked = useRef(false)
   const editable = role === "spm" && !!onSave
+  const supportingRecords = company.documents.filter(document => document.uploaded)
+  const linkedDocuments = documents.filter(id => supportingRecords.some(document => document.id === id))
+  const differentSet = (a: string[], b: string[]) => JSON.stringify([...a].sort()) !== JSON.stringify([...b].sort())
+  const changed = !!review && (differentSet(selected, review.disciplines) || differentSet(linkedDocuments, review.documentIds || []) || note.trim() !== review.note || unavailable !== review.unavailable)
   const toggle = (values: string[], value: string) =>
     values.includes(value)
       ? values.filter((v) => v !== value)
@@ -37,7 +47,7 @@ export default function CompanyCapabilities({
     try {
       await onSave({
         disciplines: selected,
-        documentIds: documents,
+        documentIds: linkedDocuments,
         note: note.trim(),
         unavailable,
         reviewedAt: "",
@@ -63,21 +73,18 @@ export default function CompanyCapabilities({
         <p>{review.note}</p>
         <p>{review.unavailable ? "Unavailable for new commitments" : "Available for capacity checks"}</p>
         <p>Supporting records: {company.documents.filter(document => (review.documentIds || []).includes(document.id)).map(document => document.name).join(", ") || "No linked records available"}</p>
-      </> : <p>Site PM capability review required.</p>}
+      </> : <><p>Site PM capability review required.</p>{!!company.proposedDisciplines?.length && <><p>Proposed trades · Not verified</p><div className="tag-list">{company.proposedDisciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div></>}</>}
     </section>
   )
   return (
-    <section className="detail-section trade-allocation">
+    <section className="detail-section trade-allocation company-capability-review">
       <h3>Site PM capability review</h3>
-      <p>
-        Verify disciplines against the company’s supporting records before
-        saving. Worker roster disciplines and the directory classification do
-        not automatically verify company capabilities.
-      </p>
-      <p>
-        Directory classification:{" "}
-        <strong>{company.primaryTrade || "Not recorded"}</strong>
-      </p>
+      <p>Select company trades supported by the records. Verification is applied when you save this review.</p>
+      <div className="capability-summary">
+        <div><span>Directory classification</span><strong>{company.primaryTrade || "Not recorded"}</strong></div>
+        <div><span>Review status</span><strong><Icon name={review && !changed ? "check" : "clock"} size={17} />{!review ? "Review required" : changed ? "Unsaved changes" : "Reviewed"}</strong></div>
+        <div><span>Selected capabilities</span><strong>{selected.length}</strong></div>
+      </div>
       {review && (
         <p>
           <Icon name="check" size={16} /> Last reviewed by {review.reviewedBy}{" "}
@@ -90,72 +97,34 @@ export default function CompanyCapabilities({
           .
         </p>
       )}
-      <fieldset disabled={busy}>
-        <legend>Capabilities to verify</legend>
-        <div className="trade-checks">
-          {disciplines.map((d) => (
-            <label key={d}>
-              <input
-                type="checkbox"
-                checked={selected.includes(d)}
-                onChange={() => setSelected(toggle(selected, d))}
-              />
-              {d}
+      {!review && !!company.proposedDisciplines?.length && <p className="capability-proposal-note"><Icon name="clock" size={16} />Proposed trades are preselected. Review the supporting records before verifying them.</p>}
+      <div className="capability-review-columns">
+        <CompanyTradePicker disciplines={disciplines} selected={selected} onChange={setSelected} disabled={busy} />
+        <section className="capability-records" aria-label="Supporting company records">
+          <div className="capability-section-heading"><h4>Supporting company records</h4></div>
+          {supportingRecords.map(document => <div className="capability-record" key={document.id}>
+            <label className="trade-check">
+              <input type="checkbox" disabled={busy} checked={documents.includes(document.id)} onChange={() => setDocuments(toggle(documents, document.id))} />
+              <Icon name="doc" size={20} /><span>{document.name}</span>
             </label>
-          ))}
-        </div>
-        <fieldset>
-          <legend>Supporting company records</legend>
-          {company.documents
-            .filter((d) => d.uploaded)
-            .map((d) => (
-              <div className="trade-heading" key={d.id}>
-              <label className="trade-check">
-                <input
-                  type="checkbox"
-                  checked={documents.includes(d.id)}
-                  onChange={() => setDocuments(toggle(documents, d.id))}
-                />
-                {d.name}
-              </label>
-              {onPreview && <Button disabled={busy} onClick={() => onPreview(d)}>Preview {d.name}</Button>}
-              </div>
-            ))}
-          {!company.documents.some((d) => d.uploaded) && (
-            <p>
-              Supporting company records are required. Add them through the company registration or supporting-document workflow, then select them for this review.
-            </p>
-          )}
-        </fieldset>
-        <Field label="Capability review note">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Which records support these capabilities?"
-            maxLength={2000}
-          />
-        </Field>
-        <label className="trade-check">
-          <input
-            type="checkbox"
-            checked={unavailable}
-            onChange={(e) => setUnavailable(e.target.checked)}
-          />
-          Company unavailable for new commitments
-        </label>
-      </fieldset>
+            {onPreview && <Button disabled={busy} onClick={() => onPreview(document)}>Preview {document.name}</Button>}
+          </div>)}
+          {!supportingRecords.length && <p>No supporting records on file. Add company records to verify the selected trades.</p>}
+          {onUpload && <Upload label="Company Supporting Document" owner="Site PM" disabled={busy} buttonLabel="Add document" onSave={async document => {
+            await onUpload(document)
+            setDocuments(current => [...new Set([...current, document.id])])
+          }} />}
+          <p className="capability-help"><Icon name="doc" size={16} />Select records supporting this review. One record can support several capabilities.</p>
+          <Field label="Capability review note"><textarea disabled={busy} value={note} onChange={event => setNote(event.target.value)} placeholder="Which records support these capabilities?" maxLength={2000} /></Field>
+          <label className="trade-check"><input type="checkbox" disabled={busy} checked={unavailable} onChange={event => setUnavailable(event.target.checked)} />Unavailable for new commitments</label>
+        </section>
+      </div>
       {error && <p role="alert">{error}</p>}
-      <Button
-        variant="primary"
-        disabled={busy || !documents.length || !note.trim()}
-        onClick={() => void save()}
-      >
-        {busy ? "Saving review…" : "Save capability review"}
-      </Button>
-      <p>
-        A company can reserve up to 2 concurrent project commitments. This
-        review does not accept any project on its behalf.
-      </p>
+      <div className="capability-review-footer">
+        <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>
+        <div className="capability-footer-actions">{onCancel && <Button disabled={busy} onClick={onCancel}>Cancel</Button>}<Button variant="primary" disabled={busy || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>
+      </div>
+      <p className="capability-help">Company approval and project acceptance are separate. Worker roster disciplines do not automatically verify company capabilities.</p>
     </section>
   )
 }
