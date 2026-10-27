@@ -928,7 +928,7 @@ export function applyWorkflow(
           proposed = replaceCompany(previous, id, best.id)
         }
       }
-      assert(proposed, "No complete eligible team is available. Ask Admin to review capabilities.")
+      assert(proposed, "No complete eligible team is available. Review company capabilities in the Site PM workspace.")
       validatePlan(p.type, allocationPhases(next, p), proposed, candidates.map(c => previous?.companyIds.includes(c.id) ? { ...c, declined: false, commitments: 0, unavailable: false } : c))
       if (previous) protectScope(previous, proposed, work.selections.filter(s => ["contacted", "accepted"].includes(s.status)).map(s => s.companyId))
       for (const selection of work.selections) if (!proposed.companyIds.includes(selection.companyId) && selection.status === "selected") selection.status = "replaced"

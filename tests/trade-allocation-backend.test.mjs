@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url"
 import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
-import { api, login, setApiBase, setToken } from "../src/api/client.ts"
+import { api, downloadApiFile, login, setApiBase, setToken } from "../src/api/client.ts"
 import { loadState } from "../src/api/load.ts"
 import { uploadFile } from "../src/api/actions.ts"
 import {
@@ -195,11 +195,27 @@ test(
       return login(email, "Password@123", true)
     }
     let user = await as("patricia.domingo@10builders.com")
+    const reviewPath = `/subcontractors/${companyIds[0]}/capabilities`
+    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Admin cannot edit capability reviews")
+    await assert.rejects(
+      api(`/projects/${projectId}/workspace-command`, { method: "POST", json: { type: "auto_allocate_company", allocationRevision: 0 } }),
+      /Lead Site PM/,
+    )
+    const opmEmail = (await db.query("select email from users where id=$1", [source.suggested_opm_id])).rows[0].email
+    user = await as(opmEmail)
+    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Office PM cannot edit capability reviews")
+    const initialClient = (await db.query("select u.email from users u join user_client_project_links l on l.user_id=u.id where l.project_id=$1 limit 1", [projectId])).rows[0].email
+    user = await as(initialClient)
+    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Clients cannot edit capability reviews")
+    user = await as(source.lead_email)
     const disciplines = (
       await db.query("select code from disciplines order by code")
     ).rows.map((d) => d.code)
+    const supportingFileIds = []
     for (const id of companyIds) {
+      user = await as("patricia.domingo@10builders.com")
       const fileId = randomUUID()
+      supportingFileIds.push(fileId)
       await uploadFile(
         fileId,
         new File(
@@ -224,6 +240,9 @@ test(
           }),
         ],
       )
+      await db.query("update stored_files set purpose='company' where id=$1", [fileId])
+      user = await as(source.lead_email)
+      assert.ok(await downloadApiFile(fileId), "Site PM can preview an approved company's supporting record uploaded by Admin")
       await api(`/subcontractors/${id}/capabilities`, {
         method: "PUT",
         json: {
@@ -242,20 +261,21 @@ test(
       assert.equal(saved.reviewedById, user.id)
       assert.notEqual(saved.reviewedAt, "")
     }
-    await assert.rejects(
-      api(`/projects/${projectId}/workspace-command`, {
-        method: "POST",
-        json: { type: "auto_allocate_company", allocationRevision: 0 },
-      }),
-      /Lead Site PM/,
-    )
+    user = await as("patricia.domingo@10builders.com")
+    const adminState = await loadState(user), reviewedCompany = adminState.companies.find(c => c.id === companyIds[0])
+    await api(`/subcontractors/${companyIds[0]}/workspace`, { method: "PUT", json: { ...reviewedCompany, capabilityReview: { ...reviewedCompany.capabilityReview, note: "Attempted Admin overwrite", disciplines: [] } } })
+    assert.equal((await db.query("select metadata->'capabilityReview'->>'note' as note from workspace_company_metadata where subcontractor_id=$1", [companyIds[0]])).rows[0].note, "Reviewed the supporting company capability records in this test.", "Admin's general company update cannot bypass capability permissions")
+    user = await as(initialClient)
+    assert.equal(await downloadApiFile(supportingFileIds[0]), undefined, "Company capability documents remain unavailable to clients")
+    user = await as(opmEmail)
+    assert.ok(await downloadApiFile(supportingFileIds[0]), "Office PM can view an approved company record without permission to edit its review")
     user = await as(source.lead_email)
     await assert.rejects(
       api(`/subcontractors/${companyIds[0]}/capabilities`, {
         method: "PUT",
         json: {},
       }),
-      /permission|allowed|Administrator|Forbidden|access/i,
+      /Select verified disciplines/,
     )
     const command = (json) =>
       api(`/projects/${projectId}/workspace-command`, { method: "POST", json })

@@ -5,6 +5,8 @@ import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
 import Reports from "./Reports"
 import ProjectClientDetails from "./ProjectClientDetails"
+import CompanyCapabilities from "./CompanyCapabilities"
+import { api } from "./api/client"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
@@ -3486,6 +3488,10 @@ export default function RoleWorkspace({
             <strong>{c.manpowerCount}</strong>
           </div>
         </div>
+        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines || []} role={actor.role} onPreview={setPreview} onSave={actor.role === "spm" ? async review => {
+          await api("/subcontractors/" + c.id + "/capabilities", { method: "PUT", json: review })
+          await onReload()
+        } : undefined} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">

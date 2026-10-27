@@ -2691,11 +2691,7 @@ function AppInner() {
           </div>
         </div>
         <p className="section-description">{c.note}</p>
-        {actor.role === "admin" && <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines || []} onSave={async review => {
-          await api("/subcontractors/" + c.id + "/capabilities", { method: "PUT", json: review })
-          await reloadWorkspace()
-          setToast("Company capabilities reviewed")
-        }} />}
+        <CompanyCapabilities company={c} disciplines={state.referenceDisciplines || []} role={actor.role} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">

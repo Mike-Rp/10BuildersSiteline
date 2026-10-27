@@ -141,7 +141,7 @@ test("accepted scope has no replacement actions; other Site PMs and Office PMs s
     }
   })
 })
-test("admin capability review supports more than three verified disciplines and requires supporting records", async () => {
+test("Site PM capability review supports more than three verified disciplines and requires supporting records", async () => {
   await withUi(async ({ React, root, server, w, button, click }) => {
     const { default: Review } = await server.ssrLoadModule(
       "/src/CompanyCapabilities.tsx",
@@ -157,6 +157,7 @@ test("admin capability review supports more than three verified disciplines and 
         React.createElement(Review, {
           company,
           disciplines: DISCIPLINES,
+          role: "spm",
           onSave: async (review) => {
             saved = review
           },
@@ -183,6 +184,55 @@ test("admin capability review supports more than three verified disciplines and 
       "",
       "the server stamps the actual reviewer and time",
     )
+  })
+})
+test("Site PM can open capability editing from the company directory and save through the protected API", async () => {
+  await withUi(async ({ React, root, server, w, button, click }) => {
+    const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
+    const state = fixture(), actor = state.accounts.find(a => a.id === "a4"), company = state.companies[0]
+    state.referenceDisciplines = DISCIPLINES
+    actor.expiry = "2099-01-01"
+    company.capabilityReview = undefined
+    company.documents = [{ id: "proof", name: "Company records.pdf", label: "Company supporting document", uploaded: true, date: "2026-10-27" }]
+    let reloads = 0, requests = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url: String(url), options })
+      return new Response(JSON.stringify({ data: {} }), { status: 200, headers: { "Content-Type": "application/json" } })
+    }
+    try {
+      await React.act(() => root.render(React.createElement(Workspace, { state, actor, onCommand: async () => ({ ok: true }), onRead() {}, onMute() {}, onReload() { reloads++ }, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
+      await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Subcon directory"))
+      await click([...document.querySelectorAll(".company-card")].find(el => el.textContent.includes(company.name)))
+      assert.match(document.querySelector('[role="dialog"]').textContent, /Site PM capability review/)
+      assert.ok(button("Preview Company records.pdf"))
+      const checks = [...document.querySelectorAll('.trade-allocation input[type="checkbox"]')]
+      await click(checks[0]); await click(checks[DISCIPLINES.length])
+      const note = document.querySelector(".trade-allocation textarea")
+      await React.act(() => { Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set.call(note, "Site PM reviewed company records."); note.dispatchEvent(new w.Event("input", { bubbles: true })) })
+      await click(button("Save capability review"))
+      const saved = requests.find(request => request.url.endsWith(`/subcontractors/${company.id}/capabilities`))
+      assert.ok(saved)
+      assert.equal(saved.options.method, "PUT")
+      assert.equal(JSON.parse(saved.options.body).note, "Site PM reviewed company records.")
+      assert.equal(reloads, 1)
+    } finally { globalThis.fetch = originalFetch }
+  })
+})
+test("capability review is read-only for Admin, Office PM and clients even when a save callback is provided", async () => {
+  await withUi(async ({ React, root, server, button }) => {
+    const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
+    const company = { ...fixture().companies[0], capabilityReview: { disciplines: ["Civil", "Structural"], unavailable: false, documentIds: ["proof"], note: "Previously reviewed supporting records.", reviewedBy: "Site reviewer", reviewedById: "a4", reviewedAt: "2026-10-27T08:00:00Z" }, documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
+    let saves = 0
+    for (const role of ["admin", "opm", "client"]) {
+      await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role, onSave: async () => { saves++ } })))
+      assert.equal(document.querySelectorAll("input,select,textarea").length, 0)
+      assert.equal(button("Save capability review"), undefined)
+      assert.match(document.body.textContent, /View only/)
+      assert.match(document.body.textContent, /Site reviewer/)
+      assert.match(document.body.textContent, /Civil/)
+    }
+    assert.equal(saves, 0)
   })
 })
 async function withUi(run) {

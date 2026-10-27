@@ -14,7 +14,7 @@ export function eligibility(company) {
   if (!company || company.status !== "approved")
     return "Company approval required"
   if (!company.reviewed || !company.disciplines.length)
-    return "Admin capability review required"
+    return "Site PM capability review required"
   if (company.declined) return "Already declined this project"
   if (company.unavailable) return "Company marked unavailable"
   if (company.commitments >= 2)

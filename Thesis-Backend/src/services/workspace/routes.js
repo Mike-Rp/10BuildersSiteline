@@ -268,6 +268,12 @@ router.get("/files/:id/content", async (req, res) => {
             if (!row)
                 throw new HttpError(404, "File not found.");
             if (user.role !== "admin" && row.uploaded_by !== user.id && row.user_id !== user.id) {
+                const companyRecord = row.purpose === "company" && ["spm", "opm"].includes(user.role) && (await db.query(`select 1
+                    from workspace_company_metadata m join subcontractors s on s.id=m.subcontractor_id
+                    where s.directory_status='approved' and not coalesce(s.is_deleted,false)
+                    and exists(select 1 from jsonb_array_elements(coalesce(m.metadata->'documents','[]'::jsonb)) d
+                        where d->>'id'=$1 and d->>'uploaded'='true') limit 1`, [row.id])).rowCount > 0;
+                if (companyRecord) return;
                 if (!row.project_id)
                     throw new HttpError(404, "File not found.");
                 await project(db, user, row.project_id);
@@ -363,7 +369,7 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
         })]);
     return {};
 }));
-router.put("/subcontractors/:id/capabilities", endpoint(["admin"], async (db, user, req) => {
+router.put("/subcontractors/:id/capabilities", endpoint(["spm"], async (db, user, req) => {
     if (!isUuid(req.params.id) || !(await db.query("select 1 from subcontractors where id=$1 and not coalesce(is_deleted,false)", [req.params.id])).rowCount)
         throw new HttpError(404, "Company not found.");
     const review = await saveCapabilityReview(db, user, req.params.id, req.body);

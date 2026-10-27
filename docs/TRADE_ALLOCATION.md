@@ -12,7 +12,7 @@ This implementation replaces the one-company intake flow for new projects with a
 
 Each required discipline in each phase is assigned to one verified company. Several companies can share a phase through different disciplines. One company can cover multiple disciplines and return in nonconsecutive phases. There is no three-discipline limit on company capabilities; the separate engineer scope rule is unchanged.
 
-Admin reviews supporting company records and explicitly records verified disciplines, availability and a review note. The server stamps the actual reviewer and review time. Directory trade/classification and worker roster disciplines remain separate; neither automatically verifies company capabilities. This is an internal capability review, not automated PCAB license verification.
+Site PM reviews supporting company records and explicitly records verified disciplines, availability and a review note in the Site PM workspace. Admin and Office PM capability views are read-only; the API accepts capability edits only from Site PM accounts. The server stamps the actual reviewer and review time. Existing reviews retain their original attribution. Admin still approves company registration. Directory trade/classification and worker roster disciplines remain separate; neither automatically verifies company capabilities. This is an internal capability review, not automated PCAB license verification.
 
 The Lead Site PM can propose a complete team automatically or choose eligible companies manually, inspect phase coverage, and adjust uncontacted scope. Auto-allocation considers complete verified coverage first and fewer other project commitments next. Stable name/ID ordering resolves equal team rankings. For a single company, the existing eligible company stays on a workload tie. Auto-allocation never contacts or accepts on behalf of a company.
 
@@ -33,13 +33,13 @@ Admin, Office PM and other Site PMs can inspect the saved allocation without tak
 1. Deploy the updated API and frontend together.
 2. Apply `Thesis-Backend/migrations/013-trade-subcontractor-allocation.sql` after the earlier numbered backend migrations, using the normal database migration process. It removes the old unique single-company selection index, preserves existing project policy versions, and defaults new projects to version 1. It is safe to rerun.
 3. Restart the API if needed. `/workspace` reports whether the new migration is available. Before it is applied, existing records remain usable and allocation writes return a clear migration-required message.
-4. Admin opens **Directory → Subcontractors → company details**, uploads genuine supporting company records, then saves **Admin-reviewed capabilities**. Repeat for enough approved companies to cover the configured backend phase disciplines. Use the unavailable checkbox for companies that cannot take new commitments.
+4. Site PM opens **Subcon directory → company details → Site PM capability review**, reviews the supporting company records, then saves the verified capabilities. Supporting records must already be uploaded through registration or the company's supporting-document workflow. Repeat for enough approved companies to cover the configured backend phase disciplines. Use the unavailable checkbox for companies that cannot take new commitments. Admin and Office PM can inspect the saved review without editing it.
 
 This change does not apply the migration to a running database, seed production companies, or deploy automatically.
 
 ## Checking on localhost
 
-Open the normal local SITELINE URL (development default: `http://127.0.0.1:8443/`). After the migration and capability reviews, create a new intake, accept the Office PM assignment, complete its registered documents, and confirm the Site PM team. An untouched legacy pending intake without contacted/accepted companies can also enter the new flow; already accepted legacy allocations retain their original workflow.
+Open the normal local SITELINE URL (development default: `http://127.0.0.1:8443/`). After the migration and Site PM capability reviews, create a new intake, accept the Office PM assignment, complete its registered documents, and confirm the Site PM team. An untouched legacy pending intake without contacted/accepted companies can also enter the new flow; already accepted legacy allocations retain their original workflow.
 
 Sign in as the assigned Lead Site PM and open the intake's subcontractor allocation. Propose the required team, inspect coverage, record company contacts and actual responses, and replace a declined company. The two buttons **Review alternatives** and **Auto-allocate** appear together on an uncontacted or declined company. Upload the signed agreement package only once all partners accept. Inspect the saved allocation from the active project's details afterward. Admin and Office PM views are read-only for allocation.
 

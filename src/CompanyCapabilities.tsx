@@ -1,16 +1,20 @@
 import { useRef, useState } from "react"
 import { Button, Field, Icon } from "./ui"
-import type { Company } from "./model"
+import type { Company, Doc, Role } from "./model"
 import "./TradeAllocationPanel.css"
 
 export default function CompanyCapabilities({
   company,
   disciplines,
+  role,
   onSave,
+  onPreview,
 }: {
   company: Company
   disciplines: string[]
-  onSave: (review: NonNullable<Company["capabilityReview"]>) => Promise<void>
+  role: Role
+  onSave?: (review: NonNullable<Company["capabilityReview"]>) => Promise<void>
+  onPreview?: (doc: Doc) => void
 }) {
   const review = company.capabilityReview
   const [selected, setSelected] = useState(review?.disciplines || [])
@@ -20,12 +24,13 @@ export default function CompanyCapabilities({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("")
   const locked = useRef(false)
+  const editable = role === "spm" && !!onSave
   const toggle = (values: string[], value: string) =>
     values.includes(value)
       ? values.filter((v) => v !== value)
       : [...values, value]
   async function save() {
-    if (locked.current) return
+    if (locked.current || !editable || !onSave) return
     locked.current = true
     setBusy(true)
     setError("")
@@ -46,9 +51,24 @@ export default function CompanyCapabilities({
       setBusy(false)
     }
   }
+  if (!editable) return (
+    <section className="detail-section trade-allocation">
+      <h3>Company capabilities</h3>
+      <p>View only. Capability reviews are managed in the Site PM workspace.</p>
+      <p>Directory classification: <strong>{company.primaryTrade || "Not recorded"}</strong></p>
+      {review ? <>
+        <div className="tag-list">{review.disciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div>
+        {!review.disciplines.length && <p>No verified capabilities recorded.</p>}
+        <p><Icon name="check" size={16} /> Last reviewed by {review.reviewedBy} on {new Date(review.reviewedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.</p>
+        <p>{review.note}</p>
+        <p>{review.unavailable ? "Unavailable for new commitments" : "Available for capacity checks"}</p>
+        <p>Supporting records: {company.documents.filter(document => (review.documentIds || []).includes(document.id)).map(document => document.name).join(", ") || "No linked records available"}</p>
+      </> : <p>Site PM capability review required.</p>}
+    </section>
+  )
   return (
     <section className="detail-section trade-allocation">
-      <h3>Admin-reviewed capabilities</h3>
+      <h3>Site PM capability review</h3>
       <p>
         Verify disciplines against the company’s supporting records before
         saving. Worker roster disciplines and the directory classification do
@@ -71,7 +91,7 @@ export default function CompanyCapabilities({
         </p>
       )}
       <fieldset disabled={busy}>
-        <legend>Verified disciplines</legend>
+        <legend>Capabilities to verify</legend>
         <div className="trade-checks">
           {disciplines.map((d) => (
             <label key={d}>
@@ -89,7 +109,8 @@ export default function CompanyCapabilities({
           {company.documents
             .filter((d) => d.uploaded)
             .map((d) => (
-              <label className="trade-check" key={d.id}>
+              <div className="trade-heading" key={d.id}>
+              <label className="trade-check">
                 <input
                   type="checkbox"
                   checked={documents.includes(d.id)}
@@ -97,11 +118,12 @@ export default function CompanyCapabilities({
                 />
                 {d.name}
               </label>
+              {onPreview && <Button disabled={busy} onClick={() => onPreview(d)}>Preview {d.name}</Button>}
+              </div>
             ))}
           {!company.documents.some((d) => d.uploaded) && (
             <p>
-              Upload supporting documents below, then select them for this
-              review.
+              Supporting company records are required. Add them through the company registration or supporting-document workflow, then select them for this review.
             </p>
           )}
         </fieldset>

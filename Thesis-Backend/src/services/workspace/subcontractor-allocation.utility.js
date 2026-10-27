@@ -190,7 +190,7 @@ export async function allocationCommand(db, p, meta, user, c) {
         proposed = c.plan || recommendTeam(ctx.type, ctx.phases, ctx.companies)
       if (!proposed)
         fail(
-          "No complete eligible team is available. Ask Admin to review capabilities or add another company.",
+          "No complete eligible team is available. Review company capabilities in the Site PM workspace or request another company.",
         )
       // Newly selected companies are rechecked after their rows are locked.
       await lockCompanies(db, proposed.companyIds)
@@ -350,6 +350,7 @@ export async function validateAllocationActivation(db, p, meta, command) {
   return plan.companyIds
 }
 export async function saveCapabilityReview(db, user, id, review) {
+  if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can edit company capability reviews.")
   if (
     !review ||
     !Array.isArray(review.disciplines) ||

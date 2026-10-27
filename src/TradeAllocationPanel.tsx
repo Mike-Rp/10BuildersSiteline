@@ -233,7 +233,7 @@ export default function TradeAllocationPanel({
         </Badge>
       </header>
       <p>
-        Match Admin-reviewed capabilities to each phase’s required disciplines.
+        Match Site PM-reviewed capabilities to each phase’s required disciplines.
         A company can cover several phases and return later; each company
         reserves one project slot after acceptance. The crew foreman handles
         workforce distribution.
