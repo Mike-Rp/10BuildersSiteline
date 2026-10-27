@@ -297,6 +297,7 @@ export type PhaseProgress = {
   locked?: boolean
 }
 export type Company = {
+  foremen?: { name: string; phone: string }[]
   proposedDisciplines?: string[]
   primaryTrade?: string
   rosterDisciplines?: string[]

@@ -50,6 +50,7 @@ import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
+import CompanyForemen from "./CompanyForemen"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
 import {
@@ -1624,18 +1625,14 @@ function AppInner() {
                         <p>{c.email || "Company email not supplied"}</p>
                         <div className="company-meta">
                           <span>
-                            <Icon name="users" size={16} />
-                            {c.manpowerCount} available manpower
-                          </span>
-                          <span>
                             <Icon name="building" size={16} />
                             {projects.length} active project commitments
                           </span>
                         </div>
                         <div className="coverage">
                           <span>
-                            Manpower list documents
-                            <strong>{c.manpowerDocuments.length}</strong>
+                            Verified capabilities
+                            <strong>{c.capabilityReview?.disciplines.length || 0}</strong>
                           </span>
                         </div>
                         <div className="card-bottom">
@@ -2673,23 +2670,20 @@ function AppInner() {
           <Status status={c.status} />
         </div>
         <div className="detail-grid account-detail-grid">
-          <div>
+          {!c.foremen?.length && <><div>
             <small>CONTACT PERSON</small>
             <strong>{c.contact}</strong>
           </div>
           <div>
             <small>PHONE</small>
             <strong>{c.phone}</strong>
-          </div>
+          </div></>}
           <div>
             <small>AVAILABILITY</small>
             <strong>{c.availability.replace("_", " ")}</strong>
           </div>
-          <div>
-            <small>AVAILABLE MANPOWER</small>
-            <strong>{c.manpowerCount}</strong>
-          </div>
         </div>
+        <CompanyForemen company={c} />
         <p className="section-description">{c.note}</p>
         <CompanyCapabilities company={c} disciplines={state.referenceDisciplines || []} role={actor.role} />
         <section className="detail-section">
@@ -2702,28 +2696,6 @@ function AppInner() {
           {!c.activeProjectIds.length && (
             <Empty title="No active project commitments" />
           )}
-        </section>
-        <section className="detail-section">
-          <h3>Manpower list documents</h3>
-          <p className="section-description">
-            Company-level manpower lists only. Individual worker records are not
-            stored in the directory.
-          </p>
-          <DocumentList
-            docs={c.manpowerDocuments}
-            onPreview={previewDoc}
-            spreadsheet
-            onUpload={(document) =>
-              updateCompany(
-                {
-                  ...c,
-                  manpowerDocuments: [...c.manpowerDocuments, document],
-                },
-                "Company manpower list uploaded",
-              )
-            }
-            uploadLabel="Company manpower list"
-          />
         </section>
         <section className="detail-section">
           <h3>Supporting documents</h3>

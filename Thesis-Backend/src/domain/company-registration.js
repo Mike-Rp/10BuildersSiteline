@@ -5,11 +5,32 @@ export function companyRegistrationErrors(company) {
     const errors = {};
     if (typeof company?.name !== "string" || !company.name.trim() || company.name.trim().length > 150)
         errors.name = "Enter a company name using 150 characters or fewer.";
-    if (typeof company?.phone !== "string" || !/^\d{11}$/.test(company.phone))
-        errors.phone = "Enter an 11-digit contact number.";
+    if (company?.foremen === undefined) {
+        if (typeof company?.phone !== "string" || !/^\d{11}$/.test(company.phone))
+            errors.phone = "Enter an 11-digit contact number.";
+    } else if (!Array.isArray(company.foremen) || company.foremen.length < 1 || company.foremen.length > 2) {
+        errors.foremen = "Provide one primary foreman and at most one backup foreman.";
+    } else {
+        company.foremen.forEach((foreman, index) => {
+            if (!foreman || typeof foreman !== "object" || Array.isArray(foreman)) { errors.foremen = "Enter a name and mobile number for each foreman contact."; return; }
+            const name = typeof foreman?.name === "string" ? foreman.name.trim() : "";
+            const phone = typeof foreman?.phone === "string" ? foreman.phone : "";
+            if (index === 1 && !name && !phone && (typeof foreman.name === "string" || foreman.name === undefined) && (typeof foreman.phone === "string" || foreman.phone === undefined)) return;
+            const label = index === 0 ? "primary" : "backup";
+            if (!name || name.length > 150) errors[`foreman${index + 1}Name`] = `Enter the ${label} foreman's full name using 150 characters or fewer.`;
+            if (!/^\d{11}$/.test(phone)) errors[`foreman${index + 1}Phone`] = `Enter an 11-digit mobile number for the ${label} foreman.`;
+        });
+    }
     if (typeof company?.email !== "string" || company.email.trim().length > 254 || !/^[a-z0-9][a-z0-9._%+\-]*@gmail\.com$/i.test(company.email.trim()))
         errors.email = "Enter a valid @gmail.com email address.";
     return errors;
+}
+
+/** Call after validation. An unused backup is omitted; legacy contacts keep their original meaning. */
+export function normalizeCompanyForemen(company) {
+    if (company.foremen === undefined) return undefined;
+    return company.foremen.filter((foreman, index) => index === 0 || foreman?.name?.trim() || foreman?.phone)
+        .map(foreman => ({ name: foreman.name.trim(), phone: foreman.phone }));
 }
 
 const heading = value => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");

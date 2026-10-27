@@ -1,0 +1,15 @@
+.company-foremen { margin: 20px 0; }
+.company-foremen > p { color: var(--color-muted); font-size: 14px; margin: 6px 0 16px; }
+.company-foreman-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-top: 14px; }
+#root .foreman-contact-card { min-width: 0; padding: 18px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-surface); margin: 0; }
+#root .foreman-contact-card.primary { background: var(--green-soft); }
+.foreman-contact-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.foreman-contact-heading h4 { margin: 0; }
+.foreman-contact-heading > span { padding: 3px 8px; border: 1px solid var(--color-line); border-radius: 5px; background: var(--color-surface); color: var(--color-primary); font-size: 14px; }
+.foreman-contact-card .field + .field { margin-top: 14px; }
+.foreman-contact-card input { min-height: 48px; }
+.foreman-contact-card > strong { display: block; margin-top: 10px; overflow-wrap: anywhere; }
+.foreman-contact-card > p { font-size: 14px; color: var(--color-muted); margin: 10px 0 0; }
+.foreman-call { display: inline-flex; align-items: center; min-height: 48px; color: var(--color-link, var(--color-primary)); text-decoration: underline; text-underline-offset: 3px; }
+.foreman-call:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+@media(max-width:600px) { .company-foreman-grid { grid-template-columns: 1fr; } #root .foreman-contact-card { padding: 14px; } }

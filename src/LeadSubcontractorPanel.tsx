@@ -43,17 +43,15 @@ function CompanyAvailability({ candidate }: { candidate: Recommendation }) {
             : "Committed to another project"}
         </Badge>
       ) : (
-        <Badge tone={candidate.availableManpower > 0 ? "green" : "amber"}>
-          {candidate.availableManpower > 0
-            ? `${candidate.availableManpower} manpower available`
-            : "Availability needs confirmation"}
+        <Badge tone={candidate.company.availability === "available" ? "green" : "amber"}>
+          {candidate.company.availability === "available" ? "Available for contact" : "Availability needs confirmation"}
         </Badge>
       )}
       <small>
         {candidate.otherProjects} other active project
         {candidate.otherProjects === 1 ? "" : "s"} ·{" "}
-        {candidate.company.manpowerDocuments.length} manpower list document
-        {candidate.company.manpowerDocuments.length === 1 ? "" : "s"}
+        {candidate.company.documents.length} supporting document
+        {candidate.company.documents.length === 1 ? "" : "s"}
       </small>
     </div>
   )

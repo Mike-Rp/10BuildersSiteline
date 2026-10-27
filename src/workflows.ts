@@ -1,6 +1,6 @@
 import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
-import { companyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { companyRegistrationErrors, normalizeCompanyForemen } from "../Thesis-Backend/src/domain/company-registration.js"
 import { allocationCandidates, allocationConsented, allocationPhases, canReleaseCompany, eligibility, protectScope, recommendTeam, replacementCandidates, replaceCompany, scopeFor, validatePlan, type AllocationPlan } from "./subcontractor-allocation.ts"
 import {
   DOC_LABELS,
@@ -830,6 +830,7 @@ function companyRequest(state: State, actor: Account, company: Company | undefin
   const c = structuredClone(company)
   const errors = companyRegistrationErrors(c)
   assert(!Object.keys(errors).length, Object.values(errors)[0] || "Check the company details.")
+  const foremen = normalizeCompanyForemen(c)
   assert(!state.companies.some(item => item.id === c.id), "This company request has already been submitted.")
   c.documents.forEach(requireDoc)
   c.manpowerDocuments ||= []
@@ -838,7 +839,7 @@ function companyRequest(state: State, actor: Account, company: Company | undefin
     requireManpowerDoc(doc)
     assert(Number.isInteger(doc.manpowerCount) && doc.manpowerCount! > 0, "Confirm a manpower list with Worker ID and Laborer Name columns.")
   })
-  return { ...c, name: c.name.trim(), email: c.email.trim().toLowerCase(), status: "pending", availability: "available",
+  return { ...c, ...(foremen === undefined ? {} : { foremen, contact: foremen[0].name, phone: foremen[0].phone }), name: c.name.trim(), email: c.email.trim().toLowerCase(), status: "pending", availability: "available",
     activeProjectIds: [], manpowerCount: c.manpowerDocuments[0]?.manpowerCount || 0, submittedBy: actor.name, submittedById: actor.id, projectId, version: 1 }
 }
 

@@ -41,19 +41,9 @@ export function recommendationReason(candidate: Candidate, pool: Candidate[]) {
           ? "no other active projects"
           : "fewest other active projects",
       )
-    if (
-      candidate.availableManpower > 0 &&
-      others.every((c) => candidate.availableManpower >= c.availableManpower)
-    )
-      reasons.push("most available workforce")
   } else {
     reasons.push(
       `${candidate.otherProjects} other active project${candidate.otherProjects === 1 ? "" : "s"}`,
-    )
-    reasons.push(
-      candidate.availableManpower > 0
-        ? `${candidate.availableManpower} manpower available`
-        : "availability needs confirmation",
     )
   }
   return reasons.join(" · ")

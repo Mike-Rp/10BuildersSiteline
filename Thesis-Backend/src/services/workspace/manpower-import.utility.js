@@ -1,5 +1,5 @@
 import XLSX from "xlsx";
-import { companyRegistrationErrors, manpowerRows } from "../../domain/company-registration.js";
+import { companyRegistrationErrors, manpowerRows, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js";
 
 export function readManpowerFile(file) {
@@ -24,6 +24,7 @@ export function readManpowerFile(file) {
 export async function registerCompany(db, user, company, loadFile, projectId = "") {
     const errors = companyRegistrationErrors(company);
     if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
+    const foremen = normalizeCompanyForemen(company);
     let proposedDisciplines;
     if (company.proposedDisciplines !== undefined) {
         if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can propose company trades.");
@@ -65,7 +66,8 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
     if (roster.length) await db.query(`insert into subcontractor_workers(id,subcontractor_id,full_name,status,availability_status,created_by,updated_by)
         select x.id,$1,x.name,'active','available',$3,$3 from jsonb_to_recordset($2::jsonb) as x(id uuid,name text)`, [companyId, JSON.stringify(roster), user.id]);
     await db.query("insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2)", [companyId, JSON.stringify({
-        contact: typeof company.contact === "string" ? company.contact.trim() : "", phone: company.phone,
+        contact: foremen?.[0].name ?? (typeof company.contact === "string" ? company.contact.trim() : ""), phone: foremen?.[0].phone ?? company.phone,
+        ...(foremen === undefined ? {} : { foremen }),
         documents, manpowerDocuments, manpowerRoster: roster, note: typeof company.note === "string" ? company.note.trim() : "",
         projectId, submittedById: user.id, submittedBy: user.full_name, availability: "available", activeProjectIds: [], manpowerCount: workers.length,
         ...(proposedDisciplines === undefined ? {} : { proposedDisciplines }),

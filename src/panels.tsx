@@ -16,7 +16,8 @@ import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
-import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, companyRegistrationErrors, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, companyRegistrationErrors, normalizeCompanyForemen, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import "./company-foremen.css"
 import { EXPERIENCE_PROJECT_TYPES, normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
   accountError,
@@ -1942,6 +1943,7 @@ export function CompanyForm({
     name: "",
     contact: "",
     phone: "",
+    foremen: [{ name: "", phone: "" }, { name: "", phone: "" }],
     email: "",
     status,
     submittedBy: owner,
@@ -1958,17 +1960,15 @@ export function CompanyForm({
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
   const [submitting, setSubmitting] = useState(false)
-  const [templateBusy, setTemplateBusy] = useState(false)
   const submittingRef = useRef(false)
   const busy = saving || submitting
-  const roster = draft.manpowerDocuments[0]
   const patch = (values: Partial<Company>) => {
     setDraft((company) => ({ ...company, ...values }))
     const errors = companyRegistrationErrors({ ...draft, ...values })
     setFieldErrors(current => {
       const next = { ...current }
-      for (const key of ["name", "phone", "email"] as const) {
-        if (key in values && key in current) {
+      for (const key of Object.keys(current) as (keyof CompanyRegistrationErrors)[]) {
+        if (key in values || ("foremen" in values && key.startsWith("forem"))) {
           if (errors[key]) next[key] = errors[key]
           else delete next[key]
         }
@@ -1977,17 +1977,9 @@ export function CompanyForm({
     })
     setError("")
   }
-  async function template() {
-    setTemplateBusy(true)
-    try {
-      const XLSX = await import("xlsx")
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-        ["Worker ID", "Laborer Name"], ["W-001", "Juan Dela Cruz"], ["W-002", "Maria Santos"],
-      ]), "Manpower")
-      XLSX.writeFile(workbook, "siteline-manpower-template.xlsx")
-    } catch { setError("We couldn’t prepare the template. Please try again.") }
-    finally { setTemplateBusy(false) }
+  const patchForeman = (index: number, values: Partial<{ name: string; phone: string }>) => {
+    const foremen = (draft.foremen || [{ name: "", phone: "" }, { name: "", phone: "" }]).map((foreman, position) => position === index ? { ...foreman, ...values } : foreman)
+    patch({ foremen, contact: foremen[0].name, phone: foremen[0].phone })
   }
   return (
     <form
@@ -2002,8 +1994,9 @@ export function CompanyForm({
         setSubmitting(true)
         setError("")
         try {
-          const saved = await onSave({ ...draft, name: draft.name.trim(), email: draft.email.trim().toLowerCase(), phone: draft.phone,
-            availability: "available", activeProjectIds: [], manpowerCount: roster?.manpowerCount || 0 })
+          const foremen = normalizeCompanyForemen(draft)!
+          const saved = await onSave({ ...draft, foremen, contact: foremen[0].name, phone: foremen[0].phone, name: draft.name.trim(), email: draft.email.trim().toLowerCase(),
+            availability: "available", activeProjectIds: [], manpowerCount: 0, manpowerDocuments: [] })
           if (saved === false) setError("We couldn’t submit this company. Your details are still here—please try again.")
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : "We couldn’t submit this company. Please try again.")
@@ -2034,21 +2027,24 @@ export function CompanyForm({
             onChange={(event) => patch({ email: event.target.value })}
           />
         </Field>
-        <Field label="Company contact person">
-          <input
-            value={draft.contact}
-            disabled={busy}
-            onChange={(event) => patch({ contact: event.target.value })}
-          />
-        </Field>
-        <Field label="Contact number *" error={fieldErrors.phone} hint="Enter exactly 11 digits.">
-          <input
-            required type="tel" inputMode="numeric" maxLength={11} pattern={COMPANY_PHONE_PATTERN} disabled={busy}
-            value={draft.phone}
-            onChange={(event) => patch({ phone: event.target.value.replace(/\D/g, "").slice(0, 11) })}
-          />
-        </Field>
       </div>
+      <section className="company-foremen" aria-label="Foreman contacts">
+        <h3>Foreman contacts</h3>
+        <p>Provide a primary contact and an optional backup.</p>
+        <div className="company-foreman-grid">{(draft.foremen || []).map((foreman, index) => {
+          const label = index === 0 ? "Primary foreman" : "Backup foreman"
+          const required = index === 0 || !!foreman.name.trim() || !!foreman.phone
+          const nameError = index === 0 ? fieldErrors.foreman1Name : fieldErrors.foreman2Name
+          const phoneError = index === 0 ? fieldErrors.foreman1Phone : fieldErrors.foreman2Phone
+          return <section key={index} className={`foreman-contact-card${index === 0 ? " primary" : ""}`} role="group" aria-label={label}>
+            <div className="foreman-contact-heading"><h4>{label}</h4><span>{index === 0 ? "Required" : "Optional"}</span></div>
+            <Field label={index === 0 ? "Full name *" : "Full name"} error={nameError}><input aria-label={`${label} full name`} required={required} maxLength={150} disabled={busy} value={foreman.name} placeholder={index === 0 ? "Enter full name" : "Enter backup foreman name"} onChange={event => patchForeman(index, { name: event.target.value })} /></Field>
+            <Field label={index === 0 ? "Mobile number *" : "Mobile number"} error={phoneError} hint={index === 0 ? "Enter exactly 11 digits." : undefined}><input aria-label={`${label} mobile number`} required={required} type="tel" inputMode="numeric" maxLength={11} pattern={COMPANY_PHONE_PATTERN} disabled={busy} value={foreman.phone} placeholder="09XXXXXXXXX" onChange={event => patchForeman(index, { phone: event.target.value.replace(/\D/g, "").slice(0, 11) })} /></Field>
+            {index === 1 && <p>Leave both blank, or complete both fields.</p>}
+          </section>
+        })}</div>
+        {fieldErrors.foremen && <p className="error" role="alert">{fieldErrors.foremen}</p>}
+      </section>
       {role === "spm" && <section className="form-section trade-allocation capability-proposal">
         <CompanyTradePicker disciplines={disciplines} selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Proposed company trades" />
         <p>Choose the trades this company offers. These remain proposals until a Site PM reviews supporting records and saves verified capabilities in company details. Company approval remains with Admin.</p>
@@ -2056,13 +2052,6 @@ export function CompanyForm({
       <div className="form-grid">
         <Field label="Company availability" hint="Not assigned to a project. Company approval does not assign a project.">
           <input readOnly value="Available" />
-        </Field>
-        <Field label="Available manpower" hint="Calculated from the confirmed Excel list. Each laborer needs a unique Worker ID and a name.">
-          <input
-            readOnly
-            value={roster?.manpowerCount ?? ""}
-            placeholder="Upload a manpower list first"
-          />
         </Field>
         <Field label="Company notes" wide>
           <textarea
@@ -2073,35 +2062,6 @@ export function CompanyForm({
         </Field>
       </div>
       {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
-      <section className="form-section">
-        <h3>Manpower list</h3>
-        <p>
-          Upload an XLSX or XLS file with Worker ID and Laborer Name columns, one laborer per row.
-          Use one current list; uploading a replacement updates the count.
-        </p>
-        {roster && <div className="role-actions">
-          <p role="status">{roster.name} · {roster.manpowerCount} laborer{roster.manpowerCount === 1 ? "" : "s"} available</p>
-          <Button
-            disabled={busy}
-            aria-label="Remove manpower list"
-            onClick={() => patch({ manpowerDocuments: [], manpowerCount: 0 })}
-          >Remove file</Button>
-        </div>}
-        <Upload
-          spreadsheet
-          label="Company Manpower List"
-          owner={owner}
-          disabled={busy}
-          buttonLabel={roster ? "Replace manpower list" : "Upload manpower list"}
-          onSave={(document) => {
-            if (!Number.isInteger(document.manpowerCount) || document.manpowerCount! < 1) throw new Error("We couldn’t read the worker list. Please upload a file with Worker ID and Laborer Name columns.")
-            patch({ manpowerDocuments: [document], manpowerCount: document.manpowerCount })
-          }}
-        />
-        <div className="role-actions">
-          <Button disabled={busy || templateBusy} onClick={template}>{templateBusy ? "Preparing template…" : "Download Excel template"}</Button>
-        </div>
-      </section>
       <section className="form-section">
         <h3>Supporting documents</h3>
         <DocumentList docs={draft.documents} onPreview={() => undefined} />

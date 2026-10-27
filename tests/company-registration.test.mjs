@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import XLSX from "xlsx"
-import { companyRegistrationErrors, manpowerRows } from "../Thesis-Backend/src/domain/company-registration.js"
+import { companyRegistrationErrors, manpowerRows, normalizeCompanyForemen } from "../Thesis-Backend/src/domain/company-registration.js"
 import { readManpowerFile } from "../Thesis-Backend/src/services/workspace/manpower-import.utility.js"
 import { applyWorkflow } from "../src/workflows.ts"
 import { initialState } from "./fixtures/demo-state.ts"
@@ -27,6 +27,25 @@ test("two-column XLSX and XLS lists count laborers and retain their IDs", () => 
     const workers = readManpowerFile(book([["Worker ID", "Laborer Name"], ["0001", "Juan Dela Cruz"], ["0002", "Maria Santos"], [], ["0003", "  Pedro   Reyes  "]], extension))
     assert.deepEqual(workers, [{ workerId: "0001", name: "Juan Dela Cruz" }, { workerId: "0002", name: "Maria Santos" }, { workerId: "0003", name: "Pedro Reyes" }])
   }
+})
+test("primary foreman is required and an unused optional backup is omitted", () => {
+  const company = { ...valid, foremen: [{ name: "  Juan Dela Cruz  ", phone: "09171234567" }, { name: "   ", phone: "" }] }
+  assert.deepEqual(companyRegistrationErrors(company), {})
+  assert.deepEqual(normalizeCompanyForemen(company), [{ name: "Juan Dela Cruz", phone: "09171234567" }])
+  assert.equal(company.foremen[0].name, "  Juan Dela Cruz  ", "normalizing must not change the caller's draft")
+  assert.equal(normalizeCompanyForemen(valid), undefined, "legacy company contacts must not be reclassified as foremen")
+  for (const foremen of [null, {}, [], [company.foremen[0], company.foremen[0], company.foremen[0]], [null]])
+    assert.ok(Object.keys(companyRegistrationErrors({ ...valid, foremen })).length)
+})
+test("both foremen require a full name and 11-digit mobile number when entered", () => {
+  const primary = { name: "Juan Dela Cruz", phone: "09171234567" }, backup = { name: "Maria Santos", phone: "09181234567" }
+  assert.deepEqual(companyRegistrationErrors({ ...valid, foremen: [primary, backup] }), {})
+  assert.ok(companyRegistrationErrors({ ...valid, foremen: [{ name: "", phone: primary.phone }] }).foreman1Name)
+  assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { name: backup.name, phone: "" }] }).foreman2Phone)
+  assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { name: "", phone: backup.phone }] }).foreman2Name)
+  for (const phone of ["123", "+639171234567", "0917abc4567", 9171234567])
+    assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { ...backup, phone }] }).foreman2Phone)
+  assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { ...backup, name: "a".repeat(151) }] }).foreman2Name)
 })
 
 test("missing columns, empty rosters, incomplete rows, duplicate IDs and formulas are rejected", () => {

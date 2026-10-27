@@ -6,6 +6,7 @@ import MonthlyReport from "./MonthlyReport"
 import Reports from "./Reports"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
+import CompanyForemen from "./CompanyForemen"
 import { api } from "./api/client"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
@@ -2853,7 +2854,7 @@ export default function RoleWorkspace({
         company.submittedBy === actor.name,
     )
     const directoryList = runList(`${actor.role}:directory`, directoryItems, {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${(c.foremen || []).map(contact => `${contact.name} ${contact.phone}`).join(" ")} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")}`,
       filters: [
         {
           id: "availability",
@@ -2915,17 +2916,14 @@ export default function RoleWorkspace({
               </div>
               <div className="company-meta">
                 <span>
-                  <Icon name="users" size={17} />
-                  {company.manpowerCount} available manpower
-                </span>
-                <span>
                   <Icon name="building" size={17} />
                   {company.activeProjectIds.length} active project commitments
                 </span>
                 <span>
-                  {company.contact || "No contact supplied"} ·{" "}
+                  {company.foremen?.length ? "Primary foreman: " : ""}{company.contact || "No contact supplied"} ·{" "}
                   {company.phone || "No phone supplied"}
                 </span>
+                {company.foremen?.[1] && <span>Backup foreman: {company.foremen[1].name} · {company.foremen[1].phone}</span>}
               </div>
               <div className="card-bottom">
                 <span>View company details & trades</span>
@@ -3476,23 +3474,20 @@ export default function RoleWorkspace({
           <Status value={c.status} />
         </div>
         <div className="detail-grid account-detail-grid">
-          <div>
+          {!c.foremen?.length && <><div>
             <small>CONTACT PERSON</small>
             <strong>{c.contact || "Not supplied"}</strong>
           </div>
           <div>
             <small>PHONE</small>
             <strong>{c.phone || "Not supplied"}</strong>
-          </div>
+          </div></>}
           <div>
             <small>AVAILABILITY</small>
             <strong>{c.availability}</strong>
           </div>
-          <div>
-            <small>AVAILABLE MANPOWER</small>
-            <strong>{c.manpowerCount}</strong>
-          </div>
         </div>
+        <CompanyForemen company={c} />
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines ?? DISCIPLINES} role={actor.role} onPreview={setPreview} onCancel={() => setDialog(undefined)} onUpload={actor.role === "spm" ? async document => {
           await api("/subcontractors/" + c.id + "/supporting-documents", { method: "POST", json: { doc: document } })
           await onReload()
@@ -3509,29 +3504,6 @@ export default function RoleWorkspace({
           </div>
           {!c.activeProjectIds.length && (
             <Empty title="No active project commitments" />
-          )}
-        </section>
-        <section className="detail-section">
-          <h3>Manpower list documents</h3>
-          <p className="role-muted subsection">
-            Worker IDs and laborer names from the uploaded list determine the available manpower count.
-          </p>
-          {c.manpowerDocuments.map((document) => (
-            <div className="document-row" key={document.id}>
-              <span className="file-icon">
-                <Icon name="doc" />
-              </span>
-              <div className="document-info">
-                <strong>{document.label}</strong>
-                <p>
-                  {document.name} · {dateLabel(document.date)}
-                </p>
-              </div>
-              <Status value="on file" />
-            </div>
-          ))}
-          {!c.manpowerDocuments.length && (
-            <Empty title="No manpower list documents" />
           )}
         </section>
         {c.status === "pending" &&

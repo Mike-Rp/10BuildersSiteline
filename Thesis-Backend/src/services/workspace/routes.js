@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
@@ -354,6 +355,13 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
     const b = req.body;
     if (!isUuid(req.params.id))
         throw new HttpError(400, "Invalid company ID.");
+    if (!(await db.query("select id from subcontractors where id=$1 for update", [req.params.id])).rowCount) throw new HttpError(404, "Company not found.");
+    const previous = (await db.query("select metadata from workspace_company_metadata where subcontractor_id=$1", [req.params.id])).rows[0]?.metadata || {};
+    if (b.foremen !== undefined) {
+        const errors = companyRegistrationErrors(b);
+        if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
+    }
+    const foremen = b.foremen === undefined ? previous.foremen : normalizeCompanyForemen(b);
     for (const [d, purpose] of [...(b.documents || []).map(d => [d, "document"]), ...(b.manpowerDocuments || []).map(d => [d, "manpower"])])
         if (d.uploaded) {
             await file(db, user, d.id, purpose);
@@ -365,7 +373,8 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
     await db.query("update subcontractors set company_name=$2,contact_email=$3,directory_status=$4,committed_until=$5 where id=$1", [req.params.id, b.name, b.email || null, status, b.committedUntil || null]);
     await db.query(`insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2)
  on conflict(subcontractor_id) do update set metadata=workspace_company_metadata.metadata||excluded.metadata`, [req.params.id, JSON.stringify({
-            contact: b.contact || "", phone: b.phone || "", documents: b.documents || [], manpowerDocuments: b.manpowerDocuments || [], note: b.note || "", availability: b.availability, manpowerCount: b.manpowerCount
+            contact: foremen?.[0]?.name ?? (b.contact || ""), phone: foremen?.[0]?.phone ?? (b.phone || ""),
+            ...(foremen === undefined ? {} : { foremen }), documents: b.documents || [], manpowerDocuments: b.manpowerDocuments || [], note: b.note || "", availability: b.availability, manpowerCount: b.manpowerCount
         })]);
     return {};
 }));

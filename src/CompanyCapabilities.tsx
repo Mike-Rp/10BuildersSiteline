@@ -124,7 +124,7 @@ export default function CompanyCapabilities({
         <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>
         <div className="capability-footer-actions">{onCancel && <Button disabled={busy} onClick={onCancel}>Cancel</Button>}<Button variant="primary" disabled={busy || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>
       </div>
-      <p className="capability-help">Company approval and project acceptance are separate. Worker roster disciplines do not automatically verify company capabilities.</p>
+      <p className="capability-help">Company approval and project acceptance are separate.</p>
     </section>
   )
 }
