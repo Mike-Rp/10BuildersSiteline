@@ -260,7 +260,7 @@ export default function ClientPortal({
             </Badge>
             {doc.uploaded && (
               <div className="button-group">
-                <Button icon="search" onClick={() => openDocument(doc.id)}>
+                <Button icon="eye" onClick={() => openDocument(doc.id)}>
                   View
                 </Button>
                 <Button
@@ -905,7 +905,7 @@ function ClientPhoto({
         <small>
           {photo.date ? dateLabel(photo.date) : "Shared by project team"}
         </small>
-        <Icon name="search" size={17} />
+        <Icon name="eye" size={17} />
       </div>
     </button>
   )

@@ -18,7 +18,7 @@ export default function SitePhotoGallery({ photos, onPreview, onRelease }: {
       <button className="assignment-history" onClick={() => onPreview(doc)}>
         <Icon name="doc" />
         <span><strong>{doc.name}</strong><Badge tone={doc.clientVisible ? "green" : "amber"}>{doc.clientVisible ? "Client-visible" : "Internal · not released"}</Badge><small>{dateLabel(doc.date)} · {doc.owner}</small></span>
-        <Icon name="search" size={18} />
+        <Icon name="eye" size={18} />
       </button>
       {!doc.clientVisible && onRelease && <Button disabled={!!saving} onClick={async () => {
         setSaving(doc.id)

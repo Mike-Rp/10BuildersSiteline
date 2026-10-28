@@ -1070,7 +1070,7 @@ export default function RoleWorkspace({
                         <Badge tone="green">Uploaded & locked</Badge>
                         <Button
                           variant="icon-button"
-                          icon="search"
+                          icon="eye"
                           aria-label={`Preview ${label}`}
                           onClick={() => showDoc(p, doc)}
                         />
@@ -2134,7 +2134,7 @@ export default function RoleWorkspace({
                   </Badge>
                   <small>{dateLabel(doc.date)}</small>
                 </span>
-                <Icon name="search" size={17} />
+                <Icon name="eye" size={17} />
               </button>
             ))}
           </div>
@@ -3403,7 +3403,7 @@ export default function RoleWorkspace({
                   {doc.name} · {dateLabel(doc.date)} · {doc.owner}
                 </small>
               </span>
-              <Icon name="search" size={18} />
+              <Icon name="eye" size={18} />
             </button>
           ))
         ) : (

@@ -330,7 +330,7 @@ export function DocumentList({
                 variant="icon-button"
                 title="Preview document"
                 aria-label={`Preview ${doc.label}`}
-                icon="search"
+                icon="eye"
                 onClick={() => onPreview(doc)}
               />
               <Button
@@ -1746,7 +1746,7 @@ export function IntakeForm({
                       <Badge tone="green">Validated</Badge>
                       <Button
                         variant="icon-button"
-                        icon="search"
+                        icon="eye"
                         aria-label="Preview Client–Subcontractor Agreement"
                         onClick={() =>
                           setAgreementPreview(clientSubconAgreement)
