@@ -5,10 +5,11 @@ import {downloadBlob} from "./panels"
 import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type MonthlyReport as Report} from "./monthly-report"
 import "./monthly-report.css"
 import ReportProjectSearch from "./ReportProjectSearch"
+import ReportExportActions, { type ReportExportFormat } from "./ReportExportActions"
 
 export default function MonthlyReport({projects,initialProjectId,initialMonth,onClose,allowProjectChange=true,onProjectChange}:{projects:{id:string;name:string}[];initialProjectId:string;initialMonth?:string;onClose:()=>void;allowProjectChange?:boolean;onProjectChange?:(id:string)=>void}) {
   const [projectId,setProjectId]=useState(initialProjectId)
-  const [projectSearchOpen,setProjectSearchOpen]=useState(allowProjectChange)
+  const [projectSearchOpen,setProjectSearchOpen]=useState(allowProjectChange && !initialProjectId)
   const [month,setMonth]=useState(()=>initialMonth||currentReportMonth())
   const [data,setData]=useState<{report:Report;snapshot:string}>()
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[refresh,setRefresh]=useState(0),[exporting,setExporting]=useState(false)
@@ -22,13 +23,19 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
       .then(result=>{if(active)setData(result)}).catch(reason=>{if(active)setError(reason.message)}).finally(()=>{if(active)setLoading(false)})
     return()=>{active=false}
   },[projectId,month,refresh])
-  async function exportReport(format:"csv"|"print") {
+  async function exportReport(format:ReportExportFormat) {
     if(!data||exporting)return
     const current=revision.current;setExporting(true);setError("")
     try {
-      const result=await api<{csv?:string;report?:Report}>(`/projects/${data.report.project.id}/monthly-report/export`,{method:"POST",json:{snapshot:data.snapshot,format}})
+      const result=await api<{csv?:string;report?:Report}>(`/projects/${data.report.project.id}/monthly-report/export`,{method:"POST",json:{snapshot:data.snapshot,format:format==="pdf"?"print":format}})
       if(current!==revision.current)return
       if(format==="csv")downloadBlob(new Blob([result.csv||""],{type:"text/csv;charset=utf-8"}),`${data.report.project.name.replace(/[\\/:*?"<>|]/g,"-")} — ${data.report.period.month}.csv`)
+      else if(format==="pdf" && result.report){
+        const {createReportPdf}=await import("./report-pdf")
+        const blob=await createReportPdf(monthlyPrintDocument(result.report))
+        if(current!==revision.current)return
+        downloadBlob(blob,`${data.report.project.name.replace(/[\\/:*?"<>|]/g,"-")} — ${data.report.period.month}.pdf`)
+      }
       else if(result.report){
         printFrame.current?.remove()
         const frame=document.createElement("iframe");frame.className="monthly-print-frame";frame.title="Monthly report print preview";frame.setAttribute("aria-hidden","true");document.body.append(frame);printFrame.current=frame
@@ -42,7 +49,7 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
   return <Modal title="Monthly Project Progress Summary" subtitle={report?.project.name||projects.find(p=>p.id===projectId)?.name} wide onClose={onClose}>
     <div className="monthly-report">
       <div className="monthly-report-controls">
-        {projects.length > 1 && <Button aria-expanded={projectSearchOpen} onClick={()=>setProjectSearchOpen(open=>!open)}>{projectSearchOpen ? "Cancel project change" : "Change project"}</Button>}
+        {allowProjectChange && projects.length > 1 && <Button aria-expanded={projectSearchOpen} onClick={()=>setProjectSearchOpen(open=>!open)}>{projectSearchOpen ? "Cancel project change" : "Change project"}</Button>}
         {projectSearchOpen && <ReportProjectSearch projects={projects} value={projectId} onChange={id=>{
           setProjectId(id);setProjectSearchOpen(false);onProjectChange?.(id)
         }} />}
@@ -78,9 +85,9 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
           {(report.projection==="client"?report.updates||[]:report.activity||[]).map((row,i)=><tr key={i}><td>{reportDate(row.date)}</td><td>{row.phase}</td><td>{"text" in row?row.text:row.record}</td></tr>)}
         </tbody></table></div>
         {!(report.projection==="client"?report.updates?.length:report.activity?.length)&&<p>No activity records are available for this period.</p>}
-        <p className="role-muted">Historical coverage starts {report.coverageFrom?reportDate(report.coverageFrom):"when reporting history is installed"}. Print / Save as PDF uses your browser’s print dialog.</p>
+        <p className="role-muted">Historical coverage starts {report.coverageFrom?reportDate(report.coverageFrom):"when reporting history is installed"}. Download PDF saves a file directly; Print opens your browser’s print dialog.</p>
       </>}
-      <div className="modal-actions"><Button onClick={onClose}>Close</Button><Button disabled={!data||loading||exporting} onClick={()=>void exportReport("print")}>Print / Save as PDF</Button><Button variant="primary" disabled={!data||loading||exporting} onClick={()=>void exportReport("csv")}>{exporting?"Preparing…":"Export CSV"}</Button></div>
+      <div className="modal-actions"><Button onClick={onClose}>Close</Button><ReportExportActions disabled={!data||loading} busy={exporting} onExport={format=>void exportReport(format)} /></div>
     </div>
   </Modal>
 }

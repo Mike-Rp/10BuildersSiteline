@@ -9,7 +9,7 @@ test("monthly report modal keeps parent context, hides client staff fields, reje
   const requests=[],pending=[];let exportedBlob
   for(const [key,value] of Object.entries({window:dom.window,document:dom.window.document,Node:dom.window.Node,IS_REACT_ACT_ENVIRONMENT:true,fetch:(url,init)=>{
     requests.push({url:String(url),init})
-    if(String(url).endsWith('/export'))return Promise.resolve(new Response(JSON.stringify({data:{csv:'"First Project"'}}),{status:200}))
+    if(String(url).endsWith('/export'))return Promise.resolve(new Response(JSON.stringify({data:JSON.parse(init.body).format==='csv'?{csv:'"First Project"'}:{report:{...report,project:{...report.project,id:'p2',name:'Second Project'}}}}),{status:200}))
     return new Promise(resolve=>pending.push(resolve))
   }})){saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})}
   const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL
@@ -28,6 +28,8 @@ test("monthly report modal keeps parent context, hides client staff fields, reje
     await act(()=>{trigger.focus();trigger.click()})
     assert.equal(document.querySelectorAll('[aria-modal=true]').length,2)
     assert.match(requests[0].url,/p1\/monthly-report\?month=/)
+    assert.equal(document.querySelector('.monthly-report .report-project-results'),null)
+    await act(()=>[...document.querySelectorAll('.monthly-report button')].find(b=>b.textContent==='Change project').click())
     const selector=[...document.querySelectorAll('.monthly-report .report-project-results button')].find(b=>b.textContent.includes('Second Project'))
     await act(()=>selector.click())
     await act(()=>pending[1](new Response(JSON.stringify({data:{report:{...report,project:{...report.project,id:'p2',name:'Second Project'}},snapshot:'second-snapshot'}}),{status:200})))
@@ -36,14 +38,34 @@ test("monthly report modal keeps parent context, hides client staff fields, reje
     assert.equal(modal.querySelector('.modal-header p').textContent,'Second Project')
     assert.doesNotMatch(modal.textContent,/Rework confirmed|Approvals withdrawn|Pending reviews/)
     assert.match(modal.textContent,/Month to date|Asia\/Manila/)
+    assert.equal(modal.querySelector('.report-export-actions select').value,'pdf')
+    assert.ok([...modal.querySelectorAll('button')].find(b=>b.textContent==='Download PDF'))
+    await act(()=>{
+      const format=modal.querySelector('.report-export-actions select');format.value='csv';format.dispatchEvent(new dom.window.Event('change',{bubbles:true}))
+    })
     await act(()=>[...modal.querySelectorAll('button')].find(b=>b.textContent==='Export CSV').click())
     assert.deepEqual(JSON.parse(requests.at(-1).init.body),{snapshot:'second-snapshot',format:'csv'})
     assert.equal(await exportedBlob.text(),'"First Project"')
+    await act(()=>{
+      const format=modal.querySelector('.report-export-actions select');format.value='pdf';format.dispatchEvent(new dom.window.Event('change',{bubbles:true}))
+    })
+    await act(async()=>{
+      [...modal.querySelectorAll('button')].find(b=>b.textContent==='Download PDF').click()
+      const deadline=Date.now()+15000
+      while(exportedBlob?.type!=='application/pdf'&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20))
+    })
+    assert.deepEqual(JSON.parse(requests.at(-1).init.body),{snapshot:'second-snapshot',format:'print'})
+    assert.equal(exportedBlob.type,'application/pdf')
+    assert.equal(new TextDecoder().decode((await exportedBlob.arrayBuffer()).slice(0,5)),'%PDF-')
+    assert.equal(document.querySelector('.monthly-print-frame'),null,'direct PDF export never opens the print dialog')
     await act(()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})))
     assert.equal(document.querySelectorAll('[aria-modal=true]').length,1)
     assert.equal(document.activeElement,trigger)
     assert.equal(parent.scrollTop,160)
     assert.equal(parentClosed,0)
+    await act(()=>root.render(React.createElement(MonthlyReport,{projects:[{id:'p1',name:'First Project'},{id:'p2',name:'Second Project'}],initialProjectId:'p1',allowProjectChange:false,onClose(){}})))
+    assert.equal(document.querySelector('.report-project-search'),null)
+    assert.ok(![...document.querySelectorAll('.monthly-report button')].some(b=>b.textContent==='Change project'))
   }finally{
     await act(()=>root.unmount());await server.close();dom.window.close();URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke
     for(const [key,descriptor] of saved)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key]

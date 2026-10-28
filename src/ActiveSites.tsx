@@ -1,5 +1,6 @@
 import OverallProjectProgress from "./OverallProjectProgress"
 import type { VerifiedProgress } from "./project-progress"
+import { progressLabel } from "./project-progress"
 import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, phaseDefinitions, type PhaseDefinition } from "./model"
 import ScheduleStatusBadge, { DelayedProjectNotice, useScheduleToday } from "./ScheduleStatus"
@@ -15,6 +16,7 @@ export type SiteCard = {
   status: string
   verifiedProgress?: VerifiedProgress
   progress: number
+  overallProgress?: number | null
   start: string
   end?: string
   lead?: string
@@ -22,6 +24,10 @@ export type SiteCard = {
 }
 
 // Accept only the caller's existing authorized projection, never global state.
+const progressValue = (project: SiteCard, overallOnly: boolean) => {
+  const value = overallOnly ? project.overallProgress : project.progress
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100 ? value : NaN
+}
 
 export default function ActiveSites({
   projects,
@@ -32,6 +38,7 @@ export default function ActiveSites({
   initialScheduleFilter = "",
   showDelayNotice = false,
   today,
+  overallOnly = false,
 }: {
   projects: SiteCard[]
 
@@ -43,6 +50,7 @@ export default function ActiveSites({
   initialScheduleFilter?: "" | "delayed"
   showDelayNotice?: boolean
   today?: string
+  overallOnly?: boolean
 }) {
   const localToday = useScheduleToday()
   const reportingDate = today ?? localToday
@@ -80,7 +88,7 @@ export default function ActiveSites({
         )
         .sort((a, b) => {
           if (sort === "progress")
-            return b.progress - a.progress || a.name.localeCompare(b.name)
+            return (progressValue(b, overallOnly) || 0) - (progressValue(a, overallOnly) || 0) || a.name.localeCompare(b.name)
 
           if (sort === "end")
             return (
@@ -90,7 +98,7 @@ export default function ActiveSites({
 
           return a.name.localeCompare(b.name)
         }),
-    [activeProjects, query, type, phase, selectedTab, sort, scheduleFilter, reportingDate],
+    [activeProjects, query, type, phase, selectedTab, sort, scheduleFilter, reportingDate, overallOnly],
   )
 
   const pages = Math.max(1, Math.ceil(filtered.length / size))
@@ -99,7 +107,7 @@ export default function ActiveSites({
 
   const visible = filtered.slice((current - 1) * size, current * size)
 
-  const recorded = activeProjects.filter((p) => Number.isFinite(p.progress))
+  const recorded = activeProjects.filter((p) => Number.isFinite(progressValue(p, overallOnly)))
 
   const schedules = activeProjects.map(p => projectScheduleStatus(p, reportingDate)).filter(s => s.targetEndDate !== null)
   const onSchedule = schedules.filter(s => s.status === "On schedule").length
@@ -138,13 +146,13 @@ export default function ActiveSites({
         </div>
         <div>
           <span className="as-summary-icon" aria-hidden="true"><Icon name="trend" size={25} /></span>
-          <span>Average recorded progress</span>
+          <span>{overallOnly ? "Average overall progress" : "Average recorded progress"}</span>
           <strong>
             {recorded.length
-              ? `${Math.round(recorded.reduce((sum, p) => sum + p.progress, 0) / recorded.length)}%`
+              ? `${Math.round(recorded.reduce((sum, p) => sum + progressValue(p, overallOnly), 0) / recorded.length)}%`
               : "—"}
           </strong>
-          <small>Recorded completion only</small>
+          <small>{overallOnly ? "Approved work across all phases" : "Recorded completion only"}</small>
         </div>
         {schedules.length > 0 && (
             <div>
@@ -288,19 +296,19 @@ export default function ActiveSites({
               <div className="as-schedule"><ScheduleStatusBadge project={p} today={reportingDate} /></div>
               {showDelayNotice && <DelayedProjectNotice project={p} today={reportingDate} />}
               <div className="as-progress-label">
-                <span>Recorded progress</span>
+                <span>{overallOnly ? "Overall project progress" : "Recorded progress"}</span>
                 <strong>
-                  {Number.isFinite(p.progress)
-                    ? `${p.progress}%`
-                    : "Not recorded"}
+                  {Number.isFinite(progressValue(p, overallOnly))
+                    ? `${progressLabel(progressValue(p, overallOnly))}%`
+                    : overallOnly ? "Unavailable" : "Not recorded"}
                 </strong>
               </div>
-              <progress
-                aria-label={`${p.name} recorded progress`}
+              {(!overallOnly || Number.isFinite(progressValue(p, overallOnly))) && <progress
+                aria-label={`${p.name} ${overallOnly ? "overall project progress" : "recorded progress"}`}
                 max={100}
-                value={Number.isFinite(p.progress) ? p.progress : undefined}
-              />
-              <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
+                value={Number.isFinite(progressValue(p, overallOnly)) ? progressValue(p, overallOnly) : undefined}
+              />}
+              {!overallOnly && <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />}
               <dl>
                 {p.lead && (
                   <div>

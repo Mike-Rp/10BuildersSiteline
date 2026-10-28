@@ -27,7 +27,12 @@ test("Reports opens on the overall monthly summary with filters, exports, retry 
     IS_REACT_ACT_ENVIRONMENT: true, fetch: async (url, init) => {
       requests.push({ url: String(url), init })
       const month = new URL(String(url), "http://x").searchParams.get("month")
-      if (String(url).endsWith("/monthly-summary/export")) return new Response(JSON.stringify({ data: { csv: '"Project One"' } }), { status: 200 })
+      if (String(url).endsWith("/monthly-summary/export")) {
+        const body=JSON.parse(init.body)
+        const data=summaryFor(currentReportMonth(),...role)
+        const {summaryView}=await import("../Thesis-Backend/src/domain/monthly-summary.js")
+        return new Response(JSON.stringify({data:body.format==='csv'?{csv:'"Project One"'}:{summary:data.summary,view:summaryView(data.summary,body.filters)}}),{status:200})
+      }
       if (String(url).includes("/monthly-summary?")) {
         if (mode === "fail") return new Response(JSON.stringify({ message: "Database unavailable" }), { status: 503 })
         if (mode === "empty") return new Response(JSON.stringify({ data: { summary: { ...summaryFor(month, ...role).summary, rows: [] }, snapshot: "s" } }), { status: 200 })
@@ -81,6 +86,16 @@ test("Reports opens on the overall monthly summary with filters, exports, retry 
     await act(() => button("Clear filters").click())
     await setValue([...document.querySelectorAll("select")].find(s => s.querySelector('option[value="pending"]')), "pending")
     assert.deepEqual(bodyRows().map(r => r.querySelector("th").textContent), ["Project One"])
+    assert.equal(document.querySelector('.report-export-actions select').value,'pdf')
+    await act(async()=>{
+      button('Download PDF').click()
+      const deadline=Date.now()+15000
+      while(exported?.type!=='application/pdf'&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20))
+    })
+    assert.deepEqual(JSON.parse(requests.at(-1).init.body),{snapshot:`snapshot-${currentReportMonth()}`,format:'print',filters:{search:'',type:'',outstanding:'pending'}})
+    assert.equal(exported.type,'application/pdf')
+    assert.equal(document.querySelector('.monthly-print-frame'),null)
+    await setValue(document.querySelector('.report-export-actions select'),'csv')
     await act(() => button("Export CSV").click()); await settle()
     const exportRequest = requests.at(-1)
     assert.match(exportRequest.url, /\/reports\/monthly-summary\/export$/)

@@ -68,7 +68,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .sidebar { width: var(--sidebar-width); height: 100vh; height: 100dvh; padding: 0 16px max(12px, env(safe-area-inset-bottom, 0px)); background: var(--color-surface); border-right: 1px solid var(--color-line); overflow: hidden; }
 #root .sidebar > :not(nav) { flex-shrink: 0; }
 #root .sidebar > nav { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
-#root .main-shell { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); }
+#root .main-shell { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); min-width: 0; }
 #root .brand { padding: 0 10px 26px; gap: 12px; font-size: 25px; letter-spacing: -.9px; font-weight: 750; }
 #root .brand-mark { width: 40px; height: 44px; border-radius: 4px; background: var(--color-primary); color: var(--color-surface); }
 #root .brand small { font-size: 14px; color: var(--color-muted); font-weight: 400; letter-spacing: 0; margin-top: 2px; }

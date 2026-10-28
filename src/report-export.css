@@ -1,0 +1,9 @@
+.report-export-actions { display: flex; flex-wrap: wrap; align-items: end; justify-content: flex-end; gap: 10px; min-width: 0; }
+.report-export-actions > label { display: grid; gap: 4px; min-width: 0; max-width: 100%; font-size: 14px; font-weight: 600; }
+.report-export-actions select { width: auto; max-width: 100%; }
+@media (max-width: 600px) {
+  .report-export-actions { width: 100%; }
+  .report-export-actions > label { flex: 1 1 180px; }
+  .report-export-actions select { width: 100%; }
+  .report-export-actions > .button { flex: 1 1 140px; }
+}

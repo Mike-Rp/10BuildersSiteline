@@ -10,6 +10,7 @@ import {
   summaryMetrics, summaryPrintDocument, summaryView, totalText, type MonthlySummary, type SummaryFilters, type SummaryTotal, type SummaryView,
 } from "./monthly-summary"
 import "./reports.css"
+import ReportExportActions, { type ReportExportFormat } from "./ReportExportActions"
 
 function SummaryCard({ label, total, value, note, icon }: { label: string; total?: SummaryTotal; value?: number; note?: string; icon: string }) {
   return <article className="metric-card report-summary-card">
@@ -48,13 +49,19 @@ export default function Reports() {
   const filtered = filters.search !== "" || filters.type !== "" || filters.outstanding !== "all"
   const setFilter = (key: keyof SummaryFilters, value: string) => setFilters(current => ({ ...current, [key]: value }))
 
-  async function exportSummary(format: "csv" | "print") {
+  async function exportSummary(format: ReportExportFormat) {
     if (!data || !view || exporting) return
     const current = revision.current; setExporting(true); setExportError("")
     try {
-      const result = await api<{ csv?: string; summary?: MonthlySummary; view?: SummaryView }>("/reports/monthly-summary/export", { method: "POST", json: { snapshot: data.snapshot, format, filters: view.filters } })
+      const result = await api<{ csv?: string; summary?: MonthlySummary; view?: SummaryView }>("/reports/monthly-summary/export", { method: "POST", json: { snapshot: data.snapshot, format: format === "pdf" ? "print" : format, filters: view.filters } })
       if (current !== revision.current) return
       if (format === "csv") downloadBlob(new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" }), `SITELINE monthly summary — ${data.summary.period.month}.csv`)
+      else if (format === "pdf" && result.summary && result.view) {
+        const { createReportPdf } = await import("./report-pdf")
+        const blob = await createReportPdf(summaryPrintDocument(result.summary, result.view), true)
+        if (current !== revision.current) return
+        downloadBlob(blob, `SITELINE monthly summary — ${data.summary.period.month}.pdf`)
+      }
       else if (result.summary && result.view) {
         printFrame.current?.remove()
         const frame = document.createElement("iframe"); frame.className = "monthly-print-frame"; frame.title = "Monthly summary print preview"; frame.setAttribute("aria-hidden", "true"); document.body.append(frame); printFrame.current = frame
@@ -73,8 +80,7 @@ export default function Reports() {
         <label htmlFor={ids.month}>Reporting month<input id={ids.month} type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e => setMonth(e.target.value)} /></label>
         <div className="report-summary-actions">
           <Button icon="clock" onClick={() => setRefresh(n => n + 1)} disabled={loading || !validMonth || future}>Refresh</Button>
-          <Button icon="doc" disabled={!view || loading || exporting} onClick={() => void exportSummary("print")}>Print / Save as PDF</Button>
-          <Button variant="primary" icon="download" disabled={!view || loading || exporting} onClick={() => void exportSummary("csv")}>{exporting ? "Preparing…" : "Export CSV"}</Button>
+          <ReportExportActions disabled={!view || loading} busy={exporting} onExport={format => void exportSummary(format)} />
         </div>
       </div>
       {!validMonth && <p role="alert" className="error">Select a reporting month.</p>}

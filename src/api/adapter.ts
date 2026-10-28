@@ -170,7 +170,8 @@ export function mapPhoto(
 export type ProjectParts = {
   handoffReadiness?: Project["handoffReadiness"]
   checklistProgress?: Project["checklistProgress"]
-    verifiedProgress?: Project["verifiedProgress"]
+  verifiedProgress?: Project["verifiedProgress"]
+  overallProgress?: Project["overallProgress"]
   list: Dto // item of GET /projects
   detail: Dto // GET /projects/:id
   documents: Dto[]
@@ -300,6 +301,7 @@ export function mapProject(parts: ProjectParts): Project {
   const project: Project = {
     ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
     ...(parts.verifiedProgress ? { verifiedProgress: parts.verifiedProgress } : {}),
+    ...(parts.overallProgress !== undefined ? { overallProgress: parts.overallProgress } : {}),
     ...(parts.handoffReadiness ? { handoffReadiness: parts.handoffReadiness } : {}),
     id,
     name: list.name,

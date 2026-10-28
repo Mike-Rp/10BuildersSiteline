@@ -34,6 +34,7 @@ export type ClientProjectView = {
   phase: string
   phases: string[]
   progress: number
+  overallProgress?: number | null
   status: "active" | "completed"
   completedAt?: string
   contacts: {
@@ -164,6 +165,7 @@ export function clientProjectViews(
         phase: p.phase,
         phases: projectPhaseNames(p),
         progress: p.progress,
+        overallProgress: p.overallProgress ?? p.verifiedProgress?.project.percentage ?? null,
         status: p.status as "active" | "completed",
         completedAt: work.completedAt,
         contacts: [

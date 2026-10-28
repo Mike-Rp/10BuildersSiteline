@@ -49,7 +49,7 @@ never claim uninterrupted coverage after a gap.
 
 - Administrator: Project details → Monthly report. Select among authorized projects.
 - Office PM / Site PM: Project Monitoring → Monthly report.
-- Client: existing Download progress report → monthly preview.
+- Client: Monthly report → monthly preview for the selected project.
 - No new sidebar module. Underlying project modal, scrolling and focus remain.
 
 GET `/api/v1/projects/:id/monthly-report?month=YYYY-MM` opens a repeatable-read,
@@ -103,9 +103,30 @@ a new cutoff rather than silently changing an open preview. No project records
 are written when previewing, refreshing or exporting reports.
 
 CSV quotes every field, doubles quotes, retains Unicode/newlines and neutralizes
-spreadsheet formulas. Client CSV omits staff sections entirely. Print opens the
-browser print dialog on an isolated print document with table headings and dates;
-choose Save as PDF. This is not a direct or certified PDF download.
+spreadsheet formulas. Client exports omit staff sections entirely. The shared
+export control defaults to PDF and also offers CSV. Download PDF first authorizes
+the same snapshot through the existing `format: print` endpoint, then generates
+and downloads a real PDF in the browser. The PDF engine and bundled Unicode fonts
+load only when needed; no report data is sent to another service. Project reports
+use portrait pages; the overall summary uses landscape pages. Tables repeat
+headers, long notes wrap, missing history stays Unavailable, and stale downloads
+are discarded if the report changes during generation. Print remains a separate
+action using the isolated print document. These are project records, not certified
+or signed documents.
+
+Client Overview shows project highlights, the latest shared update and photo
+previews without repeating an executive-summary block or document shortcuts.
+Full records remain in the sidebar, and project contacts open from Overview.
+The Overview and client Active sites cards use **Overall project progress**:
+approved required activity weight across every applicable project phase divided
+by the full required project weight, using the same verified totals as staff.
+The current phase name is separate. The workspace response exposes only a nullable
+`overallProgress` percentage to clients; phase breakdowns and internal evidence
+remain staff-only. Incomplete totals display Unavailable, never the current-phase
+percentage, a date-based estimate or an assumed 100% for legacy completed records.
+The single Monthly report button opens the selected project without another
+project selector. Staff can still use Change project when allowed; its search
+stays collapsed until requested.
 Deploy frontend/backend together; the signing key uses the existing JWT_SECRET.
 Changing it invalidates older report snapshots. Snapshots are not public links.
 
@@ -188,14 +209,15 @@ states. No automatic baseline installation or hosted writes occur on a GET.
    and one reapproval, retained evidence and existing automatic handoff behavior.
 4. As Site PM check only authorized phase detail is returned; another project is
    refused. As Client verify no review/rework sections or internal fields in JSON.
-5. Export CSV and print from the same preview. Revoke access and verify export
+5. Download PDF, export CSV and print from the same preview. Revoke access and verify export
    is refused. Refresh or change month, then ensure exports use the new snapshot.
 6. Close the report and confirm focus/scroll return to Project Monitoring.
 7. Choose a historical month before coverage: no invented past balances or queues.
 
 Automated tests use PGlite and exercise dry run, repeat migration, immutable
-events, timeline replay, role projections, snapshot authorization, CSV/print,
-period boundaries and modal behavior. See completion report for actual run results.
+events, timeline replay, role projections, snapshot authorization, CSV/print/PDF,
+period boundaries and modal behavior. PDF tests read the generated files to check
+Unicode, pagination, repeated headers, text boundaries and client-only content.
 
 ## Implementation verification
 

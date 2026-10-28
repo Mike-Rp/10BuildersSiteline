@@ -246,6 +246,7 @@ export type Project = {
   handoffBlocker?: string
   checklistProgress?: PhaseProgress[]
   verifiedProgress?: import("./project-progress").VerifiedProgress
+  overallProgress?: number | null
   id: string
   name: string
   type: string

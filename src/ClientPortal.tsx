@@ -534,7 +534,7 @@ export default function ClientPortal({
       )
     if (page === "Active sites") return <>
       <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites<span className="heading-dot">.</span></h1></div></div>
-      <ActiveSites key={actor.id} projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
+      <ActiveSites key={actor.id} overallOnly projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
     </>
     if (!project)
       return (
@@ -595,14 +595,7 @@ export default function ClientPortal({
       )
     if (page === "Progress History")
       return (
-        <Panel
-          title="Recorded project history"
-          actions={
-            <Button variant="primary" icon="download" onClick={report}>
-              Download progress report
-            </Button>
-          }
-        >
+        <Panel title="Recorded project history">
           {historyList()}
         </Panel>
       )
@@ -758,8 +751,8 @@ export default function ClientPortal({
                   ))}
                 </select>
               </Field>
-              <Button icon="download" onClick={report}>
-                Download progress report
+              <Button icon="doc" onClick={report}>
+                Monthly report
               </Button>
             </div>
           )}
@@ -806,7 +799,7 @@ export default function ClientPortal({
           if (action.kind === "project") { setProjectId(action.id); navigate("Progress History") }
           else if (action.kind === "page") navigate(action.page)
         }} />}
-      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
+      {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} allowProjectChange={false} onClose={()=>setReportProjectId("")} />}
       {viewedDoc && viewer && (
         <Preview
           doc={viewedDoc}

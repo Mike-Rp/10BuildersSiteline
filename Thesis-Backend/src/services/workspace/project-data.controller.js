@@ -147,7 +147,9 @@ export async function getProjectData(req,res) {
     join subcontractors s on s.id=a.subcontractor_id left join trades t on t.id=a.trade_id
     where a.project_id=any($1::uuid[]) and a.status='active' order by a.assigned_at desc`,[ids])).rows;
    const contracts=staff?(await db.query("select * from contracts where project_id=any($1::uuid[])",[ids])).rows:[];
-   const verified = staff ? await readVerifiedProgress(db,ids) : new Map();
+   // Use the same approved totals for clients, but expose only the overall
+   // percentage. Phase breakdowns and evidence remain staff-only.
+   const verified = await readVerifiedProgress(db,ids);
    // Read the same gates as automatic handoff, only for already-authorized
    // Administrator projects. Do not initialize future scope for a banner read.
    const readiness = new Map();
@@ -162,7 +164,7 @@ export async function getProjectData(req,res) {
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
-     assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{})};
+     assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{overallProgress:verified.get(p.id)?.project.percentage ?? null})};
    });
   });
   res.set("Cache-Control","private, no-store");

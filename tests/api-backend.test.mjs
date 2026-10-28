@@ -836,7 +836,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(clientProjectViews(client.state,client.user.id).every(p => !("checklistProgress" in p)))
   })
 
-  await t.test("trusted weighted phase/project totals remain separate and staff-only",async()=>{
+  await t.test("trusted project totals expose only the overall percentage to authorized clients and keep detailed breakdowns staff-only",async()=>{
     const {user,state}=await asUser("patricia.domingo@10builders.com")
     const project=state.projects.find(p=>p.status==="active" && p.verifiedProgress?.project.total>0)
     assert.ok(project)
@@ -853,9 +853,18 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const loaded=await loadState(user)
     assert.deepEqual(loaded.projects.find(p=>p.id===project.id).verifiedProgress,trusted)
     await asUser("f.uy@aldenheights-hoa.com")
-    assert.ok((await api("/workspace/project-data")).every(p=>!("verifiedProgress" in p)))
+    const raw=await api("/workspace/project-data")
+    assert.ok(raw.length)
+    for(const part of raw){
+      assert.ok(!('verifiedProgress' in part)&&!('checklistProgress' in part)&&!part.overview)
+      assert.equal(part.overallProgress,state.projects.find(p=>p.id===part.list.id).verifiedProgress.project.percentage)
+      assert.ok(part.overallProgress===null||typeof part.overallProgress==='number')
+    }
     const clientUser=await login("f.uy@aldenheights-hoa.com","Password@123",true)
-    assert.ok((await loadState(clientUser)).projects.every(p=>!("verifiedProgress" in p)))
+    const clientState=await loadState(clientUser)
+    assert.ok(clientState.projects.every(p=>!("verifiedProgress" in p)))
+    for(const p of clientState.projects)assert.equal(p.overallProgress,raw.find(row=>row.list.id===p.id).overallProgress)
+    for(const p of clientProjectViews(clientState,clientUser.id))assert.equal(p.overallProgress,raw.find(row=>row.list.id===p.id).overallProgress)
   })
 
   await t.test("individual bundled activity review previews impact, rejects stale requests, and never approves siblings",async()=>{

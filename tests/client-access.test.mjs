@@ -44,6 +44,19 @@ test("Client projects require active account, matching assigned client, scope an
   assert.deepEqual(clientProjectViews(state, "a9"), [])
   assert.throws(() => clientProgressReport(state, "a9", "p1"), /active Client/)
 })
+
+test("Client projections use approved overall totals without phase-progress fallback or private breakdowns",()=>{
+  const state=initialState(),project=state.projects.find(p=>p.id==='p1')
+  project.progress=100
+  assert.equal(clientProjectViews(state,'a9')[0].overallProgress,null)
+  project.overallProgress=0
+  assert.equal(clientProjectViews(state,'a9')[0].overallProgress,0)
+  project.overallProgress=23.5
+  const view=clientProjectViews(state,'a9')[0]
+  assert.equal(view.overallProgress,23.5)
+  assert.equal('verifiedProgress' in view,false)
+  assert.equal('checklistProgress' in view,false)
+})
 test("only the four source-whitelisted document types may be viewed or downloaded", () => {
   const state = activeFixture()
   const p = currentProject(state)
