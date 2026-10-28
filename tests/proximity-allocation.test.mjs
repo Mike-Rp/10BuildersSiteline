@@ -59,10 +59,10 @@ test("fallback ranks real province groups, then regions, without treating indepe
   assert.equal(locationProximity(manila, city("Quezon City")).areaRank, 1)
 })
 
-test("nearest complete team wins while trade coverage and capacity stay mandatory", () => {
+test("company teams use coverage and commitments while ignoring historical proximity", () => {
   const companies = [company("far", ["Civil"], far), company("near", ["Civil"], near, { commitments: 1 }), company("electric", ["Electrical"], site)]
   const plan = recommendTeam("Residential", phases, companies)
-  assert.ok(plan.companyIds.includes("near"), "Closer qualified company wins across a city boundary")
+  assert.ok(plan.companyIds.includes("far"), "Fewer commitments win regardless of historical coordinates")
   assert.equal(validatePlan("Residential", phases, plan, companies), true)
   assert.deepEqual(recommendTeam("Residential", phases, [...companies].reverse()), plan)
   companies[1].commitments = 2
@@ -71,26 +71,26 @@ test("nearest complete team wins while trade coverage and capacity stay mandator
   assert.equal(recommendTeam("Residential", phases, companies), null, "A close civil company cannot replace an unavailable electrical specialist")
 })
 
-test("known distances rank before missing distances, and missing distances use area fallback", () => {
+test("historical distances and area fallback do not influence company preference", () => {
   const known = company("known", ["Civil"], far), unknown = company("unknown", ["Civil"], imus)
-  assert.ok(compareCandidatePreference(known, unknown) < 0)
+  assert.equal(compareCandidatePreference(known, unknown), 0)
   const electrical = company("electric", ["Electrical"], imus)
   assert.ok(recommendTeam("Residential", phases, [known, unknown, electrical]).companyIds.includes("known"))
   const fallback = [company("province", ["Civil"], bacoor), unknown, electrical, company("region", ["Civil"], city("Calamba"))]
-  assert.ok(recommendTeam("Residential", phases, fallback).companyIds.includes("unknown"))
+  assert.ok(recommendTeam("Residential", phases, fallback).companyIds.includes("province"), "Equal commitments use stable company-name ordering")
   const plan = { companyIds: ["current", "electric"], coverage: [{ phase: "Foundation", discipline: "Civil", companyId: "current" }, { phase: "Foundation", discipline: "Electrical", companyId: "electric" }] }
   assert.deepEqual(replacementCandidates(plan, "current", [known, unknown, company("closer", ["Civil"], near)]).map(company => company.id), ["closer", "known", "unknown"])
 })
 
-test("frontend candidates use reviewed bases and service areas, never requested or fabricated ranking values", () => {
+test("frontend candidates no longer derive location restrictions or proximity", () => {
   const state = activeFixture(), project = currentProject(state), base = state.companies[0]
   project.siteLocation = site
   base.operatingLocation = site
   base.capabilityReview = { disciplines: ["Civil"], reviewedAt: "2026-10-28", operatingLocation: near, serviceAreas: [], unavailable: false }
   let candidate = allocationCandidates(state, project)[0]
-  assert.equal(candidate.locationIssue, "Outside project operating area")
+  assert.equal(candidate.locationIssue, undefined)
   base.capabilityReview.serviceAreas = [{ scope: "province", location: bacoor }]
   candidate = allocationCandidates(state, project)[0]
-  assert.equal(candidate.locationIssue, "")
-  assert.ok(candidate.proximity.distanceKm > 0)
+  assert.equal(candidate.locationIssue, undefined)
+  assert.equal(candidate.proximity, undefined)
 })

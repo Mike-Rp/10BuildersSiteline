@@ -51,7 +51,6 @@ import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
-import { locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import CompanyForemen from "./CompanyForemen"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
@@ -1016,7 +1015,7 @@ function AppInner() {
     "admin:companies",
     state.companies.filter((c) => c.status === "approved"),
     {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)} ${(c.capabilityReview?.serviceAreas || []).map(area => locationLabel(area.location)).join(" ")}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
       filters: [
         {
           id: "availability",
@@ -1627,7 +1626,6 @@ function AppInner() {
                         </div>
                         <h3>{c.name}</h3>
                         <p>{c.email || "Company email not supplied"}</p>
-                        <p>{c.capabilityReview?.operatingLocation ? "Reviewed operating base: " : "Requested base · Review required: "}{locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)}</p>
                         <div className="company-meta">
                           <span>
                             <Icon name="building" size={16} />

@@ -5,7 +5,6 @@ import { createServer } from "vite"
 import React, { act } from "react"
 import { emptyState, localToday, addDays } from "../src/model.ts"
 import { initialState } from "./fixtures/demo-state.ts"
-import { locationForCity, resolveLocation } from "../Thesis-Backend/src/domain/philippine-locations.js"
 
 test("Mixed-Use intake reviews uses and features before allocation, preserves essential packages and confirms scope",async()=>{
   const dom=new JSDOM('<div id="root"></div>',{url:"http://localhost"}),w=dom.window,previous=new Map()
@@ -34,14 +33,7 @@ test("Mixed-Use intake reviews uses and features before allocation, preserves es
     await type(field("Floor area (sqm) *"),"100")
     await type(field("Number of floors *"),"3")
     await type(field("Estimated completion date *"),addDays(localToday(),100))
-    const location=locationForCity(resolveLocation({region:"Metro Manila (NCR)",province:"Metro Manila",city:"Manila"}).code)
-    for(const [label,choice] of [["Project region *",location.region],["Project province / NCR *",location.province],["Project city / municipality *",location.city]]){
-      const input=field(label)
-      await act(()=>input.focus())
-      const root=input.closest(".location-search")
-      const option=[...root.querySelectorAll('[role="option"]')].find(element=>element.textContent===choice)
-      assert.ok(option,`${choice}: available options ${[...root.querySelectorAll('[role="option"]')].map(row=>row.textContent).join(", ")}`);await act(()=>option.click())
-    }
+    assert.equal(document.querySelector('[aria-label="Project location"]'),null,"New project intake does not request a structured site location")
     const client=state.accounts.find(account=>account.role==="client")
     await type(document.querySelector('.client-search input'),client.name)
     await act(()=>document.querySelector('[data-client-select]').click())

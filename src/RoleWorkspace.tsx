@@ -9,7 +9,6 @@ import ExecutiveSummary from "./ExecutiveSummary"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
-import { locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { api } from "./api/client"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
@@ -2789,7 +2788,7 @@ export default function RoleWorkspace({
         company.submittedBy === actor.name,
     )
     const directoryList = runList(`${actor.role}:directory`, directoryItems, {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${(c.foremen || []).map(contact => `${contact.name} ${contact.phone}`).join(" ")} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")} ${locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)} ${(c.capabilityReview?.serviceAreas || []).map(area => locationLabel(area.location)).join(" ")}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${(c.foremen || []).map(contact => `${contact.name} ${contact.phone}`).join(" ")} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")}`,
       filters: [
         {
           id: "availability",
@@ -2845,7 +2844,6 @@ export default function RoleWorkspace({
               </div>
               <h3>{company.name}</h3>
               <p>{company.email || "Company email not supplied"}</p>
-              <p>{company.capabilityReview?.operatingLocation ? "Reviewed operating base: " : "Requested base · Review required: "}{locationLabel(company.capabilityReview?.operatingLocation || company.operatingLocation)}</p>
               <div className="capability-card-summary">
                 <span>{company.capabilityReview ? "Verified trades" : company.proposedDisciplines?.length ? "Proposed trades · Review required" : "Trades not reviewed yet"}</span>
                 <div className="capability-card-tags">{(company.capabilityReview?.disciplines || company.proposedDisciplines || []).map(trade => <span key={trade}>{trade}</span>)}</div>

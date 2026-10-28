@@ -1,6 +1,6 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
-import { allocationLocationIssue, locationError, normalizeLocation, locationProximity, normalizeServiceAreas, serviceAreasError } from "../../domain/operating-location.js"
+import { locationError, normalizeLocation, normalizeServiceAreas, serviceAreasError } from "../../domain/operating-location.js"
 import {
   eligibility,
   compareCandidatePreference,
@@ -22,7 +22,6 @@ const fail = (message) => {
   throw new HttpError(409, message)
 }
 export async function allocationContext(db, p) {
-  const siteLocation = (await db.query("select metadata->'siteLocation' as location from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.location
   const type = (
     await db.query("select code from project_types where id=$1", [
       p.project_type_id,
@@ -50,8 +49,6 @@ export async function allocationContext(db, p) {
     ...c,
     disciplines: c.metadata?.capabilityReview?.disciplines || [],
     reviewed: !!c.metadata?.capabilityReview?.reviewedAt,
-    locationIssue: allocationLocationIssue(siteLocation, c.metadata?.capabilityReview?.operatingLocation, c.metadata?.capabilityReview?.serviceAreas),
-    proximity: locationProximity(siteLocation, c.metadata?.capabilityReview?.operatingLocation),
     unavailable: !!c.metadata?.capabilityReview?.unavailable,
   }))
   const selections = (
@@ -417,9 +414,7 @@ export async function saveCapabilityReview(db, user, id, review) {
     )
   ).rows
   const operatingLocation = review.operatingLocation === undefined ? metadata.capabilityReview?.operatingLocation : normalizeLocation(review.operatingLocation)
-  const serviceAreas = normalizeServiceAreas(review.serviceAreas === undefined ? metadata.capabilityReview?.serviceAreas : review.serviceAreas)
-  if (scopes.some(row => row.plan && !locationError(row.location) && allocationLocationIssue(row.location, operatingLocation, serviceAreas)))
-    fail("A contacted or accepted project still needs this operating area. Resolve the project commitment before changing it.")
+  const serviceAreas = review.serviceAreas === undefined ? metadata.capabilityReview?.serviceAreas : normalizeServiceAreas(review.serviceAreas)
   if (
     scopes.some((row) =>
       row.plan?.coverage.some(
@@ -432,7 +427,7 @@ export async function saveCapabilityReview(db, user, id, review) {
     )
   metadata.capabilityReview = {
     ...(operatingLocation ? { operatingLocation } : {}),
-    serviceAreas,
+    ...(serviceAreas === undefined ? {} : { serviceAreas }),
     disciplines: review.disciplines,
     unavailable: review.unavailable,
     note: review.note.trim(),

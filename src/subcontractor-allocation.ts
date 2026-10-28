@@ -5,7 +5,6 @@ import {
   type State,
   type Project,
 } from "./model.ts"
-import { allocationLocationIssue, locationProximity } from "../Thesis-Backend/src/domain/operating-location.js"
 import {
   validatePlan,
   type AllocationPlan,
@@ -77,8 +76,6 @@ export function allocationCandidates(
       status: company.status,
       disciplines: company.capabilityReview?.disciplines || [],
       reviewed: !!company.capabilityReview?.reviewedAt,
-      locationIssue: allocationLocationIssue(project.siteLocation, company.capabilityReview?.operatingLocation, company.capabilityReview?.serviceAreas),
-      proximity: locationProximity(project.siteLocation, company.capabilityReview?.operatingLocation),
       unavailable: !!company.capabilityReview?.unavailable,
       commitments:
         company.commitmentCount === undefined

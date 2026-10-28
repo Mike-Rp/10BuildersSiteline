@@ -26,34 +26,33 @@ function fixture() {
   return state
 }
 
-test("allocation excludes out-of-area companies from manual selection and blocks incomplete local teams", async () => {
+test("allocation remains available without company or project locations", async () => {
   await withUi(async ({ React, root, server, button, click }) => {
     const { default: Panel } = await server.ssrLoadModule("/src/TradeAllocationPanel.tsx")
     const state = fixture(), project = currentProject(state), outside = state.companies[0]
     outside.capabilityReview.operatingLocation = { region: "Metro Manila (NCR)", province: "Metro Manila", city: "Manila" }
     const props = { state, project, actor: state.accounts.find(a => a.id === "a4"), onAction() { throw Error("Unexpected action") }, onNewCompany() {}, onPreview() {}, onActivated() {}, onOpenActive() {} }
     await React.act(() => root.render(React.createElement(Panel, props)))
-    assert.match(document.body.textContent, /Outside project operating area/)
+    assert.doesNotMatch(document.body.textContent, /Outside project operating area|Project site location|Distance unavailable/)
     await click(button("Choose companies manually"))
     const labels = [...document.querySelectorAll('[role="dialog"] .trade-checks label')].map(e => e.textContent)
-    assert.ok(labels.every(label => !label.includes(outside.name)))
-    assert.equal(labels.length, state.companies.length - 1)
+    assert.ok(labels.some(label => label.includes(outside.name)))
+    assert.equal(labels.length, state.companies.length)
     await React.act(() => root.render(React.createElement(Panel, { ...props, key: "missing-location", project: { ...project, siteLocation: undefined } })))
-    assert.equal(button("Auto-allocate team").disabled, true)
-    assert.equal(button("Choose companies manually").disabled, true)
-    assert.match(document.body.textContent, /Complete site location/)
+    assert.equal(button("Auto-allocate team").disabled, false)
+    assert.equal(button("Choose companies manually").disabled, false)
+    assert.doesNotMatch(document.body.textContent, /Complete site location/)
   })
 })
 
-test("intake creation includes required structured project site fields", async () => {
+test("intake creation omits the removed project site location section", async () => {
   await withUi(async ({ React, root, server }) => {
     const { IntakeForm } = await server.ssrLoadModule("/src/panels.tsx")
     await React.act(() => root.render(React.createElement(IntakeForm, { state: fixture(), onSubmit() {}, onClient: a => a, onClose() {} })))
-    for (const text of ["Project region *", "Project province / NCR *", "Project city / municipality *"]) {
-      const label = [...document.querySelectorAll("label")].find(el => el.textContent === text)
-      assert.ok(label, text)
-      assert.equal(document.getElementById(label.htmlFor).required, true)
-    }
+    assert.equal(document.querySelector('.project-site-location'), null)
+    assert.equal(document.querySelector('[aria-label="Project location"]'), null)
+    assert.equal(document.querySelector('[aria-label="Project latitude"]'), null)
+    assert.doesNotMatch(document.body.textContent, /Project site location|Project region|Project province|Project city/)
   })
 })
 test("the allocation panel shows auto-allocation beside alternatives and keeps failed responses for retry", async () => {
@@ -267,7 +266,7 @@ test("Suggest Company exposes grouped proposed trades and submits them without m
     assert.equal(document.querySelectorAll(".capability-group").length, 4)
     for (const trade of ["Civil", "Electrical", "Waterproofing"]) await click([...document.querySelectorAll(".capability-choice")].find(label => label.textContent === trade).querySelector("input"))
     const field = text => [...document.querySelectorAll("input")].find(input => input.getAttribute("aria-label") === text) || document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
-    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"], ["Operating region *", "0700000000"], ["Operating province / NCR *", "independent:0700000000"], ["Operating city / municipality *", "0730600000"]])
+    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"]])
       if (field(label).getAttribute("role") === "combobox") {
         await React.act(() => field(label).focus())
         await React.act(() => document.querySelector(`[role="option"][data-location-code="${value}"]`).click())
@@ -323,37 +322,25 @@ test("capability review is read-only for Admin, Office PM and clients even when 
     assert.equal(saves, 0)
   })
 })
-test("Site PM confirms operating-base coordinates and additional coverage only when saving a supported review", async () => {
+test("Site PM saves verified trades without location or service-area fields", async () => {
   await withUi(async ({ React, root, server, w, button, click }) => {
     const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
     const company = { ...fixture().companies[0], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
     company.capabilityReview = { ...company.capabilityReview, serviceAreas: [], documentIds: ["proof"], note: "Confirmed crew base and service coverage from company records." }
     let saved
     await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "spm", onSave: async review => { saved = review } })))
-    const setValue = (element, value) => React.act(() => {
-      const proto = element.tagName === "SELECT" ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
-      Object.getOwnPropertyDescriptor(proto, "value").set.call(element, value)
-      element.dispatchEvent(new w.Event(element.tagName === "SELECT" ? "change" : "input", { bubbles: true }))
-    })
-    await setValue(document.querySelector('[aria-label="Operating latitude"]'), "10.3157")
-    await setValue(document.querySelector('[aria-label="Operating longitude"]'), "123.8854")
-    assert.match(document.querySelector('.capability-summary').textContent, /Unsaved changes/)
-    await setValue(document.querySelector('[aria-label="Additional service areas"] select'), "region")
-    await click(button("Add reviewed area"))
-    assert.equal(saved, undefined, "Adding coverage does not implicitly save or verify it")
-    assert.equal(document.querySelectorAll('.service-area-row').length, 1)
+    assert.equal(document.querySelector('.location-fields'), null)
+    assert.equal(document.querySelector('[aria-label="Additional service areas"]'), null)
+    assert.doesNotMatch(document.body.textContent, /Operating-base coordinates|Operating-base review|Reviewed operating base/)
     await click(button("Save verified capabilities"))
-    assert.deepEqual(saved.operatingLocation.coordinates, { latitude: 10.3157, longitude: 123.8854 })
-    assert.equal(saved.serviceAreas[0].scope, "region")
-    assert.match(saved.serviceAreas[0].location.region, /Central Visayas/)
-    assert.equal(saved.serviceAreas[0].location.coordinates, undefined)
+    assert.equal(saved.operatingLocation, undefined)
+    assert.equal(saved.serviceAreas, undefined)
+    assert.deepEqual(saved.disciplines, DISCIPLINES)
     assert.equal(company.capabilityReview.serviceAreas.length, 0, "Local editing does not mutate the source record")
-    await click(button("Remove"))
-    assert.equal(document.querySelectorAll('.service-area-row').length, 0)
   })
 })
 
-test("allocation displays measured distance and area fallback in previews and manual choices", async () => {
+test("allocation previews and manual choices show trades and commitments without distance", async () => {
   await withUi(async ({ React, root, server, button, click }) => {
     const { default: Panel } = await server.ssrLoadModule("/src/TradeAllocationPanel.tsx")
     const state = fixture(), project = currentProject(state)
@@ -361,14 +348,14 @@ test("allocation displays measured distance and area fallback in previews and ma
     state.companies[0].capabilityReview.operatingLocation = { ...project.siteLocation, coordinates: { latitude: 10.3167, longitude: 123.8864 } }
     const props = { state, project, actor: state.accounts.find(a => a.id === "a4"), onAction() { throw Error("Preview must not save") }, onNewCompany() {}, onPreview() {}, onActivated() {}, onOpenActive() {} }
     await React.act(() => root.render(React.createElement(Panel, props)))
-    const preview = document.querySelector('.allocation-proximity-preview')
+    const preview = document.querySelector('.allocation-team-preview')
     assert.ok(preview)
-    assert.match(preview.textContent, /km straight-line/)
-    assert.match(preview.textContent, /Distance unavailable.*Area fallback/)
+    assert.match(preview.textContent, /other commitments/)
+    assert.doesNotMatch(document.body.textContent, /straight-line|Distance unavailable|Operating base|Project site location/)
     await click(button("Choose companies manually"))
     const choices = document.querySelector('[role="dialog"] .trade-checks')
-    assert.match(choices.textContent, /km straight-line/)
-    assert.match(choices.textContent, /Distance unavailable/)
+    assert.match(choices.textContent, /commitments/)
+    assert.doesNotMatch(choices.textContent, /straight-line|Distance unavailable/)
   })
 })
 

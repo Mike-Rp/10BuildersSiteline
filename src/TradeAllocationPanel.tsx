@@ -30,8 +30,6 @@ import {
   type AllocationPlan,
 } from "./subcontractor-allocation"
 import "./TradeAllocationPanel.css"
-import LocationFields from "./LocationFields"
-import { locationError, locationLabel, locationProximity, proximityLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 
 type Props = {
   state: State
@@ -62,7 +60,6 @@ export function TradeAllocationOverview({
   return (
     <div className="trade-allocation">
       <h3>Trade-based subcontractor allocation</h3>
-      <p>Project site: <strong>{locationLabel(project.siteLocation)}</strong></p>
       <p>
         {requiredCompanies(project.type)} companies required · Up to 2
         concurrent commitments per company.
@@ -82,7 +79,6 @@ export function TradeAllocationOverview({
               return (
                 <article className="trade-company" key={id}>
                   <h4>{name(id)}</h4>
-                  <p>{proximityLabel(locationProximity(project.siteLocation, state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation))}</p>
                   <Badge tone={status === "accepted" ? "green" : "amber"}>
                     {status === "selected" ? "Not contacted" : status}
                   </Badge>
@@ -152,7 +148,6 @@ export default function TradeAllocationPanel({
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [statusMessage, setStatusMessage] = useState("")
-  const [siteLocation, setSiteLocation] = useState(project.siteLocation)
   const [alternatives, setAlternatives] = useState<string>(),
     [manual, setManual] = useState(false),
     [team, setTeam] = useState<string[]>([])
@@ -171,8 +166,7 @@ export default function TradeAllocationPanel({
     count = requiredCompanies(project.type)
   const eligible = candidates.filter(company => !eligibility(company)).sort((a, b) => compareCandidatePreference(a, b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   const excluded = candidates.filter(company => !!eligibility(company))
-  const locationReady = !locationError(project.siteLocation)
-  const recommended = !active && locationReady && !plan ? recommendTeam(project.type, phases, candidates) : null
+  const recommended = !active && !plan ? recommendTeam(project.type, phases, candidates) : null
   const statusOf = (id: string) =>
     work.selections.find((s) => s.companyId === id)?.status || "selected"
   const protectedCompany = (id: string) =>
@@ -248,12 +242,7 @@ export default function TradeAllocationPanel({
         reserves one project slot after acceptance. The crew foreman handles
         workforce distribution.
       </p>
-      <section className="trade-company" aria-label="Project allocation location">
-        <h4>Project site location</h4><p><strong>{locationLabel(project.siteLocation)}</strong></p>
-        {!active && !work.selections.some(s => ["contacted", "accepted"].includes(s.status)) && <details open={!locationReady}><summary>{locationReady ? "Update site location" : "Complete site location to unlock allocation"}</summary><LocationFields prefix="Project" value={siteLocation} onChange={setSiteLocation} disabled={disabled} /><Button disabled={disabled || !ready || !!locationError(siteLocation)} onClick={() => void send({ type: "set_allocation_location", siteLocation }, "Project site location saved. Prepare a new team for this location.")}>Save project site location</Button>{plan && <p>Changing location clears the uncontacted proposal. Prepare the team again for the new location.</p>}</details>}
-        <p>{eligible.length} eligible companies · {count} required. Companies outside their Site PM-reviewed service areas cannot be selected.</p>
-        <p>Recorded straight-line distances are ranked first. When coordinates are missing, area matching prefers the same city, then province/NCR, then region. Fewer commitments break proximity ties. Distances do not represent road travel or travel time.</p>
-      </section>
+      <p>{eligible.length} eligible companies · {count} required.</p>
       {project.clientSubcon && !plan && (
         <p className="notice">
           The client-nominated company must be registered and reviewed in the
@@ -278,12 +267,12 @@ export default function TradeAllocationPanel({
           <h4>Prepare the company team</h4>
           <p>
             Auto-allocation proposes a complete team using verified trade
-            coverage and service areas, then proximity and fewer existing commitments. It records no contact or
+            coverage, then fewer existing commitments. It records no contact or
             acceptance.
           </p>
-          {recommended && <details className="allocation-proximity-preview"><summary>Preview recommended companies</summary><ul>{recommended.companyIds.map(id => {
+          {recommended && <details className="allocation-team-preview"><summary>Preview recommended companies</summary><ul>{recommended.companyIds.map(id => {
             const company = candidates.find(company => company.id === id)!
-            return <li key={id}><strong>{company.name}</strong><p>{proximityLabel(company.proximity)}</p><p>Operating base: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p></li>
+            return <li key={id}><strong>{company.name}</strong><p>{company.disciplines.join(" · ")} · {company.commitments}/2 other commitments</p></li>
           })}</ul></details>}
           <div className="trade-actions">
             <Button
@@ -299,7 +288,7 @@ export default function TradeAllocationPanel({
               Auto-allocate team
             </Button>
             <Button
-              disabled={disabled || !ready || active || !locationReady || !eligible.length}
+              disabled={disabled || !ready || active || !eligible.length}
               onClick={() => {
                 setError("")
                 setManual(true)
@@ -355,8 +344,6 @@ export default function TradeAllocationPanel({
                   <div className="tag-list">
                     {company?.disciplines.map((d) => <span key={d}>{d}</span>)}
                   </div>
-                  <p>Reviewed operating base: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p>
-                  <p>{proximityLabel(company?.proximity)}</p>
                   <p>
                     <strong>{company?.commitments || 0}/2</strong> other
                     commitments
@@ -549,7 +536,7 @@ export default function TradeAllocationPanel({
         </>
       )}
       {!active && excluded.length > 0 && <details className="trade-company"><summary>Excluded companies ({excluded.length})</summary>{excluded.map(company => <p key={company.id}><strong>{company.name}</strong> · {eligibility(company)}</p>)}</details>}
-      {!active && !plan && locationReady && !recommended && <p className="notice">No complete eligible local team covers the project. Allocation remains pending. Review company operating areas and trades, or request another local company.</p>}
+      {!active && !plan && !recommended && <p className="notice">No complete eligible team covers the project. Allocation remains pending. Review company trades and availability, or request another company.</p>}
       {(project.subcontractorAllocationHistory?.length || 0) > 0 && (
         <details className="trade-company">
           <summary>Allocation history</summary>
@@ -579,7 +566,6 @@ export default function TradeAllocationPanel({
           {replacementCandidates(plan, alternatives, candidates).map((c) => (
             <div className="trade-company" key={c.id}>
               <h4>{c.name}</h4>
-              <p>{proximityLabel(c.proximity)}</p>
               <p>
                 {c.disciplines.join(" · ")} · {c.commitments}/2 other
                 commitments
@@ -641,7 +627,6 @@ export default function TradeAllocationPanel({
                 />
                 <span>
                   <strong>{c.name}</strong>
-                  <p>{proximityLabel(c.proximity)}</p>
                   <br />
                   {eligibility(c) ||
                     `${c.commitments}/2 commitments · ${c.disciplines.join(", ")}`}
