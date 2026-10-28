@@ -1,4 +1,5 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
+import { allocationLocationIssue, locationError, normalizeLocation, sameLocation } from "../../domain/operating-location.js"
 import {
   eligibility,
   validatePlan,
@@ -19,6 +20,7 @@ const fail = (message) => {
   throw new HttpError(409, message)
 }
 export async function allocationContext(db, p) {
+  const siteLocation = (await db.query("select metadata->'siteLocation' as location from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.location
   const type = (
     await db.query("select code from project_types where id=$1", [
       p.project_type_id,
@@ -46,6 +48,7 @@ export async function allocationContext(db, p) {
     ...c,
     disciplines: c.metadata?.capabilityReview?.disciplines || [],
     reviewed: !!c.metadata?.capabilityReview?.reviewedAt,
+    locationIssue: allocationLocationIssue(siteLocation, c.metadata?.capabilityReview?.operatingLocation),
     unavailable: !!c.metadata?.capabilityReview?.unavailable,
   }))
   const selections = (
@@ -147,6 +150,18 @@ export async function allocationCommand(db, p, meta, user, c) {
   )
   let ctx = await allocationContext(db, p)
   try {
+    if (c.type === "set_allocation_location") {
+      if (ctx.selections.some(s => ["contacted", "accepted"].includes(s.status))) fail("Project site location is locked after a company is contacted or accepts.")
+      if (locationError(c.siteLocation)) throw new HttpError(400, locationError(c.siteLocation))
+      if (plan) {
+        audit(meta, user, "Uncontacted allocation cleared after location change", { previous: plan })
+        await db.query("update project_subcontractor_selections set status='replaced' where project_id=$1 and status='proposed'", [p.id])
+        delete meta.subcontractorAllocation
+      }
+      meta.siteLocation = normalizeLocation(c.siteLocation)
+      audit(meta, user, "Project site location recorded", { location: meta.siteLocation })
+      return
+    }
     if (["save_allocation_plan", "auto_allocate_company"].includes(c.type)) {
       if (
         !plan &&
@@ -351,6 +366,7 @@ export async function validateAllocationActivation(db, p, meta, command) {
 }
 export async function saveCapabilityReview(db, user, id, review) {
   if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can edit company capability reviews.")
+  if (review?.operatingLocation !== undefined && locationError(review.operatingLocation)) throw new HttpError(400, locationError(review.operatingLocation))
   if (
     !review ||
     !Array.isArray(review.disciplines) ||
@@ -390,12 +406,15 @@ export async function saveCapabilityReview(db, user, id, review) {
     )
   const scopes = (
     await db.query(
-      `select m.metadata->'subcontractorAllocation' as plan from workspace_project_metadata m join projects p on p.id=m.project_id
+      `select m.metadata->'subcontractorAllocation' as plan,m.metadata->'siteLocation' as location from workspace_project_metadata m join projects p on p.id=m.project_id
       join project_subcontractor_selections s on s.project_id=p.id and s.subcontractor_id=$1 and s.status in ('contacted','accepted')
       where not coalesce(p.is_deleted,false) and p.lifecycle_status<>'archived'`,
       [id],
     )
   ).rows
+  const operatingLocation = review.operatingLocation === undefined ? metadata.capabilityReview?.operatingLocation : normalizeLocation(review.operatingLocation)
+  if (scopes.some(row => row.plan && !locationError(row.location) && !sameLocation(row.location, operatingLocation)))
+    fail("A contacted or accepted project still needs this operating area. Resolve the project commitment before changing it.")
   if (
     scopes.some((row) =>
       row.plan?.coverage.some(
@@ -407,6 +426,7 @@ export async function saveCapabilityReview(db, user, id, review) {
       "A contacted or accepted scope still needs one of these capabilities. Resolve the project commitment before removing it.",
     )
   metadata.capabilityReview = {
+    ...(operatingLocation ? { operatingLocation } : {}),
     disciplines: review.disciplines,
     unavailable: review.unavailable,
     note: review.note.trim(),

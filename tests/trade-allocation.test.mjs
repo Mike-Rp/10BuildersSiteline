@@ -213,6 +213,7 @@ function fixture() {
   const state = activeFixture(),
     project = currentProject(state)
   project.status = "pending"
+  project.siteLocation = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
   project.workflow.activation = undefined
   project.workflow.selections = []
   project.subcontractorAllocationVersion = 1
@@ -221,6 +222,7 @@ function fixture() {
     c.activeProjectIds = []
     c.commitmentCount = 0
     c.capabilityReview = {
+      operatingLocation: project.siteLocation,
       disciplines: DISCIPLINES,
       reviewedAt: "2026-10-27",
       unavailable: false,

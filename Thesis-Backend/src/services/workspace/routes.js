@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { locationError, normalizeLocation, sameLocation } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
@@ -28,7 +29,7 @@ router.post("/reports/monthly-summary/export", exportMonthlySummary);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
-    "save_allocation_plan", "auto_allocate_company", "release_allocation_company",
+    "save_allocation_plan", "auto_allocate_company", "release_allocation_company", "set_allocation_location",
     "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
     if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
@@ -408,6 +409,15 @@ router.post("/subcontractors/:id/supporting-documents", endpoint(["spm"], async 
 }));
 router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), b = req.body;
+    const previous = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    if (b.siteLocation !== undefined) {
+        if (locationError(b.siteLocation)) throw new HttpError(400, locationError(b.siteLocation));
+        if (!sameLocation(previous.siteLocation, b.siteLocation)) {
+            if (["active", "archived"].includes(p.lifecycle_status) || (await db.query("select 1 from project_subcontractor_selections where project_id=$1 and status in ('contacted','accepted')", [p.id])).rowCount)
+                throw new HttpError(409, "Project site location is locked after contact or acceptance and on active projects.");
+            if (previous.subcontractorAllocation) throw new HttpError(409, "A saved allocation already uses this site location. Resolve the allocation before changing location.");
+        }
+    }
     for (const d of b.docs || [])
         if (d.uploaded && !(await db.query("select 1 from project_documents where project_id=$1 and id=$2", [p.id, d.id])).rowCount) {
             await file(db, user, d.id);
@@ -415,7 +425,7 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
         }
     await db.query("update projects set target_end_date=$2,location=$3 where id=$1", [p.id, b.end || null, b.location || ""]);
     await db.query(`insert into workspace_project_metadata(project_id,metadata) values($1,$2)
- on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ clientSubcon: b.clientSubcon || "", clientSubconEmail: b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
+ on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ ...(b.siteLocation === undefined ? {} : { siteLocation: normalizeLocation(b.siteLocation) }), clientSubcon: b.clientSubcon || "", clientSubconEmail: b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
     for (const d of b.docs || [])
         if (d.uploaded) {
             const code = d.label === "Client Contract Agreement" ? "owner_contract" : null;
@@ -488,6 +498,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             break;
         }
         case "save_allocation_plan":
+        case "set_allocation_location":
         case "auto_allocate_company":
         case "release_allocation_company":
             leader();

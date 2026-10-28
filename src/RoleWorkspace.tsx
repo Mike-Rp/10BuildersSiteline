@@ -7,6 +7,7 @@ import Reports from "./Reports"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
+import { locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { api } from "./api/client"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
@@ -2910,6 +2911,7 @@ export default function RoleWorkspace({
               </div>
               <h3>{company.name}</h3>
               <p>{company.email || "Company email not supplied"}</p>
+              <p>{company.capabilityReview?.operatingLocation ? "Reviewed operating area: " : "Requested area · Review required: "}{locationLabel(company.capabilityReview?.operatingLocation || company.operatingLocation)}</p>
               <div className="capability-card-summary">
                 <span>{company.capabilityReview ? "Verified trades" : company.proposedDisciplines?.length ? "Proposed trades · Review required" : "Trades not reviewed yet"}</span>
                 <div className="capability-card-tags">{(company.capabilityReview?.disciplines || company.proposedDisciplines || []).map(trade => <span key={trade}>{trade}</span>)}</div>

@@ -4,6 +4,16 @@ This implementation replaces the one-company intake flow for new projects with a
 
 ## Allocation policy
 
+### Operating-area eligibility
+
+New company forms require an operating region, province/NCR, and city/municipality. Registration stores this as a **requested** area. Only a Site PM can confirm it in the capability review, using linked company records and a review note. Admin approval does not verify operating areas. Older companies can complete their area in the same Site PM review.
+
+Project intake collects the same structured site fields. The Lead Site PM can complete or update these fields in the allocation screen before any company is contacted. Updating location clears an uncontacted proposal and retains its audit history. Once contact or acceptance exists, and on active projects, site location is locked. A Site PM cannot move a reviewed company area away from a contacted/accepted project that still relies on it.
+
+Allocation requires an exact match of all three structured fields, ignoring case and repeated spaces. An address string, province alone, a broad island group, or willingness to travel does not establish eligibility. These fields are entered as text to support every locality without an incomplete built-in geographic catalog; use consistent official place names. No geographic location is guessed from legacy free text. Missing project locations or missing Site PM area reviews block new allocation until completed.
+
+The screen and API apply this same rule to automatic teams, manual plans, replacements, contact, acceptance, and activation. Manual selection shows only eligible companies; excluded companies and reasons appear separately. With no complete local team, allocation remains pending. Existing active/legacy records remain readable and no company is silently relocated or reassigned. The two-company/three-company policy and two-project limit remain unchanged. Location and review fields use existing metadata, so no additional migration is required.
+
 | Project type | Required companies |
 | --- | --- |
 | Residential | 2 |

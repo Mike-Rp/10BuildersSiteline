@@ -7,14 +7,17 @@ function fixture() {
   let state = activeFixture(),
     p = currentProject(state)
   p.status = "pending"
+  p.siteLocation = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
   p.workflow.activation = undefined
   p.workflow.selections = []
   p.subcontractorAllocationVersion = 1
   for (const c of state.companies) {
+    c.operatingLocation = p.siteLocation
     c.activeProjectIds = []
     c.commitmentCount = 0
     c.status = "approved"
     c.capabilityReview = {
+      operatingLocation: p.siteLocation,
       disciplines: DISCIPLINES,
       reviewedAt: "2026-10-27",
       unavailable: false,
@@ -22,6 +25,37 @@ function fixture() {
   }
   return state
 }
+
+test("allocation excludes out-of-area companies from manual selection and blocks incomplete local teams", async () => {
+  await withUi(async ({ React, root, server, button, click }) => {
+    const { default: Panel } = await server.ssrLoadModule("/src/TradeAllocationPanel.tsx")
+    const state = fixture(), project = currentProject(state), outside = state.companies[0]
+    outside.capabilityReview.operatingLocation = { region: "Metro Manila (NCR)", province: "Metro Manila", city: "Manila" }
+    const props = { state, project, actor: state.accounts.find(a => a.id === "a4"), onAction() { throw Error("Unexpected action") }, onNewCompany() {}, onPreview() {}, onActivated() {}, onOpenActive() {} }
+    await React.act(() => root.render(React.createElement(Panel, props)))
+    assert.match(document.body.textContent, /Outside project operating area/)
+    await click(button("Choose companies manually"))
+    const labels = [...document.querySelectorAll('[role="dialog"] .trade-checks label')].map(e => e.textContent)
+    assert.ok(labels.every(label => !label.includes(outside.name)))
+    assert.equal(labels.length, state.companies.length - 1)
+    await React.act(() => root.render(React.createElement(Panel, { ...props, key: "missing-location", project: { ...project, siteLocation: undefined } })))
+    assert.equal(button("Auto-allocate team").disabled, true)
+    assert.equal(button("Choose companies manually").disabled, true)
+    assert.match(document.body.textContent, /Complete site location/)
+  })
+})
+
+test("intake creation includes required structured project site fields", async () => {
+  await withUi(async ({ React, root, server }) => {
+    const { IntakeForm } = await server.ssrLoadModule("/src/panels.tsx")
+    await React.act(() => root.render(React.createElement(IntakeForm, { state: fixture(), onSubmit() {}, onClient: a => a, onClose() {} })))
+    for (const text of ["Project region *", "Project province / NCR *", "Project city / municipality *"]) {
+      const label = [...document.querySelectorAll("label")].find(el => el.textContent === text)
+      assert.ok(label, text)
+      assert.equal(document.getElementById(label.htmlFor).required, true)
+    }
+  })
+})
 test("the allocation panel shows auto-allocation beside alternatives and keeps failed responses for retry", async () => {
   await withUi(async ({ React, root, server, w, button, click }) => {
     const { default: Panel } = await server.ssrLoadModule(
@@ -233,7 +267,7 @@ test("Suggest Company exposes grouped proposed trades and submits them without m
     assert.equal(document.querySelectorAll(".capability-group").length, 4)
     for (const trade of ["Civil", "Electrical", "Waterproofing"]) await click([...document.querySelectorAll(".capability-choice")].find(label => label.textContent === trade).querySelector("input"))
     const field = text => [...document.querySelectorAll("input")].find(input => input.getAttribute("aria-label") === text) || document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
-    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"]])
+    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"], ["Operating region *", "Central Visayas"], ["Operating province / NCR *", "Cebu"], ["Operating city / municipality *", "Cebu City"]])
       await React.act(() => { const element = field(label); Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value); element.dispatchEvent(new w.Event("input", { bubbles: true })) })
     await click(button("Submit for Admin approval"))
     assert.deepEqual(submitted.proposedDisciplines, ["Civil", "Electrical", "Waterproofing"])

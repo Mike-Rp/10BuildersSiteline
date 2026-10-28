@@ -18,6 +18,8 @@ import {
 import { allocationCandidates } from "../src/subcontractor-allocation.ts"
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
+const cebu = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
+const manila = { region: "Metro Manila (NCR)", province: "Metro Manila", city: "Manila" }
 const port = () =>
   new Promise((resolve) => {
     const server = net.createServer().listen(0, "127.0.0.1", () => {
@@ -213,7 +215,7 @@ test(
     ).rows.map((d) => d.code)
     const suggestedId = randomUUID(), proposedDisciplines = disciplines.slice(0, 3)
     const foremen = [{ name: "Juan Dela Cruz", phone: "09171234567" }, { name: "Maria Santos", phone: "09181234567" }]
-    const suggestion = { id: suggestedId, name: "Company with proposed trades", email: "proposedtrades@gmail.com", contact: "Untrusted legacy alias", phone: "09999999999", foremen, proposedDisciplines, documents: [], manpowerDocuments: [] }
+    const suggestion = { id: suggestedId, name: "Company with proposed trades", email: "proposedtrades@gmail.com", contact: "Untrusted legacy alias", phone: "09999999999", foremen, operatingLocation: cebu, proposedDisciplines, documents: [], manpowerDocuments: [] }
     const invalidForemanId = randomUUID()
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidForemanId, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
     assert.equal((await db.query("select id from subcontractors where id=$1", [invalidForemanId])).rows.length, 0, "invalid contacts must not partially create a company")
@@ -222,6 +224,7 @@ test(
     let proposalState = await loadState(user), suggested = proposalState.companies.find(company => company.id === suggestedId)
     assert.deepEqual(suggested.proposedDisciplines, proposedDisciplines)
     assert.deepEqual(suggested.foremen, foremen, "both foremen must survive an API reload")
+    assert.deepEqual(suggested.operatingLocation, cebu, "requested operating location persists without becoming reviewed")
     assert.equal(suggested.contact, foremen[0].name)
     assert.equal(suggested.phone, foremen[0].phone, "the primary foreman is the authoritative company contact")
     assert.equal(suggested.capabilityReview, undefined, "a proposal must not become a verified capability review")
@@ -288,6 +291,7 @@ test(
         method: "PUT",
         json: {
           disciplines,
+          operatingLocation: cebu,
           unavailable: false,
           documentIds: [fileId],
           note: "Reviewed the supporting company capability records in this test.",
@@ -320,10 +324,19 @@ test(
     )
     const command = (json) =>
       api(`/projects/${projectId}/workspace-command`, { method: "POST", json })
+    await assert.rejects(command({ type: "auto_allocate_company", allocationRevision: 0 }), /No complete eligible team/)
+    await command({ type: "set_allocation_location", allocationRevision: 0, siteLocation: cebu })
+    const outsideId = companyIds[1]
+    const localReview = (await db.query("select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1", [outsideId])).rows[0].review
+    await api(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: manila } })
     await command({ type: "auto_allocate_company", allocationRevision: 0 })
     let state = await loadState(user),
       project = state.projects.find((p) => p.id === projectId),
       plan = project.subcontractorAllocation
+    assert.deepEqual(project.siteLocation, cebu)
+    assert.ok(!plan.companyIds.includes(outsideId), "automatic allocation excludes a reviewed outside-area company")
+    await assert.rejects(command({ type: "save_allocation_plan", allocationRevision: 1, plan: replaceCompany(plan, plan.companyIds[0], outsideId) }), /Outside project operating area/)
+    await api(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: cebu } })
     assert.equal(plan.companyIds.length, 2)
     assert.equal(project.subcontractorAllocationVersion, 1)
     assert.equal(
@@ -349,6 +362,9 @@ test(
       allocationRevision: 1,
       note: "Contacted representative by phone",
     })
+    await assert.rejects(command({ type: "set_allocation_location", allocationRevision: 2, siteLocation: manila }), /locked/)
+    const acceptedReview = (await db.query("select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1", [acceptedId])).rows[0].review
+    await assert.rejects(api(`/subcontractors/${acceptedId}/capabilities`, { method: "PUT", json: { ...acceptedReview, operatingLocation: manila } }), /still needs this operating area/)
     const concurrent = await Promise.allSettled(
       [1, 2].map(() =>
         command({
@@ -599,6 +615,7 @@ test(
         method: "POST",
         json,
       })
+    await commercialCommand({ type: "set_allocation_location", allocationRevision: 0, siteLocation: cebu })
     await commercialCommand({
       type: "auto_allocate_company",
       allocationRevision: 0,

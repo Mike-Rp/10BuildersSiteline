@@ -29,6 +29,8 @@ import {
   type AllocationPlan,
 } from "./subcontractor-allocation"
 import "./TradeAllocationPanel.css"
+import LocationFields from "./LocationFields"
+import { locationError, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 
 type Props = {
   state: State
@@ -59,6 +61,7 @@ export function TradeAllocationOverview({
   return (
     <div className="trade-allocation">
       <h3>Trade-based subcontractor allocation</h3>
+      <p>Project site: <strong>{locationLabel(project.siteLocation)}</strong></p>
       <p>
         {requiredCompanies(project.type)} companies required · Up to 2
         concurrent commitments per company.
@@ -147,6 +150,7 @@ export default function TradeAllocationPanel({
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [statusMessage, setStatusMessage] = useState("")
+  const [siteLocation, setSiteLocation] = useState(project.siteLocation)
   const [alternatives, setAlternatives] = useState<string>(),
     [manual, setManual] = useState(false),
     [team, setTeam] = useState<string[]>([])
@@ -163,6 +167,10 @@ export default function TradeAllocationPanel({
   const ready = allocationReady(project),
     disabled = saving || busy,
     count = requiredCompanies(project.type)
+  const eligible = candidates.filter(company => !eligibility(company))
+  const excluded = candidates.filter(company => !!eligibility(company))
+  const locationReady = !locationError(project.siteLocation)
+  const recommended = !active && locationReady && !plan ? recommendTeam(project.type, phases, candidates) : null
   const statusOf = (id: string) =>
     work.selections.find((s) => s.companyId === id)?.status || "selected"
   const protectedCompany = (id: string) =>
@@ -238,6 +246,11 @@ export default function TradeAllocationPanel({
         reserves one project slot after acceptance. The crew foreman handles
         workforce distribution.
       </p>
+      <section className="trade-company" aria-label="Project allocation location">
+        <h4>Project site location</h4><p><strong>{locationLabel(project.siteLocation)}</strong></p>
+        {!active && !work.selections.some(s => ["contacted", "accepted"].includes(s.status)) && <details open={!locationReady}><summary>{locationReady ? "Update site location" : "Complete site location to unlock allocation"}</summary><LocationFields prefix="Project" value={siteLocation} onChange={setSiteLocation} disabled={disabled} /><Button disabled={disabled || !ready || !!locationError(siteLocation)} onClick={() => void send({ type: "set_allocation_location", siteLocation }, "Project site location saved. Prepare a new team for this location.")}>Save project site location</Button>{plan && <p>Changing location clears the uncontacted proposal. Prepare the team again for the new location.</p>}</details>}
+        <p>{eligible.length} eligible companies · {count} required. Companies outside the reviewed operating area cannot be selected.</p>
+      </section>
       {project.clientSubcon && !plan && (
         <p className="notice">
           The client-nominated company must be registered and reviewed in the
@@ -268,7 +281,7 @@ export default function TradeAllocationPanel({
           <div className="trade-actions">
             <Button
               variant="primary"
-              disabled={disabled || !ready || active}
+              disabled={disabled || !ready || active || !recommended}
               onClick={() =>
                 void send(
                   { type: "auto_allocate_company" },
@@ -279,7 +292,7 @@ export default function TradeAllocationPanel({
               Auto-allocate team
             </Button>
             <Button
-              disabled={disabled || !ready || active}
+              disabled={disabled || !ready || active || !locationReady || !eligible.length}
               onClick={() => {
                 setError("")
                 setManual(true)
@@ -335,6 +348,7 @@ export default function TradeAllocationPanel({
                   <div className="tag-list">
                     {company?.disciplines.map((d) => <span key={d}>{d}</span>)}
                   </div>
+                  <p>Reviewed operating area: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p>
                   <p>
                     <strong>{company?.commitments || 0}/2</strong> other
                     commitments
@@ -526,6 +540,8 @@ export default function TradeAllocationPanel({
           </section>
         </>
       )}
+      {!active && excluded.length > 0 && <details className="trade-company"><summary>Excluded companies ({excluded.length})</summary>{excluded.map(company => <p key={company.id}><strong>{company.name}</strong> · {eligibility(company)}</p>)}</details>}
+      {!active && !plan && locationReady && !recommended && <p className="notice">No complete eligible local team covers the project. Allocation remains pending. Review company operating areas and trades, or request another local company.</p>}
       {(project.subcontractorAllocationHistory?.length || 0) > 0 && (
         <details className="trade-company">
           <summary>Allocation history</summary>
@@ -596,7 +612,7 @@ export default function TradeAllocationPanel({
           onClose={() => !disabled && setManual(false)}
         >
           <div className="trade-checks">
-            {candidates.map((c) => (
+            {eligible.map((c) => (
               <label key={c.id}>
                 <input
                   type="checkbox"

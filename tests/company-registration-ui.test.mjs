@@ -52,6 +52,9 @@ test("a Site PM can validate company contacts and retry registration without man
     assert.equal(button("Upload manpower list"), undefined)
     assert.equal(document.querySelector('input[accept=".xlsx,.xls"]'), null)
     await input(field("Company name *"), "New Labor Company")
+    await input(field("Operating region *"), "Central Visayas")
+    await input(field("Operating province / NCR *"), "Cebu")
+    await input(field("Operating city / municipality *"), "Cebu City")
     await input(field("Primary foreman mobile number"), "123")
     await input(field("Company email *"), "company@yahoo.com")
     await click(button("Submit for Admin approval"))
@@ -97,6 +100,7 @@ test("a Site PM can validate company contacts and retry registration without man
     assert.equal(uploads, 0)
     assert.equal(commands[1].company.availability, "available")
     assert.equal(commands[1].company.status, "pending")
+    assert.deepEqual(commands[1].company.operatingLocation, { region: "Central Visayas", province: "Cebu", city: "Cebu City" })
     assert.deepEqual(commands[1].company.activeProjectIds, [])
   } finally {
     await React.act(() => root.unmount()); await server.close(); dom.window.close()

@@ -269,6 +269,7 @@ export type Project = {
   docs: Doc[]
   created: string
   location: string
+  siteLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation
   note: string
   excludedOpms: string[]
   clientSubcon?: string
@@ -297,12 +298,13 @@ export type PhaseProgress = {
   locked?: boolean
 }
 export type Company = {
+  operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation
   foremen?: { name: string; phone: string }[]
   proposedDisciplines?: string[]
   primaryTrade?: string
   rosterDisciplines?: string[]
   commitmentCount?: number
-  capabilityReview?: { disciplines: string[]; unavailable: boolean; note: string; documentIds: string[]; reviewedAt: string; reviewedById: string; reviewedBy: string }
+  capabilityReview?: { operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation; disciplines: string[]; unavailable: boolean; note: string; documentIds: string[]; reviewedAt: string; reviewedById: string; reviewedBy: string }
   id: string
   name: string
   contact: string

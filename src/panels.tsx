@@ -1,6 +1,8 @@
 import { uploadFile } from "./api/actions"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
+import LocationFields from "./LocationFields"
+import { locationError, normalizeLocation, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
@@ -1212,6 +1214,7 @@ export function IntakeForm({
     )
       return "Complete all required project fields."
     if (!selectedClient) return "Select an available client account from the search results."
+    if (!project && locationError(draft.siteLocation)) return "Complete the project site location: region, province/NCR, and city/municipality."
     if (datesBlocked) return startError || endError || DATE_ERRORS.invalid
     if (!draft.end) return "Enter the Target End Date."
     if (!endAfterStart(draft.start, draft.end))
@@ -1432,6 +1435,7 @@ export function IntakeForm({
                 disabled={!!project}
               />
             </Field>
+            <div className="wide"><h3>Project site location</h3><LocationFields prefix="Project" value={draft.siteLocation} disabled={!!project} onChange={siteLocation => patch({ siteLocation, location: locationError(siteLocation) ? draft.location : locationLabel(siteLocation) })} /></div>
             <Field label="Floor area (sqm) *">
               <input
                 required
@@ -1959,6 +1963,7 @@ export function CompanyForm({
   })
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
+  const [operatingError, setOperatingError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const busy = saving || submitting
@@ -1988,14 +1993,16 @@ export function CompanyForm({
         event.preventDefault()
         if (submittingRef.current || saving) return
         const errors = companyRegistrationErrors(draft)
+        const operatingError = locationError(draft.operatingLocation)
+        setOperatingError(operatingError)
         setFieldErrors(errors)
-        if (Object.keys(errors).length) return
+        if (Object.keys(errors).length || operatingError) return
         submittingRef.current = true
         setSubmitting(true)
         setError("")
         try {
           const foremen = normalizeCompanyForemen(draft)!
-          const saved = await onSave({ ...draft, foremen, contact: foremen[0].name, phone: foremen[0].phone, name: draft.name.trim(), email: draft.email.trim().toLowerCase(),
+          const saved = await onSave({ ...draft, operatingLocation: normalizeLocation(draft.operatingLocation), foremen, contact: foremen[0].name, phone: foremen[0].phone, name: draft.name.trim(), email: draft.email.trim().toLowerCase(),
             availability: "available", activeProjectIds: [], manpowerCount: 0, manpowerDocuments: [] })
           if (saved === false) setError("We couldn’t submit this company. Your details are still here—please try again.")
         } catch (reason) {
@@ -2028,6 +2035,7 @@ export function CompanyForm({
           />
         </Field>
       </div>
+      <section className="form-section"><h3>Operating location</h3><LocationFields value={draft.operatingLocation} disabled={busy} error={operatingError} onChange={operatingLocation => { patch({ operatingLocation }); setOperatingError("") }} /><p>Requested operating area · Site PM review required before allocation.</p></section>
       <section className="company-foremen" aria-label="Foreman contacts">
         <h3>Foreman contacts</h3>
         <p>Provide a primary contact and an optional backup.</p>

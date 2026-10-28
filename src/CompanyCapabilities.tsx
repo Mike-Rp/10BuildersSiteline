@@ -2,6 +2,8 @@ import { useRef, useState } from "react"
 import { Button, Field, Icon } from "./ui"
 import type { Company, Doc, Role } from "./model"
 import CompanyTradePicker from "./CompanyTradePicker"
+import LocationFields from "./LocationFields"
+import { locationError, normalizeLocation, locationLabel, sameLocation } from "../Thesis-Backend/src/domain/operating-location.js"
 import { Upload } from "./panels"
 import "./TradeAllocationPanel.css"
 
@@ -24,6 +26,7 @@ export default function CompanyCapabilities({
 }) {
   const review = company.capabilityReview
   const [selected, setSelected] = useState(review?.disciplines || company.proposedDisciplines || [])
+  const [operatingLocation, setOperatingLocation] = useState(review?.operatingLocation || company.operatingLocation)
   const [documents, setDocuments] = useState(review?.documentIds || [])
   const [note, setNote] = useState(review?.note || "")
   const [unavailable, setUnavailable] = useState(review?.unavailable || false)
@@ -34,7 +37,7 @@ export default function CompanyCapabilities({
   const supportingRecords = company.documents.filter(document => document.uploaded)
   const linkedDocuments = documents.filter(id => supportingRecords.some(document => document.id === id))
   const differentSet = (a: string[], b: string[]) => JSON.stringify([...a].sort()) !== JSON.stringify([...b].sort())
-  const changed = !!review && (differentSet(selected, review.disciplines) || differentSet(linkedDocuments, review.documentIds || []) || note.trim() !== review.note || unavailable !== review.unavailable)
+  const changed = !!review && (differentSet(selected, review.disciplines) || differentSet(linkedDocuments, review.documentIds || []) || note.trim() !== review.note || unavailable !== review.unavailable || !sameLocation(operatingLocation, review.operatingLocation))
   const toggle = (values: string[], value: string) =>
     values.includes(value)
       ? values.filter((v) => v !== value)
@@ -45,7 +48,9 @@ export default function CompanyCapabilities({
     setBusy(true)
     setError("")
     try {
+      if (locationError(operatingLocation)) throw new Error(locationError(operatingLocation))
       await onSave({
+        operatingLocation: normalizeLocation(operatingLocation),
         disciplines: selected,
         documentIds: linkedDocuments,
         note: note.trim(),
@@ -64,6 +69,8 @@ export default function CompanyCapabilities({
   if (!editable) return (
     <section className="detail-section trade-allocation">
       <h3>Company capabilities</h3>
+      <p>Requested operating area: <strong>{locationLabel(company.operatingLocation)}</strong></p>
+      <p>Reviewed operating area: <strong>{locationLabel(review?.operatingLocation)}</strong></p>
       <p>View only. Capability reviews are managed in the Site PM workspace.</p>
       <p>Directory classification: <strong>{company.primaryTrade || "Not recorded"}</strong></p>
       {review ? <>
@@ -80,6 +87,7 @@ export default function CompanyCapabilities({
     <section className="detail-section trade-allocation company-capability-review">
       <h3>Site PM capability review</h3>
       <p>Select company trades supported by the records. Verification is applied when you save this review.</p>
+      <section className="form-section"><h4>Operating-area review</h4><p>Confirm actual local operations using the supporting company records. This area is required for allocation.</p><LocationFields value={operatingLocation} onChange={setOperatingLocation} disabled={busy} /><p>Requested area: {locationLabel(company.operatingLocation)}</p></section>
       <div className="capability-summary">
         <div><span>Directory classification</span><strong>{company.primaryTrade || "Not recorded"}</strong></div>
         <div><span>Review status</span><strong><Icon name={review && !changed ? "check" : "clock"} size={17} />{!review ? "Review required" : changed ? "Unsaved changes" : "Reviewed"}</strong></div>

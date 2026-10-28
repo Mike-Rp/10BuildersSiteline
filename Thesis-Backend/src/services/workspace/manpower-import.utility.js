@@ -1,4 +1,5 @@
 import XLSX from "xlsx";
+import { locationError, normalizeLocation } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, manpowerRows, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js";
 
@@ -22,6 +23,7 @@ export function readManpowerFile(file) {
 
 /** Values are read from stored file bytes; form-supplied headcounts are never used. */
 export async function registerCompany(db, user, company, loadFile, projectId = "") {
+    if (company?.operatingLocation !== undefined && locationError(company.operatingLocation)) throw new HttpError(400, locationError(company.operatingLocation));
     const errors = companyRegistrationErrors(company);
     if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
     const foremen = normalizeCompanyForemen(company);
@@ -68,6 +70,7 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
     await db.query("insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2)", [companyId, JSON.stringify({
         contact: foremen?.[0].name ?? (typeof company.contact === "string" ? company.contact.trim() : ""), phone: foremen?.[0].phone ?? company.phone,
         ...(foremen === undefined ? {} : { foremen }),
+        ...(company.operatingLocation === undefined ? {} : { operatingLocation: normalizeLocation(company.operatingLocation) }),
         documents, manpowerDocuments, manpowerRoster: roster, note: typeof company.note === "string" ? company.note.trim() : "",
         projectId, submittedById: user.id, submittedBy: user.full_name, availability: "available", activeProjectIds: [], manpowerCount: workers.length,
         ...(proposedDisciplines === undefined ? {} : { proposedDisciplines }),

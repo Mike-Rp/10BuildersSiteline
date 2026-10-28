@@ -1,4 +1,4 @@
-export type AllocationCandidate = { id: string; name: string; status: string; disciplines: string[]; reviewed: boolean; unavailable: boolean; commitments: number; declined: boolean };
+export type AllocationCandidate = { id: string; name: string; status: string; disciplines: string[]; reviewed: boolean; unavailable: boolean; commitments: number; declined: boolean; locationIssue?: string };
 export type AllocationCoverage = { phase: string; discipline: string; companyId: string };
 export type AllocationPlan = { companyIds: string[]; coverage: AllocationCoverage[] };
 export type AllocationPhase = { name: string; disciplines: string[] };

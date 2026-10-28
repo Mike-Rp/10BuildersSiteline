@@ -1,4 +1,5 @@
 import { phaseProgress, projectProgress } from "./project-progress.ts"
+import { locationError, normalizeLocation, type OperatingLocation } from "../Thesis-Backend/src/domain/operating-location.js"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../Thesis-Backend/src/domain/company-registration.js"
 import { allocationCandidates, allocationConsented, allocationPhases, canReleaseCompany, eligibility, protectScope, recommendTeam, replacementCandidates, replaceCompany, scopeFor, validatePlan, type AllocationPlan } from "./subcontractor-allocation.ts"
@@ -104,7 +105,8 @@ export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
   type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
     | "release_photo"
-    | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company"
+    | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company" | "set_allocation_location"
+  siteLocation?: OperatingLocation
   plan?: AllocationPlan
   allocationRevision?: number
   photoId?: string
@@ -136,7 +138,7 @@ export const LICENSE_COMMANDS: ReadonlySet<WorkflowCommand["type"]> = new Set([
   "contact_company", "respond_company", "upload_agreement", "submit_progress", "approve_update", "reject_update", "approve_rework",
   "decline_rework", "submit_checklist", "approve_checklist", "reject_checklist", "request_company",
   "archive_company_request", "activate_project", "acknowledge_client_subcon", "report_client_subcon_issue",
-  "save_allocation_plan", "auto_allocate_company", "release_allocation_company",
+  "save_allocation_plan", "auto_allocate_company", "release_allocation_company", "set_allocation_location",
 ])
 export function workflowFor(p: Project): ProjectWorkflow {
   return (
@@ -828,6 +830,7 @@ export function documentAccess(
 function companyRequest(state: State, actor: Account, company: Company | undefined, projectId = ""): Company {
   assert(company, "Company details are required.")
   const c = structuredClone(company)
+  if (c.operatingLocation !== undefined) c.operatingLocation = normalizeLocation(c.operatingLocation)
   const errors = companyRegistrationErrors(c)
   assert(!Object.keys(errors).length, Object.values(errors)[0] || "Check the company details.")
   const foremen = normalizeCompanyForemen(c)
@@ -909,6 +912,21 @@ export function applyWorkflow(
     if (command.type === "upload_agreement") assert(command.allocationRevision === p.subcontractorAllocation?.revision, "The allocation changed. Refresh the project.")
   }
   switch (command.type) {
+    case "set_allocation_location": {
+      assertLead(p, actor)
+      assert(p.status === "pending" && allocationReady(p), "Complete documents and team confirmations before allocation.")
+      assert(command.allocationRevision === (p.subcontractorAllocation?.revision || 0), "The allocation changed. Refresh the project.")
+      assert(!work.selections.some(s => ["contacted", "accepted"].includes(s.status)), "Project site location is locked after a company is contacted or accepts.")
+      assert(!locationError(command.siteLocation), locationError(command.siteLocation))
+      p.siteLocation = normalizeLocation(command.siteLocation)
+      if (p.subcontractorAllocation) {
+        p.subcontractorAllocationHistory = [...(p.subcontractorAllocationHistory || []), { action: "Uncontacted allocation cleared after location change", byId: actor.id, by: actor.name, at: date }]
+        work.selections = work.selections.filter(s => s.status !== "selected")
+        delete p.subcontractorAllocation
+      }
+      record("Project site location recorded")
+      break
+    }
     case "save_allocation_plan":
     case "auto_allocate_company": {
       assertLead(p, actor)
