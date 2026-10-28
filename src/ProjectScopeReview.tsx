@@ -24,7 +24,7 @@ export default function ProjectScopeReview({ value, onChange, onConfirm, onBack,
       <div className="notice"><Icon name="shield" /><p>Essential work stays covered. General structure, enclosure and site works remain when a specific feature does not apply. Applicable services, fire safety and closeout stay included.</p></div>
     </div><section className="scope-phase-preview" aria-label="Proposed construction phases"><h4>Proposed construction phases</h4>
       <p>{rows.filter(row => row.included).length} included phases · only included phases receive allocations and checklists.</p>
-      <div className="scope-table-scroll"><table><thead><tr><th>Construction phase</th><th>Applicability</th></tr></thead>
+      <div className="scope-phase-table"><table><thead><tr><th>Construction phase</th><th>Applicability</th></tr></thead>
         <tbody>{rows.map(row => <tr key={row.name} className={row.included ? "" : "scope-not-applicable"}>
           <th scope="row">{row.name}{row.reason && <small>{row.reason}</small>}</th>
           <td><span className={`scope-applicability ${row.included ? "included" : ""}`}>{row.included ? row.required ? "Required" : "Included" : "Not applicable"}</span></td>
