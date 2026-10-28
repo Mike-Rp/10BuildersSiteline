@@ -56,6 +56,13 @@ export default function useSidebarNavigation(enabled = true) {
   return {
     compact, expanded, toggleRef, sidebarRef,
     toggle: () => compact ? setMobileOpen(open => !open) : setDesktopCollapsed(collapsed => !collapsed),
+    close: () => {
+      if (compact) setMobileOpen(false)
+      else {
+        setDesktopCollapsed(true)
+        toggleRef.current?.focus()
+      }
+    },
     closeMobile: () => setMobileOpen(false),
   }
 }

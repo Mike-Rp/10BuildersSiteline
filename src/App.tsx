@@ -2871,8 +2871,8 @@ function AppInner() {
           <div>
             Siteline<small>10 BUILDERS</small>
           </div>
+          <Button className="sidebar-close admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
         </div>
-        {navigation.compact && <Button className="admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.closeMobile} />}
         <nav aria-label="Main navigation">
           {NAV.map((n) => (
             <div key={n.label}>
@@ -2930,7 +2930,7 @@ function AppInner() {
               ref={navigation.toggleRef}
               className="sidebar-toggle"
               variant="icon-button"
-              icon={navigation.expanded ? "close" : "menu"}
+              icon="menu"
               aria-label={navigation.expanded ? navigation.compact ? "Close navigation" : "Collapse navigation" : navigation.compact ? "Open navigation" : "Expand navigation"}
               aria-expanded={navigation.expanded}
               aria-controls="admin-navigation"

@@ -39,6 +39,12 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     for (const width of [1920, 1366, 1024]) {
       await resize(width)
       assert.equal(toggle().getAttribute("aria-label"), "Collapse Client navigation")
+      const close = sidebar().querySelector('.brand .client-nav-close')
+      assert.ok(close, "Client close control belongs inside the sidebar brand header on desktop")
+      await click(close)
+      assert.equal(toggle().getAttribute("aria-expanded"), "false")
+      assert.equal(document.activeElement, toggle())
+      await click(toggle())
       await click(toggle())
       assert.equal(toggle().getAttribute("aria-label"), "Expand Client navigation")
       assert.equal(sidebar().getAttribute("aria-hidden"), "true")
@@ -56,6 +62,7 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
       assert.equal(toggle().getAttribute("aria-expanded"), "true")
       assert.equal(document.body.style.overflow, "hidden")
       assert.equal(document.activeElement.getAttribute("aria-label"), "Close Client navigation")
+      assert.ok(document.activeElement.closest('.brand'), "Mobile close control stays inside the sidebar header")
       const controls = [...sidebar().querySelectorAll('button:not(:disabled)')]
       controls.at(-1).focus()
       await act(() => document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })))

@@ -5,9 +5,8 @@
 #root .admin-workspace.sidebar-collapsed > .sidebar { transform: translateX(-100%); visibility: hidden; pointer-events: none; }
 #root .admin-workspace.sidebar-collapsed > .main-shell { margin-left: 0; width: 100%; }
 #root .admin-workspace > .main-shell { min-width: 0; }
-#root .admin-workspace .admin-nav-close { position: absolute; top: 18px; right: 12px; min-width: 44px; width: 44px; height: 44px; }
 #root .admin-workspace .admin-nav-backdrop { padding: 0; border: 0; border-radius: 0; }
 @media (max-width: 1000px) {
   #root .admin-workspace > .main-shell { margin-left: 0; width: 100%; }
-  #root .admin-workspace > .sidebar .brand { padding-right: 62px; padding-left: 16px; gap: 8px; }
+  #root .admin-workspace > .sidebar .brand { padding-inline: 16px; }
 }

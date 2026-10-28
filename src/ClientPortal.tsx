@@ -617,8 +617,8 @@ export default function ClientPortal({
           <div>
             Siteline<small>10 BUILDERS</small>
           </div>
+          <Button className="sidebar-close client-nav-close" variant="icon-button" icon="close" aria-label="Close Client navigation" onClick={navigation.close} />
         </div>
-        {navigation.compact && <Button className="client-nav-close" variant="icon-button" icon="close" aria-label="Close Client navigation" onClick={navigation.closeMobile} />}
         <div className="nav-group-label">YOUR PROJECT</div>
         <nav aria-label="Client navigation">
           {NAV.map(([label, icon]) => (
@@ -665,7 +665,7 @@ export default function ClientPortal({
               ref={navigation.toggleRef}
               className="sidebar-toggle"
               variant="icon-button"
-              icon={navigation.expanded ? "close" : "menu"}
+              icon="menu"
               aria-label={navigation.expanded ? navigation.compact ? "Close Client navigation" : "Collapse Client navigation" : navigation.compact ? "Open Client navigation" : "Expand Client navigation"}
               aria-expanded={navigation.expanded}
               aria-controls="client-navigation"

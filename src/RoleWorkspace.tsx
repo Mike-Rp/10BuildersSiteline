@@ -280,6 +280,7 @@ export default function RoleWorkspace({
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const [mobileNav, setMobileNav] = useState(false)
+  const mobileMenuRef = useRef<HTMLButtonElement>(null)
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
   const [note, setNote] = useState("")
@@ -3618,7 +3619,7 @@ export default function RoleWorkspace({
   }
   return (
     <div className={`app-shell role-workspace${isOpm ? "" : " schedule-mobile-workspace"}`}>
-      <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+      <aside id="role-navigation" className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>
           <span>
@@ -3633,6 +3634,7 @@ export default function RoleWorkspace({
           <div>
             Siteline<small>10 BUILDERS</small>
           </div>
+          <Button className="sidebar-close role-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={() => { setMobileNav(false); mobileMenuRef.current?.focus() }} />
         </div>
         <nav aria-label="Main navigation">
           {nav.map(([label, icon], i) => (
@@ -3681,10 +3683,13 @@ export default function RoleWorkspace({
         <header className="topbar">
           <div className="breadcrumb">
             <Button
+              ref={mobileMenuRef}
               className="mobile-menu"
               icon="menu"
               variant="icon-button"
               aria-label="Open navigation"
+              aria-expanded={mobileNav}
+              aria-controls="role-navigation"
               onClick={() => setMobileNav(!mobileNav)}
             />
             <span>{ROLE_NAMES[actor.role]}</span>

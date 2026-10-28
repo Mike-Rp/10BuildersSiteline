@@ -639,6 +639,14 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .sidebar .brand { min-height: 72px; height: 72px; margin-inline: -16px; padding: 10px 26px; border-bottom: 3px solid var(--chrome-accent); gap: 12px; font-size: 23px; letter-spacing: -.6px; color: var(--chrome-foreground); }
 #root .sidebar .brand small { font-size: 14px; letter-spacing: 1px; color: var(--chrome-muted); }
 #root .sidebar .brand-mark { width: 42px; height: 42px; border-radius: 8px; background: var(--chrome-hover); color: var(--chrome-foreground); font-size: 18px; letter-spacing: -.5px; }
+#root .sidebar .brand { gap: 8px; }
+#root .sidebar .brand > .brand-mark { flex-shrink: 0; }
+#root .sidebar .brand > div { flex: 1; min-width: 0; }
+#root .sidebar .brand > .sidebar-close { flex: none; margin-left: auto; width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+#root .role-workspace .role-nav-close { display: none; }
+@media (max-width: 1000px) {
+  #root .role-workspace .role-nav-close { display: inline-flex; }
+}
 #root .sidebar .nav-group-label { color: var(--chrome-muted); }
 #root .sidebar .nav-item { color: var(--chrome-muted); border-radius: 7px; }
 #root .sidebar .nav-item:hover { background: var(--chrome-hover); color: var(--chrome-foreground); }
