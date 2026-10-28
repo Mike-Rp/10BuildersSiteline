@@ -3427,7 +3427,7 @@ export default function RoleWorkspace({
   }
   function monitoringRepository(p: Project) {
     return (
-      <div style={{ minHeight: "calc(92vh - 190px)" }}>
+      <div>
         <div className="document-browser-back">
           <Button
             variant="text-button"

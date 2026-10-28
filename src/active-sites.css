@@ -13,7 +13,7 @@
 .as-results { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 22px 0 14px; color: #62758a; }
 .as-results h2 { font-size: 20px; color: #102c4c; margin: 0 0 4px; }
 .as-results p { font-size: 12px; margin: 0; }
-.as-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-auto-rows: 1fr; gap: 16px; }
+.as-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; gap: 14px; }
 .as-card { display: flex; border: 1px solid #dae3ec; border-top: 4px solid #3577a8; border-radius: 10px; background: #fff; overflow: hidden; box-shadow: 0 2px 8px #17345104; transition: transform .18s, box-shadow .18s; min-width: 0; }
 .as-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px #17345110; }
 .as-card-body { display: flex; flex-direction: column; width: 100%; min-width: 0; padding: 18px; }
