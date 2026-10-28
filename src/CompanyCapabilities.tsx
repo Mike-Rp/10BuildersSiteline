@@ -2,12 +2,12 @@ import { useRef, useState } from "react"
 import { Button, Field, Icon } from "./ui"
 import type { Company, Doc, Role } from "./model"
 import CompanyTradePicker from "./CompanyTradePicker"
+import CompanyTradeMatches from "./CompanyTradeMatches"
 import { Upload } from "./panels"
 import "./TradeAllocationPanel.css"
 
 export default function CompanyCapabilities({
   company,
-  disciplines,
   role,
   onSave,
   onPreview,
@@ -15,7 +15,6 @@ export default function CompanyCapabilities({
   onCancel,
 }: {
   company: Company
-  disciplines: string[]
   role: Role
   onSave?: (review: NonNullable<Company["capabilityReview"]>) => Promise<void>
   onPreview?: (doc: Doc) => void
@@ -74,6 +73,7 @@ export default function CompanyCapabilities({
         <p>{review.unavailable ? "Unavailable for new commitments" : "Available for capacity checks"}</p>
         <p>Supporting records: {company.documents.filter(document => (review.documentIds || []).includes(document.id)).map(document => document.name).join(", ") || "No linked records available"}</p>
       </> : <><p>Site PM capability review required.</p>{!!company.proposedDisciplines?.length && <><p>Proposed trades · Not verified</p><div className="tag-list">{company.proposedDisciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div></>}</>}
+      <CompanyTradeMatches trades={review?.disciplines || company.proposedDisciplines || []} verified={!!review?.reviewedAt} />
     </section>
   )
   return (
@@ -99,7 +99,7 @@ export default function CompanyCapabilities({
       )}
       {!review && !!company.proposedDisciplines?.length && <p className="capability-proposal-note"><Icon name="clock" size={16} />Proposed trades are preselected. Review the supporting records before verifying them.</p>}
       <div className="capability-review-columns">
-        <CompanyTradePicker disciplines={disciplines} selected={selected} onChange={setSelected} disabled={busy} />
+        <CompanyTradePicker selected={selected} recordedTrades={review?.disciplines || company.proposedDisciplines || []} onChange={setSelected} disabled={busy} />
         <section className="capability-records" aria-label="Supporting company records">
           <div className="capability-section-heading"><h4>Supporting company records</h4></div>
           {supportingRecords.map(document => <div className="capability-record" key={document.id}>
@@ -119,6 +119,7 @@ export default function CompanyCapabilities({
           <label className="trade-check"><input type="checkbox" disabled={busy} checked={unavailable} onChange={event => setUnavailable(event.target.checked)} />Unavailable for new commitments</label>
         </section>
       </div>
+      <CompanyTradeMatches trades={selected} verified={!!review?.reviewedAt && !changed} />
       {error && <p role="alert">{error}</p>}
       <div className="capability-review-footer">
         <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>

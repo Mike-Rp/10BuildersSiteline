@@ -1954,7 +1954,6 @@ export function CompanyForm({
   saving = false,
   status = "approved",
   role,
-  disciplines = DISCIPLINES,
   onSave,
   onClose,
 }: {
@@ -1964,7 +1963,6 @@ export function CompanyForm({
   saving?: boolean
   status?: Company["status"]
   role?: Role
-  disciplines?: string[]
   onSave: (company: Company) => unknown | Promise<unknown>
   onClose: () => void
 }) {
@@ -2076,7 +2074,7 @@ export function CompanyForm({
         {fieldErrors.foremen && <p className="error" role="alert">{fieldErrors.foremen}</p>}
       </section>
       {role === "spm" && <section className="form-section trade-allocation capability-proposal">
-        <CompanyTradePicker disciplines={disciplines} selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Proposed company trades" />
+        <CompanyTradePicker selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Proposed company trades" />
         <p>Choose the trades this company offers. These remain proposals until a Site PM reviews supporting records and saves verified capabilities in company details. Company approval remains with Admin.</p>
       </section>}
       <div className="form-grid">

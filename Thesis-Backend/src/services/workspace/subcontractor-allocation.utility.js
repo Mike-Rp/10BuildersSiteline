@@ -1,6 +1,7 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
 import { locationError, normalizeLocation, normalizeServiceAreas, serviceAreasError } from "../../domain/operating-location.js"
+import { COMPANY_TRADES, companyTradePhases, normalizeCompanyTrades } from "../../domain/company-trades.js"
 import {
   eligibility,
   compareCandidatePreference,
@@ -27,15 +28,16 @@ export async function allocationContext(db, p) {
       p.project_type_id,
     ])
   ).rows[0]?.code
-  const phases = (
+  const workflow = (
     await db.query(
-      `select s.code as name, coalesce(array_agg(d.code::text order by d.code) filter(where d.id is not null),'{}') as disciplines
+      `select s.code as name
       from (${projectWorkflowSql}) pts join project_stages s on s.id=pts.project_stage_id
-      left join project_stage_discipline_links r on r.project_stage_id=s.id and r.project_type_id=pts.project_type_id
-      left join disciplines d on d.id=r.discipline_id where pts.project_id=$1 group by s.id,pts.sort_order order by pts.sort_order`,
+      where pts.project_id=$1 order by pts.sort_order`,
       [p.id],
     )
   ).rows
+  const savedPlan = (await db.query("select metadata->'subcontractorAllocation' as plan from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.plan
+  const phases = savedPlan?.requirements || companyTradePhases(type, workflow)
   const companies = (
     await db.query(
       `select c.id,c.company_name as name,c.directory_status as status,m.metadata,
@@ -388,14 +390,13 @@ export async function saveCapabilityReview(db, user, id, review) {
         [id],
       )
     ).rows[0]?.metadata || {}
-  const catalog = (await db.query("select code from disciplines")).rows.map(
-    (d) => d.code,
-  )
+  const catalog = [...COMPANY_TRADES, ...(metadata.capabilityReview?.disciplines || []), ...(metadata.proposedDisciplines || [])]
   if (
     new Set(review.disciplines).size !== review.disciplines.length ||
-    review.disciplines.some((d) => !catalog.includes(d))
+    review.disciplines.some((d) => typeof d !== "string" || !catalog.includes(d === "Façade" ? "Facade" : d))
   )
-    throw new HttpError(400, "Choose disciplines from the configured catalog.")
+    throw new HttpError(400, "Choose disciplines from the company trade catalog.")
+  const disciplines = normalizeCompanyTrades(review.disciplines)
   if (
     review.documentIds.some(
       (docId) => !metadata.documents?.some((d) => d.id === docId && d.uploaded),
@@ -418,7 +419,7 @@ export async function saveCapabilityReview(db, user, id, review) {
   if (
     scopes.some((row) =>
       row.plan?.coverage.some(
-        (r) => r.companyId === id && !review.disciplines.includes(r.discipline),
+        (r) => r.companyId === id && !disciplines.includes(r.discipline),
       ),
     )
   )
@@ -428,7 +429,7 @@ export async function saveCapabilityReview(db, user, id, review) {
   metadata.capabilityReview = {
     ...(operatingLocation ? { operatingLocation } : {}),
     ...(serviceAreas === undefined ? {} : { serviceAreas }),
-    disciplines: review.disciplines,
+    disciplines,
     unavailable: review.unavailable,
     note: review.note.trim(),
     documentIds: review.documentIds,

@@ -3423,7 +3423,7 @@ export default function RoleWorkspace({
           </div>
         </div>
         <CompanyForemen company={c} />
-        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} disciplines={state.referenceDisciplines ?? DISCIPLINES} role={actor.role} onPreview={setPreview} onCancel={() => setDialog(undefined)} onUpload={actor.role === "spm" ? async document => {
+        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={setPreview} onCancel={() => setDialog(undefined)} onUpload={actor.role === "spm" ? async document => {
           await api("/subcontractors/" + c.id + "/supporting-documents", { method: "POST", json: { doc: document } })
           await onReload()
         } : undefined} onSave={actor.role === "spm" ? async review => {
@@ -3913,7 +3913,6 @@ export default function RoleWorkspace({
             owner={actor.name}
             actorId={actor.id}
             role={actor.role}
-            disciplines={state.referenceDisciplines ?? DISCIPLINES}
             status="pending"
             saving={saving}
             project={projects.find(p => p.id === dialog.projectId)}

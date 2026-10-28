@@ -4,7 +4,7 @@ import { allocationLocationIssue, locationError, locationLabel, normalizeLocatio
 import { eligibility, recommendTeam, validatePlan, replacementCandidates, replaceCompany } from "../Thesis-Backend/src/domain/subcontractor-allocation.js"
 import { allocationCandidates } from "../src/subcontractor-allocation.ts"
 import { activeFixture, currentProject, execute } from "./fixtures.mjs"
-import { DISCIPLINES } from "../src/model.ts"
+import { COMPANY_TRADES } from "../Thesis-Backend/src/domain/company-trades.js"
 import { LOCATION_REGIONS, LOCATION_GROUPS, LOCATION_CITIES, provinceOptions, cityOptions, locationForCity, resolveLocation } from "../Thesis-Backend/src/domain/philippine-locations.js"
 const cebu = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
 const manila = { region: "Metro Manila (NCR)", province: "Metro Manila", city: "Manila" }
@@ -65,7 +65,7 @@ function fixture() {
   project.status = "pending"; project.workflow.activation = undefined; project.workflow.selections = []; project.subcontractorAllocationVersion = 1; project.siteLocation = cebu
   for (const company of state.companies) {
     company.activeProjectIds = []; company.commitmentCount = 0; company.status = "approved"
-    company.capabilityReview = { disciplines: DISCIPLINES, reviewedAt: "2026-10-28", operatingLocation: cebu, unavailable: false }
+    company.capabilityReview = { disciplines: [...COMPANY_TRADES], reviewedAt: "2026-10-28", operatingLocation: cebu, unavailable: false }
   }
   return state
 }

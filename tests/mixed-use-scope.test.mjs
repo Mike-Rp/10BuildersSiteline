@@ -15,6 +15,7 @@ import { assessPhaseHandoff } from "../Thesis-Backend/src/services/progress/hand
 import { reportBalance } from "../Thesis-Backend/src/domain/monthly-report.js"
 import { PROJECT_PHASE_DEFINITIONS, headcount, emptyState, spmCandidates } from "../src/model.ts"
 import { allocationPhases } from "../src/subcontractor-allocation.ts"
+import { companyTradePhases } from "../Thesis-Backend/src/domain/company-trades.js"
 import { allocationContext } from "../Thesis-Backend/src/services/workspace/subcontractor-allocation.utility.js"
 
 const read=path=>fs.readFileSync(new URL(path,import.meta.url),"utf8")
@@ -30,7 +31,7 @@ test("scope keeps core work for all supported use and feature combinations and n
     const saved=normalizeMixedUseScope({...draft,phases:["Closeout"],confirmedBy:"spoofed"})
     const phases=mixedUsePhaseReview(saved).filter(row=>row.included)
     const project={type:"Mixed-Use",phaseScope:saved,team:phases.map((phase,sequence)=>({phase:phase.name,sequence,requiredDisciplines:phase.disciplines}))}
-    assert.deepEqual(allocationPhases(emptyState(),project),phases.map(({name,disciplines})=>({name,disciplines})),"company allocation uses the same confirmed work packages")
+    assert.deepEqual(allocationPhases(emptyState(),project),companyTradePhases("Mixed-Use",phases),"company allocation uses the confirmed work packages with company service requirements")
     assert.ok(phases.filter(row=>!row.required).every(row=>row.reason===""),"included packages never show a non-applicability reason")
     for(const name of ["Mobilization","Design","Foundation","MEP Rough-In","Fire & Life Safety","Closeout"])assert.ok(saved.phases.includes(name))
     assert.equal(saved.phases.includes("Residential Fit-Out"),draft.uses.includes("residential"))
@@ -81,6 +82,10 @@ test("saved scopes drive checklists, options, sequential handoff and historical 
   const companyContext=await allocationContext(db,{id,project_type_id:type})
   assert.deepEqual(companyContext.phases.map(row=>row.name),saved.phases)
   assert.ok(companyContext.phases.find(row=>row.name==="Office Fit-Out").disciplines.includes("Electrical"))
+  const historicalRequirements = companyContext.phases.map(row => ({...row, disciplines: ["Geotechnical"]}))
+  await db.query("INSERT INTO workspace_project_metadata(project_id,metadata) VALUES($1,$2)",[id,JSON.stringify({subcontractorAllocation:{requirements:historicalRequirements}})])
+  assert.deepEqual((await allocationContext(db,{id,project_type_id:type})).phases,historicalRequirements,"server preserves previously recorded allocation scopes")
+  await db.query("DELETE FROM workspace_project_metadata WHERE project_id=$1",[id])
   await db.query("UPDATE projects SET current_stage_id=$2 WHERE id=$1",[id,phases[0].id])
   for(const phase of phases)await db.query("INSERT INTO project_phase_team(project_id,project_stage_id,spm_user_id,status,is_lead) VALUES($1,$2,$3,'confirmed',$4)",[id,phase.id,reviewer,phase.code==="Mobilization"])
   await validatePhaseTeam(db,type,phases.map(row=>({stage:row.code})),{projectId:id})

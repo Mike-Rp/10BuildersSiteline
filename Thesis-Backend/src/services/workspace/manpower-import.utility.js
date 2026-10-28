@@ -1,6 +1,7 @@
 import XLSX from "xlsx";
 import { locationError, normalizeLocation } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, manpowerRows, normalizeCompanyForemen } from "../../domain/company-registration.js";
+import { COMPANY_TRADES, normalizeCompanyTrades } from "../../domain/company-trades.js";
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js";
 
 export function readManpowerFile(file) {
@@ -30,10 +31,10 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
     let proposedDisciplines;
     if (company.proposedDisciplines !== undefined) {
         if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can propose company trades.");
-        const catalog = (await db.query("select code from disciplines")).rows.map(row => row.code);
-        if (!Array.isArray(company.proposedDisciplines) || new Set(company.proposedDisciplines).size !== company.proposedDisciplines.length || company.proposedDisciplines.some(value => typeof value !== "string" || !catalog.includes(value)))
+        const catalog = COMPANY_TRADES;
+        if (!Array.isArray(company.proposedDisciplines) || new Set(company.proposedDisciplines).size !== company.proposedDisciplines.length || company.proposedDisciplines.some(value => typeof value !== "string" || !catalog.includes(value === "Façade" ? "Facade" : value)))
             throw new HttpError(400, "Choose proposed trades from the configured discipline catalog.");
-        proposedDisciplines = company.proposedDisciplines;
+        proposedDisciplines = normalizeCompanyTrades(company.proposedDisciplines);
     }
     if (!Array.isArray(company.manpowerDocuments || []) || (company.manpowerDocuments || []).length > 1)
         throw new HttpError(400, "Upload one current manpower list for this company.");

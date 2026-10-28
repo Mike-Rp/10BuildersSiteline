@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { activeFixture, currentProject, execute } from "./fixtures.mjs"
-import { DISCIPLINES } from "../src/model.ts"
+import { COMPANY_TRADES as DISCIPLINES } from "../Thesis-Backend/src/domain/company-trades.js"
 
 function fixture() {
   let state = activeFixture(),
@@ -263,7 +263,8 @@ test("Suggest Company exposes grouped proposed trades and submits them without m
     const disciplines = [...DISCIPLINES, "Facade", "Waterproofing", "General Labor", "Renovation", "Fire & Life Safety"]
     await React.act(() => root.render(React.createElement(CompanyForm, { owner: "Site reviewer", actorId: "a4", role: "spm", disciplines, status: "pending", onClose() {}, onSave: company => { submitted = company } })))
     assert.match(document.body.textContent, /Proposed company trades/)
-    assert.equal(document.querySelectorAll(".capability-group").length, 4)
+    assert.equal(document.querySelectorAll(".capability-group").length, 3)
+    assert.deepEqual([...document.querySelectorAll('.capability-choice span')].map(element => element.textContent).sort(), [...DISCIPLINES].sort(), "Company trades are independent of the engineer reference catalog")
     for (const trade of ["Civil", "Electrical", "Waterproofing"]) await click([...document.querySelectorAll(".capability-choice")].find(label => label.textContent === trade).querySelector("input"))
     const field = text => [...document.querySelectorAll("input")].find(input => input.getAttribute("aria-label") === text) || document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
     for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"]])
@@ -280,6 +281,29 @@ test("Suggest Company exposes grouped proposed trades and submits them without m
     assert.equal(document.querySelector(".company-trade-picker"), null, "Admin must not get the trade editor")
   })
 })
+test("company profiles explain phase matches and update partial trade coverage without saving or verifying draft changes", async () => {
+  await withUi(async ({ React, root, server, click }) => {
+    const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
+    const company = { ...fixture().companies[0], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
+    company.capabilityReview = { ...company.capabilityReview, disciplines: ["Facade", "Waterproofing"], documentIds: ["proof"], note: "Company enclosure services verified.", reviewedBy: "Site reviewer" }
+    let saves = 0
+    await React.act(() => root.render(React.createElement(Review, { company, role: "spm", onSave: async () => { saves++ } })))
+    const connections = document.querySelector('.company-trade-matches')
+    assert.equal(connections.open, false, "Phase references remain compact until requested")
+    await click(connections.querySelector('summary'))
+    assert.equal(connections.open, true)
+    const phase = (type, name) => [...document.querySelectorAll(`[aria-label="${type} trade matches"] li`)].find(element => element.querySelector('strong').textContent === name)
+    assert.match(phase("Commercial", "Envelope / Curtain Wall").textContent, /Facade · Waterproofing2 of 2 required trades/)
+    assert.match(phase("Residential", "Envelope").textContent, /2 of 3 required trades/)
+    assert.match(connections.textContent, /Verified trades/)
+    await click([...document.querySelectorAll('.capability-choice')].find(label => label.textContent === "Waterproofing").querySelector('input'))
+    assert.match(phase("Commercial", "Envelope / Curtain Wall").textContent, /Facade1 of 2 required trades/)
+    assert.match(connections.textContent, /Site PM verification required/)
+    assert.equal(saves, 0)
+    assert.deepEqual(company.capabilityReview.disciplines, ["Facade", "Waterproofing"])
+  })
+})
+
 test("company profiles display both saved foremen with call links without relabeling legacy contacts", async () => {
   await withUi(async ({ React, root, server }) => {
     const { default: Foremen } = await server.ssrLoadModule("/src/CompanyForemen.tsx")

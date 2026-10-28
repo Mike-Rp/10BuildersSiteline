@@ -2689,7 +2689,7 @@ function AppInner() {
         </div>
         <CompanyForemen company={c} />
         <p className="section-description">{c.note}</p>
-        <CompanyCapabilities company={c} disciplines={state.referenceDisciplines || []} role={actor.role} />
+        <CompanyCapabilities company={c} role={actor.role} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">

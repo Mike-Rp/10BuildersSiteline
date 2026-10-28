@@ -1,10 +1,10 @@
 import {
   phaseDefinitions,
   projectPhaseNames,
-  projectPhaseDisciplines,
   type State,
   type Project,
 } from "./model.ts"
+import { companyTradePhases } from "../Thesis-Backend/src/domain/company-trades.js"
 import {
   validatePlan,
   type AllocationPlan,
@@ -41,12 +41,12 @@ export function tradeAllocationEnabled(state: State, project: Project) {
   )
 }
 export function allocationPhases(state: State, project: Project) {
-  if (project.phaseScope) return projectPhaseNames(project).map(name => ({name, disciplines: projectPhaseDisciplines(project,name)}))
-  return (
-    state.backendPhases?.[project.type] ||
-    project.subcontractorAllocation?.requirements ||
-    phaseDefinitions(project.type)
-  )
+  // A saved plan is a scope snapshot, including plans made before this catalog.
+  if (project.subcontractorAllocation?.requirements) return project.subcontractorAllocation.requirements
+  const phases = project.phaseScope
+    ? projectPhaseNames(project).map(name => ({ name }))
+    : state.backendPhases?.[project.type] || phaseDefinitions(project.type)
+  return companyTradePhases(project.type, phases)
 }
 export function allocationCandidates(
   state: State,

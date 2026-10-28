@@ -15,7 +15,8 @@ import {
   replacementCandidates,
   replaceCompany,
 } from "../Thesis-Backend/src/domain/subcontractor-allocation.js"
-import { allocationCandidates } from "../src/subcontractor-allocation.ts"
+import { allocationCandidates, allocationPhases } from "../src/subcontractor-allocation.ts"
+import { COMPANY_TRADES } from "../Thesis-Backend/src/domain/company-trades.js"
 import { locationForCity, LOCATION_CITIES } from "../Thesis-Backend/src/domain/philippine-locations.js"
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
@@ -217,10 +218,9 @@ test(
     user = await as(initialClient)
     await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Clients cannot edit capability reviews")
     user = await as(source.lead_email)
-    const disciplines = (
-      await db.query("select code from disciplines order by code")
-    ).rows.map((d) => d.code)
-    const suggestedId = randomUUID(), proposedDisciplines = disciplines.slice(0, 3)
+    const disciplines = [...COMPANY_TRADES]
+    const engineerCatalog = (await db.query("select code from disciplines order by code")).rows
+    const suggestedId = randomUUID(), proposedDisciplines = ["Civil", "Facade", "Waterproofing"]
     const foremen = [{ name: "Juan Dela Cruz", phone: "09171234567" }, { name: "Maria Santos", phone: "09181234567" }]
     const suggestion = { id: suggestedId, name: "Company with proposed trades", email: "proposedtrades@gmail.com", contact: "Untrusted legacy alias", phone: "09999999999", foremen, proposedDisciplines, documents: [], manpowerDocuments: [] }
     const invalidLocationId = randomUUID()
@@ -230,7 +230,7 @@ test(
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidForemanId, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
     assert.equal((await db.query("select id from subcontractors where id=$1", [invalidForemanId])).rows.length, 0, "invalid contacts must not partially create a company")
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, proposedDisciplines: ["Invented trade"] } }), /configured discipline catalog/)
-    await api("/subcontractors/registrations", { method: "POST", json: suggestion })
+    await api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, proposedDisciplines: ["Civil", "Façade", "Waterproofing"] } })
     let proposalState = await loadState(user), suggested = proposalState.companies.find(company => company.id === suggestedId)
     assert.deepEqual(suggested.proposedDisciplines, proposedDisciplines)
     assert.deepEqual(suggested.foremen, foremen, "both foremen must survive an API reload")
@@ -252,6 +252,7 @@ test(
     await api(`/subcontractors/${suggestedId}/capabilities`, { method: "PUT", json: { disciplines: proposedDisciplines, unavailable: false, documentIds: [proofId], note: "Site PM reviewed the company records for these trades." } })
     suggested = (await loadState(user)).companies.find(company => company.id === suggestedId)
     assert.deepEqual(suggested.capabilityReview.disciplines, proposedDisciplines)
+    assert.deepEqual((await db.query("select code from disciplines order by code")).rows, engineerCatalog, "company trade registration and verification must not change the engineer catalog")
     assert.equal(suggested.status, "pending", "capability verification must not approve the company")
     user = await as("patricia.domingo@10builders.com")
     const pendingCompany = (await loadState(user)).companies.find(company => company.id === suggestedId)
@@ -344,6 +345,8 @@ test(
     let state = await loadState(user),
       project = state.projects.find((p) => p.id === projectId),
       plan = project.subcontractorAllocation
+    assert.deepEqual(allocationPhases(state, project), plan.requirements, "browser and server use the same persisted company trade requirements")
+    assert.deepEqual(plan.requirements.find(phase => phase.name === "Mobilization").disciplines, ["Civil", "Electrical", "Plumbing"])
     assert.deepEqual(project.siteLocation, cebu)
     assert.equal(allocationCandidates(state, project).find(company => company.id === outsideId).locationIssue, undefined, "A different historical operating area does not exclude a company")
     await api(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: cebu } })

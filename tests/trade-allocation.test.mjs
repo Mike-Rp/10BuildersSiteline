@@ -17,6 +17,7 @@ import {
 } from "../src/subcontractor-allocation.ts"
 import { activeFixture, currentProject, execute } from "./fixtures.mjs"
 import { phaseDefinitions, DISCIPLINES } from "../src/model.ts"
+import { COMPANY_TRADES } from "../Thesis-Backend/src/domain/company-trades.js"
 
 const phases = [
   { name: "Mobilization", disciplines: ["Civil"] },
@@ -223,7 +224,7 @@ function fixture() {
     c.commitmentCount = 0
     c.capabilityReview = {
       operatingLocation: project.siteLocation,
-      disciplines: DISCIPLINES,
+      disciplines: [...COMPANY_TRADES],
       reviewedAt: "2026-10-27",
       unavailable: false,
     }
