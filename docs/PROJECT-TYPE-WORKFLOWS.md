@@ -27,6 +27,20 @@ corresponding Mixed-Use discipline links. It changes no existing project scope,
 assignment, evidence, approval or progress history. Repeat application is safe.
 No hosted database is changed by publishing the code.
 
+For an existing database that already has the default workflows, run the additive
+scope setup from the project root (it previews and rolls back unless `--apply` is supplied):
+
+```powershell
+npm.cmd --prefix Thesis-Backend run db:mixed-use-scope -- --dry-run
+npm.cmd --prefix Thesis-Backend run db:mixed-use-scope -- --apply
+```
+
+Missing scope setup can produce a misleading Office Fit-Out qualification error
+because its stage and discipline links do not exist yet. Do not change staff
+qualifications to work around missing database setup. The `db:project-types`
+command now reapplies migration 014 after migration 004, which replaces the
+default discipline links, so rerunning workflow setup retains scoped stages.
+
 The server derives the canonical ordered phases from validated uses/features;
 client-provided phase names, exclusions and reviewer identity are not trusted.
 It records the authenticated confirming administrator and timestamp and audits

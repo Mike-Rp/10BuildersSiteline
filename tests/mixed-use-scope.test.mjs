@@ -6,7 +6,8 @@ import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { defaultMixedUseScope, mixedUsePhaseReview, mixedUseScopeError, normalizeMixedUseScope } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
 import { projectWorkflowSql } from "../Thesis-Backend/src/services/projects/project-workflow.utility.js"
-import { validatePhaseTeam } from "../Thesis-Backend/src/services/projects/type-phases.utility.js"
+import { validatePhaseTeam, validateScopedQualifications } from "../Thesis-Backend/src/services/projects/type-phases.utility.js"
+import { migrateMixedUseScope } from "../Thesis-Backend/scripts/migrate-mixed-use-scope.js"
 import { snapshotProjectChecklists, readVerifiedProgress } from "../Thesis-Backend/src/services/progress/verified.utility.js"
 import { stageOptions, resolveStage } from "../Thesis-Backend/src/services/progress/phase-update.utility.js"
 import { readChecklist, assertPhaseUnlocked } from "../Thesis-Backend/src/services/progress/phase.utility.js"
@@ -57,12 +58,21 @@ test("saved scopes drive checklists, options, sequential handoff and historical 
   for(const migration of ["003-react-integration.sql","004-project-type-workflows.sql","004-verified-activity-progress.sql","005-targeted-rework.sql","009-engineer-license-workflow.sql"])await db.exec(read("../Thesis-Backend/migrations/"+migration))
   const original=(await db.query(`SELECT id,current_stage_id,current_pct,lifecycle_status FROM projects ORDER BY id`)).rows
   const originalWorkflows=(await db.query(projectWorkflowSql)).rows
-  await db.exec(read("../Thesis-Backend/migrations/014-mixed-use-project-scope.sql"))
-  await db.exec(read("../Thesis-Backend/migrations/014-mixed-use-project-scope.sql"))
+  const preview=await migrateMixedUseScope(db)
+  assert.equal(preview.mode,"dry-run (rolled back)")
+  assert.equal(preview.phases.length,3)
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name='projects' AND column_name='phase_scope'")).rows[0].n,0)
+  await migrateMixedUseScope(db,{apply:true})
+  await migrateMixedUseScope(db,{apply:true})
   assert.deepEqual((await db.query(`SELECT id,current_stage_id,current_pct,lifecycle_status FROM projects ORDER BY id`)).rows,original)
   assert.deepEqual((await db.query(projectWorkflowSql)).rows,originalWorkflows)
   const type=(await db.query("SELECT id FROM project_types WHERE code='Mixed-Use'")).rows[0].id
   const reviewer=(await db.query("SELECT id FROM users ORDER BY id LIMIT 1")).rows[0].id
+  await db.query("DELETE FROM user_discipline_scopes WHERE user_id=$1",[reviewer])
+  await db.query("INSERT INTO user_discipline_scopes(user_id,discipline_id) SELECT $1,id FROM disciplines WHERE code='Civil'",[reviewer])
+  await assert.rejects(validateScopedQualifications(db,type,[{stage:"Office Fit-Out",user_id:reviewer}]),/matching discipline/)
+  await db.query("INSERT INTO user_discipline_scopes(user_id,discipline_id) SELECT $1,id FROM disciplines WHERE code='Electrical'",[reviewer])
+  await validateScopedQualifications(db,type,[{stage:"Office Fit-Out",user_id:reviewer}])
   const saved=normalizeMixedUseScope({...scope(),uses:["office","retail"],features:{podium:false,tower:false,curtainWall:false,landscaping:false}})
   const id=randomUUID()
   await db.query("INSERT INTO projects(id,name,project_type_id,client_name,lifecycle_status,phase_scope) VALUES($1,'Scope fixture',$2,'Test','active',$3)",[id,type,JSON.stringify(saved)])

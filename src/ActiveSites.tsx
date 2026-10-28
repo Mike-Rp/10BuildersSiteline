@@ -268,8 +268,8 @@ export default function ActiveSites({
           <p role="status">{filtered.length ? `Showing ${(current - 1) * size + 1}-${Math.min(current * size, filtered.length)} of ${filtered.length} projects` : "0 projects"}</p>
         </div>
         <div className="as-layout" role="group" aria-label="Project layout">
-          <Button aria-pressed={layout === "cards"} onClick={() => setLayout("cards")} icon="grid">Cards</Button>
-          <Button aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="doc">List</Button>
+          <Button variant={layout === "cards" ? "primary" : ""} aria-pressed={layout === "cards"} onClick={() => setLayout("cards")} icon="grid">Cards</Button>
+          <Button variant={layout === "list" ? "primary" : ""} aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="doc">List</Button>
           {(query || type || phase || scheduleFilter) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
         </div>
       </div>
@@ -322,13 +322,17 @@ export default function ActiveSites({
             </div>
           </article>
         ))}
-      </div> : <div className="as-list-scroll" role="region" aria-label="Active projects list" tabIndex={0}><table className="as-list">
+      </div> : <div className="as-list-view">
+        {visible.length > 0 && <p className="as-list-hint" id={`${tabId}-list-hint`}>
+          <span aria-hidden="true">↔</span> Swipe to see more. Project names stay visible.
+        </p>}
+        <div className="as-list-scroll" role="region" aria-label="Active projects list" aria-describedby={visible.length ? `${tabId}-list-hint` : undefined} tabIndex={0}><table className="as-list">
         <thead><tr><th>Project</th><th>Current phase</th><th>Schedule status</th><th>Target completion</th><th>Details</th></tr></thead>
         <tbody>{visible.map(p => {
           const schedule = projectScheduleStatus(p, reportingDate)
           return <tr key={p.id}><th scope="row">{p.name}</th><td>{p.phase || "Phase not recorded"}</td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
         })}</tbody>
-      </table></div>}
+      </table></div></div>}
       {!visible.length && (
         <Empty
           title={

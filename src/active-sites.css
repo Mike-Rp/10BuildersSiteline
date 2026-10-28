@@ -1,4 +1,4 @@
-.active-sites { color: #172d45; }
+.active-sites { color: #172d45; min-width: 0; }
 .as-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 14px; margin-bottom: 20px; }
 .as-summary > div { position: relative; padding: 16px 16px 16px 76px; border: 1px solid #dce4ec; border-radius: 10px; background: #fff; display: grid; gap: 4px; align-content: center; min-height: 100px; }
 .as-summary span,.as-summary small { color: #62758a; font-size: 12px; }
@@ -68,8 +68,18 @@
 #root .as-layout { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #root .as-layout [aria-pressed="true"] { background: var(--color-primary); color: white; }
 #root .as-list-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); }
+#root .as-list-view { min-width: 0; }
+#root .as-list-hint { display: none; }
 #root .as-list { min-width: 700px; width: 100%; }
 #root .as-list :is(th, td) { font-size: 14px; white-space: normal; }
 #root .as-list tbody th { color: var(--color-ink); background: var(--color-surface); letter-spacing: normal; }
 #root .as-overdue { display: block; color: var(--color-danger); margin-top: 6px; font-size: 14px; }
-@media (max-width: 640px) { #root .as-results { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 640px) {
+  #root .as-results { align-items: flex-start; flex-direction: column; }
+  #root .as-list-hint { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--color-muted); font-size: 14px; }
+  #root .as-list-hint > span { font-size: 20px; }
+  #root .as-list { table-layout: fixed; }
+  #root .as-list tr > :first-child { position: sticky; left: 0; z-index: 1; width: 144px; overflow-wrap: anywhere; box-shadow: 2px 0 0 var(--color-line); }
+  #root .as-list thead th:first-child { background: var(--surface-subtle); }
+  #root .as-list tbody th { background: var(--color-surface); }
+}
