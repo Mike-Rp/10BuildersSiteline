@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { emptyState } from "../src/model.ts"
 
-test("intake client creation rejects non-Gmail addresses inline, preserves details, and saves a normalized Gmail address", async () => {
+test("client creation requires a company address, preserves intake details, and retains generated company emails", async () => {
   const [{ JSDOM }, { createServer }, React] = await Promise.all([import("jsdom"), import("vite"), import("react")])
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" }), previous = new Map(), w = dom.window
   for (const [key, value] of Object.entries({ window: w, document: w.document, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -26,24 +26,28 @@ test("intake client creation rejects non-Gmail addresses inline, preserves detai
     await type("Client / company name *", "Sample Client")
     await type("Contact person", "Primary contact")
     await type("Contact number", "09171234567")
-    assert.match(document.body.textContent, /Use an @gmail.com address/)
-    for (const email of ["mikahiro@gmial.com", "mikahiro@yahoo.com", "mikahiro@gmail.com.evil", "mikahiro@notgmail.com", "", "mikahiro@@gmail.com"]) {
+    assert.match(document.body.textContent, /client's @10builders.com account address/)
+    assert.match(document.body.textContent, /Project access is not activated/)
+    assert.equal(field("Email address *").placeholder, "lastname.firstname@10builders.com")
+    for (const email of ["mikahiro@gmail.com", "mikahiro@yahoo.com", "mikahiro@10builders.com.evil", "mikahiro@not10builders.com", "", "mikahiro@@10builders.com"]) {
       await type("Email address *", email)
       await click("Save client for project")
       assert.equal(saved.length, 0)
       assert.equal(field("Email address *").getAttribute("aria-invalid"), "true")
       const description = document.getElementById(field("Email address *").getAttribute("aria-describedby"))
-      assert.match(description.textContent, /Enter a valid @gmail.com email address/)
+      assert.match(description.textContent, /Enter a valid @10builders\.com email address/)
       assert.equal(field("Client / company name *").value, "Sample Client")
       assert.equal(field("Contact person").value, "Primary contact")
       assert.equal(field("Contact number").value, "09171234567")
     }
-    await type("Email address *", "  Mika.Hiro+Project@GMAIL.COM  ")
+    await type("Email address *", "  Hiro.Mika@10BUILDERS.COM  ")
     assert.equal(field("Email address *").getAttribute("aria-invalid"), null)
     await click("Save client for project")
     assert.equal(saved.length, 1)
-    assert.equal(saved[0].email, "mika.hiro+project@gmail.com")
-    assert.ok([...document.querySelectorAll(".selected-client-details input")].some(input => input.value === "mika.hiro+project@gmail.com"))
+    assert.equal(saved[0].email, "hiro.mika@10builders.com")
+    assert.equal(saved[0].status, "pending-setup")
+    assert.deepEqual(saved[0].scope, [])
+    assert.ok([...document.querySelectorAll(".selected-client-details input")].some(input => input.value === "hiro.mika@10builders.com"))
     // Existing records remain selectable instead of forcing a new account.
     const legacy = { ...saved[0], id: "legacy-client", email: "legacy@company.test" }
     state.accounts.push(legacy)
@@ -54,6 +58,23 @@ test("intake client creation rejects non-Gmail addresses inline, preserves detai
     assert.equal(used.id, legacy.id)
     await React.act(() => root.render(React.createElement(AccountForm, { key: "existing", state, account: legacy, onSave() {}, onClose() {} })))
     assert.equal(field("Email address *").getAttribute("pattern"), null)
+    // The main account form's company-email generator also works for Clients.
+    const project = { id: "client-project", name: "Client Project" }
+    state.projects = [project]
+    await React.act(() => root.render(React.createElement(AccountForm, { key: "generated", state, onSave: account => saved.push(account), onClose() {} })))
+    await React.act(() => {
+      const role = field("Account role")
+      Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(role, "client")
+      role.dispatchEvent(new w.Event("change", { bubbles: true }))
+    })
+    await type("First name *", "Vialh")
+    await type("Last name *", "Gonzales")
+    assert.equal(field("Email address *").value, "gonzales.vialh@10builders.com")
+    await React.act(() => document.querySelector('input[type="checkbox"]').click())
+    await click("Create account")
+    assert.equal(saved.length, 2)
+    assert.equal(saved[1].email, "gonzales.vialh@10builders.com")
+    assert.equal(saved[1].status, "invited")
   } finally {
     await React.act(() => root.unmount()); await server.close(); dom.window.close()
     for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]

@@ -132,15 +132,21 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       : !p.clientId), true,"legacy projects without an actual account link do not borrow a same-name account")
   })
 
-  await t.test("new client accounts require Gmail and retain normalized addresses without changing older clients", async () => {
+  let intakeClient
+  await t.test("new clients require company addresses and cannot log in before project activation", async () => {
     await asUser("patricia.domingo@10builders.com")
-    for (const email of ["mikahiro@gmial.com", "client@yahoo.com", "client@gmail.com.evil", "client@notgmail.com", "bad@@gmail.com", ""]) {
-      await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", email, role: "client", password: "Password@123" } }), /@gmail.com/)
+    for (const email of ["client@gmail.com", "client@yahoo.com", "client@10builders.com.evil", "client@not10builders.com", "bad@@10builders.com", ""]) {
+      await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", email, role: "client", password: "Password@123" } }), /@10builders\.com/)
     }
     assert.equal((await db.query("select 1 from users where full_name='Invalid new client'")).rowCount, 0)
-    const created = await api("/accounts", { method: "POST", json: { full_name: "Gmail Client Test", email: "  Intake.Client+Test@GMAIL.COM  ", role: "client", phone: "09171234567", password: "Password@123" } })
-    assert.equal(created.email, "intake.client+test@gmail.com")
+    const created = await api("/accounts", { method: "POST", json: { full_name: "Intake Client Test", email: "  Intake.Client@10BUILDERS.COM  ", role: "client", phone: "09171234567", password: "Password@123" } })
+    intakeClient = created
+    assert.equal(created.email, "intake.client@10builders.com")
+    assert.equal(created.status, "invited")
     assert.equal((await api(`/accounts/${created.id}`)).email, created.email)
+    await assert.rejects(login(created.email, "Password@123", true), error => error.status === 403 && /awaiting project approvals/.test(error.message))
+    assert.equal((await db.query("select status from users where id=$1", [created.id])).rows[0].status, "invited")
+    assert.equal((await db.query("select 1 from users_token where user_id=$1", [created.id])).rowCount, 0)
     const legacy = (await db.query("select id,email from users where email='maria.santos@rosariabiz.ph'")).rows[0]
     assert.equal((await api(`/accounts/${legacy.id}`)).email, legacy.email)
   })
@@ -387,7 +393,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const draft=state.projects.find(p=>p.name.startsWith("Alden Heights"))
     const source=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
-    const project={...draft,id:randomUUID(),name:"Integration Test Site",type:source.type,clientId:source.clientId,
+    const project={...draft,id:randomUUID(),name:"Integration Test Site",type:source.type,clientId:intakeClient.id,
       opmId:source.opmId,area:"100",floors:"1",start:"2027-01-15",end:"2027-10-15",docs:[],clientSubcon:"",clientSubconEmail:"",
       team:source.team.map(t=>({...t,status:"pending"}))}
     for(const id of new Set([project.opmId,...project.team.map(t=>t.accountId)])){
@@ -399,6 +405,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     newProjectId=await saveApiProject(project,false)
     state=await loadState(user)
     assert.equal(state.projects.find(p=>p.id===newProjectId).end,"2027-10-15")
+    await assert.rejects(login(intakeClient.email,"Password@123",true),/awaiting project approvals/,"sending intake does not enable client login")
     const opm=state.accounts.find(a=>a.id===project.opmId)
     ;({user,state}=await asUser(opm.email))
     await sendApiWorkflow(state,state.accounts.find(a=>a.id===user.id),{type:"accept_opm",projectId:newProjectId})
@@ -419,6 +426,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     }
     ;({user,state}=await asUser("patricia.domingo@10builders.com"))
     assert.equal((await api("/projects/"+newProjectId)).lifecycle_status,"spm_review","Confirmations alone must not bypass agreement and allocation")
+    await assert.rejects(login(intakeClient.email,"Password@123",true),/awaiting project approvals/,"documents and confirmations alone do not enable client login")
     const lead=state.accounts.find(a=>a.id===fresh.team[0].accountId)
     const session=await asUser(lead.email)
     const leadActor=session.state.accounts.find(a=>a.id===session.user.id)
@@ -501,6 +509,11 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await sendApiWorkflow(session.state,actor,{type:"activate_project",projectId:project.id})
     assert.equal((await api("/projects/"+project.id)).lifecycle_status,"active")
     assert.equal((await loadState(session.user)).projects.find(p=>p.id===project.id).clientSubconReview.issues[0].status,"resolved")
+    const clientSession=await asUser(intakeClient.email)
+    assert.equal(clientSession.user.status,"active")
+    assert.equal(clientSession.user.temp_password_issued,true,"the first-login password change is still required")
+    assert.deepEqual(clientSession.state.projects.map(p=>p.id),[project.id],"the newly activated client sees only their linked project")
+    assert.deepEqual(clientProjectViews(clientSession.state,intakeClient.id).map(p=>p.id),[project.id])
   })
 
   await t.test("a combined progress update is visible after reload and can be approved",async()=>{

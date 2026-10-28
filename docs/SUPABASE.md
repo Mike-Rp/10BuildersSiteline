@@ -27,6 +27,8 @@ For a disposable empty development database, `supabase/seed/dummy-data.sql` supp
 
 New manager assignments require an active account and a current uploaded PRC license. A license number alone is insufficient. Administrators can upload the license from the account screen. New accounts receive a temporary password and must replace it on first login.
 
+New Client accounts use `@10builders.com` addresses. Saving a Client account creates an invited record; signing in remains blocked until a linked project completes intake and becomes active. Submitting intake, receiving confirmations or uploading some documents does not enable login. After activation, the Client can monitor only their authorized active or completed projects. Clients who already monitor an active project retain access while another project is in intake. Existing account addresses are not rewritten by this validation rule.
+
 ## Connected actions
 
 Account creation and edits, client creation, license documents, intake submission, OPM and SPM confirmations, phase reassignment, registered documents, subcontractor suggestions and decisions, agreement review, activation, checklist evidence, progress submissions and approvals, notes, photos, notifications, rule settings, preferences and resignation records use API writes. The UI reloads saved server state before showing success.

@@ -655,13 +655,13 @@ export function AccountForm({
   const [error, setError] = useState("")
   const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
   const [emailError, setEmailError] = useState("")
-  const requiresGmail = !account && draft.role === "client"
+  const requiresClientEmail = !account && draft.role === "client"
   const existingClient = clientOnly
     ? clientForEmail(state, draft.email, draft.id)
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const invalidClientEmail = requiresGmail ? clientEmailError(draft.email) : ""
+    const invalidClientEmail = requiresClientEmail ? clientEmailError(draft.email) : ""
     setEmailError(invalidClientEmail)
     if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
@@ -681,14 +681,14 @@ export function AccountForm({
             )
           ? "This email is already in use. Select the existing client instead."
           : ""
-      : accountError(requiresGmail ? { ...draft, email: draft.email.trim() } : draft, state)
+      : accountError(requiresClientEmail ? { ...draft, email: draft.email.trim() } : draft, state)
     setError(err)
     if (!err) try {
       await onSave(
         {
           ...draft,
           name: draft.name.trim(),
-          email: requiresGmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
+          email: requiresClientEmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
           phone: draft.phone.trim(),
         },
         account ? undefined : pass,
@@ -728,7 +728,7 @@ export function AccountForm({
     )
   }
   return (
-    <form onSubmit={submit} noValidate={requiresGmail}>
+    <form onSubmit={submit} noValidate={requiresClientEmail}>
       <div className="form-grid">
         {!clientOnly && (
           <Field label="Account role" wide>
@@ -764,20 +764,20 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        <Field label="Email address *" wide={generatedIdentity} error={requiresGmail ? emailError : undefined} hint={requiresGmail ? "Use an @gmail.com address, for example name@gmail.com." : undefined}>
+        <Field label="Email address *" wide={generatedIdentity} error={requiresClientEmail ? emailError : undefined} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
           <input
             required
             type="email"
             maxLength={254}
-            pattern={requiresGmail ? CLIENT_EMAIL_PATTERN : undefined}
+            pattern={requiresClientEmail ? CLIENT_EMAIL_PATTERN : undefined}
             value={draft.email}
             onChange={(e) => {
               if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
-              if (emailError) setEmailError(requiresGmail ? clientEmailError(e.target.value) : "")
+              if (emailError) setEmailError(requiresClientEmail ? clientEmailError(e.target.value) : "")
               setError("")
             }}
-            placeholder={requiresGmail ? "name@gmail.com" : generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder={requiresClientEmail || generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>
         {generatedIdentity && <div className="field wide">
