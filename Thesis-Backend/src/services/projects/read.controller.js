@@ -1,4 +1,5 @@
 import execute from "../../common/utilities/query.utility.js";
+import { projectWorkflowSql } from "./project-workflow.utility.js";
 import {
   handleError, sendOk, sendError, requireUser, hasProjectAccess, isUuid, paging,
 } from "../../common/utilities/access.utility.js";
@@ -13,6 +14,7 @@ const SORTS = {
  
 export const LIST_SELECT = `
   p.id, p.name, p.client_name, pt.code AS project_type,
+  to_jsonb(p)->'phase_scope' AS phase_scope,
   coalesce((to_jsonb(p)->>'subcontractor_allocation_version')::int,0) as subcontractor_allocation_version,
   p.floor_area_sqm, p.floor_count, p.target_start_date, p.target_end_date, p.location,
   p.current_stage_id, ps.code AS current_stage, phase_progress.pct AS current_pct,
@@ -49,7 +51,7 @@ export const LIST_FROM = `
   ) phase_progress ON true`;
  
 export const stripInternal = (row) => {
-  const { suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, ...rest } = row;
+  const { suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
   return rest;
 };
  
@@ -136,10 +138,12 @@ export const getProjectById = async (req, res) => {
           ORDER BY assigned_at`, [id]),
       execute(
         `SELECT t.project_stage_id AS stage_id, s.code AS stage, w.sort_order,
+                ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
+                  WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
                 t.spm_user_id, u.full_name AS spm_name, t.status, t.is_lead
            FROM project_phase_team t
            JOIN projects p ON p.id=t.project_id
-           JOIN project_type_stages w ON w.project_type_id=p.project_type_id AND w.project_stage_id=t.project_stage_id
+           JOIN (${projectWorkflowSql}) w ON w.project_id=p.id AND w.project_stage_id=t.project_stage_id
            JOIN project_stages s ON s.id = t.project_stage_id
            LEFT JOIN users u ON u.id = t.spm_user_id
           WHERE t.project_id = $1

@@ -68,7 +68,7 @@ function setup(options = {}) {
         return result(params[1] === state.phaseOwner ? [{}] : []);
       }
       
-      if (sql.startsWith("SELECT s.id,s.code,w.sort_order FROM project_type_stages")) {
+      if (sql.startsWith("SELECT s.id,s.code,w.sort_order FROM")) {
         const all = updateUtility.STAGES.map((code, i) => ({ id: i + 1, code, sort_order: i + 1 }));
         return result(all.filter(stage => (params[1] == null || stage.id === Number(params[1])) &&
           (params[2] == null || stage.code.toLowerCase() === params[2].toLowerCase())));

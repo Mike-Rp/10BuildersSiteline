@@ -19,7 +19,7 @@ export const submitPhaseUpdate = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
       await assertLicenseActive(user, client);
-      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id, p.id);
       await assertPhaseUnlocked(client, p, stage.id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const existing = await client.query(
@@ -86,7 +86,7 @@ const resolvePhaseUpdate = decision => async (req, res) => {
       if (Number(p.current_stage_id) !== Number(update.prior_stage_id)) {
         throw new HttpError(409, "The project's stage changed after submission. Reject this update and submit a new one.");
       }
-      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id, p.project_type_id);
+      const stage = await resolveStage(client, { stage_id: update.selected_stage_id }, p.current_stage_id, p.project_type_id, p.id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const checklist = await readChecklist(client, p.id, stage.id);
       const isIssue = update.issue_categories.length > 0 || update.issue_reason != null;

@@ -3,6 +3,9 @@ import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
 import LocationFields from "./LocationFields"
 import EstimatedCompletionDate from "./EstimatedCompletionDate"
+import ProjectScopeReview from "./ProjectScopeReview"
+import ProjectScopeSummary from "./ProjectScopeSummary"
+import { defaultMixedUseScope, mixedUsePhaseReview, mixedUseScopeError, normalizeMixedUseScope } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
 import { CLIENT_EMAIL_PATTERN, clientEmailError } from "../Thesis-Backend/src/domain/client-email.js"
 import { locationError, normalizeLocation, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { recordedProgress, type ProgressProject } from "./progress"
@@ -1104,7 +1107,8 @@ export function IntakeForm({
   onClient: (a: Account) => Account | Promise<Account>
   onClose: () => void
 }) {
-  const [step, setStep] = useState(project ? 2 : 1)
+  const [step, setStep] = useState(project ? "allocation" : "details")
+  const [scopeDraft, setScopeDraft] = useState(project?.phaseScope || defaultMixedUseScope())
   const [newClient, setNewClient] = useState(false)
   const [error, setError] = useState("")
   const [run, setRun] = useState(0)
@@ -1149,11 +1153,13 @@ export function IntakeForm({
         name,
         disciplines: projectPhaseDisciplines(project, name),
       }))
-    : (state.backendPhases?.[draft.type] || phaseDefinitions(draft.type))
-  function recommend(version = 0) {
+    : draft.type === "Mixed-Use" && draft.phaseScope
+      ? mixedUsePhaseReview(draft.phaseScope).filter(phase => phase.included)
+      : (state.backendPhases?.[draft.type] || phaseDefinitions(draft.type))
+  function recommend(version = 0, phases = allocationPhases, phaseScope = draft.phaseScope) {
     const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
-    const team = allocationPhases.map((phase, sequence) => {
-      const candidates = spmCandidates(state, draft.type, phase.name, draft.id)
+    const team = phases.map((phase, sequence) => {
+      const candidates = spmCandidates(state, draft.type, phase.name, draft.id, phase.disciplines)
       return {
         phase: phase.name,
         accountId:
@@ -1164,7 +1170,7 @@ export function IntakeForm({
         sequence,
       }
     })
-    patch({ opmId: opms[0]?.id || "", team })
+    patch({ opmId: opms[0]?.id || "", team, phaseScope })
     setRun(version)
   }
   // Date rules apply to new projects only; an existing project's dates are locked here.
@@ -1242,8 +1248,8 @@ export function IntakeForm({
     const err = validDetails()
     setError(err)
     if (err) return
-    recommend()
-    setStep(2)
+    if (draft.type === "Mixed-Use" && !project) setStep("scope")
+    else { recommend(); setStep("allocation") }
   }
   async function submit() {
     if (submitGuard.current) return
@@ -1281,7 +1287,7 @@ export function IntakeForm({
       draft.team.length !== allocationPhases.length ||
       draft.team.some(
         (t) =>
-          !spmCandidates(state, draft.type, t.phase, draft.id).some(
+          !spmCandidates(state, draft.type, t.phase, draft.id, t.requiredDisciplines).some(
             (c) => c.account.id === t.accountId,
           ),
       )
@@ -1305,7 +1311,7 @@ export function IntakeForm({
     } catch(reason) { setError((reason as Error).message) }
     finally { submitGuard.current = false; setSubmitting(false) }
   }
-  const count = headcount(draft.type, draft.area, draft.floors)
+  const count = headcount(draft.type, draft.area, draft.floors, allocationPhases)
   const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
   const requiredDisciplines = [
     ...new Set(allocationPhases.flatMap((phase) => phase.disciplines)),
@@ -1317,22 +1323,23 @@ export function IntakeForm({
     (doc) => doc.label === "Client & Subcontractor Agreement" && doc.uploaded,
   )
   const projectTypeError =
-    step === 1 && !draft.type && error
+    step === "details" && !draft.type && error
       ? "Select a project type to generate allocation."
       : ""
   return (
     <>
       <div className="intake-steps">
-        <span className={step === 1 ? "current" : "done"}>
-          <b>{step > 1 ? <Icon name="check" size={14} /> : "1"}</b>Project
+        <span className={step === "details" ? "current" : "done"}>
+          <b>{step !== "details" ? <Icon name="check" size={14} /> : "1"}</b>Project
           details
         </span>
         <i />
-        <span className={step === 2 ? "current" : ""}>
-          <b>2</b>Staffing & agreements
+        {draft.type === "Mixed-Use" && <><span className={step === "scope" ? "current" : step === "allocation" ? "done" : ""}><b>2</b>Project scope</span><i /></>}
+        <span className={step === "allocation" ? "current" : ""}>
+          <b>{draft.type === "Mixed-Use" ? "3" : "2"}</b>Staffing & agreements
         </span>
       </div>
-      {step === 1 ? (
+      {step === "details" ? (
         <form onSubmit={next}>
           <div className="form-grid">
             <Field label="Project name *" wide>
@@ -1368,7 +1375,7 @@ export function IntakeForm({
                       role="radio"
                       aria-checked={selected}
                       onClick={() => {
-                        patch({ type: option.name })
+                        patch({ type: option.name, ...(option.name !== draft.type ? {phaseScope: undefined} : {}) })
                         if (projectTypeError) setError("")
                       }}
                     >
@@ -1528,11 +1535,19 @@ export function IntakeForm({
               icon="arrow"
               disabled={datesBlocked}
             >
-              Generate allocation
+              {draft.type === "Mixed-Use" ? "Review project scope" : "Generate allocation"}
             </Button>
           </div>
         </form>
-      ) : (
+      ) : step === "scope" ? <ProjectScopeReview value={scopeDraft} onChange={setScopeDraft} onBack={() => {setError("");setStep("details")}} error={error}
+        onConfirm={() => {
+          const issue = mixedUseScopeError(scopeDraft)
+          setError(issue)
+          if (issue) return
+          const scope = normalizeMixedUseScope(scopeDraft)
+          recommend(0, mixedUsePhaseReview(scope).filter(phase => phase.included), scope)
+          setStep("allocation")
+        }} /> : (
         <>
           <div className="allocation-summary">
             <div>
@@ -1546,6 +1561,10 @@ export function IntakeForm({
               Re-run allocation
             </Button>
           </div>
+          {draft.phaseScope && <>
+            <ProjectScopeSummary scope={draft.phaseScope} />
+            {!project && <Button onClick={() => {setError("");setStep("scope")}}>Review scope</Button>}
+          </>}
           <div className="notice">
             <Icon name="shield" />
             <p>
@@ -1624,6 +1643,7 @@ export function IntakeForm({
                   draft.type,
                   phase.name,
                   draft.id,
+                  phase.disciplines,
                 )
                 const row = draft.team.find((t) => t.phase === phase.name)
                 const current = candidates.find(
@@ -1799,7 +1819,7 @@ export function IntakeForm({
             </p>
           )}
           <div className="modal-actions">
-            <Button onClick={() => setStep(1)}>Back to details</Button>
+            <Button onClick={() => setStep("details")}>Back to details</Button>
             <Button
               variant="primary"
               onClick={submit}

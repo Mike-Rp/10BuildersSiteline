@@ -1,6 +1,65 @@
 # Project-type workflows
 
-Residential and Commercial use 9 phases; Mixed-Use uses 12. The authoritative definitions and per-type order are in `project_type_stages`, joined to `project_stages` and `project_stage_discipline_links`. The workspace API supplies them to the frontend.
+Residential and Commercial use 9 default phases; the default Mixed-Use template has 12. `project_type_stages`, `project_stages` and `project_stage_discipline_links` still define those defaults. Confirmed Mixed-Use intake scopes can now select a project-specific sequence, as described below.
+
+## Mixed-Use scope review
+
+New Mixed-Use intake follows Project details → Project scope → Staffing & agreements.
+The administrator selects at least two supported building uses (residential,
+retail/commercial, offices, hotel/hospitality), separately from podium, tower,
+curtain wall and landscaping features. A written scope basis and explicit
+confirmation are required. This confirms proposed allocation scope; responsible
+project professionals must still review design, permit and contract applicability.
+
+The shared `mixed-use-scope.js` policy proposes applicable phases. Uses select
+their fit-out packages, including Office Fit-Out and Hotel Fit-Out. Without a
+tower, Structure remains; without curtain wall, Envelope remains; without
+landscaping, Site Works remains. Mobilization, Design, Foundation, MEP,
+Fire & Life Safety and Closeout cannot be unchecked. Non-applicable packages
+retain their generated reasons in the scope snapshot, rather than receiving
+completion or fabricated approvals. Re-run allocation retains its existing
+ranking behavior and only allocates phases in the confirmed scope.
+
+Apply `Thesis-Backend/migrations/014-mixed-use-project-scope.sql` after the
+project-type workflow, verified checklist and integration prerequisites. It adds
+the nullable `projects.phase_scope` snapshot, three stage definitions and the
+corresponding Mixed-Use discipline links. It changes no existing project scope,
+assignment, evidence, approval or progress history. Repeat application is safe.
+No hosted database is changed by publishing the code.
+
+The server derives the canonical ordered phases from validated uses/features;
+client-provided phase names, exclusions and reviewer identity are not trusted.
+It records the authenticated confirming administrator and timestamp and audits
+the scope. The saved scope is locked after submission, including returned
+intakes. It is visible read-only in staff project details. Existing projects and
+legacy API clients without a scope continue to use the full type workflow.
+Read paths tolerate a missing phase_scope column, but creating a scoped intake
+requires migration 014. Deploy the migration before using the new scope form.
+
+`projectWorkflowSql` resolves project-specific stages with a type-workflow
+fallback. It is shared across assignment validation, staff detail reads,
+checklist initialization, stage selection, unlock/handoff, archive gates and
+subcontractor allocation. Progress and monthly-report reconstruction use the
+same snapshot. Mobilization/Closeout retain four standard checklists, each
+included intermediate phase three. Existing mandatory evidence and approval
+provenance rules remain intact. Excluded phases cannot be initialized/submitted
+as a way to bypass the saved scope.
+
+Validation includes every supported use/feature combination, missing/forged
+scope rejection, frontend scope confirmation/reconfirmation, qualification
+matching, authenticated intake/reload, immutable scope, phase unlock/handoff,
+checklist totals, company-allocation scope, report balances and unchanged legacy
+workflows. See `tests/mixed-use-scope*.test.mjs` and the scoped-intake scenario
+in `tests/api-backend.test.mjs`.
+
+Verification results for this change: 461 repository tests passed; the final
+authenticated API rerun passed 40/40 and scope/schema checks passed 8/8.
+TypeScript, production build and phase lint passed. Narrow-screen browser
+inspection confirmed the responsive form. The standalone backend suite has
+10 pre-existing failures (84/94 passed), reproduced against the unchanged
+baseline: old client-email expectations, legacy crew-flow mocks and evidence
+reviews missing required preview tokens. No approval requirements were relaxed
+to satisfy those tests. Existing Vite configuration/bundle-size warnings remain.
 
 ## Apply to an existing database
 

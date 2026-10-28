@@ -1,4 +1,4 @@
-import { validatePhaseTeam } from "./type-phases.utility.js";
+import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { experienceForProjectSql } from "../accounts/experience.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 
@@ -111,7 +111,7 @@ export const updatePhaseTeam = async (req, res) => {
     }
     const data = await withTransaction(async (client) => {
       // Prevent overwriting an SPM's already confirmed assignments.
-      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
+      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status, to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
       if (!locked.rowCount) throw Object.assign(new Error('Project not found.'), {status:404});
       if(locked.rows[0].lifecycle_status==="archived") throw Object.assign(new Error("Archived projects are read-only."),{status:409});
       const confirmed = await client.query(`SELECT 1 FROM project_phase_team WHERE project_id = $1 AND status = 'confirmed' LIMIT 1`, [project_id]);
@@ -120,18 +120,19 @@ export const updatePhaseTeam = async (req, res) => {
         const ownership = await client.query(`SELECT 1 FROM project_engineers WHERE project_id=$1 AND user_id=$2 AND unassigned_at IS NULL`, [project_id,actor.id]);
         if (!ownership.rowCount) throw Object.assign(new Error('Not assigned to this project.'), {status:403});
       }
-      await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team);
+      await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
       for (const stage of phase_team) await assertEligibleManager(client, stage.user_id, 'spm');
+      if (locked.rows[0].phase_scope) await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team);
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
       const deadline=locked.rows[0].lifecycle_status==="spm_review" ? businessDeadline(clock.rows[0].now) : null;
-      for (const stage of phase_team) {
+      for (const [index,stage] of phase_team.entries()) {
         const inserted = await client.query(`INSERT INTO project_phase_team
           (project_id, project_stage_id, spm_user_id, is_lead, status, response_deadline_at, created_by, updated_by)
           SELECT $1, ps.id, $3, $4, 'pending', $6::timestamptz, $5, $5
           FROM project_stages ps WHERE ps.code=$2 RETURNING project_stage_id`,
-          [project_id,stage.stage,stage.user_id,stage.is_lead ?? false,actor.id,deadline]);
+          [project_id,stage.stage,stage.user_id,locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
         if (!inserted.rowCount) throw Object.assign(new Error('Unknown project stage.'), {status:422});
       }
       return {project_id, phase_team};

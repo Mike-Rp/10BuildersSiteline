@@ -37,8 +37,8 @@ export const getPhaseOverview = async (req, res) => {
     if (!user) return;
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id);
-      const stages = await stageOptions(client, p.project_type_id);
-      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id, p.project_type_id);
+      const stages = await stageOptions(client, p.project_type_id, p.id);
+      const selected = await resolveStage(client, req.query ?? {}, p.current_stage_id ?? stages[0]?.id, p.project_type_id, p.id);
       const checklist = await readChecklist(client, p.id, selected.id);
       const selectedIndex = stages.findIndex(stage => Number(stage.id) === Number(selected.id));
       const currentIndex = stages.findIndex(stage => Number(stage.id) === Number(p.current_stage_id));
@@ -95,7 +95,7 @@ async function itemProject(client, user, projectId, itemId, body = {}) {
   const item = await client.query(
     "SELECT project_stage_id FROM project_phase_checklist_items WHERE id = $1 AND project_id = $2", [itemId, p.id]);
   if (!item.rowCount) throw new HttpError(404, "Checklist item not found.");
-  const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id);
+  const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id, p.id);
   if (Number(stage.id) !== Number(item.rows[0].project_stage_id)) throw new HttpError(422, "The checklist item belongs to another stage.");
   await assertPhaseUnlocked(client, p, stage.id);
   return { ...p, current_stage_id: stage.id, current_stage: stage.code };
@@ -141,7 +141,7 @@ export const getProjectStages = async (req, res) => {
     if (!user) return;
     const stages = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id);
-      return stageOptions(client, p.project_type_id);
+      return stageOptions(client, p.project_type_id, p.id);
     });
     return sendOk(res, "Selectable stages retrieved.", stages.length, stages);
   } catch (error) { return handleError(res, error); }
@@ -157,7 +157,7 @@ export const reportProjectIssue = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       await assertProjectSpm(client, user, p);
       await assertLicenseActive(user, client);
-      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id);
+      const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id, p.id);
       if(Number(stage.id)!==Number(p.current_stage_id))throw new HttpError(422,"Issue reports must concern the current phase.");
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       await validateFiles(client,selected,user.id,body.file_ids);
@@ -263,7 +263,7 @@ export const uploadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, req.user, req.params.id, { active: true });
       await assertProjectSpm(client, req.user, p);
-      const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id);
+      const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id, p.id);
       await assertPhaseUnlocked(client, p, stage.id);
       return insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id);
     });

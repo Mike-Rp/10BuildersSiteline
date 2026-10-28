@@ -1,3 +1,4 @@
+import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import OverallProjectProgress from "./OverallProjectProgress"
@@ -3223,6 +3224,7 @@ export default function RoleWorkspace({
           <Status value={p.status} />
         </div>
         <ProjectClientDetails project={p} accounts={state.accounts} />
+        <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>

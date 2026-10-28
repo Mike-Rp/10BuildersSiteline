@@ -1,5 +1,6 @@
 import { blockingReviews, verifiedComplete } from "./lifecycle.utility.js";
 import { readChecklist, recordPhaseHistory } from "./phase.utility.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 // Caller owns the project row lock. Expected blockers return without undoing
 // the activity approval; unexpected database failures still roll back atomically.
@@ -12,11 +13,11 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
     reason: "All required checklist items must be approved before advancing.", code: 422 };
   const next = await db.query(
     `SELECT s.id AS project_stage_id, t.status, t.spm_user_id, s.code
-       FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
+       FROM projects p JOIN (${projectWorkflowSql}) w ON w.project_id=p.id
        JOIN project_stages s ON s.id=w.project_stage_id
        LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=s.id
       WHERE p.id=$1 AND w.sort_order >
-        (SELECT sort_order FROM project_type_stages WHERE project_type_id=p.project_type_id AND project_stage_id=$2)
+        (SELECT sort_order FROM (${projectWorkflowSql}) current WHERE current.project_id=p.id AND project_stage_id=$2)
       ORDER BY w.sort_order LIMIT 1`, [project.id, project.current_stage_id]);
   if (!next.rowCount) return { state: "final", advanced: false, reason: "This is the project's final assigned phase. Existing completion checks apply.", code: 409 };
   if (await blockingReviews(db, project.id)) return blocked("Resolve pending rework, progress and subcontractor reviews before advancing this phase.", "pending_reviews", 409);

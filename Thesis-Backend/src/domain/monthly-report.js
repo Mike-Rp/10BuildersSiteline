@@ -18,6 +18,13 @@ export function reportPeriod(month, now = new Date()) {
   return {month,timezone:REPORT_TIMEZONE,start:start.toISOString(),end:end.toISOString(),cutoff:(month===current?now:end).toISOString(),monthToDate:month===current,generatedAt:now.toISOString()};
 }
 const key=(table,row)=>table==="project_type_stages"?`${row.project_type_id}:${row.project_stage_id}`:table==="project_phase_checklists"?`${row.project_id}:${row.project_stage_id}`:String(row.id);
+const reportWorkflow = state => {
+  const project=state.projects?.[0];
+  if (Array.isArray(project?.phase_scope?.phases)) return project.phase_scope.phases.map((name,index)=>({
+    project_stage_id:state.project_stages?.find(stage=>stage.code===name)?.id,sort_order:index+1,
+  }));
+  return (state.project_type_stages||[]).filter(w=>String(w.project_type_id)===String(project?.project_type_id)).sort((a,b)=>a.sort_order-b.sort_order);
+};
 export function applyReportEvent(state,event) {
   const rows=state[event.source_table] ??= [];
   const row=event.after_row||event.before_row;
@@ -28,7 +35,8 @@ export function applyReportEvent(state,event) {
 export function reportBalance(state) {
   const project=state.projects?.[0];
   if(!project)return {project:unavailable(),phases:[]};
-  const workflow=(state.project_type_stages||[]).filter(w=>String(w.project_type_id)===String(project.project_type_id)).sort((a,b)=>a.sort_order-b.sort_order);
+  const workflow=reportWorkflow(state);
+  if (workflow.some(phase=>phase.project_stage_id===undefined)) return {project:unavailable(),phases:[]};
   const phases=workflow.map(w=>{
     const phaseId=String(w.project_stage_id);
     const items=(state.project_phase_checklist_items||[]).filter(i=>String(i.project_stage_id)===phaseId);
@@ -44,7 +52,7 @@ export function reportBalance(state) {
   return {project:additional.some(id=>!expected.has(id))?unavailable():projectProgress(phases,[...expected]),phases:phases.map(p=>({id:p.id,name:p.name,...phaseProgress(p)}))};
 }
 const inPeriod=(at,period)=>at>=period.start&&at<period.cutoff;
-const scopeSignature=state=>JSON.stringify({workflow:(state.project_type_stages||[]).filter(w=>String(w.project_type_id)===String(state.projects?.[0]?.project_type_id)).map(w=>[String(w.project_stage_id),w.sort_order]).sort(),
+const scopeSignature=state=>JSON.stringify({workflow:reportWorkflow(state).map(w=>[String(w.project_stage_id),w.sort_order]).sort(),
   items:(state.project_phase_checklist_items||[]).filter(i=>i.required!==false).map(i=>[String(i.id),String(i.project_stage_id),i.required,Number(i.weight)]).sort()});
 const phaseName=(state,id)=>(state.project_stages||[]).find(s=>String(s.id)===String(id))?.code||"Project";
 

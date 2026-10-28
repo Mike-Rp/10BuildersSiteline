@@ -1,6 +1,7 @@
 import {
   phaseDefinitions,
   projectPhaseNames,
+  projectPhaseDisciplines,
   type State,
   type Project,
 } from "./model.ts"
@@ -40,6 +41,7 @@ export function tradeAllocationEnabled(state: State, project: Project) {
   )
 }
 export function allocationPhases(state: State, project: Project) {
+  if (project.phaseScope) return projectPhaseNames(project).map(name => ({name, disciplines: projectPhaseDisciplines(project,name)}))
   return (
     state.backendPhases?.[project.type] ||
     project.subcontractorAllocation?.requirements ||

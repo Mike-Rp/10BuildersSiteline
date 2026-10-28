@@ -1,4 +1,6 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
+import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import { locationError, normalizeLocation, sameLocation } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
@@ -409,6 +411,11 @@ router.post("/subcontractors/:id/supporting-documents", endpoint(["spm"], async 
 }));
 router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), b = req.body;
+    if (b.phaseScope !== undefined) {
+        let matches = false;
+        try { matches = !!p.phase_scope && JSON.stringify(normalizeMixedUseScope(b.phaseScope)) === JSON.stringify(normalizeMixedUseScope(p.phase_scope)); } catch { /* Invalid scope cannot amend the saved workflow. */ }
+        if (!matches) throw new HttpError(409, "Project scope is locked after submission. Scope cannot be changed through workspace edits.");
+    }
     const previous = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
     const unchangedHistoricalLocation = b.siteLocation && previous.siteLocation && ["region", "province", "city", "psgcCode"].every(key => b.siteLocation[key] === previous.siteLocation[key]);
     const siteLocation = b.siteLocation !== undefined && !locationError(b.siteLocation) ? normalizeLocation(b.siteLocation) : undefined;
@@ -566,7 +573,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 await db.query("insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count) values($1,$2,$3,$4)", [p.id, selected.subcontractor_id, selected.trade_id, workers.rowCount]);
             }
             await snapshotProjectChecklists(db,p.id);
-            await db.query("update projects set lifecycle_status='active',current_stage_id=(select project_stage_id from project_type_stages where project_type_id=projects.project_type_id order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1", [p.id, assigned]);
+            await db.query(`update projects set lifecycle_status='active',current_stage_id=(select project_stage_id from (${projectWorkflowSql}) w where w.project_id=projects.id order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1`, [p.id, assigned]);
             meta.activation = { byId: user.id, by: user.full_name, at: new Date().toISOString() };
             break;
         }

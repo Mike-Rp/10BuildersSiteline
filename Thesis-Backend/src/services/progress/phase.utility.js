@@ -5,6 +5,7 @@ import { phaseProgress } from "../../domain/verified-progress.js";
 import { projectChecklistTemplateSql } from "./checklist-template.utility.js";
 import { markPhaseCompleted } from "../licenses/history.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -47,8 +48,8 @@ export async function assertPhaseUnlocked(client, project, stageId) {
   const result = await client.query(`SELECT selected.sort_order > current.sort_order AS locked,
     COALESCE((to_jsonb(c)->>'on_hold')::boolean,false) AS on_hold
     FROM projects p
-    JOIN project_type_stages current ON current.project_type_id=p.project_type_id AND current.project_stage_id=p.current_stage_id
-    JOIN project_type_stages selected ON selected.project_type_id=p.project_type_id AND selected.project_stage_id=$2
+    JOIN (${projectWorkflowSql}) current ON current.project_id=p.id AND current.project_stage_id=p.current_stage_id
+    JOIN (${projectWorkflowSql}) selected ON selected.project_id=p.id AND selected.project_stage_id=$2
     LEFT JOIN project_phase_checklists c ON c.project_id=p.id AND c.project_stage_id=$2
     WHERE p.id=$1`, [project.id,stageId]);
   if (!result.rowCount || result.rows[0].locked) throw new HttpError(422, "This phase is locked until prior required evidence is approved and handoff is complete.");
@@ -98,7 +99,7 @@ export async function readChecklist(client, projectId, stageId, { initialize = t
   const approved = required.filter(i => i.status === "approved" && i.reviewed_by && i.reviewed_at).length;
   const scope = await client.query(`SELECT w.project_stage_id,
     COALESCE((to_jsonb(c)->>'on_hold')::boolean,false) AS on_hold
-    FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
+    FROM projects p JOIN (${projectWorkflowSql}) w ON w.project_id=p.id
     LEFT JOIN project_phase_checklists c ON c.project_id=p.id AND c.project_stage_id=w.project_stage_id
     WHERE p.id=$1 ORDER BY w.sort_order`, [projectId]);
   const position = scope.rows.findIndex(row => Number(row.project_stage_id) === Number(stageId));

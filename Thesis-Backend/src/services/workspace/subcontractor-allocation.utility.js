@@ -1,4 +1,5 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
 import { allocationLocationIssue, locationError, normalizeLocation, sameLocation } from "../../domain/operating-location.js"
 import {
   eligibility,
@@ -29,10 +30,10 @@ export async function allocationContext(db, p) {
   const phases = (
     await db.query(
       `select s.code as name, coalesce(array_agg(d.code::text order by d.code) filter(where d.id is not null),'{}') as disciplines
-      from project_type_stages pts join project_stages s on s.id=pts.project_stage_id
+      from (${projectWorkflowSql}) pts join project_stages s on s.id=pts.project_stage_id
       left join project_stage_discipline_links r on r.project_stage_id=s.id and r.project_type_id=pts.project_type_id
-      left join disciplines d on d.id=r.discipline_id where pts.project_type_id=$1 group by s.id,pts.sort_order order by pts.sort_order`,
-      [p.project_type_id],
+      left join disciplines d on d.id=r.discipline_id where pts.project_id=$1 group by s.id,pts.sort_order order by pts.sort_order`,
+      [p.id],
     )
   ).rows
   const companies = (
@@ -88,9 +89,9 @@ async function intakeReady(db, p) {
     [p.id],
   )
   const missing = await db.query(
-    `select 1 from project_type_stages pts left join project_phase_team t on t.project_id=$1 and t.project_stage_id=pts.project_stage_id
-      where pts.project_type_id=$2 and (t.spm_user_id is null or t.status<>'confirmed') limit 1`,
-    [p.id, p.project_type_id],
+    `select 1 from (${projectWorkflowSql}) pts left join project_phase_team t on t.project_id=$1 and t.project_stage_id=pts.project_stage_id
+      where pts.project_id=$1 and (t.spm_user_id is null or t.status<>'confirmed') limit 1`,
+    [p.id],
   )
   if (
     required.rows[0].n !== 6 ||

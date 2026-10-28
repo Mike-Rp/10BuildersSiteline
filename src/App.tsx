@@ -1,3 +1,4 @@
+import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useSignOutConfirmation from "./useSignOutConfirmation"
@@ -2298,6 +2299,7 @@ function AppInner() {
             </section>
             {p.status === "active" && (
               <section className="detail-section">
+                <ProjectScopeSummary scope={p.phaseScope} />
                 <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
               </section>
             )}

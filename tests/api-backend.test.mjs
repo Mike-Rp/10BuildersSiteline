@@ -2,6 +2,7 @@ import { overallChecklistProgress } from "../src/project-progress.ts"
 import { projectPhaseNames } from "../src/model.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import { readChecklist } from "../Thesis-Backend/src/services/progress/phase.utility.js"
+import { defaultMixedUseScope, normalizeMixedUseScope } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
 // End to end: the Supabase schema + demo data in an in-process Postgres, the real
 // Thesis-Backend (Express) in front of it, and the frontend's own login/loader.
 // Uses the backend bundled in this repository; all writes stay in the test database.
@@ -1343,6 +1344,71 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       assert.equal(result.opm.experience_years, 7)
       assert.equal(result.phase_team.find(row => row.stage === "Mobilization").user_id, created.spm7)
     }
+  })
+
+  await t.test("confirmed Mixed-Use scope persists through authenticated intake, allocation, progress, reports and rejected scope edits",async()=>{
+    await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/014-mixed-use-project-scope.sql"),"utf8"))
+    const session=await asUser("patricia.domingo@10builders.com")
+    const managers={}
+    for(const role of ["opm","spm"]){
+      const manager=await api("/accounts",{method:"POST",json:{full_name:`Scope ${role}`,email:`scope.${role}@10builders.com`,role,password:"Password@123",
+        scope:role==="opm"?{project_types:["Mixed-Use"]}:{disciplines:["Civil","Structural","Electrical"]}}})
+      managers[role]=manager.id
+      await db.query("UPDATE users SET status='active' WHERE id=$1",[manager.id])
+      await db.query(`INSERT INTO user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,created_by)
+        SELECT $1,'SCOPE-TEST',current_date+400,'uploaded',upload_file_ref,$2 FROM user_licenses WHERE upload_file_ref IS NOT NULL LIMIT 1`,[manager.id,session.user.id])
+    }
+    const scope=normalizeMixedUseScope({...defaultMixedUseScope(),uses:["office","hotel"],features:{podium:false,tower:false,curtainWall:false,landscaping:false},basis:"Reviewed client brief: office and hotel building without residential or retail units, with general structure, enclosure and site works.",confirmed:true})
+    const id=randomUUID()
+    const client=session.state.accounts.find(account=>account.role==="client")
+    const body={intake_id:id,name:"Scoped office and hotel",project_type:"Mixed-Use",floor_area_sqm:100,floor_count:3,target_start_date:"2027-01-15",client_user_id:client.id,suggested_opm_id:managers.opm,
+      phase_scope:{...scope,phases:["Closeout"],confirmedBy:"spoofed"},phase_team:scope.phases.map((stage,index)=>({stage,user_id:managers.spm,is_lead:index===0}))}
+    await assert.rejects(api("/projects/intake",{method:"POST",json:{...body,phase_scope:{...scope,uses:["office"]}}}),/at least two/)
+    await assert.rejects(api("/projects/intake",{method:"POST",json:{...body,phase_team:body.phase_team.filter(row=>row.stage!=="Fire & Life Safety")}}),/confirmed project scope/)
+    assert.equal((await db.query("SELECT 1 FROM projects WHERE id=$1",[id])).rowCount,0)
+    await api("/projects/intake",{method:"POST",json:body})
+    const loaded=(await loadState(session.user)).projects.find(project=>project.id===id)
+    assert.deepEqual(projectPhaseNames(loaded),scope.phases)
+    assert.deepEqual(loaded.phaseScope.phases,scope.phases,"server derives phases instead of trusting client names")
+    assert.equal(loaded.phaseScope.confirmedBy,session.user.id)
+    assert.ok(loaded.phaseScope.confirmedAt)
+    assert.ok(loaded.team.find(row=>row.phase==="Hotel Fit-Out").requiredDisciplines.includes("Fire Protection"))
+    assert.deepEqual((await api(`/projects/${id}/stages`)).map(row=>row.code),scope.phases)
+    assert.deepEqual((await api(`/projects/${id}`)).phase_team.map(row=>row.stage),scope.phases)
+    assert.deepEqual(loaded.checklistProgress.map(row=>row.name),scope.phases)
+    assert.equal(loaded.checklistProgress.reduce((sum,row)=>sum+row.required,0),8+3*(scope.phases.length-2))
+    await api(`/projects/${id}/workspace`,{method:"PUT",json:{...loaded,end:"2027-10-15"}})
+    const changedScope=normalizeMixedUseScope({...scope,uses:["retail","residential"]})
+    await assert.rejects(api(`/projects/${id}/workspace`,{method:"PUT",json:{...loaded,phaseScope:changedScope}}),/scope is locked/)
+    await assert.rejects(api(`/projects/${id}`,{method:"PUT",json:{phase_scope:changedScope}}),/Only project details/)
+    await assert.rejects(api("/projects/recommendations/update-phase-team",{method:"PUT",json:{project_id:id,phase_team:[...body.phase_team,{stage:"Residential Fit-Out",user_id:managers.spm}]}}),/confirmed project scope/)
+    await db.query("UPDATE projects SET lifecycle_status='confirmed' WHERE id=$1",[id])
+    await assert.rejects(api("/projects/intake",{method:"POST",json:{...body,intake_id:undefined,draft_project_id:id,phase_scope:undefined,project_type:"Commercial"}}),/type is locked/)
+    await assert.rejects(api("/projects/intake",{method:"POST",json:{...body,intake_id:undefined,draft_project_id:id,phase_scope:changedScope}}),/saved phase scope/)
+    await db.query("UPDATE projects SET lifecycle_status='sent_to_opm' WHERE id=$1",[id])
+    assert.equal((await loadState(session.user)).projects.find(project=>project.id===id).end,"2027-10-15")
+    const stageRows=(await db.query("SELECT id,code FROM project_stages WHERE code=ANY($1::text[])",[scope.phases])).rows
+    const mobilization=stageRows.find(stage=>stage.code==="Mobilization")
+    const foundation=stageRows.find(stage=>stage.code==="Foundation")
+    await db.query("UPDATE projects SET lifecycle_status='active',current_stage_id=$2 WHERE id=$1",[id,mobilization.id])
+    await db.query("UPDATE project_phase_team SET status='confirmed' WHERE project_id=$1",[id])
+    for(const stage of stageRows)await readChecklist(db,id,stage.id)
+    const reloaded=(await loadState(session.user)).projects.find(project=>project.id===id)
+    assert.deepEqual(projectPhaseNames(reloaded),scope.phases)
+    assert.equal(reloaded.verifiedProgress.project.total,(8+3*(scope.phases.length-2))*10)
+    await asUser("scope.spm@10builders.com")
+    await assert.rejects(api(`/projects/${id}/phase-updates`,{method:"POST",json:{stage:"Residential Fit-Out",note:"Cannot revive omitted phase"}}),/Unknown/)
+    await assert.rejects(api(`/projects/${id}/phase-updates`,{method:"POST",json:{stage:"Office Fit-Out",note:"Cannot skip required work"}}),/locked/)
+    await asUser("scope.opm@10builders.com")
+    const report=(await api(`/projects/${id}/monthly-report?month=${currentReportMonth()}`)).report
+    assert.ok(report)
+    const before=(await db.query("SELECT phase_scope FROM projects WHERE id=$1",[id])).rows[0].phase_scope
+    await db.query("UPDATE projects SET current_stage_id=$2 WHERE id=$1",[id,foundation.id])
+    const checklist=(await readChecklist(db,id,foundation.id)).items
+    for(const item of checklist)await db.query("INSERT INTO project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at) VALUES($1,$2,$3,'approved',$4,$5,now())",[id,foundation.id,item.id,managers.spm,managers.opm])
+    const handoff=await api(`/projects/${id}/advance-phase`,{method:"POST",json:{}})
+    assert.equal(handoff.current_stage,"Structure")
+    assert.deepEqual((await db.query("SELECT phase_scope FROM projects WHERE id=$1",[id])).rows[0].phase_scope,before)
   })
 
   await t.test("the API refuses requests without a session", async () => {

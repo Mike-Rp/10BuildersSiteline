@@ -305,6 +305,7 @@ export function mapProject(parts: ProjectParts): Project {
     name: list.name,
     subcontractorAllocationVersion: Number(list.subcontractor_allocation_version || 0),
     type: list.project_type,
+    ...(list.phase_scope ? {phaseScope: list.phase_scope} : {}),
     area: formatArea(list.floor_area_sqm),
     floors:
       list.floor_count === null || list.floor_count === undefined

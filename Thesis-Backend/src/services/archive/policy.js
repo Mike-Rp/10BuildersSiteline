@@ -2,6 +2,7 @@ import { readChecklist } from "../progress/phase.utility.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { blockingReviews, verifiedComplete } from "../progress/lifecycle.utility.js";
 import { businessDeadline, recordArchiveEvent } from "./audit.utility.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 export async function maybeCloseProject(db, project, actorId = null) {
   if (project.lifecycle_status !== "active" || String(project.current_stage).toLowerCase() !== "closeout") return false;
@@ -13,7 +14,7 @@ export async function maybeCloseProject(db, project, actorId = null) {
   if (!verifiedComplete(checklist.verified)) return false;
   const totals = (await readVerifiedProgress(db,[project.id])).get(project.id);
   if (!verifiedComplete(totals?.project)) return false;
-  const assignments = await db.query(`SELECT 1 FROM projects p JOIN project_type_stages w ON w.project_type_id=p.project_type_id
+  const assignments = await db.query(`SELECT 1 FROM projects p JOIN (${projectWorkflowSql}) w ON w.project_id=p.id
     LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=w.project_stage_id
     WHERE p.id=$1 AND (t.spm_user_id IS NULL OR t.status IS DISTINCT FROM 'confirmed') LIMIT 1`,[project.id]);
   if (assignments.rowCount || await blockingReviews(db,project.id)) return false;

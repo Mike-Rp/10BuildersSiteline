@@ -1,5 +1,5 @@
 import { api, apiList, downloadApiFile, registerFileUrl } from "./client.ts";
-import { headcount, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
+import { headcount, projectPhaseDisciplines, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
 import type { WorkflowCommand } from "../workflows.ts";
 import { DOC_CODES, type Dto } from "./adapter.ts";
 const post = (path: string, json: unknown = {}) => api<Dto>(path, { method: "POST", json });
@@ -184,7 +184,9 @@ export async function saveApiProject(project: Project, existing: boolean) {
     const result = await post("/projects/intake", {
         name: project.name, project_type: project.type, floor_area_sqm: Number(project.area.replace(/,/g, "")),
         floor_count: Number(project.floors), target_start_date: project.start, client_user_id: project.clientId,
-        suggested_opm_id: project.opmId, crew_required: headcount(project.type, project.area, project.floors).total,
+        suggested_opm_id: project.opmId, crew_required: headcount(project.type, project.area, project.floors,
+          project.team.map(row => ({name: row.phase, disciplines: projectPhaseDisciplines(project,row.phase)}))).total,
+        ...(project.phaseScope ? {phase_scope: project.phaseScope} : {}),
         phase_team: project.team.map((t, index) => ({ stage: t.phase, user_id: t.accountId, is_lead: index === 0 })),
         ...(existing ? { draft_project_id: project.id } : { intake_id: project.id }),
     });

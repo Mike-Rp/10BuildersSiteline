@@ -23,7 +23,7 @@ async function query(sql,args=[]) {
  if(sql.startsWith("WITH added AS"))return rows([]);
  if(sql.startsWith("SELECT w.project_stage_id"))return rows(Array.from({length:7},(_,index)=>({project_stage_id:index+1,on_hold:false})));
  if(sql.startsWith("WITH workflow AS")) return rows((state.projectIncomplete ? [7,4] : [7]).flatMap(stage=>CLOSEOUT_ACTIVITIES.map((item,index)=>({project_id:id,phase_id:String(stage),name:stage===7?"Closeout":"Structure",expected:true,configured:true,activity_id:String(stage*10+index),code:item.code,required:true,weight:10,status:stage===4?"missing":"approved",approval_valid:stage===7,position:stage-1,phase_count:7,on_hold:false,started:false}))));
- if(sql.startsWith("SELECT 1 FROM projects p JOIN project_type_stages"))return rows(state.unconfirmed?[{}]:[]);
+ if(sql.startsWith("SELECT 1 FROM projects p JOIN"))return rows(state.unconfirmed?[{}]:[]);
  if(sql.startsWith("SELECT i.id")) return rows(state.items);
  if(sql.startsWith("SELECT 1 FROM project_phase_updates")) return rows(state.pending ? [{}] : []);
  if(sql.startsWith("SELECT count(*)::int AS headcount")) return rows([{headcount:state.headcount}]);

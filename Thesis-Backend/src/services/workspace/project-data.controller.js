@@ -6,6 +6,7 @@ import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
 import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
 import { ensureChecklist } from "../progress/phase.utility.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
 const scope = `p.id in (
@@ -56,9 +57,9 @@ export async function reconcilePhaseHandoffs(req,res) {
     const current=totals?.phases.find(phase=>phase.id===String(project.current_stage_id));
     if(!verifiedComplete(current))continue;
     // Final-phase completion remains with the existing closeout workflow.
-    const next=(await db.query(`SELECT 1 FROM project_type_stages w WHERE w.project_type_id=$1
-     AND w.sort_order>(SELECT sort_order FROM project_type_stages WHERE project_type_id=$1 AND project_stage_id=$2) LIMIT 1`,
-     [project.project_type_id,project.current_stage_id])).rowCount;
+    const next=(await db.query(`SELECT 1 FROM (${projectWorkflowSql}) w WHERE w.project_id=$1
+     AND w.sort_order>(SELECT sort_order FROM (${projectWorkflowSql}) current WHERE project_id=$1 AND project_stage_id=$2) LIMIT 1`,
+     [project.id,project.current_stage_id])).rowCount;
     if(!next)continue;
     const handoff=await transitionPhase(db,project,null);
     results.push({project_id:project.id,from:project.current_stage,...handoff});
@@ -96,8 +97,10 @@ export async function getProjectData(req,res) {
     for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id,{reconcile:true});
    }
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
+     ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
+       WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,t.response_deadline_at,t.responded_at
-     from project_phase_team t join projects p on p.id=t.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id
+     from project_phase_team t join projects p on p.id=t.project_id join (${projectWorkflowSql}) w on w.project_id=p.id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id
      left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by w.sort_order`,[ids])).rows;
    const documents=(await db.query(`select p.id as project_id,d.id,t.code,t.label,
     t.is_client_visible_default as client_visible,d.status='uploaded' as uploaded,d.uploaded_at,

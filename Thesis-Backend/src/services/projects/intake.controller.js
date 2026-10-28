@@ -1,4 +1,5 @@
-import { validatePhaseTeam } from "./type-phases.utility.js";
+import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
+import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from '../../common/utilities/transaction.utility.js';
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
@@ -23,6 +24,12 @@ export const createIntake = async (req, res) => {
     }
     const tier = Number(floor_area_sqm) >= 50000 || Number(floor_count) >= 31 ? 'Large'
       : Number(floor_area_sqm) >= 15000 || Number(floor_count) >= 30 ? 'Medium' : 'Small';
+    let phaseScope;
+    if (req.body.phase_scope !== undefined) {
+      if (project_type !== 'Mixed-Use') return responseError(res,'Project scope review is supported for Mixed-Use only.',422);
+      try { phaseScope=normalizeMixedUseScope(req.body.phase_scope); }
+      catch(error) { return responseError(res,error.message,422); }
+    }
     if (req.body?.draft_project_id && !isUuid(req.body.draft_project_id)) return responseError(res,"Invalid draft_project_id.",400);
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
@@ -44,7 +51,7 @@ export const createIntake = async (req, res) => {
       }
       let draft=null;
       if (req.body.draft_project_id) {
-        const found=await client.query("SELECT id,client_name,lifecycle_status FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
+        const found=await client.query("SELECT id,client_name,lifecycle_status,project_type_id,to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
         if(!found.rowCount) throw Object.assign(new Error("Draft not found."),{status:404});
         draft=found.rows[0];
         if(!["draft","suggested_allocation","confirmed"].includes(draft.lifecycle_status)) throw Object.assign(new Error("This intake has already been submitted."),{status:409});
@@ -65,7 +72,17 @@ export const createIntake = async (req, res) => {
       if(typeof company!=="string" || !company.trim() || company.length>150) throw Object.assign(new Error("Invalid client_name."),{status:400});
       const projectType=await client.query("SELECT id FROM project_types WHERE code=$1",[project_type]);
       if(!projectType.rowCount) throw Object.assign(new Error("Invalid project_type."),{status:422});
-      await validatePhaseTeam(client,projectType.rows[0].id,phase_team);
+      if (draft?.phase_scope) {
+        if (Number(draft.project_type_id)!==Number(projectType.rows[0].id))
+          throw Object.assign(new Error("The project type is locked by its saved phase scope."),{status:409});
+        const stored=normalizeMixedUseScope(draft.phase_scope);
+        if (phaseScope && JSON.stringify(stored)!==JSON.stringify(phaseScope))
+          throw Object.assign(new Error("An existing project's saved phase scope cannot be changed during resubmission."),{status:409});
+        phaseScope=stored;
+      } else if (draft && phaseScope) {
+        throw Object.assign(new Error("Existing projects retain their original phase scope."),{status:409});
+      }
+      await validatePhaseTeam(client,projectType.rows[0].id,phase_team,draft?.phase_scope ? {projectId:draft.id} : {phaseNames:phaseScope?.phases});
       if(draft) {
         const accepted=await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND status='confirmed' LIMIT 1",[draft.id]);
         if(accepted.rowCount) throw Object.assign(new Error("Allocation is locked after an SPM accepts."),{status:409});
@@ -75,6 +92,7 @@ export const createIntake = async (req, res) => {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
         await assertEligibleManager(client, phase.user_id, 'spm');
       }
+      if (phaseScope) await validateScopedQualifications(client,projectType.rows[0].id,phase_team);
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
@@ -94,14 +112,20 @@ export const createIntake = async (req, res) => {
          suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id,intakeId]);
       if (!inserted.rowCount) throw Object.assign(new Error('Invalid project_type.'), {status:422});
       const project = inserted.rows[0];
+      if (phaseScope && !draft) {
+        phaseScope={...phaseScope,confirmedBy:actor.id,confirmedAt:new Date().toISOString()};
+        await client.query("UPDATE projects SET phase_scope=$2::jsonb WHERE id=$1",[project.id,JSON.stringify(phaseScope)]);
+        await client.query(`INSERT INTO audit_log(table_name,record_id,operation,changed_by,new_values)
+          VALUES('projects',$1,'UPDATE',$2,jsonb_build_object('_project_scope_review',true,'phase_scope',$3::jsonb))`,[project.id,actor.id,JSON.stringify(phaseScope)]);
+      }
       if(draft) await client.query("DELETE FROM project_phase_team WHERE project_id=$1",[project.id]);
-      for (const phase of phase_team) {
+      for (const [index,phase] of phase_team.entries()) {
         const r = await client.query(`INSERT INTO project_phase_team
           (project_id, project_stage_id, spm_user_id, is_lead, status,
            response_deadline_at, created_by, updated_by)
           SELECT $1, ps.id, $3, $4, 'pending', NULL, $5, $5
           FROM project_stages ps WHERE ps.code = $2 RETURNING project_stage_id`,
-          [project.id,phase.stage,phase.user_id,phase.is_lead ?? false,actor.id]);
+          [project.id,phase.stage,phase.user_id,phaseScope ? index===0 : phase.is_lead ?? false,actor.id]);
         if (!r.rowCount) throw Object.assign(new Error(`Unknown stage: ${phase.stage}`), {status:422});
       }
       if(selectedClient) {

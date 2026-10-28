@@ -1,4 +1,5 @@
 import { HttpError, isUuid, isBigintId, isSmallintId } from "../../common/utilities/access.utility.js";
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 // Legacy public export retained for older consumers; selection and ordering use project_type_stages.
 export const STAGES = ["Mobilization", "Design", "Foundation", "Structure", "MEP Rough-in", "Finishes", "Closeout"];
@@ -72,21 +73,21 @@ export function updateBody(body = {}) {
     })),
   };
 }
-export async function resolveStage(client, body, fallback, projectTypeId) {
+export async function resolveStage(client, body, fallback, projectTypeId, projectId) {
  const id=body.stage_id ?? (body.stage===undefined ? fallback : null);
  if(id!=null && !isSmallintId(id))throw new HttpError(400,"Invalid stage_id.");
  if(body.stage!==undefined && (typeof body.stage!=="string" || !body.stage.trim()))throw new HttpError(400,"Unknown stage.");
  if(id==null && body.stage===undefined)throw new HttpError(400,"Select a stage.");
- const result=await client.query(`SELECT s.id,s.code,w.sort_order FROM project_type_stages w
+ const result=await client.query(`SELECT s.id,s.code,w.sort_order FROM ${projectId ? `(${projectWorkflowSql})` : "project_type_stages"} w
  JOIN project_stages s ON s.id=w.project_stage_id
  WHERE w.project_type_id=$1 AND ($2::smallint IS NULL OR s.id=$2)
- AND ($3::text IS NULL OR lower(s.code)=lower($3))`,[projectTypeId,id==null?null:Number(id),body.stage?.trim()??null]);
+ AND ($3::text IS NULL OR lower(s.code)=lower($3)) ${projectId ? "AND w.project_id=$4" : ""}`,[projectTypeId,id==null?null:Number(id),body.stage?.trim()??null,...(projectId ? [projectId] : [])]);
  if(!result.rowCount)throw new HttpError(400,"Unknown or conflicting stage selection for this project type.");
  return result.rows[0];
 }
-export async function stageOptions(client, projectTypeId) {
- return (await client.query(`SELECT s.id,s.code,w.sort_order FROM project_type_stages w
- JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_type_id=$1 ORDER BY w.sort_order`,[projectTypeId])).rows;
+export async function stageOptions(client, projectTypeId, projectId) {
+ return (await client.query(`SELECT s.id,s.code,w.sort_order FROM ${projectId ? `(${projectWorkflowSql})` : "project_type_stages"} w
+ JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_type_id=$1 ${projectId ? "AND w.project_id=$2" : ""} ORDER BY w.sort_order`,[projectTypeId,...(projectId ? [projectId] : [])])).rows;
 }
 export async function validateFiles(client, project, userId, fileIds) {
   if (!fileIds.length) return;

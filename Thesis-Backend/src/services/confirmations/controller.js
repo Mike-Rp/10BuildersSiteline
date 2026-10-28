@@ -1,3 +1,4 @@
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { archiveNote,businessDeadline,recordArchiveEvent } from "../archive/audit.utility.js";
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
 import { assertLicenseActive } from '../../common/utilities/license-gate.utility.js';
@@ -256,7 +257,7 @@ export const getPhaseTeam = async (req, res) => {
               pt.response_deadline_at, pt.responded_at
          FROM project_phase_team pt
          JOIN projects p ON p.id=pt.project_id
-         JOIN project_type_stages w ON w.project_type_id=p.project_type_id AND w.project_stage_id=pt.project_stage_id
+         JOIN (${projectWorkflowSql}) w ON w.project_id=p.id AND w.project_stage_id=pt.project_stage_id
          JOIN project_stages ps ON ps.id = pt.project_stage_id
          LEFT JOIN users u ON u.id = pt.spm_user_id
         WHERE pt.project_id = $1
@@ -319,7 +320,7 @@ const respondToPhase = (newStatus) => async (req, res) => {
                 SET lifecycle_status = 'active',
                     current_stage_id = COALESCE(current_stage_id, (
                       SELECT t.project_stage_id FROM project_phase_team t
-                      JOIN project_type_stages w ON w.project_type_id=projects.project_type_id AND w.project_stage_id=t.project_stage_id
+                      JOIN (${projectWorkflowSql}) w ON w.project_id=projects.id AND w.project_stage_id=t.project_stage_id
                       WHERE t.project_id = $1 AND t.status = 'confirmed' ORDER BY w.sort_order LIMIT 1)),
                     current_pct = CASE WHEN current_stage_id IS NULL THEN 0 ELSE current_pct END,
                     updated_by = $2, updated_at = now()

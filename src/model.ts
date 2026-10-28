@@ -238,6 +238,7 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  phaseScope?: import("../Thesis-Backend/src/domain/mixed-use-scope.js").MixedUseScope
   subcontractorAllocationVersion?: number
   subcontractorAllocation?: import("./subcontractor-allocation").SavedAllocation
   subcontractorAllocationHistory?: { action: string; byId: string; by: string; at: string; companyId?: string; note?: string; accepted?: boolean }[]
@@ -768,8 +769,9 @@ export function spmCandidates(
   type: string,
   phase: string,
   excluding = "",
+  disciplines?: string[],
 ) {
-  const tags = state.backendPhases?.[type]?.find(p=>p.name===phase)?.disciplines || requiredTags(type, phase)
+  const tags = disciplines || state.projects.find(p => p.id === excluding)?.team.find(row => row.phase === phase)?.requiredDisciplines || state.backendPhases?.[type]?.find(p=>p.name===phase)?.disciplines || requiredTags(type, phase)
   const activeLeads = state.projects
     .filter((p) => p.id !== excluding && p.status === "active")
     .map((p) => p.team.find((row) => row.phase === "Mobilization")?.accountId)
@@ -793,12 +795,12 @@ export function spmCandidates(
         a.account.name.localeCompare(b.account.name),
     )
 }
-export function headcount(type: string, area: string, floors: string) {
+export function headcount(type: string, area: string, floors: string, phases = phaseDefinitions(type)) {
   const sqm = Number(area.replace(/,/g, ""))
   const levels = Number(floors)
   const multiplier =
     sqm >= 30000 || levels >= 25 ? 3 : sqm >= 10000 || levels >= 10 ? 2 : 1
-  const base = phaseDefinitions(type)
+  const base = phases
     .filter((phase) => phase.name !== "Closeout")
     .reduce((sum, phase) => sum + phase.disciplines.length, 0)
   return {

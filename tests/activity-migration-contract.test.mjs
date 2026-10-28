@@ -129,6 +129,7 @@ test("migration coverage: PostgreSQL prepares backend static SQL including the n
   await db.exec(read("Thesis-Backend/migrations/009-engineer-license-workflow.sql"))
   await db.exec(read("Thesis-Backend/migrations/010-photo-release.sql"))
   await db.exec(read("Thesis-Backend/migrations/013-trade-subcontractor-allocation.sql"))
+  await db.exec(read("Thesis-Backend/migrations/014-mixed-use-project-scope.sql"))
   const directory=fileURLToPath(new URL("Thesis-Backend/src/",root))
   let count=0;const failures=[]
   const {migrateNotifications}=await import("../Thesis-Backend/scripts/migrate-notifications.js")
