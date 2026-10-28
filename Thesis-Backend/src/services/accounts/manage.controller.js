@@ -1,4 +1,5 @@
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
+import { clientEmailError } from "../../domain/client-email.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "./experience.utility.js";
@@ -138,6 +139,7 @@ export async function createAccountRecord(client, actor, body) {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
   const phone = body.phone ?? body.contact_number ?? null;
   const role = body.role;
+  if (role === "client" && clientEmailError(email)) throw new HttpError(400, clientEmailError(email));
   if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
   if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");

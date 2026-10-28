@@ -267,8 +267,11 @@ test("Suggest Company exposes grouped proposed trades and submits them without m
     assert.equal(document.querySelectorAll(".capability-group").length, 4)
     for (const trade of ["Civil", "Electrical", "Waterproofing"]) await click([...document.querySelectorAll(".capability-choice")].find(label => label.textContent === trade).querySelector("input"))
     const field = text => [...document.querySelectorAll("input")].find(input => input.getAttribute("aria-label") === text) || document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
-    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"], ["Operating region *", "Central Visayas"], ["Operating province / NCR *", "Cebu"], ["Operating city / municipality *", "Cebu City"]])
-      await React.act(() => { const element = field(label); Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value); element.dispatchEvent(new w.Event("input", { bubbles: true })) })
+    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"], ["Operating region *", "0700000000"], ["Operating province / NCR *", "independent:0700000000"], ["Operating city / municipality *", "0730600000"]])
+      if (field(label).getAttribute("role") === "combobox") {
+        await React.act(() => field(label).focus())
+        await React.act(() => document.querySelector(`[role="option"][data-location-code="${value}"]`).click())
+      } else await React.act(() => { const element = field(label); Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value); element.dispatchEvent(new w.Event("input", { bubbles: true })) })
     await click(button("Submit for Admin approval"))
     assert.deepEqual(submitted.proposedDisciplines, ["Civil", "Electrical", "Waterproofing"])
     assert.equal(submitted.capabilityReview, undefined)

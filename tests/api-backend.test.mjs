@@ -132,6 +132,19 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       : !p.clientId), true,"legacy projects without an actual account link do not borrow a same-name account")
   })
 
+  await t.test("new client accounts require Gmail and retain normalized addresses without changing older clients", async () => {
+    await asUser("patricia.domingo@10builders.com")
+    for (const email of ["mikahiro@gmial.com", "client@yahoo.com", "client@gmail.com.evil", "client@notgmail.com", "bad@@gmail.com", ""]) {
+      await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", email, role: "client", password: "Password@123" } }), /@gmail.com/)
+    }
+    assert.equal((await db.query("select 1 from users where full_name='Invalid new client'")).rowCount, 0)
+    const created = await api("/accounts", { method: "POST", json: { full_name: "Gmail Client Test", email: "  Intake.Client+Test@GMAIL.COM  ", role: "client", phone: "09171234567", password: "Password@123" } })
+    assert.equal(created.email, "intake.client+test@gmail.com")
+    assert.equal((await api(`/accounts/${created.id}`)).email, created.email)
+    const legacy = (await db.query("select id,email from users where email='maria.santos@rosariabiz.ph'")).rows[0]
+    assert.equal((await api(`/accounts/${legacy.id}`)).email, legacy.email)
+  })
+
   await t.test("each role sees only its own projects", async () => {
     assert.deepEqual(names((await asUser("lea.fernandez@10builders.com")).state), ["Meralco Ave. Fit-out", "Rosaria Business Park"])
     assert.deepEqual(names((await asUser("renz.villaverde@10builders.com")).state), [

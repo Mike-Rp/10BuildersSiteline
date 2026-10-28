@@ -2,6 +2,7 @@ import { uploadFile } from "./api/actions"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
 import LocationFields from "./LocationFields"
+import { CLIENT_EMAIL_PATTERN, clientEmailError } from "../Thesis-Backend/src/domain/client-email.js"
 import { locationError, normalizeLocation, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
@@ -653,11 +654,16 @@ export function AccountForm({
   const [pass, setPass] = useState(password())
   const [error, setError] = useState("")
   const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
+  const [emailError, setEmailError] = useState("")
+  const requiresGmail = !account && draft.role === "client"
   const existingClient = clientOnly
     ? clientForEmail(state, draft.email, draft.id)
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const invalidClientEmail = requiresGmail ? clientEmailError(draft.email) : ""
+    setEmailError(invalidClientEmail)
+    if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
       try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { setError((reason as Error).message); return }
       if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter years of experience for at least one project type. Use 0 for a new engineer."); return }
@@ -666,23 +672,23 @@ export function AccountForm({
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
     if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
     const err = clientOnly
-      ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)
+      ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())
         ? "A client name and valid email are required."
         : state.accounts.some(
               (a) =>
                 a.id !== draft.id &&
-                a.email.toLowerCase() === draft.email.toLowerCase(),
+                a.email.trim().toLowerCase() === draft.email.trim().toLowerCase(),
             )
           ? "This email is already in use. Select the existing client instead."
           : ""
-      : accountError(draft, state)
+      : accountError(requiresGmail ? { ...draft, email: draft.email.trim() } : draft, state)
     setError(err)
     if (!err) try {
       await onSave(
         {
           ...draft,
           name: draft.name.trim(),
-          email: draft.email.trim(),
+          email: requiresGmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
           phone: draft.phone.trim(),
         },
         account ? undefined : pass,
@@ -722,7 +728,7 @@ export function AccountForm({
     )
   }
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} noValidate={requiresGmail}>
       <div className="form-grid">
         {!clientOnly && (
           <Field label="Account role" wide>
@@ -758,17 +764,20 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        <Field label="Email address *" wide={generatedIdentity}>
+        <Field label="Email address *" wide={generatedIdentity} error={requiresGmail ? emailError : undefined} hint={requiresGmail ? "Use an @gmail.com address, for example name@gmail.com." : undefined}>
           <input
             required
             type="email"
+            maxLength={254}
+            pattern={requiresGmail ? CLIENT_EMAIL_PATTERN : undefined}
             value={draft.email}
             onChange={(e) => {
               if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
+              if (emailError) setEmailError(requiresGmail ? clientEmailError(e.target.value) : "")
               setError("")
             }}
-            placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder={requiresGmail ? "name@gmail.com" : generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>
         {generatedIdentity && <div className="field wide">
@@ -1435,7 +1444,6 @@ export function IntakeForm({
                 disabled={!!project}
               />
             </Field>
-            <div className="wide"><h3>Project site location</h3><LocationFields prefix="Project" value={draft.siteLocation} disabled={!!project} onChange={siteLocation => patch({ siteLocation, location: locationError(siteLocation) ? draft.location : locationLabel(siteLocation) })} /></div>
             <Field label="Floor area (sqm) *">
               <input
                 required
@@ -1456,6 +1464,15 @@ export function IntakeForm({
                 disabled={!!project}
               />
             </Field>
+            <section className="field wide project-site-location">
+              <h3>Project site location</h3>
+              <LocationFields
+                prefix="Project"
+                value={draft.siteLocation}
+                disabled={!!project}
+                onChange={siteLocation => patch({ siteLocation, location: locationError(siteLocation) ? draft.location : locationLabel(siteLocation) })}
+              />
+            </section>
             <Field label="Client *" wide>
               <ClientSearch
                 clients={clients}

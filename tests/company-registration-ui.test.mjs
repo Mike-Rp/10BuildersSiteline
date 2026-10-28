@@ -26,10 +26,17 @@ test("a Site PM can validate company contacts and retry registration without man
   const root = createRoot(document.getElementById("root"))
   const button = text => [...document.querySelectorAll("button")].find(el => el.textContent.trim() === text)
   const click = element => { assert.ok(element, "Expected an interactive element"); return React.act(async () => { element.click() }) }
-  const input = (element, value) => React.act(async () => {
-    Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value)
-    element.dispatchEvent(new w.Event("input", { bubbles: true }))
-  })
+  const input = async (element, value) => {
+    if (element.getAttribute("role") === "combobox") {
+      await React.act(() => element.focus())
+      const option = document.querySelector(`[role="option"][data-location-code="${value}"]`)
+      assert.ok(option, value)
+      await React.act(() => option.click())
+    } else await React.act(() => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value)
+      element.dispatchEvent(new w.Event("input", { bubbles: true }))
+    })
+  }
   const field = label => [...document.querySelectorAll("input")].find(element => element.getAttribute("aria-label") === label) || document.getElementById([...document.querySelectorAll("form label")].find(el => el.textContent === label)?.htmlFor || "")
   try {
     const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
@@ -44,7 +51,7 @@ test("a Site PM can validate company contacts and retry registration without man
     await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Subcon directory"))
     assert.equal(button("Suggest Company").disabled, false)
     await click(button("Suggest Company"))
-    assert.equal(document.querySelectorAll("form select").length, 0, "No project or availability selection is required for a new company")
+    assert.equal(document.querySelectorAll('form [role="combobox"]').length, 3, "Only the linked location selectors are required for a new company")
     assert.equal(field("Company availability").value, "Available")
     assert.equal(field("Company availability").readOnly, true)
     assert.ok(![...document.querySelectorAll("form label")].some(element => element.textContent === "Available manpower"))
@@ -52,9 +59,9 @@ test("a Site PM can validate company contacts and retry registration without man
     assert.equal(button("Upload manpower list"), undefined)
     assert.equal(document.querySelector('input[accept=".xlsx,.xls"]'), null)
     await input(field("Company name *"), "New Labor Company")
-    await input(field("Operating region *"), "Central Visayas")
-    await input(field("Operating province / NCR *"), "Cebu")
-    await input(field("Operating city / municipality *"), "Cebu City")
+    await input(field("Operating region *"), "0700000000")
+    await input(field("Operating province / NCR *"), "independent:0700000000")
+    await input(field("Operating city / municipality *"), "0730600000")
     await input(field("Primary foreman mobile number"), "123")
     await input(field("Company email *"), "company@yahoo.com")
     await click(button("Submit for Admin approval"))
@@ -100,7 +107,7 @@ test("a Site PM can validate company contacts and retry registration without man
     assert.equal(uploads, 0)
     assert.equal(commands[1].company.availability, "available")
     assert.equal(commands[1].company.status, "pending")
-    assert.deepEqual(commands[1].company.operatingLocation, { region: "Central Visayas", province: "Cebu", city: "Cebu City" })
+    assert.deepEqual(commands[1].company.operatingLocation, { region: "Region VII (Central Visayas)", province: "Independent cities (no province)", city: "City of Cebu", psgcCode: "0730600000" })
     assert.deepEqual(commands[1].company.activeProjectIds, [])
   } finally {
     await React.act(() => root.unmount()); await server.close(); dom.window.close()

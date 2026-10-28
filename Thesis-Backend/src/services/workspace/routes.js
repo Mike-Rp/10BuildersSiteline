@@ -410,9 +410,11 @@ router.post("/subcontractors/:id/supporting-documents", endpoint(["spm"], async 
 router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), b = req.body;
     const previous = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    const unchangedHistoricalLocation = b.siteLocation && previous.siteLocation && ["region", "province", "city", "psgcCode"].every(key => b.siteLocation[key] === previous.siteLocation[key]);
+    const siteLocation = b.siteLocation !== undefined && !locationError(b.siteLocation) ? normalizeLocation(b.siteLocation) : undefined;
     if (b.siteLocation !== undefined) {
-        if (locationError(b.siteLocation)) throw new HttpError(400, locationError(b.siteLocation));
-        if (!sameLocation(previous.siteLocation, b.siteLocation)) {
+        if (!siteLocation && !unchangedHistoricalLocation) throw new HttpError(400, locationError(b.siteLocation));
+        if (siteLocation && !sameLocation(previous.siteLocation, siteLocation)) {
             if (["active", "archived"].includes(p.lifecycle_status) || (await db.query("select 1 from project_subcontractor_selections where project_id=$1 and status in ('contacted','accepted')", [p.id])).rowCount)
                 throw new HttpError(409, "Project site location is locked after contact or acceptance and on active projects.");
             if (previous.subcontractorAllocation) throw new HttpError(409, "A saved allocation already uses this site location. Resolve the allocation before changing location.");
@@ -425,7 +427,7 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
         }
     await db.query("update projects set target_end_date=$2,location=$3 where id=$1", [p.id, b.end || null, b.location || ""]);
     await db.query(`insert into workspace_project_metadata(project_id,metadata) values($1,$2)
- on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ ...(b.siteLocation === undefined ? {} : { siteLocation: normalizeLocation(b.siteLocation) }), clientSubcon: b.clientSubcon || "", clientSubconEmail: b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
+ on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ ...(siteLocation === undefined ? {} : { siteLocation }), clientSubcon: b.clientSubcon || "", clientSubconEmail: b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
     for (const d of b.docs || [])
         if (d.uploaded) {
             const code = d.label === "Client Contract Agreement" ? "owner_contract" : null;

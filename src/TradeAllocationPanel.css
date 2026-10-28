@@ -1,6 +1,8 @@
-.location-fields input { min-height: 48px; font-size: 14px; }
+.location-fields input, .location-fields select { min-height: 48px; font-size: 14px; min-width: 0; width: 100%; }
 .location-fields .form-grid { margin-top: 12px; }
 .location-fields { margin-bottom: 16px; }
+#root .project-site-location .location-fields > .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 600px) { #root .project-site-location .location-fields > .form-grid { grid-template-columns: minmax(0, 1fr); } }
 .trade-allocation { color: var(--color-ink); font-size: 14px; line-height: 1.55; min-width: 0; }
 .trade-allocation p { margin: 12px 0; overflow-wrap: anywhere; }
 .trade-allocation h3, .trade-allocation h4 { margin: 0; }

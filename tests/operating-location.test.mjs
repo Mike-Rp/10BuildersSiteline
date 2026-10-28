@@ -5,8 +5,47 @@ import { eligibility, recommendTeam, validatePlan, replacementCandidates, replac
 import { allocationCandidates } from "../src/subcontractor-allocation.ts"
 import { activeFixture, currentProject, execute } from "./fixtures.mjs"
 import { DISCIPLINES } from "../src/model.ts"
+import { LOCATION_REGIONS, LOCATION_GROUPS, LOCATION_CITIES, provinceOptions, cityOptions, locationForCity, resolveLocation } from "../Thesis-Backend/src/domain/philippine-locations.js"
 const cebu = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
 const manila = { region: "Metro Manila (NCR)", province: "Metro Manila", city: "Manila" }
+
+test("the bundled catalog covers all regions and every city has valid regional and area parents", () => {
+  assert.equal(LOCATION_REGIONS.length, 18)
+  assert.equal(LOCATION_GROUPS.filter(group => group.kind === "province").length, 82)
+  assert.equal(LOCATION_CITIES.length, 1642)
+  assert.equal(new Set(LOCATION_CITIES.map(city => city.code)).size, LOCATION_CITIES.length)
+  for (const city of LOCATION_CITIES) {
+    assert.match(city.code, /^\d{10}$/)
+    assert.ok(LOCATION_REGIONS.some(region => region.code === city.regionCode))
+    assert.ok(LOCATION_GROUPS.some(group => group.code === city.groupCode && group.regionCode === city.regionCode))
+    assert.equal(resolveLocation(locationForCity(city.code))?.code, city.code)
+  }
+})
+test("NCR contains 17 cities/municipalities, independent cities do not appear under provinces, and Negros has its own region", () => {
+  const ncr = provinceOptions("1300000000")
+  assert.deepEqual(ncr.map(group => group.name), ["Metro Manila"])
+  const ncrCities = cityOptions("1300000000", "ncr")
+  assert.equal(ncrCities.length, 17)
+  assert.ok(ncrCities.some(city => city.name === "City of Manila"))
+  assert.ok(ncrCities.some(city => city.name === "Pateros"))
+  assert.ok(!ncrCities.some(city => city.name === "Ermita"))
+  assert.ok(!cityOptions("0700000000", "0702200000").some(city => city.code === "0730600000"))
+  assert.ok(cityOptions("0700000000", "independent:0700000000").some(city => city.code === "0730600000"))
+  assert.ok(LOCATION_REGIONS.some(region => region.code === "1800000000"))
+  assert.equal(LOCATION_GROUPS.find(group => group.name === "Negros Oriental").regionCode, "1800000000")
+  assert.equal(LOCATION_GROUPS.find(group => group.name === "Sulu").regionCode, "0900000000")
+})
+test("standard city codes match exact legacy aliases but cannot spoof names, regions or area parents", () => {
+  const selected = locationForCity("0730600000")
+  assert.equal(sameLocation(selected, cebu), true)
+  assert.equal(sameLocation(locationForCity("1380600000"), manila), true)
+  assert.equal(normalizeLocation(selected).psgcCode, "0730600000")
+  for (const bad of [{ ...selected, city: "City of Manila" }, { ...selected, province: "Cebu" }, { ...selected, region: "Metro Manila (NCR)" }, { ...selected, psgcCode: "1380600000" }, { ...selected, psgcCode: "9999999999" }, { ...cebu, province: "Leyte" }, { ...cebu, city: "A fictional city" }]) {
+    assert.ok(locationError(bad)); assert.equal(sameLocation(selected, bad), false)
+  }
+  assert.throws(() => locationForCity("9999999999"), /catalog/)
+  assert.equal(locationLabel({ region: "Legacy region", province: "Legacy province", city: "Legacy city" }), "Legacy city, Legacy province · Legacy region")
+})
 
 test("structured areas require every component and normalize spacing and case without guessing addresses", () => {
   for (const bad of [undefined, null, "Cebu City", [], {}, { ...cebu, city: "" }, { ...cebu, region: 3 }, { ...cebu, province: "x".repeat(101) }, { ...cebu, city: "Cebu\nCity" }]) {
