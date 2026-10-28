@@ -2,6 +2,7 @@ import { uploadFile } from "./api/actions"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
 import LocationFields from "./LocationFields"
+import EstimatedCompletionDate from "./EstimatedCompletionDate"
 import { CLIENT_EMAIL_PATTERN, clientEmailError } from "../Thesis-Backend/src/domain/client-email.js"
 import { locationError, normalizeLocation, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import { recordedProgress, type ProgressProject } from "./progress"
@@ -1202,10 +1203,10 @@ export function IntakeForm({
       patch({ start: value })
     }
   }
-  function changeEnd(e: ChangeEvent<HTMLInputElement>) {
+  function changeEnd(value: string, badInput = false) {
     setEndCleared(false)
-    setBadDate((b) => ({ ...b, end: e.target.validity.badInput }))
-    patch({ end: e.target.value })
+    setBadDate((b) => ({ ...b, end: badInput }))
+    patch({ end: value })
   }
   const markBad = (field: "start" | "end") => (e: FocusEvent<HTMLInputElement>) =>
     setBadDate((b) => ({ ...b, [field]: e.target.validity.badInput }))
@@ -1398,7 +1399,7 @@ export function IntakeForm({
               )}
             </fieldset>
             <Field
-              label="Target start date *"
+              label="Estimated start date *"
               error={startError ? `⚠ ${startError}` : undefined}
             >
               <input
@@ -1414,7 +1415,7 @@ export function IntakeForm({
               />
             </Field>
             <Field
-              label="Target end date *"
+              label="Estimated completion date *"
               error={
                 endError
                   ? `⚠ ${endError}`
@@ -1432,13 +1433,13 @@ export function IntakeForm({
                   : "Set valid dates to see the duration."
               }
             >
-              <input
-                type="date"
+              <EstimatedCompletionDate
                 required
                 value={draft.end || ""}
-                min={project ? draft.start || undefined : endMin}
-                max={project ? undefined : maxIso}
-                onChange={changeEnd}
+                start={draft.start}
+                min={endMin}
+                max={maxIso}
+                onValueChange={changeEnd}
                 onBlur={markBad("end")}
                 aria-invalid={datesInvalid || endCleared}
                 disabled={!!project}

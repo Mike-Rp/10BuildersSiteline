@@ -1,0 +1,20 @@
+.estimated-completion-control { display: flex; gap: 6px; min-width: 0; }
+.estimated-completion-control input { flex: 1; min-width: 0; }
+.estimated-completion-control input::-webkit-calendar-picker-indicator { display: none; }
+#root .estimated-completion-control > .button { flex: 0 0 48px; min-height: 48px; padding: 8px; }
+#root .estimated-completion-date .modal { width: 500px; }
+#root .estimated-completion-date .modal-header { padding: 16px 20px; gap: 12px; }
+#root .estimated-completion-date .modal-header h2 { font-size: 20px; }
+#root .estimated-completion-date .modal-body { padding: 16px 20px; }
+.completion-calendar { max-width: 390px; margin-inline: auto; }
+.completion-calendar-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.completion-calendar-heading strong { font-size: 18px; }
+.completion-calendar-selectors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.completion-calendar-selectors label { display: grid; gap: 6px; font-size: 14px; }
+.completion-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+#root .completion-calendar-days .button { min-width: 0; min-height: 44px; padding: 8px 0; font-size: 14px; }
+.completion-weekday { text-align: center; padding-bottom: 8px; font-size: 14px; color: var(--color-muted); }
+#root .completion-calendar-days .completion-selected { background: var(--color-primary); color: var(--color-surface); }
+.completion-calendar-note { color: var(--color-muted); font-size: 14px; margin-top: 12px; }
+#root .completion-calendar .modal-actions { margin-top: 12px; padding-top: 12px; }
+#root .completion-calendar-days .button:disabled { color: var(--color-muted); opacity: .5; }
