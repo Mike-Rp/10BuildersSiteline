@@ -643,9 +643,17 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .sidebar .brand > .brand-mark { flex-shrink: 0; }
 #root .sidebar .brand > div { flex: 1; min-width: 0; }
 #root .sidebar .brand > .sidebar-close { flex: none; margin-left: auto; width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
-#root .role-workspace .role-nav-close { display: none; }
+#root .app-shell .sidebar-toggle { display: inline-flex; flex: none; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
+#root .app-shell .topbar :is(.sidebar-toggle, .mobile-menu)[hidden] { display: none; }
+#root .app-shell > .sidebar { transition: transform .18s ease-out; }
+#root .app-shell.sidebar-expanded > .sidebar { transform: translateX(0); visibility: visible; }
+#root .app-shell.sidebar-collapsed > .sidebar { transform: translateX(-100%); visibility: hidden; pointer-events: none; }
+#root .app-shell.sidebar-collapsed > .main-shell { margin-left: 0; width: 100%; }
+#root .app-shell > .main-shell { min-width: 0; }
+#root .app-shell .role-nav-backdrop { padding: 0; border: 0; border-radius: 0; }
 @media (max-width: 1000px) {
-  #root .role-workspace .role-nav-close { display: inline-flex; }
+  #root .app-shell > .main-shell { margin-left: 0; width: 100%; }
+  #root .app-shell > .sidebar .brand { padding-inline: 16px; }
 }
 #root .sidebar .nav-group-label { color: var(--chrome-muted); }
 #root .sidebar .nav-item { color: var(--chrome-muted); border-radius: 7px; }

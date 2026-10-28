@@ -1,6 +1,7 @@
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSignOutConfirmation from "./useSignOutConfirmation"
+import useSidebarNavigation from "./useSidebarNavigation"
 import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
@@ -279,8 +280,7 @@ export default function RoleWorkspace({
   const [confirmTab, setConfirmTab] = useState("mine")
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
-  const [mobileNav, setMobileNav] = useState(false)
-  const mobileMenuRef = useRef<HTMLButtonElement>(null)
+  const navigation = useSidebarNavigation(!paused)
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
   const [note, setNote] = useState("")
@@ -491,7 +491,7 @@ export default function RoleWorkspace({
     setConfirmTab("mine")
     setQuery("")
     setError("")
-    setMobileNav(false)
+    navigation.closeMobile()
     setBell(false)
   }
   // Old SPM responses links open the Site PM responses tab of Confirmation queue.
@@ -3618,8 +3618,8 @@ export default function RoleWorkspace({
     }
   }
   return (
-    <div className={`app-shell role-workspace${isOpm ? "" : " schedule-mobile-workspace"}`}>
-      <aside id="role-navigation" className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
+    <div className={`app-shell role-workspace ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}${isOpm ? "" : " schedule-mobile-workspace"}`}>
+      <aside id="role-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label={`${ROLE_NAMES[actor.role]} navigation`} aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>
           <span>
@@ -3634,7 +3634,7 @@ export default function RoleWorkspace({
           <div>
             Siteline<small>10 BUILDERS</small>
           </div>
-          <Button className="sidebar-close role-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={() => { setMobileNav(false); mobileMenuRef.current?.focus() }} />
+          <Button className="sidebar-close role-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
         </div>
         <nav aria-label="Main navigation">
           {nav.map(([label, icon], i) => (
@@ -3673,24 +3673,27 @@ export default function RoleWorkspace({
           </div>
         </div>
       </aside>
-      {mobileNav && (
-        <div
-          className="mobile-nav-backdrop"
-          onClick={() => setMobileNav(false)}
+      {navigation.compact && navigation.expanded && (
+        <button
+          className="mobile-nav-backdrop role-nav-backdrop"
+          aria-label="Close navigation backdrop"
+          tabIndex={-1}
+          onClick={navigation.closeMobile}
         />
       )}
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
             <Button
-              ref={mobileMenuRef}
-              className="mobile-menu"
+              ref={navigation.toggleRef}
+              className="sidebar-toggle"
+              hidden={navigation.expanded}
               icon="menu"
               variant="icon-button"
               aria-label="Open navigation"
-              aria-expanded={mobileNav}
+              aria-expanded={navigation.expanded}
               aria-controls="role-navigation"
-              onClick={() => setMobileNav(!mobileNav)}
+              onClick={navigation.toggle}
             />
             <span>{ROLE_NAMES[actor.role]}</span>
             <Icon name="chevron" size={14} />

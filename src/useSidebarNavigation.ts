@@ -9,6 +9,16 @@ export default function useSidebarNavigation(enabled = true) {
   const toggleRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   const expanded = compact ? mobileOpen : !desktopCollapsed
+  const previousExpanded = useRef(expanded)
+
+  useEffect(() => {
+    // Move focus after React has hidden or revealed the menu button.
+    if (enabled && previousExpanded.current !== expanded) {
+      if (expanded) sidebarRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href],[tabindex="0"]')?.focus()
+      else toggleRef.current?.focus()
+    }
+    previousExpanded.current = expanded
+  }, [enabled, expanded])
 
   useEffect(() => {
     if (!enabled) setMobileOpen(false)
@@ -20,7 +30,6 @@ export default function useSidebarNavigation(enabled = true) {
     const resize = () => {
       setCompact(media.matches)
       setMobileOpen(false)
-      if (sidebarRef.current?.contains(document.activeElement)) toggleRef.current?.focus()
     }
     media.addEventListener("change", resize)
     return () => media.removeEventListener("change", resize)
@@ -58,10 +67,7 @@ export default function useSidebarNavigation(enabled = true) {
     toggle: () => compact ? setMobileOpen(open => !open) : setDesktopCollapsed(collapsed => !collapsed),
     close: () => {
       if (compact) setMobileOpen(false)
-      else {
-        setDesktopCollapsed(true)
-        toggleRef.current?.focus()
-      }
+      else setDesktopCollapsed(true)
     },
     closeMobile: () => setMobileOpen(false),
   }

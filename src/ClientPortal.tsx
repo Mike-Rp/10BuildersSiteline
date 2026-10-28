@@ -664,6 +664,7 @@ export default function ClientPortal({
             <Button
               ref={navigation.toggleRef}
               className="sidebar-toggle"
+              hidden={navigation.expanded}
               variant="icon-button"
               icon="menu"
               aria-label={navigation.expanded ? navigation.compact ? "Close Client navigation" : "Collapse Client navigation" : navigation.compact ? "Open Client navigation" : "Expand Client navigation"}

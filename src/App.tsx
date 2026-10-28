@@ -2929,6 +2929,7 @@ function AppInner() {
             <Button
               ref={navigation.toggleRef}
               className="sidebar-toggle"
+              hidden={navigation.expanded}
               variant="icon-button"
               icon="menu"
               aria-label={navigation.expanded ? navigation.compact ? "Close navigation" : "Collapse navigation" : navigation.compact ? "Open navigation" : "Expand navigation"}
