@@ -20,6 +20,7 @@ import {
   allocationConsented,
   allocationPhases,
   canReleaseCompany,
+  compareCandidatePreference,
   eligibility,
   recommendTeam,
   replaceCompany,
@@ -30,7 +31,7 @@ import {
 } from "./subcontractor-allocation"
 import "./TradeAllocationPanel.css"
 import LocationFields from "./LocationFields"
-import { locationError, locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
+import { locationError, locationLabel, locationProximity, proximityLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 
 type Props = {
   state: State
@@ -81,6 +82,7 @@ export function TradeAllocationOverview({
               return (
                 <article className="trade-company" key={id}>
                   <h4>{name(id)}</h4>
+                  <p>{proximityLabel(locationProximity(project.siteLocation, state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation))}</p>
                   <Badge tone={status === "accepted" ? "green" : "amber"}>
                     {status === "selected" ? "Not contacted" : status}
                   </Badge>
@@ -167,7 +169,7 @@ export default function TradeAllocationPanel({
   const ready = allocationReady(project),
     disabled = saving || busy,
     count = requiredCompanies(project.type)
-  const eligible = candidates.filter(company => !eligibility(company))
+  const eligible = candidates.filter(company => !eligibility(company)).sort((a, b) => compareCandidatePreference(a, b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   const excluded = candidates.filter(company => !!eligibility(company))
   const locationReady = !locationError(project.siteLocation)
   const recommended = !active && locationReady && !plan ? recommendTeam(project.type, phases, candidates) : null
@@ -249,7 +251,8 @@ export default function TradeAllocationPanel({
       <section className="trade-company" aria-label="Project allocation location">
         <h4>Project site location</h4><p><strong>{locationLabel(project.siteLocation)}</strong></p>
         {!active && !work.selections.some(s => ["contacted", "accepted"].includes(s.status)) && <details open={!locationReady}><summary>{locationReady ? "Update site location" : "Complete site location to unlock allocation"}</summary><LocationFields prefix="Project" value={siteLocation} onChange={setSiteLocation} disabled={disabled} /><Button disabled={disabled || !ready || !!locationError(siteLocation)} onClick={() => void send({ type: "set_allocation_location", siteLocation }, "Project site location saved. Prepare a new team for this location.")}>Save project site location</Button>{plan && <p>Changing location clears the uncontacted proposal. Prepare the team again for the new location.</p>}</details>}
-        <p>{eligible.length} eligible companies · {count} required. Companies outside the reviewed operating area cannot be selected.</p>
+        <p>{eligible.length} eligible companies · {count} required. Companies outside their Site PM-reviewed service areas cannot be selected.</p>
+        <p>Recorded straight-line distances are ranked first. When coordinates are missing, area matching prefers the same city, then province/NCR, then region. Fewer commitments break proximity ties. Distances do not represent road travel or travel time.</p>
       </section>
       {project.clientSubcon && !plan && (
         <p className="notice">
@@ -275,9 +278,13 @@ export default function TradeAllocationPanel({
           <h4>Prepare the company team</h4>
           <p>
             Auto-allocation proposes a complete team using verified trade
-            coverage, then fewer existing commitments. It records no contact or
+            coverage and service areas, then proximity and fewer existing commitments. It records no contact or
             acceptance.
           </p>
+          {recommended && <details className="allocation-proximity-preview"><summary>Preview recommended companies</summary><ul>{recommended.companyIds.map(id => {
+            const company = candidates.find(company => company.id === id)!
+            return <li key={id}><strong>{company.name}</strong><p>{proximityLabel(company.proximity)}</p><p>Operating base: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p></li>
+          })}</ul></details>}
           <div className="trade-actions">
             <Button
               variant="primary"
@@ -348,7 +355,8 @@ export default function TradeAllocationPanel({
                   <div className="tag-list">
                     {company?.disciplines.map((d) => <span key={d}>{d}</span>)}
                   </div>
-                  <p>Reviewed operating area: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p>
+                  <p>Reviewed operating base: {locationLabel(state.companies.find(c => c.id === id)?.capabilityReview?.operatingLocation)}</p>
+                  <p>{proximityLabel(company?.proximity)}</p>
                   <p>
                     <strong>{company?.commitments || 0}/2</strong> other
                     commitments
@@ -571,6 +579,7 @@ export default function TradeAllocationPanel({
           {replacementCandidates(plan, alternatives, candidates).map((c) => (
             <div className="trade-company" key={c.id}>
               <h4>{c.name}</h4>
+              <p>{proximityLabel(c.proximity)}</p>
               <p>
                 {c.disciplines.join(" · ")} · {c.commitments}/2 other
                 commitments
@@ -632,6 +641,7 @@ export default function TradeAllocationPanel({
                 />
                 <span>
                   <strong>{c.name}</strong>
+                  <p>{proximityLabel(c.proximity)}</p>
                   <br />
                   {eligibility(c) ||
                     `${c.commitments}/2 commitments · ${c.disciplines.join(", ")}`}

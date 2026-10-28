@@ -1,0 +1,26 @@
+.client-search { min-width: 0; }
+.client-search-control { display: flex; align-items: center; gap: 10px; }
+.client-search-input { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0 12px; border: 1px solid var(--control-border, var(--color-line)); border-radius: 6px; background: var(--color-surface); }
+.client-search-input > svg { flex-shrink: 0; color: var(--color-muted); pointer-events: none; }
+#root .client-search-input > input { flex: 1; min-width: 0; width: 100%; padding: 11px 0; border: 0; border-radius: 0; background: transparent; }
+#root .client-search-input:focus-within { outline: 3px solid var(--color-steel, var(--color-primary)); outline-offset: 2px; }
+#root .client-search-input > input:focus-visible { outline: none; }
+.client-search-input:has(input:disabled) { background: var(--color-canvas); }
+.client-search-control > .button { position: static; flex-shrink: 0; }
+.client-search-hint { display: block; margin-top: 7px; color: var(--color-muted); overflow-wrap: anywhere; }
+.client-search-results { margin-top: 10px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-surface); }
+.client-search-count { padding: 10px 14px; background: var(--surface-subtle); border-radius: 6px 6px 0 0; color: var(--color-muted); }
+.client-search-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-top: 1px solid var(--color-line); }
+.client-search-avatar { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; background: var(--surface-subtle); color: var(--color-primary); }
+.client-search-person { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.client-search-person > strong, .client-search-person > span { display: block; }
+.client-search-person > span { color: var(--color-muted); margin-top: 3px; }
+.client-search-row > .button { flex-shrink: 0; }
+.client-search-pages { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--color-line); }
+.client-search-pages > span { color: var(--color-muted); }
+.client-search-empty { padding: 18px 14px; color: var(--color-muted); }
+@media (max-width: 480px) {
+  .client-search-avatar { display: none; }
+  .client-search-row { padding: 12px; gap: 8px; }
+  .client-search-pages { flex-wrap: wrap; }
+}

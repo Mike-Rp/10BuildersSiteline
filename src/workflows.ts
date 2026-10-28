@@ -2,7 +2,7 @@ import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { locationError, normalizeLocation, type OperatingLocation } from "../Thesis-Backend/src/domain/operating-location.js"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../Thesis-Backend/src/domain/company-registration.js"
-import { allocationCandidates, allocationConsented, allocationPhases, canReleaseCompany, eligibility, protectScope, recommendTeam, replacementCandidates, replaceCompany, scopeFor, validatePlan, type AllocationPlan } from "./subcontractor-allocation.ts"
+import { allocationCandidates, allocationConsented, allocationPhases, canReleaseCompany, compareCandidatePreference, eligibility, protectScope, recommendTeam, replacementCandidates, replaceCompany, scopeFor, validatePlan, type AllocationPlan } from "./subcontractor-allocation.ts"
 import {
   DOC_LABELS,
   PHASES,
@@ -942,7 +942,7 @@ export function applyWorkflow(
           assert(previous.companyIds.includes(id), "Choose a company in this allocation.")
           assert(!work.selections.some(s => s.companyId === id && ["accepted", "contacted"].includes(s.status)), "Contacted and accepted company scopes are locked.")
           const best = replacementCandidates(previous, id, candidates)[0]
-          if (!eligibility(current) && scopeFor(previous, id).every(r => current!.disciplines.includes(r.discipline)) && (!best || current!.commitments <= best.commitments)) break
+          if (!eligibility(current) && scopeFor(previous, id).every(r => current!.disciplines.includes(r.discipline)) && (!best || compareCandidatePreference(current!, best) <= 0)) break
           assert(best, "No eligible replacement covers this entire scope. Allocation remains pending.")
           proposed = replaceCompany(previous, id, best.id)
         }

@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SITELINE · Active projects mobile preview</title></head>
+<body style="margin:0"><div id="root" style="max-width:100%;padding:12px"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import ActiveSites from '/src/ActiveSites.tsx';
+import '/src/index.css';
+import '/src/construction-daylight.css';
+const projects = [
+  {id:'preview-1',name:'Cedar Heights Commercial 011',type:'Commercial',phase:'Structure',end:'2027-06-30'},
+  {id:'preview-2',name:'Cedar Heights Residential 001',type:'Residential',phase:'Mobilization',end:'2027-10-15'},
+  {id:'preview-3',name:'Harbor Point Commercial 002',type:'Commercial',phase:'Design'},
+].map((p,i)=>({...p,status:'active',progress:30+i*10,start:'2026-10-01',lead:'Sample Site PM'}));
+createRoot(document.getElementById('root')).render(React.createElement(ActiveSites,{projects,today:'2026-10-28',onOpen(id){window.alert('Preview project: '+id)}}));
+</script></body></html>

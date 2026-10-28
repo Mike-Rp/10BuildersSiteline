@@ -1,0 +1,190 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { emptyState } from "../src/model.ts"
+
+test("client creation requires a company address, preserves intake details, and retains generated company emails", async () => {
+  const [{ JSDOM }, { createServer }, React] = await Promise.all([import("jsdom"), import("vite"), import("react")])
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" }), previous = new Map(), w = dom.window
+  for (const [key, value] of Object.entries({ window: w, document: w.document, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })) {
+    previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
+  }
+  const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
+  const { createRoot } = await import("react-dom/client"), root = createRoot(document.getElementById("root"))
+  try {
+    const { IntakeForm, AccountForm } = await server.ssrLoadModule("/src/panels.tsx")
+    const state = emptyState(), saved = []
+    const button = text => [...document.querySelectorAll("button")].find(element => element.textContent.trim() === text)
+    const click = text => React.act(async () => { assert.ok(button(text), text); button(text).click() })
+    const field = text => document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
+    const type = (label, value) => React.act(() => {
+      const input = field(label); assert.ok(input, label)
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(input, value)
+      input.dispatchEvent(new w.Event("input", { bubbles: true }))
+    })
+    await React.act(() => root.render(React.createElement(IntakeForm, { state, onSubmit() {}, onClient: account => { saved.push(account); state.accounts.push(account); return account }, onClose() {} })))
+    await click("Create a client account")
+    await type("Client / company name *", "Sample Client")
+    await type("Contact person", "Primary contact")
+    await type("Contact number", "09171234567")
+    assert.match(document.body.textContent, /client's @10builders.com account address/)
+    assert.match(document.body.textContent, /Project access is not activated/)
+    assert.equal(field("Email address *").placeholder, "lastname.firstname@10builders.com")
+    for (const email of ["mikahiro@gmail.com", "mikahiro@yahoo.com", "mikahiro@10builders.com.evil", "mikahiro@not10builders.com", "", "mikahiro@@10builders.com"]) {
+      await type("Email address *", email)
+      await click("Save client for project")
+      assert.equal(saved.length, 0)
+      assert.equal(field("Email address *").getAttribute("aria-invalid"), "true")
+      const description = document.getElementById(field("Email address *").getAttribute("aria-describedby"))
+      assert.match(description.textContent, /Enter a valid @10builders\.com email address/)
+      assert.equal(field("Client / company name *").value, "Sample Client")
+      assert.equal(field("Contact person").value, "Primary contact")
+      assert.equal(field("Contact number").value, "09171234567")
+    }
+    await type("Email address *", "  Hiro.Mika@10BUILDERS.COM  ")
+    assert.equal(field("Email address *").getAttribute("aria-invalid"), null)
+    await click("Save client for project")
+    assert.equal(saved.length, 1)
+    assert.equal(saved[0].email, "hiro.mika@10builders.com")
+    assert.equal(saved[0].status, "pending-setup")
+    assert.deepEqual(saved[0].scope, [])
+    assert.ok([...document.querySelectorAll(".selected-client-details input")].some(input => input.value === "hiro.mika@10builders.com"))
+    // Existing records remain selectable instead of forcing a new account.
+    const legacy = { ...saved[0], id: "legacy-client", email: "legacy@company.test" }
+    state.accounts.push(legacy)
+    let used
+    await React.act(() => root.render(React.createElement(AccountForm, { state, clientOnly: true, onSave() { throw Error("Must use existing") }, onUseExisting: account => { used = account }, onClose() {} })))
+    await type("Email address *", legacy.email)
+    await click("Use Existing Client")
+    assert.equal(used.id, legacy.id)
+    await React.act(() => root.render(React.createElement(AccountForm, { key: "existing", state, account: legacy, onSave() {}, onClose() {} })))
+    assert.equal(field("Email address *").getAttribute("pattern"), null)
+    // The main account form's company-email generator also works for Clients.
+    const project = { id: "client-project", name: "Client Project" }
+    state.projects = [project]
+    await React.act(() => root.render(React.createElement(AccountForm, { key: "generated", state, onSave: account => saved.push(account), onClose() {} })))
+    await React.act(() => {
+      const role = field("Account role")
+      Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(role, "client")
+      role.dispatchEvent(new w.Event("change", { bubbles: true }))
+    })
+    await type("First name *", "Vialh")
+    await type("Last name *", "Gonzales")
+    assert.equal(field("Email address *").value, "gonzales.vialh@10builders.com")
+    await React.act(() => document.querySelector('input[type="checkbox"]').click())
+    await click("Create account")
+    assert.equal(saved.length, 2)
+    assert.equal(saved[1].email, "gonzales.vialh@10builders.com")
+    assert.equal(saved[1].status, "invited")
+  } finally {
+    await React.act(() => root.unmount()); await server.close(); dom.window.close()
+    for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]
+  }
+})
+
+test("intake client search opens only after typing, paginates, selects real IDs, and preserves modal and account creation", async () => {
+  const {JSDOM}=await import("jsdom")
+  const {createServer}=await import("vite")
+  const {default:React,act}=await import("react")
+  const dom=new JSDOM('<div id="root"></div>',{url:"http://localhost"})
+  const previous=new Map()
+  for(const [key,value] of Object.entries({window:dom.window,document:dom.window.document,Node:dom.window.Node,IS_REACT_ACT_ENVIRONMENT:true})) {
+    previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})
+  }
+  const server=await createServer({server:{middlewareMode:true,hmr:false,watch:null},appType:"custom",logLevel:"silent",optimizeDeps:{noDiscovery:true,include:[]}})
+  const {createRoot}=await import("react-dom/client")
+  const root=createRoot(document.getElementById("root"))
+  try {
+    const {IntakeForm}=await server.ssrLoadModule("/src/panels.tsx")
+    const {Modal}=await server.ssrLoadModule("/src/ui.tsx")
+    const {default:ClientSearch}=await server.ssrLoadModule("/src/ClientSearch.tsx")
+    const state=emptyState()
+    const names=["Adrian Aguilar","Bianca Aguilar","Carlo Aguilar","Diana Aguilar","Enzo Aguilar"]
+    const clients=names.map((name,i)=>({id:`client-${i+1}`,role:"client",name,email:`client00${i+1}@example.test`,status:"active",phone:"09123456789",contactPerson:"Client Contact",scope:[],projectTypes:[],docs:[]}))
+    clients[4].id="11111111-ad00-4000-8000-111111111111"
+    state.accounts=[...clients,{...clients[0],id:"blocked",name:"Blocked Aguilar",status:"suspended"},{...clients[0],id:"inactive",name:"Inactive Aguilar",status:"deactivated"},{...clients[0],id:"staff",name:"Staff Aguilar",role:"opm"}]
+    let closed=0
+    await act(()=>root.render(React.createElement(Modal,{title:"New project intake",onClose:()=>closed++},React.createElement(IntakeForm,{state,onSubmit:()=>{},onClient:a=>a,onClose:()=>closed++}))))
+    const get=selector=>document.querySelector(selector)
+    const search=()=>get('.client-search input')
+    const type=async value=>act(()=>{
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,"value").set.call(search(),value)
+      search().dispatchEvent(new dom.window.Event("input",{bubbles:true}))
+    })
+    assert.equal(search().value,"")
+    assert.equal(get('.client-search-results'),null)
+    assert.equal(get('.client-search select'),null,"client field no longer uses the native dropdown")
+    assert.equal(get('label[for="'+search().id+'"]')?.textContent,"Client *","existing field label names the search input")
+    await act(()=>search().focus())
+    assert.equal(get('.client-search-results'),null,"focus alone never lists every client")
+    await type("a")
+    assert.equal(search().getAttribute("aria-expanded"),"true")
+    assert.equal(get('.client-search-count').textContent,"5 matching clients","staff and unavailable clients excluded")
+    assert.equal(document.querySelectorAll('.client-search-row').length,3)
+    await act(()=>get('[aria-label="Next client results"]').click())
+    assert.equal(document.querySelectorAll('.client-search-row').length,2)
+    assert.match(get('.client-search-pages').textContent,/Page 2 of 2/)
+    await type(" Ad ")
+    assert.equal(get('.client-search-count').textContent,"1 matching client","hidden ID fragments must not match unrelated names")
+    assert.match(get('.client-search-person').textContent,/Adrian Aguilar/)
+    assert.equal(get('.client-search-pages'),null,"narrowing search resets pagination")
+    await type("Adrain")
+    assert.match(get('.client-search-empty').textContent,/No clients found/,"misspellings are not fuzzy matched")
+    await type(clients[4].id)
+    assert.match(get('.client-search-empty').textContent,/No clients found/,"internal account IDs are not searchable")
+    await type("CLIENT002@EXAMPLE.TEST")
+    assert.equal(get('.client-search-count').textContent,"1 matching client")
+    await act(()=>search().dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})))
+    assert.equal(document.activeElement,get('[data-client-select]'))
+    await act(()=>document.activeElement.click())
+    assert.equal(search().value,"Bianca Aguilar")
+    assert.equal(get('.client-search-results'),null)
+    assert.match(get('.selected-client-details').textContent,/Client \/ Company Name/)
+    assert.ok([...document.querySelectorAll('.selected-client-details input')].some(el=>el.value==='client002@example.test'),"actual selected account populates existing details")
+    await type("Carlo")
+    assert.equal(get('.selected-client-details'),null,"typing a replacement invalidates the previous selection")
+    await act(()=>get('[data-client-select]').click())
+    assert.equal(search().value,"Carlo Aguilar")
+    const create=[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Create a client account'))
+    await act(()=>create.click())
+    assert.equal(document.querySelectorAll('[aria-modal="true"]').length,2,"existing create-account dialog still opens")
+    const nested=[...document.querySelectorAll('[aria-modal="true"]')].at(-1)
+    await act(()=>nested.querySelector('[aria-label="Close dialog"]').click())
+    assert.equal(document.querySelectorAll('[aria-modal="true"]').length,1)
+    assert.equal(search().value,"Carlo Aguilar","canceling account creation preserves selection")
+    await act(()=>get('[aria-label="Change selected client"]').click())
+    assert.equal(search().value,"")
+    assert.equal(get('.client-search-results'),null)
+    await type("  ")
+    assert.equal(get('.client-search-results'),null)
+    await type("unknown person")
+    assert.match(get('.client-search-empty').textContent,/No clients found/)
+    await act(()=>search().dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true})))
+    assert.equal(get('.client-search-results'),null)
+    assert.equal(closed,0,"Escape dismisses search before the containing project modal")
+    await type("Aguilar")
+    await act(()=>search().dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true})))
+    await act(()=>search().dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})))
+    assert.equal(document.activeElement,get('[data-client-select]'),"keyboard can reopen and enter results after Escape")
+    await type("Aguilar")
+    await act(()=>document.body.dispatchEvent(new dom.window.Event("pointerdown",{bubbles:true})))
+    assert.equal(get('.client-search-results'),null)
+    await type("Aguilar")
+    await act(()=>get('[aria-label="Clear client search"]').click())
+    assert.equal(search().value,"")
+    assert.equal(get('.client-search-results'),null)
+    await act(()=>root.render(React.createElement(ClientSearch,{clients:[...clients,{...clients[0],id:"new-client",name:"New Client"}],value:"new-client",onChange:()=>{}})))
+    assert.equal(get('input').value,'New Client',"newly created accounts are reflected from the parent state")
+    assert.equal(get('.client-search-results'),null)
+    const selected=[]
+    await act(()=>root.render(React.createElement(ClientSearch,{clients,value:clients[1].id,onChange:id=>selected.push(id),disabled:true})))
+    assert.equal(get('input').value,'Bianca Aguilar')
+    assert.equal(get('input').disabled,true)
+    assert.equal(get('.client-search-results'),null)
+    assert.deepEqual(selected,[],"locked client on existing projects stays unchanged")
+  } finally {
+    await act(()=>root.unmount())
+    await server.close()
+    dom.window.close()
+    for(const [key,descriptor] of previous)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key]
+  }
+})

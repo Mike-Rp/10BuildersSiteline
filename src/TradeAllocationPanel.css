@@ -60,3 +60,8 @@
 .capability-card-tags > span { padding: 4px 7px; border: 1px solid var(--color-line); border-radius: 5px; background: var(--green-soft); color: var(--color-primary); font-size: 14px; }
 @media(max-width:900px) { .capability-review-columns { grid-template-columns: 1fr; } .capability-records { border-left: 0; border-top: 1px solid var(--color-line); padding: 18px 0 0; } }
 @media(max-width:540px) { .capability-group-grid, .capability-summary { grid-template-columns: 1fr; } .capability-summary > div + div { border-left: 0; border-top: 1px solid var(--color-line); padding: 12px 0 0; } .capability-footer-actions, .capability-footer-actions .button { flex: 1 1 100%; } }
+.location-coordinates { margin-top:12px; padding:12px; border:1px solid var(--color-line); border-radius:6px; min-width:0; }
+.location-coordinates summary { cursor:pointer; font-weight:600; }
+.location-coordinates .form-grid { margin-top:10px; }
+.service-area-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--color-line); }
+.service-area-row > span { flex:1 1 220px; overflow-wrap:anywhere; }

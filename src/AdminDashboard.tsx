@@ -4,13 +4,14 @@ import type { DashboardCategory, DashboardItem } from "./admin-dashboard"
 import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems } from "./urgent-actions"
 import { DelayedProjectsRow } from "./ScheduleStatus"
+import ExecutiveSummary from "./ExecutiveSummary"
 import "./admin-dashboard.css"
 
 const categories: ["all" | DashboardCategory, string][] = [
   ["all", "All"], ["requests", "Requests"], ["licenses", "Licenses"], ["updates", "Project updates"], ["intake", "Intake"],
 ]
 
-export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onActivity, activity, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
+export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
   delayedCount?: number
   onDelayedProjects?: () => void
   readinessAvailable?: boolean
@@ -18,6 +19,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   onNavigate: (page: string) => void
   onOpen: (item: DashboardItem) => void
   onNewIntake: () => void
+  onMonthlyReport: () => void
   onActivity: () => void
   activity: ReactNode
 }) {
@@ -32,11 +34,28 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   const pages = Math.max(1, Math.ceil(filtered.length / 6))
   const current = Math.min(page, pages)
   const visible = filtered.slice((current - 1) * 6, current * 6)
+  function showAttention() {
+    setBlockersOnly(false); setPriorityOnly(false); setCategory("all"); setPage(1)
+    attentionHeading.current?.focus()
+    attentionHeading.current?.scrollIntoView?.({ block: "nearest", behavior: "auto" })
+  }
   return <div className="admin-overview">
     <header className="ao-heading">
-      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Workspace overview<span>.</span></h1></div>
-      <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
+      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Dashboard<span>.</span></h1></div>
+      <div className="dashboard-actions">
+        <Button icon="doc" onClick={onMonthlyReport}>Monthly report</Button>
+        <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
+      </div>
     </header>
+    <ExecutiveSummary
+      description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${overview.items.length} follow-up ${overview.items.length === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
+      metrics={[
+        { label: "Active projects", value: overview.activeProjects, hint: "Open Active sites", icon: "building", onOpen: () => onNavigate("Active sites") },
+        { label: "Projects in intake", value: overview.intakeProjects, hint: "Open Project intake", onOpen: () => onNavigate("Project intake") },
+        { label: "Follow-up items", value: overview.items.length, hint: "Review needs attention", icon: "alert", onOpen: showAttention },
+        { label: "Team accounts", value: overview.teamAccounts, hint: "Active and invited accounts", icon: "users", onOpen: () => onNavigate("Team") },
+      ]}
+    />
     <UrgentActionBanner items={priorities.map(adminBannerItem)} label="Priority attention" className={readinessAvailable && blockers.length ? "ao-blocker-banner" : ""}
       description={`${readinessAvailable && blockers.length ? `${blockers.length} ${blockers.length === 1 ? "project cannot" : "projects cannot"} advance. ` : ""}Review urgent deadlines, license alerts and actions that need a decision.`}
       actionLabel={readinessAvailable && blockers.length ? blockers.length === 1 ? "Review issue" : "View blockers" : "Review priority items"}
@@ -45,17 +64,6 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
         if (readinessAvailable && blockers.length === 1) onOpen(blockers[0])
         else { setBlockersOnly(readinessAvailable && blockers.length > 0); setPriorityOnly(true); setPage(1); attentionHeading.current?.focus(); attentionHeading.current?.scrollIntoView?.({block:"nearest",behavior:"auto"}) }
       }} />
-    <div className="ao-metrics" aria-label="Workspace totals">
-      {[
-        {label:"Active projects", value:overview.activeProjects, hint:"Open Active Sites", icon:"building", page:"Active sites"},
-        {label:"Projects in intake", value:overview.intakeProjects, hint:"Open Project Intake", icon:null, page:"Project intake"},
-        {label:"Team accounts", value:overview.teamAccounts, hint:"Active and invited accounts", icon:"users", page:"Team"},
-      ].map(metric => <button className="ao-metric" key={metric.label} onClick={() => onNavigate(metric.page)}>
-        {metric.icon && <span className="ao-metric-icon" aria-hidden="true"><Icon name={metric.icon} size={22} /></span>}
-        <span className="ao-metric-copy"><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.hint}</small></span>
-        <Icon name="chevron" size={16} />
-      </button>)}
-    </div>
     <div className="ao-content">
       <section className="ao-panel" aria-labelledby="ao-attention-title">
         <header className="ao-panel-header"><div><h2 id="ao-attention-title" ref={attentionHeading} tabIndex={-1}>Needs attention</h2><p>Open an item to view its details and existing actions.</p></div><span className="ao-count" aria-label={`${overview.items.length + Number(delayedCount > 0)} attention items`}>{overview.items.length + Number(delayedCount > 0)}</span></header>

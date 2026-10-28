@@ -96,15 +96,16 @@ test("Administrator dashboard filters and pages attention items and preserves ac
   try {
     const {default:AdminDashboard} = await server.ssrLoadModule("/src/AdminDashboard.tsx")
     const opened = [], navigated = []
-    let created = 0, activityOpened = 0
+    let created = 0, activityOpened = 0, reportsOpened = 0
     const props = {
       overview:adminDashboardOverview(workspace()), onOpen:item=>opened.push(item), onNavigate:page=>navigated.push(page),
-      onNewIntake:()=>created++,onActivity:()=>activityOpened++,activity:React.createElement("p",null,"Existing authorized activity feed"),
+      onNewIntake:()=>created++,onMonthlyReport:()=>reportsOpened++,onActivity:()=>activityOpened++,activity:React.createElement("p",null,"Existing authorized activity feed"),
     }
     await act(()=>root.render(React.createElement(AdminDashboard,props)))
     const button = text => [...document.querySelectorAll("button")].find(el=>el.textContent.trim().startsWith(text))
-    assert.equal(document.querySelectorAll(".ao-metric").length,3)
-    assert.equal(button("Projects in intake").querySelector(".ao-metric-icon"),null)
+    assert.equal(document.querySelectorAll(".executive-summary").length,1)
+    assert.equal(document.querySelectorAll(".executive-metric").length,4)
+    assert.match(document.querySelector(".executive-summary").textContent, /3 active projects and 4 projects in intake/)
     assert.equal(button("Projects in intake").querySelectorAll("svg").length,1)
     assert.ok(button("New project intake").matches(".ao-new-intake"))
     assert.ok(button("New project intake").querySelector("svg"))
@@ -133,8 +134,10 @@ test("Administrator dashboard filters and pages attention items and preserves ac
     await act(()=>document.querySelector(".ao-task").click())
     assert.equal(opened[3].kind,"intake")
     await act(()=>button("New project intake").click())
+    await act(()=>button("Monthly report").click())
     await act(()=>button("View all").click())
     assert.equal(created,1)
+    assert.equal(reportsOpened,1)
     assert.equal(activityOpened,1)
     assert.match(document.body.textContent,/Existing authorized activity feed/)
     await act(()=>root.render(React.createElement(AdminDashboard,{...props,overview:adminDashboardOverview(emptyState())})))

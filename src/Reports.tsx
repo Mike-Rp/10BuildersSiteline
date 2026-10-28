@@ -22,7 +22,7 @@ function SummaryCard({ label, total, value, note, icon }: { label: string; total
 
 // Overall monthly summary across every project the server authorizes for this account.
 // Summary reads and exports enforce project and role permissions on the server.
-export default function Reports() {
+export default function Reports({ embedded = false }: { embedded?: boolean }) {
   const ids = { search: useId(), type: useId(), outstanding: useId(), month: useId() }
   const [month, setMonth] = useState(currentReportMonth)
   const [data, setData] = useState<{ summary: MonthlySummary; snapshot: string }>()
@@ -73,7 +73,7 @@ export default function Reports() {
   }
 
   return <>
-    <div className="page-heading"><div><h1>Reports</h1><p>{REPORTS_PURPOSE}</p></div></div>
+    {!embedded && <div className="page-heading"><div><h1>Reports</h1><p>{REPORTS_PURPOSE}</p></div></div>}
     <section className="report-summary" aria-labelledby="report-summary-title">
       <div className="section-title"><h2 id="report-summary-title"><Icon name="doc" /> Overall Monthly Project Summary</h2><span>{summary ? periodLabel(summary).toUpperCase() : "MONTHLY"}</span></div>
       <div className="report-summary-controls">

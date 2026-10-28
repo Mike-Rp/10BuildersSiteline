@@ -1,0 +1,18 @@
+import { Router } from "express";
+import { getArchive,getArchiveSummary,getEscalatedAssignments } from "./controller.js";
+import { getArchiveDocuments,downloadArchiveFile } from "./documents.controller.js";
+import { closeProject,requestChanges,resolveChanges,archiveSuspendedAccount,reinstateAccount,reassignPhase,runArchiveSweep } from "./actions.controller.js";
+const router=Router();
+router.get("/summary",getArchiveSummary);
+router.get("/assignments/escalated",getEscalatedAssignments);
+router.get("/projects/:id/documents",getArchiveDocuments);
+router.get("/projects/:id/:kind/:fileId/download",downloadArchiveFile);
+router.post("/projects/:id/close",closeProject);
+router.post("/projects/:id/changes-requested",requestChanges);
+router.post("/projects/:id/changes-requested/:eventId/resolve",resolveChanges);
+router.post("/accounts/:id/remove",archiveSuspendedAccount);
+router.post("/accounts/:id/reinstate",reinstateAccount);
+router.post("/phase-assignments/:assignmentId/reassign",reassignPhase);
+router.post("/maintenance",runArchiveSweep);
+router.get("/:view",getArchive);
+export default router;

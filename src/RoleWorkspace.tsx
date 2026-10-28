@@ -4,7 +4,8 @@ import useSignOutConfirmation from "./useSignOutConfirmation"
 import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
-import Reports from "./Reports"
+import MonthlySummaryDialog from "./MonthlySummaryDialog"
+import ExecutiveSummary from "./ExecutiveSummary"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
@@ -171,7 +172,6 @@ const OPM_NAV = [
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
-  ["Reports", "doc"],
 ]
 const SPM_NAV = [
   ["Dashboard", "grid"],
@@ -183,7 +183,6 @@ const SPM_NAV = [
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
-  ["Reports", "doc"],
 ]
 type Result = {
   ok: boolean
@@ -246,6 +245,7 @@ export default function RoleWorkspace({
   )
   const [dialog, setDialog] = useState<RoleDialog>()
   const [reportProjectId,setReportProjectId]=useState("")
+  const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   // Project Monitoring modal: one modal that switches between its monitoring
   // content and the project repository. Reset whenever the modal closes.
   const [monitorView, setMonitorView] = useState<"monitoring" | "repository">(
@@ -485,6 +485,7 @@ export default function RoleWorkspace({
     }
   }
   function navigate(next: string) {
+    if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
     setActiveSitesScheduleFilter("")
     setPage(normalizeWorkspacePage(next))
     setConfirmTab("mine")
@@ -795,96 +796,28 @@ export default function RoleWorkspace({
   function dashboard() {
     // Dashboard widgets show 5 rows per page with a compact pager; "View all" opens the full module.
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
+    const reviewCount = isOpm ? pendingUpdates.length + pendingRework.length + qaCount
+      : projects.filter(p => workflowFor(p).pendingRework?.authorId === actor.id).length
+    const completed = projects.filter(p => p.status === "completed").length
     return (
       <>
         {header(
-          isOpm ? "Project overview" : "Site overview",
+          "Dashboard",
+          <Button icon="doc" onClick={() => setMonthlySummaryOpen(true)}>Monthly report</Button>,
         )}
+        <ExecutiveSummary
+          description={`${active.length} active ${active.length === 1 ? "site is" : "sites are"} assigned to you. ${tasks.length} ${tasks.length === 1 ? "assignment awaits" : "assignments await"} your ${isOpm ? "confirmation" : "response"}. ${reviewCount} ${isOpm ? `progress, checklist or rework ${reviewCount === 1 ? "review is" : "reviews are"} pending` : `rework ${reviewCount === 1 ? "flag awaits" : "flags await"} Office PM review`}. You handle ${projects.length} project records, including ${completed} completed.${!isOpm ? ` ${projects.reduce((n, p) => n + p.team.filter(t => t.accountId === actor.id).length, 0)} phases are assigned to you.` : ""}`}
+          metrics={[
+            { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => navigate("Active sites") },
+            { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
+            { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => navigate(isOpm ? "Rework & approvals" : "Active sites") },
+            { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
+          ]}
+        />
         {isOpm && delayedProjects(allActive, scheduleToday).length > 0 && <Panel title="Needs your attention">
           <DelayedProjectsRow count={delayedProjects(allActive, scheduleToday).length} onOpen={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }} />
         </Panel>}
         {!isOpm && delayedProjects(allActive, scheduleToday).map(project => <section key={project.id} aria-label={`Project schedule: ${project.name}`}><h2>{project.name}</h2><DelayedProjectNotice project={project} today={scheduleToday} /></section>)}
-        <div className="metrics-grid">
-          {[
-            {
-              title: isOpm ? "Managed active sites" : "Current active sites",
-              value: active.length,
-              detail: "Assigned to you",
-              icon: "building",
-              target: "Active sites",
-            },
-            {
-              title: "Actionable assignments",
-              value: tasks.length,
-              detail: isOpm
-                ? "Awaiting your confirmation"
-                : "Awaiting your response",
-              icon: "check",
-              target: isOpm ? "Confirmation queue" : "Assignments",
-            },
-            {
-              title: isOpm ? "Pending reviews" : "Rework flags submitted",
-              value: isOpm
-                ? pendingUpdates.length + pendingRework.length + qaCount
-                : projects.filter(
-                    (p) => workflowFor(p).pendingRework?.authorId === actor.id,
-                  ).length,
-              detail: isOpm
-                ? "Progress, QA/QC and rework"
-                : "Pending Office PM review",
-              icon: "shield",
-              target: isOpm ? "Rework & approvals" : "Active sites",
-            },
-            {
-              title: "Open intake projects",
-              value: intakes.length,
-              detail: "In pre-construction setup",
-              icon: "folder",
-              target: isOpm ? "Documents" : "Assignments",
-            },
-          ].map((metric) => (
-            <button
-              className="metric-card"
-              key={metric.title}
-              onClick={() => navigate(metric.target)}
-            >
-              <div className="metric-top">
-                <span>{metric.title}</span>
-                <span className="metric-icon">
-                  <Icon name={metric.icon} />
-                </span>
-              </div>
-              <div className="metric-value">
-                {String(metric.value).padStart(2, "0")}
-              </div>
-              <div className="metric-bottom">
-                <span>{metric.detail}</span>
-                <Icon name="arrow" size={16} />
-              </div>
-            </button>
-          ))}
-        </div>
-        <div className="summary-pills">
-          <span>
-            <b>{projects.length}</b>Projects handled
-          </span>
-          <span>
-            <b>{projects.filter((p) => p.status === "completed").length}</b>
-            Completed project records
-          </span>
-          {!isOpm && (
-            <span>
-              <b>
-                {projects.reduce(
-                  (n, p) =>
-                    n + p.team.filter((t) => t.accountId === actor.id).length,
-                  0,
-                )}
-              </b>
-              Phases assigned to you
-            </span>
-          )}
-        </div>
         {picked && (
           <Panel
             title="Your next step"
@@ -2856,7 +2789,7 @@ export default function RoleWorkspace({
         company.submittedBy === actor.name,
     )
     const directoryList = runList(`${actor.role}:directory`, directoryItems, {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${(c.foremen || []).map(contact => `${contact.name} ${contact.phone}`).join(" ")} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${(c.foremen || []).map(contact => `${contact.name} ${contact.phone}`).join(" ")} ${c.primaryTrade || ""} ${(c.capabilityReview?.disciplines || c.proposedDisciplines || []).join(" ")} ${locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)} ${(c.capabilityReview?.serviceAreas || []).map(area => locationLabel(area.location)).join(" ")}`,
       filters: [
         {
           id: "availability",
@@ -2912,7 +2845,7 @@ export default function RoleWorkspace({
               </div>
               <h3>{company.name}</h3>
               <p>{company.email || "Company email not supplied"}</p>
-              <p>{company.capabilityReview?.operatingLocation ? "Reviewed operating area: " : "Requested area · Review required: "}{locationLabel(company.capabilityReview?.operatingLocation || company.operatingLocation)}</p>
+              <p>{company.capabilityReview?.operatingLocation ? "Reviewed operating base: " : "Requested base · Review required: "}{locationLabel(company.capabilityReview?.operatingLocation || company.operatingLocation)}</p>
               <div className="capability-card-summary">
                 <span>{company.capabilityReview ? "Verified trades" : company.proposedDisciplines?.length ? "Proposed trades · Review required" : "Trades not reviewed yet"}</span>
                 <div className="capability-card-tags">{(company.capabilityReview?.disciplines || company.proposedDisciplines || []).map(trade => <span key={trade}>{trade}</span>)}</div>
@@ -3538,7 +3471,6 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
-    if (page === "Reports") return <Reports />
     switch (page) {
       case "Dashboard":
         return dashboard()
@@ -3961,6 +3893,7 @@ export default function RoleWorkspace({
               : projectDetail(detail)}
           </Modal>
         )}
+      {monthlySummaryOpen && <MonthlySummaryDialog onClose={() => setMonthlySummaryOpen(false)} />}
       {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {dialog?.kind === "company" && company && (
         <Modal
@@ -4064,7 +3997,7 @@ export default function RoleWorkspace({
           onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
       {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}
-        action={notificationAction(selectedNotification, actor, projects, state.accounts, [...nav.map(([label]) => label), ...(isOpm ? ["SPM responses"] : [])])}
+        action={notificationAction(selectedNotification, actor, projects, state.accounts, [...nav.map(([label]) => label), "Reports", ...(isOpm ? ["SPM responses"] : [])])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)
           if (action.kind === "project") setDialog({ kind: "project", projectId: action.id })

@@ -1,0 +1,87 @@
+/* Client-only overview. No changes to staff dashboards or shared repository styles. */
+#root .client-portal .sidebar-toggle { display: inline-flex; flex: none; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
+#root .client-portal > .sidebar { transition: transform .18s ease-out; }
+#root .client-portal.sidebar-expanded > .sidebar { transform: translateX(0); visibility: visible; }
+#root .client-portal.sidebar-collapsed > .sidebar { transform: translateX(-100%); visibility: hidden; pointer-events: none; }
+#root .client-portal.sidebar-collapsed > .main-shell { margin-left: 0; width: 100%; }
+#root .client-portal > .main-shell { min-width: 0; }
+#root .client-portal .client-nav-close { position: absolute; top: 18px; right: 12px; min-width: 44px; width: 44px; height: 44px; }
+#root .client-portal .client-nav-backdrop { padding: 0; border: 0; border-radius: 0; }
+@media (max-width: 1000px) {
+  #root .client-portal > .main-shell { margin-left: 0; width: 100%; }
+  #root .client-portal > .sidebar .brand { padding-right: 62px; padding-left: 16px; gap: 8px; }
+}
+#root .client-portal .client-project-toolbar { margin-bottom: 12px; gap: 16px; }
+#root .client-portal .client-project-toolbar > .field { max-width: 680px; min-width: 0; }
+#root .client-portal .client-project-toolbar select { width: 100%; text-overflow: ellipsis; }
+#root .client-portal .sidebar .brand small { font-size: 14px; }
+#root .client-portal .sidebar nav { flex: 1; min-height: 100px; overflow-y: auto; }
+#root .client-portal .nav-group-label { margin-top: 24px; }
+#root .client-portal .co-project-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--color-muted); font-size: 14px; }
+#root .client-overview { display: grid; gap: 14px; min-width: 0; }
+#root .client-overview :is(.co-highlights,.co-update,.co-photos) { min-width: 0; border: 1px solid var(--color-line); border-radius: 12px; background: white; }
+#root .client-overview .co-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+#root .client-overview .co-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 18px; }
+#root .client-overview .co-highlights .co-heading { justify-content: flex-start; padding-bottom: 10px; }
+#root .client-overview :is(h1,h2) { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; margin: 0; }
+#root .client-overview .co-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 6px 18px 18px; }
+#root .client-overview .co-metrics > div { min-width: 0; padding-inline: 24px; border-left: 1px solid var(--color-line); }
+#root .client-overview .co-metrics > div:first-child { padding-left: 0; border-left: 0; }
+#root .client-overview .co-metrics > div:last-child { padding-right: 0; }
+#root .client-overview .co-metrics > div > span { display: block; color: var(--color-muted); font-size: 14px; margin-bottom: 8px; }
+#root .client-overview .co-metrics strong { display: block; color: var(--color-primary); font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
+#root .client-overview .co-metrics progress { display: block; width: 100%; height: 8px; margin-top: 10px; }
+#root .client-overview .co-target { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#root .client-overview .co-completed { display: flex; align-items: center; gap: 8px; padding: 0 22px 18px; font-size: 14px; color: var(--color-success); }
+#root .client-overview .co-preview-grid { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: 14px; min-width: 0; align-items: start; }
+#root .client-overview .co-update-stack { display: grid; align-content: start; gap: 12px; min-width: 0; }
+#root .client-overview :is(.co-update,.co-photos) { display: flex; flex-direction: column; }
+#root .client-overview .co-update-body { padding: 0 18px 8px; }
+#root .client-overview .co-update-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--color-muted); }
+#root .client-overview .co-update-body > p { margin-top: 10px; font-size: 16px; }
+#root .client-overview details { margin-top: 6px; }
+#root .client-overview summary { cursor: pointer; color: var(--color-steel, #315a85); font-size: 14px; padding-block: 6px; }
+#root .client-overview details p { overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; margin-top: 8px; }
+#root .client-overview .co-preview-link { align-self: flex-end; margin: 2px 14px 10px; }
+#root .client-overview .client-photos-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 0 22px 12px; }
+#root .client-overview .client-photo { min-width: 0; }
+#root .client-overview .client-photo img, #root .client-overview .client-photo > span { height: 120px; }
+#root .client-overview .client-photo > div { padding: 10px; }
+#root .client-overview .client-photo strong { font-size: 14px; overflow-wrap: anywhere; }
+#root .client-overview .client-photo small { display: none; }
+#root .client-overview .co-empty { color: var(--color-muted); font-size: 14px; padding: 4px 18px 12px; }
+#root .client-portal .client-project-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+#root .client-portal .client-project-facts div { padding: 14px; background: #f4f7fa; border-radius: 8px; min-width: 0; }
+#root .client-portal .client-project-facts dt { font-size: 14px; color: var(--color-muted); }
+#root .client-portal .client-project-facts dd { margin: 5px 0 0; overflow-wrap: anywhere; }
+/* One large photo beside two stacked photos, like the reference collage. */
+#root .client-portal .client-photos-collage { display: grid; grid-template-columns: 1.15fr 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 6px; height: 240px; padding: 0 16px 8px; }
+#root .client-portal .client-photos-collage.photos-1 { grid-template-columns: minmax(0, 1fr); }
+#root .client-portal .client-photos-collage.photos-2 { grid-template-rows: minmax(0, 1fr); }
+#root .client-portal .client-photos-collage .client-photo { position: relative; padding: 0; height: 100%; min-height: 0; min-width: 0; border: 0; border-radius: 7px; overflow: hidden; }
+#root .client-portal .client-photos-collage .client-photo:first-child { grid-row: 1 / -1; }
+#root .client-portal .client-photos-collage .client-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#root .client-portal .client-photos-collage .client-photo > span { height: 100%; min-height: 0; font-size: 14px; padding: 10px; }
+#root .client-portal .client-photos-collage .client-photo > div { position: absolute; inset: auto 0 0; padding: 22px 10px 8px; background: linear-gradient(transparent, #102438d9); }
+#root .client-portal .client-photos-collage .client-photo strong { color: white; font-size: 14px; font-weight: 500; padding: 0; line-height: 1.4; }
+#root .client-portal .client-photos-collage .client-photo small, #root .client-portal .client-photos-collage .client-photo > div > svg { display: none; }
+#root .client-portal .client-photo-example-note { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 0 18px; margin: 0 0 10px; color: var(--color-muted); font-size: 14px; line-height: 1.5; }
+#root .client-portal .client-photo-example-note span, #root .client-portal .client-photo-example-note .badge { font-size: 14px; }
+#root .client-portal .client-sample-photos:not(.compact) { padding-top: 16px; }
+#root .client-portal .client-sample-preview { display: block; max-height: 65vh; width: 100%; object-fit: contain; border-radius: 8px; }
+#root .client-portal .client-sample-caption { margin-top: 12px; font-size: 14px; color: var(--color-muted); }
+@media (max-width: 1000px) {
+  #root .client-overview .co-preview-grid { grid-template-columns: 1fr; }
+  #root .client-overview .co-metrics > div { padding-inline: 16px; }
+}
+@media (max-width: 600px) {
+  #root .client-portal .topbar { flex-wrap: nowrap; gap: 8px; padding: 12px 16px; }
+  #root .client-portal .topbar .breadcrumb { min-width: 0; }
+  #root .client-portal .topbar .topbar-actions { width: auto; flex: none; margin-left: auto; }
+  #root .client-overview .co-metrics { grid-template-columns: 1fr; gap: 16px; }
+  #root .client-overview .co-metrics > div { border-left: 0; border-top: 1px solid var(--color-line); padding: 14px 0 0; }
+  #root .client-overview .co-metrics > div:first-child { border-top: 0; padding-top: 0; }
+  #root .client-portal .client-photos-collage { height: 220px; padding-inline: 14px; }
+  #root .client-portal .client-project-toolbar { align-items: stretch; flex-direction: column; }
+  #root .client-portal .client-project-facts { grid-template-columns: 1fr; }
+}

@@ -66,7 +66,7 @@ test("OPM dashboard highlights checklist deadlines, opens the right reviews, and
       onStayActive: () => {}, onResume: () => {}, onPause: () => {}, onReload: () => {} }
     await act(() => root.render(React.createElement(RoleWorkspace, props)))
     assert.ok(banner())
-    const metrics = document.querySelector('.metrics-grid')
+    const metrics = document.querySelector('.executive-summary')
     assert.ok(banner().compareDocumentPosition(metrics) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING)
     await act(() => document.querySelector('[aria-label="Review checklist for Project soon"]').click())
     assert.equal(document.querySelector('.tabs.standalone .active').textContent, "QA/QC evidence (3)")

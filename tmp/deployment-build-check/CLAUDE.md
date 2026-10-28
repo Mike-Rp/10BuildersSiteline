@@ -1,0 +1,2 @@
+@AGENTS.md
+@docs/HANDOFF_FOR_CLAUDE_CODE.md

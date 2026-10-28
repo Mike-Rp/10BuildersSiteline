@@ -2073,7 +2073,7 @@ export function CompanyForm({
           />
         </Field>
       </div>
-      <section className="form-section"><h3>Operating location</h3><LocationFields value={draft.operatingLocation} disabled={busy} error={operatingError} onChange={operatingLocation => { patch({ operatingLocation }); setOperatingError("") }} /><p>Requested operating area · Site PM review required before allocation.</p></section>
+      <section className="form-section"><h3>Company operating base</h3><LocationFields value={draft.operatingLocation} disabled={busy} error={operatingError} onChange={operatingLocation => { patch({ operatingLocation }); setOperatingError("") }} /><p>Record where the crew is dispatched from. Site PM review confirms the base and service areas before allocation.</p></section>
       <section className="company-foremen" aria-label="Foreman contacts">
         <h3>Foreman contacts</h3>
         <p>Provide a primary contact and an optional backup.</p>

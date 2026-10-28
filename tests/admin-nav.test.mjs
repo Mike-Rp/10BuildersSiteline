@@ -97,3 +97,8 @@ test("Admin has a dedicated activity log navigation tab", () => {
   assert.equal(ADMIN_NAV.find(item => item.label === "Activity log").icon, "activity")
   assert.deepEqual(adminBreadcrumb("Activity log", "project", "engineers"), ["Activity log"])
 })
+
+test("monthly reporting lives on Dashboard while Project intake remains in navigation", () => {
+  assert.ok(!labels.includes("Reports"))
+  assert.ok(labels.includes("Project intake"))
+})

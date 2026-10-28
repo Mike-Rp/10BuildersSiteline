@@ -33,7 +33,7 @@ import { persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import MonthlyReport from "./MonthlyReport"
-import Reports from "./Reports"
+import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
@@ -51,6 +51,7 @@ import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
+import { locationLabel } from "../Thesis-Backend/src/domain/operating-location.js"
 import CompanyForemen from "./CompanyForemen"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
@@ -290,6 +291,7 @@ function AppInner() {
   const [dialog, setDialog] = useState<Dialog>()
   const [preview, setPreview] = useState<Doc>()
   const [reportProjectId,setReportProjectId]=useState("")
+  const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [toast, setToast] = useState("")
   const [query, setQuery] = useState("")
   const [globalQuery, setGlobalQuery] = useState("")
@@ -536,6 +538,7 @@ function AppInner() {
   }
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
+    if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
     setActiveSitesScheduleFilter("")
     const target = resolveAdminTarget(next)
     setPage(target ? target.page : normalizeWorkspacePage(next))
@@ -1013,7 +1016,7 @@ function AppInner() {
     "admin:companies",
     state.companies.filter((c) => c.status === "approved"),
     {
-      searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
+      searchText: (c) => `${c.name} ${c.contact} ${c.email} ${locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)} ${(c.capabilityReview?.serviceAreas || []).map(area => locationLabel(area.location)).join(" ")}`,
       filters: [
         {
           id: "availability",
@@ -1366,6 +1369,7 @@ function AppInner() {
       ] }}
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
+      onMonthlyReport={() => setMonthlySummaryOpen(true)}
       onActivity={() => navigate("Activity log")}
       onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
@@ -1412,7 +1416,6 @@ function AppInner() {
         />
       </Panel>
     </>
-    if (page === "Reports") return <Reports />
     if (page === "Dashboard") return dashboard()
     if (page === "Active sites")
       return (
@@ -1624,6 +1627,7 @@ function AppInner() {
                         </div>
                         <h3>{c.name}</h3>
                         <p>{c.email || "Company email not supplied"}</p>
+                        <p>{c.capabilityReview?.operatingLocation ? "Reviewed operating base: " : "Requested base · Review required: "}{locationLabel(c.capabilityReview?.operatingLocation || c.operatingLocation)}</p>
                         <div className="company-meta">
                           <span>
                             <Icon name="building" size={16} />
@@ -3280,6 +3284,7 @@ function AppInner() {
           </div>
         </Modal>
       )}
+      {monthlySummaryOpen && <MonthlySummaryDialog onClose={() => setMonthlySummaryOpen(false)} />}
       {reportProjectId && <MonthlyReport projects={state.projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {preview && (
         <Preview doc={preview} onClose={() => setPreview(undefined)} />
@@ -3353,7 +3358,7 @@ function AppInner() {
         </div>
       )}
       {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings}
-        action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
+        action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Reports", "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)
           if (action.kind === "project") setDialog({ kind: "project", id: action.id })

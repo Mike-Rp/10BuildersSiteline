@@ -1,0 +1,55 @@
+.admin-overview { color: #172d45; }
+.ao-blocker-banner { display: flex; align-items: center; gap: 16px; padding: 18px 20px; margin-bottom: 24px; background: #fff; border: 1px solid #dda34e; border-left: 4px solid #b45309; border-radius: 10px; min-width: 0; }
+.ao-blocker-icon { color: #b45309; flex-shrink: 0; }
+.ao-blocker-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.ao-blocker-copy strong { color: #172b4d; font-size: 16px; }
+.ao-blocker-copy p { margin: 5px 0 0; line-height: 1.5; color: #64748b; }
+.ao-blocker-banner .button { flex-shrink: 0; font-size: 14px; }
+@media(max-width: 640px) { .ao-blocker-banner { flex-wrap: wrap; gap: 12px; padding: 16px; } .ao-blocker-copy { flex-basis: calc(100% - 40px); } .ao-blocker-banner .button { margin-left: 36px; max-width: calc(100% - 36px); white-space: normal; } }
+.ao-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+.ao-eyebrow { font-size: 10px; font-weight: 650; letter-spacing: 1.5px; color: #6b8095; }
+.ao-heading h1 { font-size: 30px; line-height: 1.25; color: #102c4c; margin: 8px 0; letter-spacing: -.6px; }
+.ao-heading h1 span { color: #4f7da3; }
+.ao-heading p { margin: 0; color: #6b8095; font-size: 13px; }
+#root .admin-overview .ao-new-intake { min-height: 54px; min-width: 230px; padding: 15px 24px; font-size: 15px; font-weight: 650; border-radius: 10px; gap: 12px; box-shadow: 0 5px 14px #172b4d26; flex-shrink: 0; }
+.ao-new-intake svg { width: 23px; height: 23px; padding: 3px; border-radius: 5px; background: #ffffff26; }
+.ao-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; gap: 12px; margin-bottom: 16px; }
+.ao-metric { display: flex; align-items: center; gap: 12px; text-align: left; padding: 16px; background: #fff; color: inherit; border: 1px solid #dce4ec; border-radius: 12px; cursor: pointer; min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.ao-metric:hover { border-color: #759bbb; box-shadow: 0 5px 16px #1734510a; }
+.ao-metric-icon { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px; color: #315f85; background: #eef4f9; }
+.ao-metric-copy { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.ao-metric-copy > span { font-size: 12px; color: #62758a; }
+.ao-metric-copy strong { font-size: 28px; line-height: 1.1; font-weight: 650; color: #102c4c; }
+.ao-metric-copy small { font-size: 11px; color: #748497; }
+.ao-content { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); gap: 16px; align-items: start; }
+.ao-panel { border: 1px solid #dce4ec; border-radius: 12px; background: #fff; overflow: hidden; min-width: 0; }
+.ao-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #e6edf3; }
+.ao-panel-header h2 { font-size: 18px; color: #102c4c; margin: 0 0 5px; }
+.ao-panel-header p { font-size: 12px; color: #748497; margin: 0; }
+.ao-panel-header .text-button { padding: 6px 0; white-space: nowrap; font-size: 12px; }
+.ao-count { display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 8px; background: #fff2df; color: #855316; border-radius: 9px; font-weight: 650; }
+.ao-filters { display: flex; flex-wrap: wrap; gap: 5px; padding: 14px 20px; border-bottom: 1px solid #e6edf3; }
+.ao-filters button { padding: 6px 10px; border: 1px solid transparent; border-radius: 7px; color: #62758a; background: transparent; font-size: 11px; cursor: pointer; }
+.ao-filters button[aria-pressed="true"] { background: #eaf2f9; color: #244f73; border-color: #dbe7f1; font-weight: 600; }
+.ao-task-list { list-style: none; padding: 0; margin: 0; }
+.ao-task-list li + li { border-top: 1px solid #edf2f6; }
+.ao-task { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left; color: inherit; border: 0; background: #fff; padding: 17px 22px; cursor: pointer; }
+.ao-task:hover { background: #f7fafc; }
+.ao-task-icon { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; color: #315f85; background: #eef4f9; border-radius: 9px; }
+.ao-task-icon.licenses,.ao-task-icon.requests { background: #fff6e9; color: #946124; }
+.ao-task-copy { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.ao-task-copy strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.ao-task-copy small { color: #748497; font-size: 11px; line-height: 1.5; }
+.ao-task-label { font-size: 10px; color: #62758a; background: #f2f6f9; padding: 4px 7px; border-radius: 5px; white-space: nowrap; }
+.ao-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #e6edf3; padding: 12px 20px; color: #748497; font-size: 11px; }
+.ao-pager > div { display: flex; align-items: center; gap: 8px; }
+.ao-pager .button { padding: 5px 8px; min-height: 30px; font-size: 11px; }
+.ao-activity .activity-item { padding: 17px 20px; }
+.ao-activity .activity-copy strong { font-size: 13px; }
+.ao-activity .activity-copy small,.ao-activity .activity-time { font-size: 11px; }
+.admin-overview :focus-visible { outline: 3px solid #5285af; outline-offset: -3px; }
+@media(max-width: 1100px) { .ao-content { grid-template-columns: minmax(0,1fr); } .ao-metric { padding: 16px; gap: 10px; } .ao-metric-icon { width: 36px; height: 40px; } }
+@media(max-width: 640px) { .ao-heading h1 { font-size: 26px; } .ao-metrics { grid-template-columns: minmax(0,1fr); gap: 10px; } .ao-metric { padding: 14px 16px; } .ao-metric-copy { grid-template-columns: minmax(0,1fr) auto; align-items: center; } .ao-metric-copy strong { grid-column: 2; grid-row: 1 / 3; font-size: 26px; } .ao-task-label { display: none; } .ao-task { padding: 15px; } .ao-panel-header { padding: 18px 16px; } .ao-filters { padding: 12px; } }
+@media(prefers-reduced-motion: reduce) { .ao-metric { transition: none; } }
+@media(max-width: 640px) { #root .admin-overview .ao-new-intake { width: 100%; min-width: 0; justify-content: center; } }
+@media(max-width: 640px) { .ao-task { display: grid; grid-template-columns: 36px minmax(0,1fr) 16px; gap: 6px 10px; } .ao-task-icon { grid-row: 1 / 3; } .ao-task-copy { grid-column: 2; } .ao-task-label { display: block; grid-column: 2; justify-self: start; } .ao-task > svg { grid-column: 3; grid-row: 1 / 3; } }

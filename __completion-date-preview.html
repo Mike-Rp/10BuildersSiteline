@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Estimated completion calendar preview</title></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {IntakeForm} from '/src/panels.tsx';
+import {Modal} from '/src/ui.tsx';
+import {emptyState} from '/src/model.ts';
+import '/src/index.css';
+import '/src/construction-daylight.css';
+createRoot(document.getElementById('root')).render(React.createElement(Modal,{title:'New project intake',subtitle:'Local preview · No records are saved',wide:true,onClose(){}},React.createElement(IntakeForm,{state:emptyState(),onSubmit(){},onClient:a=>a,onClose(){}})));
+</script></body></html>

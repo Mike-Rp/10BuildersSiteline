@@ -16,7 +16,7 @@ import {
   replaceCompany,
 } from "../Thesis-Backend/src/domain/subcontractor-allocation.js"
 import { allocationCandidates } from "../src/subcontractor-allocation.ts"
-import { locationForCity } from "../Thesis-Backend/src/domain/philippine-locations.js"
+import { locationForCity, LOCATION_CITIES } from "../Thesis-Backend/src/domain/philippine-locations.js"
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
 const cebu = { region: "Central Visayas", province: "Cebu", city: "Cebu City" }
@@ -626,13 +626,31 @@ test(
         method: "POST",
         json,
       })
-    await commercialCommand({ type: "set_allocation_location", allocationRevision: 0, siteLocation: cebu })
+    const preciseSite = { ...cebu, coordinates: { latitude: 10.3157, longitude: 123.8854 } }
+    await assert.rejects(commercialCommand({ type: "set_allocation_location", allocationRevision: 0, siteLocation: { ...cebu, coordinates: { latitude: 10 } } }), /longitude/)
+    await commercialCommand({ type: "set_allocation_location", allocationRevision: 0, siteLocation: preciseSite })
+    const nearbyCompanyId = companyIds[1]
+    const nearbyReview = (await db.query("select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1", [nearbyCompanyId])).rows[0].review
+    const mandaue = locationForCity(LOCATION_CITIES.find(city => city.name.includes("Mandaue")).code)
+    const preciseBase = { ...mandaue, coordinates: { latitude: 10.3158, longitude: 123.8855 } }
+    const reviewedCoverage = [{ scope: "city", location: codedCebu }]
+    await assert.rejects(api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [{ scope: "province", location: mandaue }] } }), /Independent cities/)
+    await api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: reviewedCoverage } })
     await commercialCommand({
       type: "auto_allocate_company",
       allocationRevision: 0,
+      plan: { companyIds: [], coverage: [] }, // An auto request cannot supply its own ranking/plan.
     })
     state = await loadState(user)
     const commercial = state.projects.find((p) => p.id === commercialId)
+    assert.deepEqual(commercial.siteLocation, preciseSite)
+    const reloadedCompany = state.companies.find(company => company.id === nearbyCompanyId)
+    assert.deepEqual(reloadedCompany.capabilityReview.operatingLocation, preciseBase)
+    assert.deepEqual(reloadedCompany.capabilityReview.serviceAreas, reviewedCoverage)
+    assert.equal(commercial.subcontractorAllocation.companyIds[0], nearbyCompanyId, "Known distance ranks before area-only fallback, across city boundaries with reviewed coverage")
+    const previewCandidates = allocationCandidates(state, commercial)
+    assert.equal(previewCandidates.find(company => company.id === nearbyCompanyId).locationIssue, "")
+    assert.ok(previewCandidates.find(company => company.id === nearbyCompanyId).proximity.distanceKm < 0.1)
     assert.equal(commercial.subcontractorAllocation.companyIds.length, 3)
     let revision = 1
     for (const id of commercial.subcontractorAllocation.companyIds) {
@@ -650,6 +668,13 @@ test(
         note: "Company accepted commercial scope",
       })
     }
+    await assert.rejects(commercialCommand({ type: "set_allocation_location", allocationRevision: revision, siteLocation: { ...preciseSite, coordinates: { latitude: 10.33, longitude: 123.89 } } }), /locked/)
+    user = await as("patricia.domingo@10builders.com")
+    await assert.rejects(api(`/projects/${commercialId}/workspace`, { method: "PUT", json: { siteLocation: { ...preciseSite, coordinates: { latitude: 10.33, longitude: 123.89 } }, docs: [] } }), /locked/, "Admin cannot bypass the contacted-site lock by moving coordinates within the same city")
+    user = await as(source.lead_email)
+    await assert.rejects(api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [] } }), /still needs this operating area/)
+    const afterContact = (await loadState(user)).projects.find(project => project.id === commercialId)
+    assert.deepEqual(afterContact.subcontractorAllocation.companyIds, commercial.subcontractorAllocation.companyIds, "Location checks do not replace contacted or accepted companies")
     const commercialDoc = randomUUID()
     await uploadFile(
       commercialDoc,

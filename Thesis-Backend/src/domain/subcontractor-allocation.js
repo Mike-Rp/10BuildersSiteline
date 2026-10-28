@@ -34,8 +34,21 @@ export function requirementsFor(phases) {
   )
 }
 const key = (row) => JSON.stringify([row.phase, row.discipline])
+// Prefer recorded distances, then area-only fallbacks, then commitments. Team
+// scores sum these nonnegative components after enforcing complete coverage;
+// unknown distances are never treated as zero kilometres.
+const preference = company => {
+  const proximity = company.proximity
+  const known = Number.isFinite(proximity?.distanceKm) && proximity.distanceKm >= 0
+  return [known ? 0 : 1, known ? proximity.distanceKm : 0, known ? 0 : proximity?.areaRank ?? 0, company.commitments]
+}
+const compareScore = (a, b) => {
+  for (let index = 0; index < a.length; index++) if (a[index] !== b[index]) return a[index] - b[index]
+  return 0
+}
+export const compareCandidatePreference = (a, b) => compareScore(preference(a), preference(b))
 const rank = (a, b) =>
-  a.commitments - b.commitments ||
+  compareCandidatePreference(a, b) ||
   a.name.localeCompare(b.name) ||
   a.id.localeCompare(b.id)
 export function buildCoverage(phases, companies) {
@@ -139,9 +152,9 @@ export function recommendTeam(type, phases, companies) {
     ...new Set(requirementsFor(phases).map((row) => row.discipline)),
   ]
   let best = null,
-    bestScore = Infinity
+    bestScore = null
   function visit(start, selected, score) {
-    if (score > bestScore || (best && score === bestScore)) return
+    if (bestScore && compareScore(score, bestScore) >= 0) return
     if (selected.length === count) {
       if (
         disciplines.some(
@@ -169,7 +182,7 @@ export function recommendTeam(type, phases, companies) {
       for (const company of [...selected].sort((a, b) => matchingCount(a) - matchingCount(b) || rank(a, b)))
         if (!reserve(company, new Set())) return
       for (const [index, company] of reserved) coverage[index].companyId = company.id
-      if (score < bestScore) {
+      if (!bestScore || compareScore(score, bestScore) < 0) {
         best = { companyIds: selected.map((c) => c.id), coverage }
         bestScore = score
       }
@@ -179,10 +192,10 @@ export function recommendTeam(type, phases, companies) {
       visit(
         i + 1,
         [...selected, candidates[i]],
-        score + candidates[i].commitments,
+        score.map((value, index) => value + preference(candidates[i])[index]),
       )
   }
-  visit(0, [], 0)
+  visit(0, [], [0, 0, 0, 0])
   if (best) validatePlan(type, phases, best, companies)
   return best
 }

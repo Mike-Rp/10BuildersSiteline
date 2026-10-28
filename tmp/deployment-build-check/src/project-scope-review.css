@@ -1,0 +1,23 @@
+.project-scope-review { font-size: 14px; color: var(--color-ink); }
+.project-scope-review header { margin-bottom: 20px; }
+.project-scope-review h3 { font-size: 22px; margin: 6px 0; }
+.project-scope-review p { line-height: 1.6; color: var(--color-muted); }
+.scope-review-columns { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 24px; margin-bottom: 20px; }
+.project-scope-review fieldset { min-width: 0; border: 0; padding: 0; margin: 0 0 22px; }
+.project-scope-review legend,.scope-phase-preview h4 { font-weight: 650; font-size: 16px; margin: 0; }
+.scope-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.scope-options label { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px; border: 1px solid var(--color-line); border-radius: 7px; cursor: pointer; overflow-wrap: anywhere; }
+.scope-options label.selected { border-color: var(--color-primary); background: #eff6ff; }
+.scope-options input,.scope-confirmation input { width: 18px; height: 18px; min-height: 18px; flex-shrink: 0; accent-color: var(--color-primary); }
+.scope-table-scroll { overflow-x: auto; }
+.scope-phase-preview table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.scope-phase-preview th,.scope-phase-preview td { padding: 9px; text-align: left; border-bottom: 1px solid var(--color-line); }
+.scope-phase-preview thead { background: #f1f5f9; }
+.scope-phase-preview tbody th { font-weight: 500; }
+.scope-phase-preview small { display: block; font-size: 14px; color: var(--color-muted); line-height: 1.5; margin-top: 4px; }
+.scope-applicability { display: inline-block; white-space: nowrap; padding: 4px 7px; border-radius: 5px; background: #f1f5f9; color: #475569; }
+.scope-applicability.included { background: #eff6ff; color: #1d4ed8; }
+.scope-not-applicable { background: #f8fafc; }
+.scope-confirmation { display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; margin: 18px 0; }
+.scope-saved-summary { padding: 14px; border: 1px solid var(--color-line); border-radius: 7px; margin: 16px 0; font-size: 14px; }
+@media(max-width: 720px) { .scope-review-columns { grid-template-columns: minmax(0,1fr); gap: 12px; } .scope-options { grid-template-columns: minmax(0,1fr); } }

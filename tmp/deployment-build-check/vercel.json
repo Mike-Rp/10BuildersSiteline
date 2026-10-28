@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci && npm --prefix Thesis-Backend ci --omit=dev",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "regions": ["sin1"],
+  "functions": {
+    "api/index.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/v1/cron/license-sweep", "schedule": "0 22 * * *" }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/:path*", "destination": "/index.html" }
+  ]
+}

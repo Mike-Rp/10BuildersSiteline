@@ -1,0 +1,125 @@
+/* Login-only presentation; password reset and workspace screens retain their styles. */
+#root .login-redesign {
+  font-family: "Inter", Arial, sans-serif;
+  min-height: 100svh;
+  padding: clamp(16px, 3vw, 48px);
+  background: #edf1f5;
+}
+#root .login-redesign .login-card {
+  max-width: 1240px;
+  min-height: 660px;
+  padding: 10px;
+  border: 1px solid #e0e6ed;
+  border-radius: 24px;
+  box-shadow: 0 20px 70px #172b4d0d;
+}
+#root .login-redesign .login-panel {
+  flex: 1 1 48%;
+  min-width: 0;
+  padding: 30px clamp(28px, 4vw, 64px) 22px;
+}
+#root .login-redesign .login-panel > :is(.login-brand, .login-content, .login-foot) {
+  width: 100%;
+  max-width: 390px;
+  margin-inline: auto;
+}
+#root .login-redesign .login-brand { color: #172b4d; }
+#root .login-redesign .brand-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #172b4d;
+  background: #eef3f8;
+  border: 1px solid #dce5ef;
+  border-radius: 11px;
+}
+#root .login-redesign .login-brand strong { font-size: 22px; }
+#root .login-redesign .login-content {
+  width: 100%;
+  max-width: 390px;
+  margin: 32px auto 0;
+  padding-block: 0 24px;
+}
+#root .login-redesign .login-heading { margin: 0 0 28px; }
+#root .login-redesign .login-heading h1 {
+  color: #172b4d;
+  font-size: clamp(26px, 2.4vw, 32px);
+  letter-spacing: -1px;
+}
+#root .login-redesign .login-heading p { margin-top: 12px; line-height: 1.7; }
+#root .login-redesign .login-form { gap: 20px; }
+#root .login-redesign .login-form input {
+  min-height: 50px;
+  border: 1px solid #c7d2df;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 16px;
+}
+#root .login-redesign .password-field input { padding-right: 70px; }
+#root .login-redesign .login-form input[aria-invalid="true"] { border-color: var(--color-danger); }
+#root .login-redesign .login-form input:focus { border-color: var(--color-steel, #315a85); }
+#root .login-redesign .password-toggle { min-width: 54px; min-height: 44px; }
+#root .login-redesign .login-help { font-size: 14px; line-height: 1.7; }
+#root .login-redesign .login-submit {
+  min-height: 50px;
+  border-radius: 8px;
+  background: #172b4d;
+  color: #fff;
+  font-weight: 600;
+}
+#root .login-redesign .login-submit:hover:not(:disabled) { background: #27486b; }
+#root .login-redesign .login-foot {
+  margin-top: 0;
+  padding-top: 18px;
+  border-top: 1px solid #e8edf3;
+}
+#root .login-redesign .login-foot p { font-size: 14px; }
+#root .login-redesign .login-info {
+  position: relative;
+  flex: 1 1 52%;
+  min-width: 0;
+  min-height: 600px;
+  overflow: hidden;
+  justify-content: space-between;
+  padding: 30px;
+  border-radius: 16px;
+  isolation: isolate;
+  background: #172b4d;
+}
+#root .login-redesign .login-photo { position: absolute; inset: 0; z-index: -2; }
+#root .login-redesign .login-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 45%; }
+#root .login-redesign .login-info::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, #0d213844 0%, #0d213800 34%, #0d2138dd 100%);
+}
+#root .login-redesign .login-photo-caption { margin-top: auto; padding-top: 260px; }
+#root .login-redesign .login-info h2 { margin: 10px 0 0; color: #fff; font-size: clamp(24px, 2.3vw, 32px); line-height: 1.25; letter-spacing: -.6px; font-weight: 600; }
+#root .login-redesign .login-banner-image { opacity: 0; transition: opacity 600ms ease; }
+#root .login-redesign .login-banner-image.is-active { opacity: 1; }
+#root .login-redesign .login-banner-brand { color: #d4e4f4; font-size: 14px; font-weight: 600; letter-spacing: .5px; }
+#root .login-redesign .login-banner-description { color: #e4edf7; font-size: 16px; line-height: 1.6; margin-top: 14px; min-height: 52px; }
+#root .login-redesign .login-banner [aria-roledescription="slide"] { min-height: 128px; }
+#root .login-redesign .login-banner-footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid #ffffff55; }
+#root .login-redesign .login-banner-indicators { display: flex; align-items: center; gap: 20px; padding: 20px 8px; }
+#root .login-redesign .login-banner-indicator { width: 24px; height: 4px; border-radius: 3px; background: #ffffff66; }
+#root .login-redesign .login-banner-indicator.is-active { background: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  #root .login-redesign .login-banner-image { transition: none; }
+}
+@media (max-width: 1000px) {
+  #root .login-redesign .login-panel { padding-inline: 24px; }
+  #root .login-redesign .login-info { padding: 24px; }
+  #root .login-redesign .login-banner [aria-roledescription="slide"] { min-height: 200px; }
+}
+@media (max-width: 760px) {
+  #root .login-redesign { padding: 16px; }
+  #root .login-redesign .login-card { flex-direction: column; max-width: 500px; min-height: 0; padding: 0; border-radius: 18px; }
+  #root .login-redesign .login-panel { flex: none; padding: 28px 24px; }
+  #root .login-redesign .login-info { display: none; }
+}
+
+#root .login-redesign .login-help a { text-decoration: underline; text-underline-offset: 3px; }

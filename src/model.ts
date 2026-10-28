@@ -306,7 +306,7 @@ export type Company = {
   primaryTrade?: string
   rosterDisciplines?: string[]
   commitmentCount?: number
-  capabilityReview?: { operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation; disciplines: string[]; unavailable: boolean; note: string; documentIds: string[]; reviewedAt: string; reviewedById: string; reviewedBy: string }
+  capabilityReview?: { operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation; serviceAreas?: import("../Thesis-Backend/src/domain/operating-location.js").ServiceArea[]; disciplines: string[]; unavailable: boolean; note: string; documentIds: string[]; reviewedAt: string; reviewedById: string; reviewedBy: string }
   id: string
   name: string
   contact: string

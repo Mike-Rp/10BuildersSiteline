@@ -1,8 +1,9 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
-import { allocationLocationIssue, locationError, normalizeLocation, sameLocation } from "../../domain/operating-location.js"
+import { allocationLocationIssue, locationError, normalizeLocation, locationProximity, normalizeServiceAreas, serviceAreasError } from "../../domain/operating-location.js"
 import {
   eligibility,
+  compareCandidatePreference,
   validatePlan,
   protectScope,
   recommendTeam,
@@ -49,7 +50,8 @@ export async function allocationContext(db, p) {
     ...c,
     disciplines: c.metadata?.capabilityReview?.disciplines || [],
     reviewed: !!c.metadata?.capabilityReview?.reviewedAt,
-    locationIssue: allocationLocationIssue(siteLocation, c.metadata?.capabilityReview?.operatingLocation),
+    locationIssue: allocationLocationIssue(siteLocation, c.metadata?.capabilityReview?.operatingLocation, c.metadata?.capabilityReview?.serviceAreas),
+    proximity: locationProximity(siteLocation, c.metadata?.capabilityReview?.operatingLocation),
     unavailable: !!c.metadata?.capabilityReview?.unavailable,
   }))
   const selections = (
@@ -194,7 +196,7 @@ export async function allocationCommand(db, p, meta, user, c) {
           scopeFor(plan, c.companyId).every((r) =>
             current.disciplines.includes(r.discipline),
           ) &&
-          (!candidates[0] || current.commitments <= candidates[0].commitments)
+          (!candidates[0] || compareCandidatePreference(current, candidates[0]) <= 0)
         )
           return
         if (!candidates.length)
@@ -203,7 +205,7 @@ export async function allocationCommand(db, p, meta, user, c) {
           )
         proposed = replaceCompany(plan, c.companyId, candidates[0].id)
       } else
-        proposed = c.plan || recommendTeam(ctx.type, ctx.phases, ctx.companies)
+        proposed = c.type === "auto_allocate_company" ? recommendTeam(ctx.type, ctx.phases, ctx.companies) : c.plan
       if (!proposed)
         fail(
           "No complete eligible team is available. Review company capabilities in the Site PM workspace or request another company.",
@@ -368,6 +370,7 @@ export async function validateAllocationActivation(db, p, meta, command) {
 export async function saveCapabilityReview(db, user, id, review) {
   if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can edit company capability reviews.")
   if (review?.operatingLocation !== undefined && locationError(review.operatingLocation)) throw new HttpError(400, locationError(review.operatingLocation))
+  if (serviceAreasError(review?.serviceAreas)) throw new HttpError(400, serviceAreasError(review.serviceAreas))
   if (
     !review ||
     !Array.isArray(review.disciplines) ||
@@ -414,7 +417,8 @@ export async function saveCapabilityReview(db, user, id, review) {
     )
   ).rows
   const operatingLocation = review.operatingLocation === undefined ? metadata.capabilityReview?.operatingLocation : normalizeLocation(review.operatingLocation)
-  if (scopes.some(row => row.plan && !locationError(row.location) && !sameLocation(row.location, operatingLocation)))
+  const serviceAreas = normalizeServiceAreas(review.serviceAreas === undefined ? metadata.capabilityReview?.serviceAreas : review.serviceAreas)
+  if (scopes.some(row => row.plan && !locationError(row.location) && allocationLocationIssue(row.location, operatingLocation, serviceAreas)))
     fail("A contacted or accepted project still needs this operating area. Resolve the project commitment before changing it.")
   if (
     scopes.some((row) =>
@@ -428,6 +432,7 @@ export async function saveCapabilityReview(db, user, id, review) {
     )
   metadata.capabilityReview = {
     ...(operatingLocation ? { operatingLocation } : {}),
+    serviceAreas,
     disciplines: review.disciplines,
     unavailable: review.unavailable,
     note: review.note.trim(),

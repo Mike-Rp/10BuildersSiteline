@@ -323,6 +323,55 @@ test("capability review is read-only for Admin, Office PM and clients even when 
     assert.equal(saves, 0)
   })
 })
+test("Site PM confirms operating-base coordinates and additional coverage only when saving a supported review", async () => {
+  await withUi(async ({ React, root, server, w, button, click }) => {
+    const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
+    const company = { ...fixture().companies[0], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
+    company.capabilityReview = { ...company.capabilityReview, serviceAreas: [], documentIds: ["proof"], note: "Confirmed crew base and service coverage from company records." }
+    let saved
+    await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "spm", onSave: async review => { saved = review } })))
+    const setValue = (element, value) => React.act(() => {
+      const proto = element.tagName === "SELECT" ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(element, value)
+      element.dispatchEvent(new w.Event(element.tagName === "SELECT" ? "change" : "input", { bubbles: true }))
+    })
+    await setValue(document.querySelector('[aria-label="Operating latitude"]'), "10.3157")
+    await setValue(document.querySelector('[aria-label="Operating longitude"]'), "123.8854")
+    assert.match(document.querySelector('.capability-summary').textContent, /Unsaved changes/)
+    await setValue(document.querySelector('[aria-label="Additional service areas"] select'), "region")
+    await click(button("Add reviewed area"))
+    assert.equal(saved, undefined, "Adding coverage does not implicitly save or verify it")
+    assert.equal(document.querySelectorAll('.service-area-row').length, 1)
+    await click(button("Save verified capabilities"))
+    assert.deepEqual(saved.operatingLocation.coordinates, { latitude: 10.3157, longitude: 123.8854 })
+    assert.equal(saved.serviceAreas[0].scope, "region")
+    assert.match(saved.serviceAreas[0].location.region, /Central Visayas/)
+    assert.equal(saved.serviceAreas[0].location.coordinates, undefined)
+    assert.equal(company.capabilityReview.serviceAreas.length, 0, "Local editing does not mutate the source record")
+    await click(button("Remove"))
+    assert.equal(document.querySelectorAll('.service-area-row').length, 0)
+  })
+})
+
+test("allocation displays measured distance and area fallback in previews and manual choices", async () => {
+  await withUi(async ({ React, root, server, button, click }) => {
+    const { default: Panel } = await server.ssrLoadModule("/src/TradeAllocationPanel.tsx")
+    const state = fixture(), project = currentProject(state)
+    project.siteLocation = { ...project.siteLocation, coordinates: { latitude: 10.3157, longitude: 123.8854 } }
+    state.companies[0].capabilityReview.operatingLocation = { ...project.siteLocation, coordinates: { latitude: 10.3167, longitude: 123.8864 } }
+    const props = { state, project, actor: state.accounts.find(a => a.id === "a4"), onAction() { throw Error("Preview must not save") }, onNewCompany() {}, onPreview() {}, onActivated() {}, onOpenActive() {} }
+    await React.act(() => root.render(React.createElement(Panel, props)))
+    const preview = document.querySelector('.allocation-proximity-preview')
+    assert.ok(preview)
+    assert.match(preview.textContent, /km straight-line/)
+    assert.match(preview.textContent, /Distance unavailable.*Area fallback/)
+    await click(button("Choose companies manually"))
+    const choices = document.querySelector('[role="dialog"] .trade-checks')
+    assert.match(choices.textContent, /km straight-line/)
+    assert.match(choices.textContent, /Distance unavailable/)
+  })
+})
+
 async function withUi(run) {
   const [{ JSDOM }, { createServer }, React] = await Promise.all([
     import("jsdom"),

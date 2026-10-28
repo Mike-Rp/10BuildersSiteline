@@ -102,7 +102,7 @@ for (const label of navLabels) {
   if(document.querySelector('.client-portal .intake-tabs, .client-portal .intake-next')) problems.push('Client received internal intake guidance')
   if (label === "Dashboard" && document.querySelector('.project-progress, .chart-summary')) problems.push('Retired dashboard schedule chart remains')
   if (label === "Dashboard" && document.querySelector('.admin-overview')) {
-    if (document.querySelectorAll('.ao-metric').length !== 3) problems.push('Administrator dashboard totals are duplicated')
+    if (document.querySelectorAll('.executive-summary').length !== 1 || document.querySelectorAll('.executive-metric').length !== 4) problems.push('Administrator executive summary totals are missing or duplicated')
     if (document.querySelector('.admin-overview table, .admin-overview .attention-strip, .admin-overview .pipeline-panel')) problems.push('Duplicate dashboard project or pipeline content remains')
     const item = document.querySelector('.ao-task')
     if (item) {
