@@ -21,6 +21,10 @@ Run the processes separately with `npm run dev:web` and `npm run dev:api`. Check
 
 ## Accounts and optional test records
 
+Office PMs, Site PMs and Clients sign in at `/login` (also the signed-out `/` page). Administrators use `/admin/login`. A secondary button below each login form switches to the other sign-in page. Successful sessions use `/admin` for administrators and `/` for other roles, and sign-out returns to the appropriate login page.
+
+Deploy the frontend and Express backend together. Regular sign-in posts to `/api/v1/auth/login`, and administrator sign-in posts to `/api/v1/auth/admin/login`. Both validate the account's database role before issuing or replacing a session, share failed-login throttling, and preserve password recovery and first-login password changes. This change needs no database migration.
+
 Accounts must exist in the selected database. The app does not create demo accounts during login. In the optional demo seed, Patricia's login is `patricia.domingo@10builders.com` / `Password@123`; other databases may contain different accounts.
 
 For a disposable empty development database, `supabase/seed/dummy-data.sql` supplies the small connected demo. It replaces its demo records and refuses non-demo users. For the larger additive dataset, see [BULK-TEST-DATA.md](BULK-TEST-DATA.md): 5,000 workers, five companies, 50 admins, 120 OPMs, 120 SPMs and 50 linked projects. Neither seed is run automatically.

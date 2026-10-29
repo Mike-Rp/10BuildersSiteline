@@ -6,8 +6,8 @@ const slides = [
   { image: "documents", label: "Document management", description: "Access the plans, reports, and documents available to your account." },
 ]
 
-export default function LoginBanner() {
-  const [active, setActive] = useState(0)
+export default function LoginBanner({ background = false }: { background?: boolean }) {
+  const [active, setActive] = useState(background ? 1 : 0)
   const [visible, setVisible] = useState(true)
   const [desktop, setDesktop] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -17,7 +17,7 @@ export default function LoginBanner() {
     const wide = window.matchMedia("(min-width: 761px)")
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)")
     const sync = () => {
-      setDesktop(wide.matches)
+      setDesktop(background || wide.matches)
       setReducedMotion(reduced.matches)
       setVisible(!document.hidden)
     }
@@ -30,7 +30,7 @@ export default function LoginBanner() {
       reduced.removeEventListener("change", sync)
       document.removeEventListener("visibilitychange", sync)
     }
-  }, [])
+  }, [background])
 
   useEffect(() => {
     if (!desktop || reducedMotion || !visible) return
@@ -39,23 +39,23 @@ export default function LoginBanner() {
   }, [desktop, reducedMotion, visible])
 
   const slide = slides[active]
+  const photos = slides.map((item, index) => (
+    <picture key={item.image} className={`login-photo login-banner-image${index === active ? " is-active" : ""}`} aria-hidden="true">
+      {!background && <source media="(max-width: 760px)" srcSet="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" />}
+      <img src={`/images/login-${item.image}-1120.webp`}
+        srcSet={`/images/login-${item.image}-720.webp 720w, /images/login-${item.image}-1120.webp 1120w`}
+        sizes={background ? "100vw" : "(max-width: 1200px) 50vw, 640px"}
+        width="1120" height="1400" alt="" decoding="async" />
+    </picture>
+  ))
+  if (background) return <div className="admin-login-background" aria-hidden="true">{photos}</div>
   return (
     <aside
       className="login-info login-banner"
       aria-label="Explore SITELINE"
       aria-roledescription="carousel"
     >
-      {slides.map((item, index) => (
-        <picture key={item.image} className={`login-photo login-banner-image${index === active ? " is-active" : ""}`} aria-hidden="true">
-          <source media="(max-width: 760px)" srcSet="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" />
-          <img
-            src={`/images/login-${item.image}-1120.webp`}
-            srcSet={`/images/login-${item.image}-720.webp 720w, /images/login-${item.image}-1120.webp 1120w`}
-            sizes="(max-width: 1200px) 50vw, 640px"
-            width="1120" height="1400" alt="" decoding="async"
-          />
-        </picture>
-      ))}
+      {photos}
       <div className="login-photo-caption">
         <p className="login-banner-brand">SITELINE · 10 Builders</p>
         <div role="group" aria-roledescription="slide" aria-label={`${active + 1} of ${slides.length}`} aria-live="off">

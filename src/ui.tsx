@@ -16,6 +16,7 @@ export function Icon({ name, size = 20 }: {
   size?: number
 }) {
   const paths: Record<string, ReactNode> = {
+    lock: (<><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>),
     grid: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1.3" />

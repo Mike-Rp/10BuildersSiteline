@@ -5,6 +5,14 @@ import { execFileSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
+test("the approved company logo ships as real PNG bytes without LFS", async () => {
+  const path="public/images/10-builders-logo.png"
+  const bytes=await readFile(new URL(`../${path}`,import.meta.url))
+  assert.equal(bytes.subarray(1,4).toString(),"PNG")
+  const attributes=execFileSync("git",["check-attr","filter","text","--",path],{cwd:root,encoding:"utf8"})
+  assert.match(attributes,/filter: unset/)
+  assert.match(attributes,/text: unset/)
+})
 
 test("login banners remain real WebP files in deployments without Git LFS", async () => {
   for (const slide of ["construction", "teams", "documents"]) {

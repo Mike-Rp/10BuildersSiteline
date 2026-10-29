@@ -95,7 +95,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
 
   const asUser = async (email) => {
     setToken("")
-    const user = await login(email, "Password@123", true) // test role switches explicitly replace the earlier session
+    const role = (await db.query("select r.code from users u join roles r on r.id=u.role_id where lower(u.email::text)=lower($1)", [email])).rows[0]?.code
+    const user = await login(email, "Password@123", true, role === "admin" ? "admin" : "workspace") // test role switches explicitly replace the earlier session
     return { user, state: await loadState(user) }
   }
   const names = (state) => state.projects.map((p) => p.name).sort()
@@ -654,12 +655,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(!reset.temp_password.toLowerCase().includes("santos"))
     const secondReset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
     assert.notEqual(secondReset.temp_password, reset.temp_password)
-    await assert.rejects(login("santos.juan@10builders.com", reset.temp_password))
+    await assert.rejects(login("santos.juan@10builders.com", reset.temp_password, false, "admin"), /Invalid credentials/)
     await asUser("patricia.domingo@10builders.com") // the rejected login cleared the admin session token
     assert.equal((await api("/accounts/password-reset-requests")).some(r => r.id === saved.id), false)
     setToken("")
-    await assert.rejects(login("santos.juan@10builders.com", "Password@123"))
-    const target = await login("santos.juan@10builders.com", secondReset.temp_password)
+    await assert.rejects(login("santos.juan@10builders.com", "Password@123", false, "admin"), /Invalid credentials/)
+    const target = await login("santos.juan@10builders.com", secondReset.temp_password, false, "admin")
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
@@ -669,7 +670,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const template=state.accounts.find(a=>a.id===user.id)
     const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",email:"resignation.admin@example.test",docs:[]},false,"Password@123")
-    const invited=await login("resignation.admin@example.test","Password@123")
+    const invited=await login("resignation.admin@example.test","Password@123",false,"admin")
     assert.equal(invited.temp_password_issued,true)
     await assert.rejects(api("/auth/reset-password",{method:"POST",json:{password:"short"}}),/8 to 72/)
     await api("/auth/reset-password",{method:"POST",json:{password:"NewPassword@123"}})
@@ -679,7 +680,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,new File(["%PDF-1.4\nResignation letter"],"resignation.pdf",{type:"application/pdf"}))
     await api("/accounts/"+saved.id+"/resignation",{method:"POST",json:{noticeDays:0,letter:{id,name:"resignation.pdf"}}})
     assert.equal((await loadState(user)).accounts.find(a=>a.id===saved.id).status,"deactivated")
-    await assert.rejects(login("resignation.admin@example.test","NewPassword@123"),/Invalid credentials/)
+    await assert.rejects(login("resignation.admin@example.test","NewPassword@123",false,"admin"),/Invalid credentials/)
     ;({user,state}=await asUser("patricia.domingo@10builders.com"))
     await api("/workspace/preferences",{method:"POST",json:{muted:["notice"]}})
     assert.deepEqual((await loadState(user)).muted,["notice"])

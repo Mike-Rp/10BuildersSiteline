@@ -36,6 +36,7 @@ import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import { currentLoginPortal, type LoginPortal } from "./login-portal"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -312,7 +313,24 @@ function AppInner() {
     destructive?: boolean
   }>()
   const [signedOut, setSignedOut] = useState(true)
+  const [loginPortal, setLoginPortal] = useState<LoginPortal>(currentLoginPortal)
+  useEffect(() => {
+    const changed = () => setLoginPortal(currentLoginPortal())
+    window.addEventListener("popstate", changed)
+    return () => window.removeEventListener("popstate", changed)
+  }, [])
+  useEffect(() => {
+    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : "SITELINE | 10 Builders"
+  }, [loginPortal])
   const navigation = useSidebarNavigation(!signedOut && actor.role === "admin")
+  useEffect(() => {
+    if (signedOut) return
+    const portal = actor.role === "admin" ? "admin" : "workspace"
+    if (portal !== loginPortal) {
+      window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
+      setLoginPortal(portal)
+    }
+  }, [signedOut, actor.role, loginPortal])
   const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
   const [sessionMessage, setSessionMessage] = useState("")
   const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
@@ -597,6 +615,11 @@ function AppInner() {
       stateRef.current = loaded
       setState(loaded)
       setReadinessAvailable(true)
+      const portal = account.role === "admin" ? "admin" : "workspace"
+      if (currentLoginPortal() !== portal || /\/login\/?$/i.test(window.location.pathname)) {
+        window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
+      }
+      setLoginPortal(portal)
       return account
     } finally {
       setLoadingWorkspaceRole(undefined)
@@ -606,7 +629,7 @@ function AppInner() {
     const account: Account = await guardedSignIn(signInAttempts,email,async()=>{
     let user: Awaited<ReturnType<typeof apiLogin>>
     try {
-      user = await apiLogin(email, password, replaceSession)
+      user = await apiLogin(email, password, replaceSession, loginPortal)
     } catch (error) {
       if (error instanceof ApiError && error.code === "ACCOUNT_ALREADY_SIGNED_IN") throw error
       throw new Error(
@@ -644,6 +667,9 @@ function AppInner() {
     }
   }
   function endSession() {
+    const portal = currentLoginPortal()
+    window.history.replaceState(null, "", portal === "admin" ? "/admin/login" : "/login")
+    setLoginPortal(portal)
     clearSession()
     setSelectedNotification(undefined)
     setWelcomeGreeting(undefined)
@@ -2759,7 +2785,7 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
+    return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)

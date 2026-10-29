@@ -197,7 +197,8 @@ test(
     }
     async function as(email) {
       setToken("")
-      return login(email, "Password@123", true)
+      const role = (await db.query("select r.code from users u join roles r on r.id=u.role_id where lower(u.email::text)=lower($1)", [email])).rows[0]?.code
+      return login(email, "Password@123", true, role === "admin" ? "admin" : "workspace")
     }
     let user = await as("patricia.domingo@10builders.com")
     const historicalLocation = { region: "Old recorded region", province: "Old recorded province", city: "Old recorded city" }

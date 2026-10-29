@@ -1,4 +1,5 @@
 import { resolveApiBase } from "./base.ts"
+import { currentLoginPortal, type LoginPortal } from "../login-portal.ts"
 
 // The backend is required. Missing configuration never enables demo data.
 let base = resolveApiBase(import.meta.env?.VITE_API_URL, Boolean(import.meta.env?.PROD))
@@ -148,7 +149,7 @@ export async function apiList<T = Record<string, any>>(
   return out
 }
 
-export async function login(email: string, password: string, replaceSession = false) {
+export async function login(email: string, password: string, replaceSession = false, portal: LoginPortal = currentLoginPortal()) {
   const data = await api<{
     token: string
     user: {
@@ -159,7 +160,7 @@ export async function login(email: string, password: string, replaceSession = fa
       status: string
       temp_password_issued: boolean
     }
-  }>("/auth/login", { method: "POST", json: { email: email.trim(), password, ...(replaceSession ? { replace_session: true } : {}) } })
+  }>(portal === "admin" ? "/auth/admin/login" : "/auth/login", { method: "POST", json: { email: email.trim(), password, ...(replaceSession ? { replace_session: true } : {}) } })
   setToken(data.token)
   return data.user
 }

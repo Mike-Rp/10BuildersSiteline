@@ -9,7 +9,10 @@ import { authenticate } from "../../common/utilities/auth.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError,sendOk,sendError,handleError,requireUser } from "../../common/utilities/access.utility.js";
 
-export const login = async (req,res) => {
+export const login = (req,res) => signIn(req,res,false);
+export const adminLogin = (req,res) => signIn(req,res,true);
+
+async function signIn(req,res,adminOnly) {
   try {
     const {email,password}=req.body || {};
     if(typeof email!=="string" || !email.trim() || typeof password!=="string" || !password) {
@@ -25,6 +28,8 @@ export const login = async (req,res) => {
       if(!u || !["active","invited"].includes(u.status) || !(await bcrypt.compare(password,u.password_hash))) {
         throw new HttpError(401,"Invalid credentials or unavailable account.");
       }
+      const permitted = adminOnly ? u.role === "admin" : ["opm","spm","client"].includes(u.role);
+      if(!permitted) throw new HttpError(403,"This account cannot sign in through this page. Use the correct sign-in page.","LOGIN_PORTAL_MISMATCH");
       if(u.role==="client" && u.status==="invited") {
         const ready=await client.query(
           `SELECT 1 FROM user_client_project_links l JOIN projects p ON p.id=l.project_id
@@ -52,7 +57,7 @@ export const login = async (req,res) => {
     });
     return sendOk(res,"Login successful.",1,data);
   } catch(error) { return handleError(res,error); }
-};
+}
 
 export const refresh = async (req, res) => {
   try {

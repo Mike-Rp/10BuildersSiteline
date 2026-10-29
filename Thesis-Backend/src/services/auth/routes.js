@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { login, refresh, reset, logout } from "./controller.js";
+import { login, adminLogin, refresh, reset, logout } from "./controller.js";
 const router = Router();
+router.post('/admin', adminLogin);
 
 
 router.post('/', async (req, res) => {

@@ -2,6 +2,7 @@ import { api, ApiError } from "./api/client"
 import { useState, type FormEvent } from "react"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import type { Role } from "./model"
+import type { LoginPortal } from "./login-portal"
 import { Button, Field, Icon, Modal } from "./ui"
 import { SIGN_IN_MESSAGES, validateSignInFields } from "./signInPolicy"
 import "./login-page.css"
@@ -11,11 +12,13 @@ export default function LoginPage({
   checkingSession = false,
   workspaceRole,
   sessionMessage,
+  portal = "workspace",
   onSignIn,
 }: {
   checkingSession?: boolean
   workspaceRole?: Role
   sessionMessage?: string
+  portal?: LoginPortal
   onSignIn: (email: string, password: string, replaceSession?: boolean) => Promise<void>
 }) {
   const [resetOpen, setResetOpen] = useState(false)
@@ -39,6 +42,7 @@ export default function LoginPage({
   const [touched, setTouched] = useState({ email: false, password: false })
   const [submitted, setSubmitted] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
+  const admin = portal === "admin"
   // Field errors appear on submit and when a field is left (blur).
   const fieldErrors = validateSignInFields(email, password)
   const emailError =
@@ -89,7 +93,8 @@ export default function LoginPage({
     setDeviceNotice("Your current device will stay signed in.")
   }
   return (
-    <main className="login-page login-redesign">
+    <main className={`login-page login-redesign${admin ? " admin-login" : ""}`}>
+      {admin && <LoginBanner background />}
       {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
         <p>Your account is already logged in on another device.</p>
         <p className="subsection">Choose where you want to continue. Logging in on this device will sign out the other device.</p>
@@ -130,25 +135,26 @@ export default function LoginPage({
       <div className="login-card">
         <section className="login-panel" aria-label="Log in">
           <div className="login-brand">
-            <span className="brand-mark">
-              <Icon name="building" size={28} />
+            <span className="brand-mark company-logo-mark">
+              <img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="50" height="76" />
             </span>
             <span>
               <strong>SITELINE</strong>
-              <small>10 Builders</small>
+              <small>10 Builders and Development Corporation</small>
             </span>
           </div>
 
           <div className="login-content">
+            {admin && <div className="admin-access-badge"><Icon name="shield" size={16} />Administrator access</div>}
             <div className="login-heading">
-              <h1>Welcome to SITELINE</h1>
-              <p>Enter the work email and password issued by your administrator.</p>
+              <h1>{admin ? "Administrator sign-in" : "Welcome to SITELINE"}</h1>
+              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : "Enter the work email and password issued by your administrator."}</p>
             </div>
 
             <form className="login-form" onSubmit={submit} noValidate>
               {(deviceNotice || sessionMessage) && <p className="notice" role="status">{deviceNotice || sessionMessage}</p>}
               <Field
-                label="Work Email"
+                label={admin ? "Administrator email" : "Work Email"}
                 error={emailError ? `⚠ ${emailError}` : undefined}
               >
                 <input
@@ -158,7 +164,7 @@ export default function LoginPage({
                   spellCheck={false}
                   // "username" is the standard token that lets password managers fill the sign-in identifier, which is an email here.
                   autoComplete="username"
-                  placeholder="name@10builders.com"
+                  placeholder={admin ? "admin@10builders.com" : "name@10builders.com"}
                   value={email}
                   disabled={loading || checkingSession}
                   onChange={(event) => {
@@ -217,7 +223,7 @@ export default function LoginPage({
                 </small>
               )}
               <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>{admin ? "Need help signing in?" : "Forgot password?"}</a>
               </p>
               {error && (
                 <div className="login-error" role="alert">
@@ -234,14 +240,19 @@ export default function LoginPage({
                   ? "Checking session…"
                   : loading
                     ? "Signing in…"
-                    : "Log In"}
+                    : admin ? "Sign in to administration" : "Log In"}
               </Button>
             </form>
+            <a className="button login-portal-switch" href={admin ? "/login" : "/admin/login"}>
+              <Icon name={admin ? "home" : "shield"} size={18} />
+              {admin ? "Back to regular sign-in" : "Administrator sign-in"}
+            </a>
+            {admin && <p className="admin-restricted-note"><Icon name="lock" size={15} /><span>Restricted to authorized 10 Builders administrators.</span></p>}
           </div>
 
         </section>
 
-        <LoginBanner />
+        {!admin && <LoginBanner />}
       </div>
     </main>
   )

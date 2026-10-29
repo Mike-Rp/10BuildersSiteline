@@ -49,6 +49,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         await act(async () => { root.render(React.createElement(App, { key: `${role}-${mobile}` })); await new Promise(resolve => setTimeout(resolve, 25)) })
         for (let n = 0; n < 100 && !document.querySelector('.sidebar [aria-label="Sign out"]'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
         assert.ok(!!document.querySelector('.sidebar [aria-label="Sign out"]'), `Missing exit for ${role}, mobile=${mobile}`)
+        assert.equal(w.location.pathname.startsWith('/admin'), role === 'admin', 'restored sessions use the portal for the verified account role')
         const baseline = logoutCalls()
         async function requestSignOut() {
           const toggle = document.querySelector(".sidebar-toggle, .mobile-menu")
@@ -85,6 +86,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(logoutCalls(), baseline + 1, "confirm sends exactly one logout request")
         assert.equal(client.getToken(), "")
         assert.ok(!!document.querySelector("form.login-form"), `Confirmed ${role} logout must return to login`)
+        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : '/login')
+        assert.equal(!!document.querySelector('.admin-access-badge'), role === 'admin')
         await act(() => root.render(null))
       }
     }

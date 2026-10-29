@@ -1,5 +1,6 @@
 {
-  "title": "sitelineui",
+  "title": "SITELINE | 10 Builders",
+  "icons": { "icon": "/images/10-builders-logo.png" },
   "description": "Manage construction projects efficiently with role-based access for administrators, project managers, and clients, ensuring seamless coordination and progress tracking.",
   "robots": {
     "index": false
