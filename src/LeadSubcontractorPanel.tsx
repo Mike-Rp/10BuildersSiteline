@@ -375,19 +375,19 @@ function LegacyLeadSubcontractorPanel({
             <Button
               variant="primary"
               icon="doc"
-              disabled={!clientAgreement}
+              disabled={!clientAgreement && !project.clientSubconCompany}
               onClick={() => setAgreementOpen(true)}
             >
-              View Agreement
+              {project.clientSubconCompany ? "View company details" : "View Agreement"}
             </Button>
-            {!clientAgreement && (
+            {!clientAgreement && !project.clientSubconCompany && (
               <small className="role-muted">
                 Agreement missing. Ask Admin to correct the record.
               </small>
             )}
           </div>
           <small className="role-muted">
-            The company and agreement are locked. You cannot edit, replace or
+            The company details are locked. You cannot edit, replace or
             archive them.
           </small>
         </section>

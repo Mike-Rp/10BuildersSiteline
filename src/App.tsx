@@ -32,7 +32,7 @@ import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
-import { persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow, createCompany } from "./api/actions"
+import { persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import MonthlyReport from "./MonthlyReport"
@@ -89,7 +89,6 @@ import {
 import {
   AccountDeactivationForm,
   AccountForm,
-  CompanyForm,
   DocumentList,
   downloadBlob,
   downloadDoc,
@@ -1769,15 +1768,7 @@ function AppInner() {
         <>
           {pageHeading(
             "Directory",
-            directoryTab === "subcontractors" ? (
-              <Button
-                variant="primary"
-                icon="plus"
-                onClick={() => setDialog({ kind: "add-company" })}
-              >
-                Add Company
-              </Button>
-            ) : undefined,
+            undefined,
           )}
           {pageTabs(
             "Directory sections",
@@ -3226,22 +3217,6 @@ function AppInner() {
           onClose={() => setDialog(undefined)}
         >
           {companyDetails(selectedCompany)}
-        </Modal>
-      )}
-      {dialog?.kind === "add-company" && (
-        <Modal
-          title="Add subcontractor company"
-          wide
-          onClose={() => setDialog(undefined)}
-        >
-          <CompanyForm
-            owner={admin.name}
-            onClose={() => setDialog(undefined)}
-            onSave={async(company)=>{
-              try{const saved=await createCompany(company);await reloadWorkspace();setDialog({kind:"company",id:saved.id});setToast("Company added")}
-              catch(error){setToast((error as Error).message)}
-            }}
-          />
         </Modal>
       )}
       {dialog?.kind === "search" && (

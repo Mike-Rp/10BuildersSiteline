@@ -2800,14 +2800,14 @@ export default function RoleWorkspace({
       <>
         {header(
           "Subcontractor directory",
-          <Button
+          !isOpm ? <Button
             icon="plus"
             variant="primary"
             disabled={saving}
             onClick={() => setDialog({ kind: "new-company" })}
           >
             Suggest Company
-          </Button>,
+          </Button> : undefined,
         )}
         <ListSection
           list={directoryList}
@@ -3902,7 +3902,7 @@ export default function RoleWorkspace({
           {companyDetail(company)}
         </Modal>
       )}
-      {dialog?.kind === "new-company" && (
+      {actor.role === "spm" && dialog?.kind === "new-company" && (
         <Modal
           title="Suggest a subcontractor company"
           subtitle="Company approval is separate from project acceptance."

@@ -187,6 +187,7 @@ export async function saveApiProject(project: Project, existing: boolean) {
         suggested_opm_id: project.opmId, crew_required: headcount(project.type, project.area, project.floors,
           project.team.map(row => ({name: row.phase, disciplines: projectPhaseDisciplines(project,row.phase)}))).total,
         ...(project.phaseScope ? {phase_scope: project.phaseScope} : {}),
+        ...(project.clientSubconCompany ? { client_subcon_company: project.clientSubconCompany } : {}),
         phase_team: project.team.map((t, index) => ({ stage: t.phase, user_id: t.accountId, is_lead: index === 0 })),
         ...(existing ? { draft_project_id: project.id } : { intake_id: project.id }),
     });

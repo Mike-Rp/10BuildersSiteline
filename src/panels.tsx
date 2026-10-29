@@ -1,3 +1,4 @@
+import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
@@ -21,7 +22,7 @@ import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
-import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, companyRegistrationErrors, normalizeCompanyForemen, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { companyRegistrationErrors, normalizeCompanyForemen, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
 import "./company-foremen.css"
 import { EXPERIENCE_PROJECT_TYPES, normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
@@ -1113,7 +1114,7 @@ export function IntakeForm({
   const [submitting, setSubmitting] = useState(false)
   const submitGuard = useRef(false)
   const [ownSubcon, setOwnSubcon] = useState(!!project?.clientSubcon)
-  const [agreementPreview, setAgreementPreview] = useState<Doc>()
+
   const [draft, setDraft] = useState<Project>(
     project
       ? { ...project, team: project.team.map((t) => ({ ...t })) }
@@ -1257,22 +1258,11 @@ export function IntakeForm({
       )
     )
       err = "Upload and confirm the signed Client Contract Agreement."
-    if (ownSubcon) {
-      if (!draft.clientSubcon?.trim())
-        err = "Enter the subcontractor company name."
-      else if (
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          draft.clientSubconEmail?.trim() || "",
-        )
-      )
-        err = "Enter a valid email address for the client subcontractor."
-      else if (
-        !draft.docs.some(
-          (d) => d.label === "Client & Subcontractor Agreement" && d.uploaded,
-        )
-      )
-        err = "Upload and confirm the Client–Subcontractor Agreement."
+    if (ownSubcon && (!project || draft.clientSubconCompany)) {
+      const errors = companyRegistrationErrors(clientCompany)
+      if (Object.keys(errors).length) err = Object.values(errors)[0] as string
     }
+
     if (
       !opmCandidates(state, draft.type, draft.id, draft.excludedOpms).some(
         (a) => a.id === draft.opmId,
@@ -1299,9 +1289,10 @@ export function IntakeForm({
         ...draft,
         status: "pending",
         opmAccepted: false,
-        clientSubcon: ownSubcon ? draft.clientSubcon?.trim() : undefined,
+        clientSubconCompany: ownSubcon && (!project || draft.clientSubconCompany) ? { ...clientCompany, foremen: normalizeCompanyForemen(clientCompany), name: clientCompany.name.trim(), email: clientCompany.email.trim().toLowerCase() } : undefined,
+        clientSubcon: ownSubcon ? clientCompany.name.trim() : undefined,
         clientSubconEmail: ownSubcon
-          ? draft.clientSubconEmail?.trim()
+          ? clientCompany.email.trim().toLowerCase()
           : undefined,
         team: draft.team.map((t) => ({ ...t, status: "pending" })),
       })
@@ -1316,9 +1307,8 @@ export function IntakeForm({
   const assignedSitePms = new Set(
     draft.team.map((row) => row.accountId).filter(Boolean),
   ).size
-  const clientSubconAgreement = draft.docs.find(
-    (doc) => doc.label === "Client & Subcontractor Agreement" && doc.uploaded,
-  )
+  const clientCompany = draft.clientSubconCompany || { name: draft.clientSubcon || "", email: draft.clientSubconEmail || "", foremen: [{ name: "", phone: "" }, { name: "", phone: "" }], contact: "", phone: "", note: "", availability: "available" as const, documents: [] as Doc[] }
+  const patchClientCompany = (values: Partial<Company>) => patch({ clientSubconCompany: { ...clientCompany, ...values }, clientSubcon: values.name ?? clientCompany.name, clientSubconEmail: values.email ?? clientCompany.email })
   const projectTypeError =
     step === "details" && !draft.type && error
       ? "Select a project type to generate allocation."
@@ -1729,74 +1719,10 @@ export function IntakeForm({
             </label>
             {ownSubcon && (
               <div className="subcontractor-agreement">
-                <div className="client-subcon-fields">
-                  <Field label="Subcontractor Company Name *">
-                    <input
-                      required
-                      disabled={!!project}
-                      value={draft.clientSubcon || ""}
-                      onChange={(e) => patch({ clientSubcon: e.target.value })}
-                      placeholder="Enter registered company name"
-                    />
-                  </Field>
-                  <Field label="Subcontractor Email *">
-                    <input
-                      required
-                      type="email"
-                      disabled={!!project}
-                      value={draft.clientSubconEmail || ""}
-                      onChange={(e) =>
-                        patch({ clientSubconEmail: e.target.value })
-                      }
-                      placeholder="name@company.com"
-                    />
-                  </Field>
-                </div>
-                <p>This company is locked to the project after submission.</p>
-                <div className="client-subcon-upload">
-                  <div>
-                    <strong>Client–Subcontractor Agreement *</strong>
-                    <p>PDF, JPG or PNG · Maximum 10 MB</p>
-                  </div>
-                  {clientSubconAgreement ? (
-                    <div className="client-subcon-file">
-                      <span className="file-icon">
-                        <Icon name="doc" size={18} />
-                      </span>
-                      <span>
-                        <strong>{clientSubconAgreement.name}</strong>
-                        <small>
-                          Uploaded {dateLabel(clientSubconAgreement.date)}
-                        </small>
-                      </span>
-                      <Badge tone="green">Validated</Badge>
-                      <Button
-                        variant="icon-button"
-                        icon="eye"
-                        aria-label="Preview Client–Subcontractor Agreement"
-                        onClick={() =>
-                          setAgreementPreview(clientSubconAgreement)
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <Upload
-                      label="Client & Subcontractor Agreement"
-                      buttonLabel="Upload agreement"
-                      onSave={(doc) =>
-                        patch({
-                          docs: [
-                            ...draft.docs.filter(
-                              (item) =>
-                                item.label !==
-                                "Client & Subcontractor Agreement",
-                            ),
-                            doc,
-                          ],
-                        })
-                      }
-                    />
-                  )}
+                <CompanyRegistrationFields draft={clientCompany} patch={patchClientCompany} busy={!!project || submitting} />
+                <div className="form-grid">
+                  <Field label="Company availability" hint="This company is reserved for this project after submission."><input readOnly value="Available" /></Field>
+                  <Field label="Company notes" wide><textarea disabled={!!project || submitting} value={clientCompany.note} onChange={event => patchClientCompany({ note: event.target.value })} /></Field>
                 </div>
               </div>
             )}
@@ -1846,13 +1772,7 @@ export function IntakeForm({
           />
         </Modal>
       )}
-      {agreementPreview && (
-        <Preview
-          doc={agreementPreview}
-          downloadable={false}
-          onClose={() => setAgreementPreview(undefined)}
-        />
-      )}
+
     </>
   )
 }
@@ -2005,10 +1925,6 @@ export function CompanyForm({
     })
     setError("")
   }
-  const patchForeman = (index: number, values: Partial<{ name: string; phone: string }>) => {
-    const foremen = (draft.foremen || [{ name: "", phone: "" }, { name: "", phone: "" }]).map((foreman, position) => position === index ? { ...foreman, ...values } : foreman)
-    patch({ foremen, contact: foremen[0].name, phone: foremen[0].phone })
-  }
   return (
     <form
       noValidate
@@ -2034,45 +1950,7 @@ export function CompanyForm({
         }
       }}
     >
-      <div className="form-grid">
-        <Field label="Company name *" error={fieldErrors.name}>
-          <input
-            required
-            maxLength={150}
-            disabled={busy}
-            value={draft.name}
-            onChange={(event) => patch({ name: event.target.value })}
-          />
-        </Field>
-        <Field label="Company email *" error={fieldErrors.email} hint="Use an @gmail.com address.">
-          <input
-            type="email"
-            required
-            maxLength={254}
-            pattern={COMPANY_EMAIL_PATTERN}
-            disabled={busy}
-            value={draft.email}
-            onChange={(event) => patch({ email: event.target.value })}
-          />
-        </Field>
-      </div>
-      <section className="company-foremen" aria-label="Foreman contacts">
-        <h3>Foreman contacts</h3>
-        <p>Provide a primary contact and an optional backup.</p>
-        <div className="company-foreman-grid">{(draft.foremen || []).map((foreman, index) => {
-          const label = index === 0 ? "Primary foreman" : "Backup foreman"
-          const required = index === 0 || !!foreman.name.trim() || !!foreman.phone
-          const nameError = index === 0 ? fieldErrors.foreman1Name : fieldErrors.foreman2Name
-          const phoneError = index === 0 ? fieldErrors.foreman1Phone : fieldErrors.foreman2Phone
-          return <section key={index} className={`foreman-contact-card${index === 0 ? " primary" : ""}`} role="group" aria-label={label}>
-            <div className="foreman-contact-heading"><h4>{label}</h4><span>{index === 0 ? "Required" : "Optional"}</span></div>
-            <Field label={index === 0 ? "Full name *" : "Full name"} error={nameError}><input aria-label={`${label} full name`} required={required} maxLength={150} disabled={busy} value={foreman.name} placeholder={index === 0 ? "Enter full name" : "Enter backup foreman name"} onChange={event => patchForeman(index, { name: event.target.value })} /></Field>
-            <Field label={index === 0 ? "Mobile number *" : "Mobile number"} error={phoneError} hint={index === 0 ? "Enter exactly 11 digits." : undefined}><input aria-label={`${label} mobile number`} required={required} type="tel" inputMode="numeric" maxLength={11} pattern={COMPANY_PHONE_PATTERN} disabled={busy} value={foreman.phone} placeholder="09XXXXXXXXX" onChange={event => patchForeman(index, { phone: event.target.value.replace(/\D/g, "").slice(0, 11) })} /></Field>
-            {index === 1 && <p>Leave both blank, or complete both fields.</p>}
-          </section>
-        })}</div>
-        {fieldErrors.foremen && <p className="error" role="alert">{fieldErrors.foremen}</p>}
-      </section>
+      <CompanyRegistrationFields draft={draft} patch={patch} fieldErrors={fieldErrors} busy={busy} />
       {role === "spm" && <section className="form-section trade-allocation capability-proposal">
         <CompanyTradePicker selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Proposed company trades" />
         <p>Choose the trades this company offers. These remain proposals until a Site PM reviews supporting records and saves verified capabilities in company details. Company approval remains with Admin.</p>
@@ -2090,18 +1968,6 @@ export function CompanyForm({
         </Field>
       </div>
       {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
-      <section className="form-section">
-        <h3>Supporting documents</h3>
-        <DocumentList docs={draft.documents} onPreview={() => undefined} />
-        <Upload
-          label="Company Supporting Document"
-          owner={owner}
-          disabled={busy}
-          onSave={(document) =>
-            patch({ documents: [...draft.documents, document] })
-          }
-        />
-      </section>
       {error && (
         <p className="error" role="alert">
           {error}

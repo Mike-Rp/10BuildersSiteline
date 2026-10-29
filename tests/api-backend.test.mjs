@@ -208,12 +208,18 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
     assert.ok(created.id)
     assert.equal((await api("/accounts/"+created.id)).email,"integration.admin@example.test")
+    await assert.rejects(createCompany({...state.companies[0],id:randomUUID(),name:"Admin cannot register",email:"admin.register@gmail.com",phone:"09171234567",documents:[],manpowerDocuments:[]}),error=>error.status===403)
+    await asUser("karlo.espiritu@10builders.com")
     const fileId=randomUUID()
     await uploadFile(fileId,new File(["%PDF-1.4\nIntegration company document"],"company.pdf",{type:"application/pdf"}))
     const source=state.companies[0]
     const saved=await createCompany({...source,id:randomUUID(),name:"Integration Construction",status:"approved",email:"integration.construction@gmail.com",phone:"09171234567",
       documents:[{id:fileId,label:"Company Profile",name:"company.pdf",uploaded:true,owner:self.name,date:"2026-10-18",clientVisible:false}],manpowerDocuments:[]})
     assert.ok(saved.id)
+    assert.equal(saved.status,"pending","Site PM submissions always require an Admin decision")
+    ;({user,state}=await asUser("patricia.domingo@10builders.com"))
+    const pendingCompany=state.companies.find(c=>c.id===saved.id)
+    await api(`/subcontractors/${saved.id}/workspace`,{method:"PUT",json:{...pendingCompany,status:"approved"}})
     state=await loadState(user)
     assert.equal(state.companies.find(c=>c.id===saved.id).documents[0].id,fileId)
     assert.equal((await downloadApiFile(fileId)).type,"application/pdf")
@@ -239,12 +245,16 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,excel,"manpower")
     const doc={id,label:"Manpower list",name:excel.name,uploaded:true,owner:"Administrator",date:"2026-10-22",clientVisible:false}
     const source=state.companies[0]
-    const company=await createCompany({...source,id:randomUUID(),name:"Manpower Format Test",email:"manpower.format@gmail.com",phone:"09171234567",documents:[],manpowerDocuments:[doc]})
+    await asUser("karlo.espiritu@10builders.com")
+    const spmFileId=randomUUID()
+    await uploadFile(spmFileId,excel,"manpower")
+    const company=await createCompany({...source,id:randomUUID(),name:"Manpower Format Test",email:"manpower.format@gmail.com",phone:"09171234567",documents:[],manpowerDocuments:[{...doc,id:spmFileId}]})
+    await asUser("patricia.domingo@10builders.com")
     assert.ok(company.id)
     await assert.rejects(api(`/subcontractors/${company.id}/workspace`,{method:"PUT",json:{...source,name:"Manpower Format Test",status:"approved",documents:[doc],manpowerDocuments:[]}}),/Supported files/)
     const active=state.projects.find(p=>p.status==='active')
     await assert.rejects(api(`/projects/${active.id}/workspace`,{method:"PUT",json:{docs:[doc]}}),/Supported files/)
-    assert.equal((await db.query("select metadata->'manpowerDocuments'->0->>'id' as id from workspace_company_metadata where subcontractor_id=$1",[company.id])).rows[0].id,id)
+    assert.equal((await db.query("select metadata->'manpowerDocuments'->0->>'id' as id from workspace_company_metadata where subcontractor_id=$1",[company.id])).rows[0].id,spmFileId)
   })
 
   await t.test("unassigned company requests validate contacts, derive Excel headcounts, preserve approval, and isolate uploaded lists", async () => {
@@ -298,6 +308,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: empty }), /already been submitted/)
     await api(`/subcontractors/${pending.id}/withdraw`, { method: "POST" })
     assert.equal((await loadState(user)).companies.find(item => item.id === pending.id).status, "archived")
+    const declined=await createCompany({...empty,id:randomUUID(),name:"Company for Admin decision"})
+    await assert.rejects(api(`/subcontractors/${declined.id}/workspace`,{method:"PUT",json:{...empty,status:"approved"}}),error=>error.status===403)
+    ;({user,state}=await asUser("patricia.domingo@10builders.com"))
+    const reviewCompany=state.companies.find(item=>item.id===declined.id)
+    await api(`/subcontractors/${declined.id}/workspace`,{method:"PUT",json:{...reviewCompany,status:"rejected"}})
+    assert.equal((await loadState(user)).companies.find(item=>item.id===declined.id).status,"rejected")
   })
 
   await t.test("monthly report permissions, read-only generation and snapshot exports hold for every role", async () => {
@@ -1419,6 +1435,27 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const handoff=await api(`/projects/${id}/advance-phase`,{method:"POST",json:{}})
     assert.equal(handoff.current_stage,"Structure")
     assert.deepEqual((await db.query("SELECT phase_scope FROM projects WHERE id=$1",[id])).rows[0].phase_scope,before)
+  })
+
+  await t.test("client company contacts persist and can be acknowledged without an agreement",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const project=session.state.projects.find(p=>p.id===newProjectId)
+    await db.query("update projects set lifecycle_status='spm_review' where id=$1",[project.id])
+    await db.query("update workspace_project_metadata set metadata=metadata-'clientSubconReview'-'subcontractorAllocation' where project_id=$1",[project.id])
+    const company={name:"Client Crew",email:"CLIENT.CREW@GMAIL.COM",foremen:[{name:"Juan Cruz",phone:"09171234567"},{name:"Maria Cruz",phone:"09181234567"}],note:"Primary and backup contacts",documents:[]}
+    const payload={...project,clientSubconCompany:company,docs:project.docs.filter(d=>d.label!=="Client & Subcontractor Agreement")}
+    await assert.rejects(api(`/projects/${project.id}/workspace`,{method:'PUT',json:{...payload,clientSubconCompany:{...company,foremen:[]}}}),/primary foreman|one primary/)
+    await api(`/projects/${project.id}/workspace`,{method:'PUT',json:payload})
+    const reloaded=(await loadState(session.user)).projects.find(p=>p.id===project.id)
+    assert.equal(reloaded.clientSubcon,'Client Crew')
+    assert.equal(reloaded.clientSubconEmail,'client.crew@gmail.com')
+    assert.deepEqual(reloaded.clientSubconCompany.foremen,company.foremen)
+    assert.ok(!reloaded.docs.some(d=>d.label==='Client & Subcontractor Agreement'))
+    await assert.rejects(api(`/projects/${project.id}/workspace`,{method:'PUT',json:{...payload,clientSubconCompany:{...company,name:'Changed company'}}}),/locked/)
+    const lead=session.state.accounts.find(a=>a.id===project.team[0].accountId)
+    session=await asUser(lead.email)
+    await api(`/projects/${project.id}/workspace-command`,{method:'POST',json:{type:'acknowledge_client_subcon'}})
+    assert.ok((await loadState(session.user)).projects.find(p=>p.id===project.id).clientSubconReview.acknowledgedAt)
   })
 
   await t.test("the API refuses requests without a session", async () => {

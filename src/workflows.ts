@@ -248,8 +248,8 @@ export function clientSubconAcknowledged(p: Project) {
   )
 }
 export function consentComplete(state: State, p: Project) {
-  if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) return allocationConsented(state, p)
   if (p.clientSubcon) return clientSubconAcknowledged(p)
+  if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) return allocationConsented(state, p)
   // Only the contacted/accepted company counts; un-actioned "selected" rows are suggestions.
   const selections = activeSubcontractors(p).filter(
     (s) => s.status !== "selected",
@@ -1304,7 +1304,7 @@ export function applyWorkflow(
         "Acknowledgment is on hold until Admin resolves the reported issue.",
       )
       assert(
-        clientSubconAgreement(p),
+        p.clientSubconCompany || clientSubconAgreement(p),
         "The Admin-uploaded agreement is missing. Report the issue to Admin.",
       )
       review.acknowledgedById = actor.id

@@ -275,6 +275,7 @@ export type Project = {
   note: string
   excludedOpms: string[]
   clientSubcon?: string
+  clientSubconCompany?: Pick<Company, "name" | "email" | "foremen" | "contact" | "phone" | "note" | "availability" | "documents">
   clientSubconEmail?: string
   clientSubconReview?: ClientSubconReview
   workflow?: ProjectWorkflow

@@ -24,6 +24,7 @@ export function readManpowerFile(file) {
 
 /** Values are read from stored file bytes; form-supplied headcounts are never used. */
 export async function registerCompany(db, user, company, loadFile, projectId = "") {
+    if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can submit subcontractor companies for Administrator approval.");
     if (company?.operatingLocation !== undefined && locationError(company.operatingLocation)) throw new HttpError(400, locationError(company.operatingLocation));
     const errors = companyRegistrationErrors(company);
     if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
@@ -61,7 +62,7 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
         throw new HttpError(409, "This company request has already been submitted. Refresh the directory to view it.");
     const trade = (await db.query("select id from trades where code='Structural / Rebar'", [])).rows[0];
     if (!trade) throw new HttpError(422, "The company trade is not configured. Contact your Administrator.");
-    const status = user.role === "admin" ? (company.status === "pending" ? "pending" : "approved") : "pending";
+    const status = "pending";
     const inserted = await db.query(`insert into subcontractors(id,company_name,trade_id,contact_email,source,directory_status,created_by,updated_by)
         values($1,$2,$3,$4,'directory',$5,$6,$6) on conflict(id) do nothing returning id`, [companyId, company.name.trim(), trade.id, company.email.trim().toLowerCase(), status, user.id]);
     if (!inserted.rowCount) throw new HttpError(409, "This company request has already been submitted. Refresh the directory to view it.");

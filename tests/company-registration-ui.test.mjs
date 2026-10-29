@@ -51,6 +51,7 @@ test("a Site PM can validate company contacts and retry registration without man
     await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Subcon directory"))
     assert.equal(button("Suggest Company").disabled, false)
     await click(button("Suggest Company"))
+    assert.doesNotMatch(document.querySelector('form').textContent,/Supporting documents|No documents on file/)
     assert.equal(document.querySelectorAll('form .location-fields').length, 0, "Company registration no longer asks for location")
     assert.equal(field("Company availability").value, "Available")
     assert.equal(field("Company availability").readOnly, true)

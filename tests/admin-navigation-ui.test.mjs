@@ -85,6 +85,8 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     assert.equal(toggle().hidden, true)
     await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
     assert.equal(toggle().getAttribute("aria-expanded"), "true", "desktop navigation stays open after changing pages")
+    await click(document.querySelector('.sidebar [aria-label="Directory"]'))
+    assert.ok(![...document.querySelectorAll('main button')].some(button=>button.textContent.trim()==='Add Company'),'Admin reviews company requests instead of adding companies directly')
     // Smaller laptops/tablets and phones use the same accessible drawer behavior.
     await resize(true)
     assert.equal(toggle().getAttribute("aria-expanded"), "false")

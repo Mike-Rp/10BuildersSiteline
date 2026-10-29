@@ -4,6 +4,7 @@ import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import { locationError, normalizeLocation, sameLocationRecord } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
+import { normalizeClientCompany } from "../../domain/client-company.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
@@ -242,7 +243,7 @@ router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"
  values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
     return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
 }));
-router.post("/subcontractors/registrations", endpoint(["admin", "spm"], async (db, user, req) => {
+router.post("/subcontractors/registrations", endpoint(["spm"], async (db, user, req) => {
     if (user.role === "spm") await assertLicenseActive(user, db);
     const saved = await registerCompany(db, user, req.body, file);
     await event(db, user, null, user.role === "spm" ? "Subcontractor company suggestion submitted" : "Subcontractor company added", req.body.name);
@@ -412,6 +413,13 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
         if (!matches) throw new HttpError(409, "Project scope is locked after submission. Scope cannot be changed through workspace edits.");
     }
     const previous = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    let clientSubconCompany = previous.clientSubconCompany;
+    if (b.clientSubconCompany !== undefined) {
+        try { clientSubconCompany = normalizeClientCompany(b.clientSubconCompany); }
+        catch (error) { throw new HttpError(400, error.message); }
+        if (previous.clientSubconCompany && JSON.stringify(clientSubconCompany) !== JSON.stringify(normalizeClientCompany(previous.clientSubconCompany)))
+            throw new HttpError(409, "The client subcontractor company is locked after submission.");
+    }
     const unchangedHistoricalLocation = b.siteLocation && previous.siteLocation && ["region", "province", "city", "psgcCode", "coordinates"].every(key => JSON.stringify(b.siteLocation[key]) === JSON.stringify(previous.siteLocation[key]));
     const siteLocation = b.siteLocation !== undefined && !locationError(b.siteLocation) ? normalizeLocation(b.siteLocation) : undefined;
     if (b.siteLocation !== undefined) {
@@ -422,14 +430,14 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
             if (previous.subcontractorAllocation) throw new HttpError(409, "A saved allocation already uses this site location. Resolve the allocation before changing location.");
         }
     }
-    for (const d of b.docs || [])
+    for (const d of [...(b.docs || []), ...(clientSubconCompany?.documents || [])])
         if (d.uploaded && !(await db.query("select 1 from project_documents where project_id=$1 and id=$2", [p.id, d.id])).rowCount) {
             await file(db, user, d.id);
             await db.query("update stored_files set project_id=$2,purpose='document' where id=$1", [d.id, p.id]);
         }
     await db.query("update projects set target_end_date=$2,location=$3 where id=$1", [p.id, b.end || null, b.location || ""]);
     await db.query(`insert into workspace_project_metadata(project_id,metadata) values($1,$2)
- on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ ...(siteLocation === undefined ? {} : { siteLocation }), clientSubcon: b.clientSubcon || "", clientSubconEmail: b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
+ on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata`, [p.id, JSON.stringify({ ...(siteLocation === undefined ? {} : { siteLocation }), ...(clientSubconCompany ? { clientSubconCompany } : {}), clientSubcon: clientSubconCompany?.name || b.clientSubcon || "", clientSubconEmail: clientSubconCompany?.email || b.clientSubconEmail || "", note: b.note || "", extraDocs: (b.docs || []).filter(d => d.label === "Client & Subcontractor Agreement" || d.subjectId) })]);
     for (const d of b.docs || [])
         if (d.uploaded) {
             const code = d.label === "Client Contract Agreement" ? "owner_contract" : null;
@@ -463,6 +471,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "contact_company": {
             leader();
+            if (meta.clientSubcon) throw new HttpError(409, "This project has a locked client-provided subcontractor.");
             if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
             const current = (await db.query("select * from project_subcontractor_selections where project_id=$1 and status in ('contacted','accepted')", [p.id])).rows[0];
             if (current)
@@ -479,6 +488,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "respond_company": {
             leader();
+            if (meta.clientSubcon) throw new HttpError(409, "This project has a locked client-provided subcontractor.");
             if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
             if (typeof c.accepted !== "boolean")
                 throw new HttpError(400, "An explicit company response is required.");
@@ -510,8 +520,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             break;
         case "acknowledge_client_subcon":
             leader();
-            if (!meta.clientSubcon || !meta.extraDocs?.some(d => d.label === "Client & Subcontractor Agreement") || meta.clientSubconReview?.issues?.some(i => i.status === "open"))
-                throw new HttpError(409, "The client agreement must be available and open issues resolved.");
+            if (!meta.clientSubcon || (!meta.clientSubconCompany && !meta.extraDocs?.some(d => d.label === "Client & Subcontractor Agreement")) || meta.clientSubconReview?.issues?.some(i => i.status === "open"))
+                throw new HttpError(409, "Client company details must be available and open issues resolved.");
             meta.clientSubconReview = { issues: [], ...meta.clientSubconReview, acknowledgedById: user.id, acknowledgedBy: user.full_name, acknowledgedAt: new Date().toISOString() };
             break;
         case "report_client_subcon_issue":

@@ -245,25 +245,8 @@ export const createSubcontractor = async (req, res) => {
   try {
     const user = await requireUser(req, res, WRITE_ROLES);
     if (!user) return;
-    if (user.role === "spm") return sendError(res, "Submit company suggestions through the directory form for Administrator approval.", 403);
-    const b = req.body || {};
-    if (!b.company_name || !String(b.company_name).trim()) return sendError(res, "company_name is required.", 400);
-    if (b.contact_email && !EMAIL_RE.test(b.contact_email)) return sendError(res, "contact_email is not a valid email.", 400);
-
-    const tradeId = await resolveLookup(execute, "trades", { code: b.trade, id: b.trade_id });
-    if (tradeId === null) return sendError(res, "trade (code) or trade_id is required.", 400);
-
-    const result = await execute(
-      `INSERT INTO subcontractors
-         (id, company_name, trade_id, contact_email, meta_description, source, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, 'directory', $6, $6)
-       RETURNING id, company_name, source`,
-      [uuidv4(), String(b.company_name).trim(), tradeId, b.contact_email ?? null, b.meta_description ?? null, user.id]
-    );
-    return sendOk(res, "Subcontractor created.", 1, { ...result.rows[0], trade: b.trade ?? null }, 201);
-  } catch (error) {
-    return handleError(res, error);
-  }
+    return sendError(res, "Site PMs must submit company suggestions through the directory form for Administrator approval.", 403);
+  } catch (error) { return handleError(res, error); }
 };
 
 export const getWorkers = async (req, res) => {

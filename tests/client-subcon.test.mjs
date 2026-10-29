@@ -27,6 +27,16 @@ function ready() {
 }
 const sub = (s) => currentProject(s).clientSubconReview
 
+test("client company details can be reviewed without an agreement on new allocation-version projects",()=>{
+  const state=ready(), p=currentProject(state)
+  p.docs=p.docs.filter(doc=>doc.label!=="Client & Subcontractor Agreement")
+  p.clientSubconCompany={name:p.clientSubcon,email:"crew@gmail.com",foremen:[{name:"Juan Cruz",phone:"09171234567"}],contact:"Juan Cruz",phone:"09171234567",note:"",availability:"available",documents:[]}
+  p.subcontractorAllocationVersion=1
+  const done=execute(state,"a4",{type:"acknowledge_client_subcon"})
+  assert.ok(sub(done).acknowledgedAt)
+  assert.equal(activationChecks(done,currentProject(done)).find(check=>check.id==='subcontractors').passed,true)
+})
+
 test("only the Lead acknowledges, once, and records name and time", () => {
   const state = ready()
   assert.throws(

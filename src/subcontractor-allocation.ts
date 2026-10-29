@@ -29,6 +29,7 @@ export type SavedAllocation = AllocationPlan & {
   requirements: AllocationPhase[]
 }
 export function tradeAllocationEnabled(state: State, project: Project) {
+  if (project.clientSubcon) return false
   return (
     !!project.subcontractorAllocation ||
     project.subcontractorAllocationVersion === 1 ||

@@ -144,7 +144,7 @@ export function AgreementPreviewModal({
     await onAction({ ...command, projectId: project.id }, message)
   return (
     <Modal
-      title="Agreement Preview"
+      title={project.clientSubconCompany ? "Client subcontractor details" : "Agreement Preview"}
       subtitle={`${project.clientSubcon} · ${project.name}`}
       wide
       onClose={onClose}
@@ -165,8 +165,8 @@ export function AgreementPreviewModal({
           <strong>{project.name}</strong>
         </div>
         <div>
-          <small>Agreement source</small>
-          <Badge tone="green">Uploaded by Administrator</Badge>
+          <small>Record source</small>
+          <Badge tone="green">Provided by Administrator</Badge>
           {doc && <span>{dateLabel(doc.date)}</span>}
         </div>
         <div>
@@ -182,6 +182,12 @@ export function AgreementPreviewModal({
       </div>
       {doc ? (
         <AgreementViewer doc={doc} />
+      ) : project.clientSubconCompany ? (
+        <section className="detail-section">
+          <h3>Foreman contacts</h3>
+          {(project.clientSubconCompany.foremen || []).map((foreman, index) => <p key={index}><strong>{index === 0 ? "Primary foreman" : "Backup foreman"}:</strong> {foreman.name} · {foreman.phone}</p>)}
+          {project.clientSubconCompany.note && <p>{project.clientSubconCompany.note}</p>}
+        </section>
       ) : (
         <div className="role-error">
           <Icon name="alert" />
@@ -224,11 +230,11 @@ export function AgreementPreviewModal({
                 disabled={!!open}
                 onChange={(e) => setReviewed(e.target.checked)}
               />
-              I have reviewed the assigned subcontractor details and agreement.
+              {project.clientSubconCompany ? "I have reviewed the assigned subcontractor company and foreman contacts." : "I have reviewed the assigned subcontractor details and agreement."}
             </label>
             <p className="role-muted">
               Acknowledgment confirms {actor.name}’s review only. The company
-              and agreement stay locked as assigned by Admin.
+              details stay locked as assigned by Admin.
             </p>
             {error && (
               <p className="error" role="alert">
@@ -249,7 +255,7 @@ export function AgreementPreviewModal({
               <Button
                 variant="primary"
                 icon="check"
-                disabled={saving || !reviewed || !!open || !doc}
+                disabled={saving || !reviewed || !!open || (!doc && !project.clientSubconCompany)}
                 onClick={async () => {
                   if (
                     await send(

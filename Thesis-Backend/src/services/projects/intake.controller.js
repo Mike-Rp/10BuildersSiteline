@@ -1,5 +1,6 @@
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
+import { normalizeClientCompany } from "../../domain/client-company.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from '../../common/utilities/transaction.utility.js';
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
@@ -12,6 +13,10 @@ export const createIntake = async (req, res) => {
   try {
     const actor = await requireUser(req, res, ['admin']);
     if (!actor) return;
+    if (req.body?.client_subcon_company !== undefined) {
+      try { normalizeClientCompany(req.body.client_subcon_company); }
+      catch (error) { return responseError(res, error.message, 400); }
+    }
     const {name, project_type, floor_area_sqm, floor_count, target_start_date,
       client_name, suggested_opm_id, suggested_opm_match_score, suggested_opm_math_score, headcount_suggested,
       phase_team = [], client_user_id = null, crew_required = headcount_suggested ?? 0} = req.body || {};
