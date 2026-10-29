@@ -80,8 +80,16 @@ test("all three login pages use the approved branding, switches, and their own s
         assert.equal(document.querySelector('.admin-login-background').getAttribute('aria-hidden'),'true')
       }
       const switches=[...document.querySelectorAll('.login-portal-nav a')].map(a=>[a.textContent.trim(),a.getAttribute('href')])
-      assert.deepEqual(switches,staff?[['Administrator sign-in','/admin/login'],['Client sign-in','/login']]:[['Staff sign-in','/staff/login']])
+      assert.deepEqual(switches,internal?[['Client sign-in','/login']]:[['Staff sign-in','/staff/login']])
       assert.equal(document.querySelector('.login-content .login-portal-switch'),null,'Switches must stay outside the credential form')
+      const selector=document.querySelector('.login-role-selector')
+      assert.equal(!!selector,internal)
+      if(internal){
+        assert.deepEqual([...selector.querySelectorAll('a')].map(a=>[a.textContent,a.getAttribute('href')]),[['Staff','/staff/login'],['Admin','/admin/login']])
+        assert.equal(selector.querySelectorAll('[aria-current="page"]').length,1)
+        assert.equal(selector.querySelector('[aria-current="page"]').getAttribute('href'),admin?'/admin/login':'/staff/login')
+        assert.equal(selector.closest('form'),null,'Switching login pages must not submit credentials')
+      }
       if(!internal){
         assert.match(document.querySelector('.client-access-badge').textContent,/Client access/)
         assert.equal(document.querySelector('.login-info h2').textContent,'Your project, in view')

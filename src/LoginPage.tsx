@@ -100,10 +100,9 @@ export default function LoginPage({
       <nav className="login-portal-nav" aria-label="Sign-in portals">
         <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : staff ? "STAFF" : "CLIENT"} PORTAL</span>
         <div className="login-portal-links">
-          {staff && <a className="login-portal-switch" href="/admin/login"><Icon name="shield" size={17} />Administrator sign-in</a>}
-          <a className="login-portal-switch" href={staff ? "/login" : "/staff/login"}>
-            <Icon name={staff ? "home" : "shield"} size={17} />
-            {staff ? "Client sign-in" : "Staff sign-in"}
+          <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
+            <Icon name={internal ? "home" : "shield"} size={17} />
+            {internal ? "Client sign-in" : "Staff sign-in"}
           </a>
         </div>
       </nav>
@@ -160,8 +159,13 @@ export default function LoginPage({
             <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>
             <div className="login-heading">
               <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to SITELINE"}</h1>
-              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : staff ? "For Office Project Managers and Site Project Managers." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
+              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
             </div>
+
+            {internal && <nav className="login-role-selector" aria-label="Staff and administrator sign-in">
+              <a href="/staff/login" aria-label="Staff sign-in" aria-current={staff ? "page" : undefined}>Staff</a>
+              <a href="/admin/login" aria-label="Administrator sign-in" aria-current={admin ? "page" : undefined}>Admin</a>
+            </nav>}
 
             <form className="login-form" onSubmit={submit} noValidate>
               {(deviceNotice || sessionMessage) && <p className="notice" role="status">{deviceNotice || sessionMessage}</p>}
