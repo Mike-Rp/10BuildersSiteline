@@ -69,8 +69,15 @@ test("all three login pages use the approved branding, switches, and their own s
       client.setToken("")
       await act(()=>root.render(React.createElement(App,{key:portal})))
       assert.match(document.title,admin?/BuildAxis Admin/:staff?/BuildAxis Staff/:/BuildAxis \| 10 Builders/)
-      assert.equal(document.querySelector('.login-brand img').getAttribute('src'),'/images/10-builders-logo.png')
-      assert.equal(document.querySelector('.login-brand small').textContent,'10 Builders and Development Corporation')
+      if(internal){
+        assert.equal(document.querySelector('.login-brand img').getAttribute('src'),'/images/10-builders-logo.png')
+        assert.equal(document.querySelector('.login-brand small').textContent,'10 Builders and Development Corporation')
+      }else{
+        assert.equal(document.querySelector('.client-form-portal-label'),null)
+        assert.doesNotMatch(document.body.textContent,/10 BUILDERS · CLIENT PORTAL/)
+        assert.equal(document.querySelector('.login-portal-nav .login-portal-label'),null)
+        assert.equal(document.querySelector('.login-panel .login-brand'),null)
+      }
       assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Administrator sign-in':staff?'Staff sign-in':'Welcome to BuildAxis')
       assert.equal(!!document.querySelector('.admin-access-badge'),internal)
       assert.equal(document.querySelectorAll('.admin-login-background picture').length,internal?3:0)

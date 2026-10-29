@@ -98,7 +98,7 @@ export default function LoginPage({
     <main className={`login-page login-redesign${internal ? " admin-login" : " client-login"}`}>
       {internal && <LoginBanner background />}
       <nav className="login-portal-nav" aria-label="Sign-in portals">
-        <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : staff ? "STAFF" : "CLIENT"} PORTAL</span>
+        {internal && <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : "STAFF"} PORTAL</span>}
         <div className="login-portal-links">
           <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
             <Icon name={internal ? "home" : "shield"} size={17} />
@@ -145,7 +145,7 @@ export default function LoginPage({
       </Modal>}
       <div className="login-card">
         <section className="login-panel" aria-label="Log in">
-          <div className="login-brand">
+          {internal && <div className="login-brand">
             <span className="brand-mark company-logo-mark">
               <img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="50" height="76" />
             </span>
@@ -153,7 +153,7 @@ export default function LoginPage({
               <strong>BuildAxis</strong>
               <small>10 Builders and Development Corporation</small>
             </span>
-          </div>
+          </div>}
 
           <div className="login-content">
             <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>

@@ -198,6 +198,7 @@
 #root .client-login::after { content: ""; position: absolute; width: 640px; height: 640px; right: -150px; top: 120px; z-index: -1; pointer-events: none; border: 1px solid #c9a56490; box-shadow: 0 0 0 50px #ffffff30, 0 0 0 51px #799ab32b; transform: rotate(22deg); }
 #root .client-login .login-card { position: relative; min-height: 670px; box-shadow: 0 24px 80px #14365418; }
 #root .client-login .login-panel { padding: 32px 46px; }
+#root .client-login .login-portal-nav { justify-content: flex-end; }
 #root .client-login .login-content { margin-top: 26px; padding-bottom: 0; }
 #root .client-login .login-heading { margin: 14px 0 24px; }
 #root .client-login .login-heading h1 { font-size: 30px; line-height: 1.25; }
