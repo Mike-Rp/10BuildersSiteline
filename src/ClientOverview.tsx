@@ -5,6 +5,7 @@ import { calendarDay, progressLabel } from "./project-progress"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import InfoPopover from "./InfoPopover"
 import { Badge, Button, Icon } from "./ui"
+import PageTitlePanel from "./PageTitlePanel"
 import "./client-overview.css"
 
 export default function ClientOverview({ project, latest, photos, onNavigate, onDetails }: {
@@ -19,18 +20,20 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
   const validProgress = typeof overall === "number" && Number.isFinite(overall) && overall >= 0 && overall <= 100
   const endSet = calendarDay(project.end) !== null
   return <div className="client-overview">
+    <PageTitlePanel title="Project overview" eyebrow={project.name}>
+      <div className="co-heading-actions">
+        <Button variant="text-button" onClick={onDetails}>Project details & contacts</Button>
+        <InfoPopover title="About your project progress" label="Help: project progress">
+          <p>Overall project progress is based on approved required activities across all applicable construction phases. Pending uploads earn no credit. If complete project totals are unavailable, no percentage is shown.</p>
+        </InfoPopover>
+      </div>
+    </PageTitlePanel>
     <div className="co-project-meta">
       <span>{project.type}{project.location ? ` · ${project.location}` : ""}</span>
       <Badge tone="green">{project.status === "completed" ? "Completed" : "Active"}</Badge>
     </div>
     <ProjectScheduleDetails project={project} today={today} />
     <section className="co-highlights" aria-label="Project highlights">
-      <div className="co-heading"><h1>Project overview</h1><div className="co-heading-actions">
-        <Button variant="text-button" onClick={onDetails}>Project details & contacts</Button>
-        <InfoPopover title="About your project progress" label="Help: project progress">
-          <p>Overall project progress is based on approved required activities across all applicable construction phases. Pending uploads earn no credit. If complete project totals are unavailable, no percentage is shown.</p>
-        </InfoPopover></div>
-      </div>
       <div className="co-metrics">
         <div><span>Current phase</span><strong>{project.phase}</strong></div>
         <div><span>Overall project progress</span><strong>{validProgress ? `${progressLabel(overall)}%` : "Unavailable"}</strong>

@@ -7,6 +7,7 @@ import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import ExecutiveSummary from "./ExecutiveSummary"
+import PageTitlePanel from "./PageTitlePanel"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
@@ -556,17 +557,9 @@ export default function RoleWorkspace({
   function header(title: string, action?: ReactNode) {
     return (
       <>
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">
-              {isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}
-            </div>
-            <h1>
-              {title}
-            </h1>
-          </div>
+        <PageTitlePanel title={title} eyebrow={isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}>
           {action}
-        </div>
+        </PageTitlePanel>
         {urgentBanner()}
         <LicenseBanner license={state.license?.self} />
         {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (

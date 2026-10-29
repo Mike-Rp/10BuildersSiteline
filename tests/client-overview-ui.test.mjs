@@ -78,6 +78,8 @@ test("client overview shows each highlight once and preserves shared records and
     assert.ok(!document.querySelector('.client-overview').textContent.includes(project.name))
     assert.ok(!document.querySelector('.client-overview').textContent.includes('NaN'))
     await click('Active sites')
+    assert.equal(document.querySelectorAll('main h1').length,1,'Active sites has one module title rather than a duplicate heading')
+    assert.equal(document.querySelector('main h1').textContent,'Active sites')
     const cards=[...document.querySelectorAll('.as-card')]
     const firstCard=cards.find(card=>card.textContent.includes(project.name))
     const secondCard=cards.find(card=>card.textContent.includes(second.name))

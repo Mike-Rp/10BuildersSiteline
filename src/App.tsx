@@ -10,6 +10,7 @@ import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
+import PageTitlePanel from "./PageTitlePanel"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -1412,19 +1413,9 @@ function AppInner() {
   function pageHeading(title: string, action?: ReactNode) {
     return (
       <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            {["Team", "Settings", "Archive", "Activity log"].includes(page)
-              ? "ORGANIZATION"
-              : "CONSTRUCTION OPERATIONS"}
-          </div>
-          <h1>
-            {title}
-          </h1>
-        </div>
+      <PageTitlePanel title={title} eyebrow={["Team", "Settings", "Archive", "Activity log"].includes(page) ? "ORGANIZATION" : "CONSTRUCTION OPERATIONS"}>
         {action}
-      </div>
+      </PageTitlePanel>
       <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />
       </>
     )

@@ -18,12 +18,12 @@
 #root .client-portal .nav-group-label { margin-top: 24px; }
 #root .client-portal .co-project-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--color-muted); font-size: 14px; }
 #root .client-overview { display: grid; gap: 14px; min-width: 0; }
+#root .client-overview > .page-title-panel { margin-bottom: 0; }
 #root .client-overview :is(.co-highlights,.co-update,.co-photos) { min-width: 0; border: 1px solid var(--color-line); border-radius: 12px; background: white; }
 #root .client-overview .co-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 #root .client-overview .co-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 18px; }
-#root .client-overview .co-highlights .co-heading { justify-content: flex-start; padding-bottom: 10px; }
-#root .client-overview :is(h1,h2) { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; margin: 0; }
-#root .client-overview .co-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 6px 18px 18px; }
+#root .client-overview h2 { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; margin: 0; }
+#root .client-overview .co-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 18px; }
 #root .client-overview .co-metrics > div { min-width: 0; padding-inline: 24px; border-left: 1px solid var(--color-line); }
 #root .client-overview .co-metrics > div:first-child { padding-left: 0; border-left: 0; }
 #root .client-overview .co-metrics > div:last-child { padding-right: 0; }

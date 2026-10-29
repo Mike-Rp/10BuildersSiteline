@@ -6,6 +6,7 @@ import UrgentActionBanner from "./UrgentActionBanner"
 import { clientExecutiveSummary } from "./client-executive-summary"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import ClientOverview from "./ClientOverview"
+import PageTitlePanel from "./PageTitlePanel"
 import ClientSamplePhotos from "./ClientSamplePhotos"
 import { canShowClientPhotoExamples } from "./client-photo-examples"
 import NotificationDetail from "./NotificationDetail"
@@ -533,7 +534,6 @@ export default function ClientPortal({
         </>
       )
     if (page === "Active sites") return <>
-      <div className="page-heading"><div><div className="eyebrow">YOUR CONSTRUCTION PROJECTS</div><h1>Active sites</h1></div></div>
       <ActiveSites key={actor.id} overallOnly projects={projects.filter(p => p.status === "active").map(p => ({ ...p, lead: p.contacts.find(c => c.role === "Site Project Manager")?.name }))} onOpen={id => { setProjectId(id); setSiteDetails(true) }} />
     </>
     if (!project)
@@ -757,15 +757,8 @@ export default function ClientPortal({
               </Button>
             </div>
           )}
-          {page !== "Project Overview" && project && (
-            <div className="page-heading">
-              <div>
-                <div className="eyebrow">{project.name}</div>
-                <h1>
-                  {page}
-                </h1>
-              </div>
-            </div>
+          {page !== "Project Overview" && (project || page === "Active sites") && (
+            <PageTitlePanel title={page} eyebrow={page === "Active sites" ? "YOUR CONSTRUCTION PROJECTS" : project?.name} />
           )}
           {error && (
             <div className="role-error" role="alert">
