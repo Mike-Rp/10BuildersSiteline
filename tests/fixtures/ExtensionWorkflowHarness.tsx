@@ -141,7 +141,7 @@ function DemoWorkspace({ onExit }: { onExit: () => void }) {
               </span>
             </div>
             <div className="brand">
-              BuildAxis<small>10 BUILDERS</small>
+              SiteCore<small>10 BUILDERS</small>
             </div>
             <nav aria-label="Admin demo navigation">
               <Button

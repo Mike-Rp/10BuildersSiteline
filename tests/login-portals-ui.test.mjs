@@ -33,7 +33,7 @@ test("explicit sign-in pages wait for credentials even when this tab has a saved
         await act(()=>root.render(React.createElement(App,{key:role+path})))
         assert.equal(requests.length,0,"Visiting a sign-in page must not fetch or restore a cached account")
         assert.ok(document.querySelector('form.login-form'),`Expected a form at ${path} for saved ${role}`)
-        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/')?'Administrator sign-in':path.startsWith('/staff/')?'Staff sign-in':'Welcome to BuildAxis')
+        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/')?'Administrator sign-in':path.startsWith('/staff/')?'Staff sign-in':'Welcome to SiteCore')
         assert.equal(w.location.pathname,new URL(path,w.location.origin).pathname)
         for(const input of document.querySelectorAll('form.login-form input')) assert.equal(input.value,"")
         assert.equal(client.getToken(),token,"Opening a login form must not revoke an existing session")
@@ -68,7 +68,7 @@ test("all three login pages use the approved branding, switches, and their own s
       w.history.replaceState(null,"",admin?"/admin/login":staff?"/staff/login":"/login")
       client.setToken("")
       await act(()=>root.render(React.createElement(App,{key:portal})))
-      assert.match(document.title,admin?/BuildAxis Admin/:staff?/BuildAxis Staff/:/BuildAxis \| 10 Builders/)
+      assert.match(document.title,admin?/SiteCore Admin/:staff?/SiteCore Staff/:/SiteCore \| 10 Builders/)
       if(internal){
         assert.equal(document.querySelector('.login-brand img').getAttribute('src'),'/images/10-builders-logo.png')
         assert.equal(document.querySelector('.login-brand small').textContent,'10 Builders and Development Corporation')
@@ -78,7 +78,7 @@ test("all three login pages use the approved branding, switches, and their own s
         assert.equal(document.querySelector('.login-portal-nav .login-portal-label'),null)
         assert.equal(document.querySelector('.login-panel .login-brand'),null)
       }
-      assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Administrator sign-in':staff?'Staff sign-in':'Welcome to BuildAxis')
+      assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Administrator sign-in':staff?'Staff sign-in':'Welcome to SiteCore')
       assert.equal(!!document.querySelector('.admin-access-badge'),internal)
       assert.equal(document.querySelectorAll('.admin-login-background picture').length,internal?3:0)
       if(internal) {

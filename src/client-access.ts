@@ -230,7 +230,7 @@ export function clientProgressReport(
     (p) => p.id === projectId,
   )!
   return [
-    "BuildAxis — PROJECT PROGRESS REPORT",
+    "SiteCore — PROJECT PROGRESS REPORT",
     "Text export — not a certified PDF.",
     "",
     `Project: ${project.name}`,

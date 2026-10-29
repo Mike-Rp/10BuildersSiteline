@@ -3,7 +3,7 @@ import { summaryMetrics } from "./monthly-summary.js";
 export const fraction=balance=>balance?.percentage==null?"Unavailable":`${balance.earned} / ${balance.total} (${balance.percentage.toFixed(1)}%)`;
 export function reportRows(report) {
   const rows=[
-    ["BuildAxis — Monthly Project Progress Summary"],
+    ["SiteCore — Monthly Project Progress Summary"],
     ["Project",report.project.name],["Type",report.project.type],["Reporting month",report.period.month],
     ["Timezone",report.period.timezone],["Period start",report.period.start],["Cutoff (exclusive)",report.period.cutoff],
     ["Generated",report.period.generatedAt],["Period",report.period.monthToDate?"Month to date":"Month-end snapshot"],
@@ -41,7 +41,7 @@ export function summaryRows(summary,view) {
   const {period,projection,inclusion}=summary,{totals,highlights,filters}=view;
   const metrics=summaryMetrics(projection);
   const rows=[
-    ["BuildAxis \u2014 Overall Monthly Project Summary"],
+    ["SiteCore \u2014 Overall Monthly Project Summary"],
     ["Reporting month",period.month],["Timezone",period.timezone],["Period start",period.start],["Cutoff (exclusive)",period.cutoff],
     ["Generated",period.generatedAt],["Period",period.monthToDate?"Month to date":"Month-end snapshot"],
     ["Inclusion",inclusion.rule],["Projects in report",inclusion.included],["Excluded (created on or after cutoff)",inclusion.excludedAfterCutoff],

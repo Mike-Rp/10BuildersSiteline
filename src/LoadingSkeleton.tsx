@@ -36,7 +36,7 @@ export default function WorkspaceSkeleton({ role }: { role?: Role }) {
   if (role !== "client") return <main className="workspace-loading" aria-busy="true" aria-label="Loading workspace"><LoadingStatus label="Loading workspace" /></main>
   return <LoadingRoleProvider role="client"><div className="app-shell workspace-skeleton">
     <aside className="sidebar" aria-hidden="true">
-      <div className="brand"><span className="brand-mark">10</span><div>BuildAxis<small>10 BUILDERS</small></div></div>
+      <div className="brand"><span className="brand-mark">10</span><div>SiteCore<small>10 BUILDERS</small></div></div>
       <div className="workspace-switch"><span className="workspace-avatar">10</span><span><strong>10 Builders</strong><small>Loading workspace</small></span></div>
       <div className="skeleton-nav">{Array.from({ length: 6 }, (_, i) => <Bar key={i} short={i % 2 === 1} />)}</div>
     </aside>

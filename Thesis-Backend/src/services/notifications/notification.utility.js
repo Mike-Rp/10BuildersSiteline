@@ -15,7 +15,7 @@ function subject(type, id) {
 function internalLink(link) {
   if (link != null && (typeof link !== "string" || link.length > 1000 || !/^\/[a-zA-Z0-9]/.test(link) || /[\\\s]/.test(link)
     || [...link].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)))
-    throw new HttpError(400, "Notification links must stay inside BuildAxis.");
+    throw new HttpError(400, "Notification links must stay inside SiteCore.");
 }
 export async function createNotification(db, { recipientId, type = "notice", title, message = "", link = null,
   priority = "normal", projectId = null, activityLogId = null, subjectType = null, subjectId = null }) {
