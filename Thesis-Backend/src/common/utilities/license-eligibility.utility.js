@@ -6,7 +6,7 @@ export const LICENSE_ELIGIBILITY_SQL = `NOT EXISTS (SELECT 1 FROM workspace_acco
     AND valid_license.superseded_at IS NULL
     AND valid_license.upload_status = 'uploaded'
     AND valid_license.upload_file_ref IS NOT NULL
-    AND valid_license.license_expiry >= CURRENT_DATE
+    AND valid_license.license_expiry > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30
 )`;
 
 export async function assertEligibleManager(client, userId, role) {
@@ -19,7 +19,7 @@ export async function assertEligibleManager(client, userId, role) {
     FOR UPDATE OF u
   `, [userId, role]);
   if (check.rowCount !== 1) {
-    const error = new Error(`Selected ${role.toUpperCase()} is inactive, missing a verified current PRC license, or has an expired license.`);
+    const error = new Error(`Selected ${role.toUpperCase()} is inactive, missing a verified current PRC license, or has a license expiring within 30 days.`);
     error.status = 422;
     throw error;
   }
@@ -31,14 +31,14 @@ export async function getLicenseEligibility(userId, db = execute) {
     SELECT u.id,
       CASE WHEN l.id IS NULL THEN 'missing'
            WHEN l.upload_status <> 'uploaded' OR l.upload_file_ref IS NULL THEN 'pending_document'
-           WHEN l.license_expiry < CURRENT_DATE THEN 'expired'
-           WHEN l.license_expiry <= CURRENT_DATE + 30 THEN 'expiring_soon'
+           WHEN l.license_expiry < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date THEN 'expired'
+           WHEN l.license_expiry <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30 THEN 'expiring_soon'
            ELSE 'valid' END AS license_status,
       l.license_expiry,
       CASE WHEN l.id IS NOT NULL
              AND l.upload_status = 'uploaded'
              AND l.upload_file_ref IS NOT NULL
-             AND l.license_expiry >= CURRENT_DATE
+             AND l.license_expiry > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30
            THEN true ELSE false END AS eligible_for_new_assignment
     FROM public.users u
     LEFT JOIN LATERAL (

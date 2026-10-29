@@ -1,9 +1,10 @@
+import { licenseAccessPolicy } from "../../domain/license-access.js";
 // License maintenance, run by the 15-minute maintenance timer and (throttled) when a workspace loads:
 //  - reminders at each configured day before expiry, then weekly during the grace period
 //  - one alert to the Administrator when the grace period ends without a renewal
 //  - reassignment requests that were not answered before their deadline
 // Every reminder is recorded in license_reminders_sent, so it is sent once, however often this runs.
-import { computeLicenseStatus, localDay, readLicenseRules } from "../../common/utilities/license-status.utility.js";
+import { computeLicenseStatus, localDay, readLicenseRules, needsLicenseReplacement } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
 import { resolveNotifications } from "../notifications/notification.utility.js";
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -45,8 +46,27 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
   const result = { reminders: 0, graceEnded: 0, overridesExpired: 0 };
 
   for (const engineer of engineers) {
-    if (underReview.has(engineer.id)) continue; // an Administrator is already reviewing the renewal
     const state = computeLicenseStatus({ expiry: engineer.license_expiry, today, reminderDays: rules.reminderDays, graceDays: rules.graceDays });
+    if (needsLicenseReplacement(state)) {
+      const projects = (await db.query(
+        `select distinct p.id, p.name from projects p where p.lifecycle_status not in ('archived','completed')
+          and not coalesce(p.is_deleted,false) and (p.suggested_opm_id=$1 or exists
+          (select 1 from project_phase_team t where t.project_id=p.id and t.spm_user_id=$1 and t.status in ('pending','confirmed')))`, [engineer.id])).rows;
+      for (const project of projects) {
+        const first = await db.query("insert into license_reminders_sent(user_id,license_expiry,reminder_key) values($1,$2,$3) on conflict do nothing returning id",
+          [engineer.id, engineer.license_expiry, (state.daysToExpiry <= 30 ? 'replacement-overdue:' : 'replacement-prepare:') + project.id]);
+        if (first.rowCount) await notify(db, { title: state.daysToExpiry <= 30 ? "Engineer replacement overdue" : "Prepare engineer replacement", recipientIds: admins, projectId: project.id,
+          detail: engineer.full_name + ' · ' + project.name + ' · license ' + when(state) + '. Arrange office signing and confirm the replacement before the 30-day notice, or verify the renewed license.' });
+      }
+    }
+    const policy = licenseAccessPolicy(state.expiry, today);
+    if (policy.prepareReplacement) {
+      const stage = policy.mode === "disabled" ? "access-disabled" : policy.mode === "view_only" ? "view-only-started" : "preparation-notice";
+      const fresh = await db.query("insert into license_reminders_sent(user_id,license_expiry,reminder_key) values($1,$2,$3) on conflict do nothing returning id",[engineer.id,engineer.license_expiry,stage]);
+      if(fresh.rowCount) await notify(db,{title: policy.mode === "disabled" ? "Workspace access disabled" : policy.mode === "view_only" ? "Seven-day viewing period started" : "License replacement preparation notice",recipientIds:[engineer.id,...admins],
+        detail: engineer.full_name + ' · Company policy: viewing-only access starts ' + policy.noticeOn + '; workspace access ends ' + policy.disabledOn + ' unless renewal is verified. Contact Admin to arrange verification.'});
+    }
+    if (underReview.has(engineer.id)) continue;
     const key = reminderKeyFor(state, rules.reminderDays);
     if (!key) continue;
     const first = await db.query(
@@ -58,13 +78,13 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
       await notify(db, { title: "Engineer license expired: assignment needs cover", recipientIds: others,
         detail: `${engineer.full_name} · license ${when(state)} · not renewed after the grace period` });
       await notify(db, { title: "Your license was not renewed", recipientIds: [engineer.id],
-        detail: "The grace period has ended. An Administrator may reassign your work. Upload a renewed license to be considered for new assignments." });
+        detail: "Workspace access is restricted under company policy. Contact your Administrator to submit and verify your renewed license." });
       result.graceEnded++;
     } else {
       const left = state.graceDaysLeft;
       await notify(db, { title: "License renewal reminder", recipientIds: [engineer.id],
         detail: state.restricted
-          ? `Your PRC license ${when(state)}. ${left} day${left === 1 ? "" : "s"} left in the grace period. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.`
+          ? `Your PRC license ${when(state)}. Workspace access is restricted under company policy. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.`
           : `Your PRC license ${when(state)}. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.` });
       await notify(db, { title: "Engineer license reminder", recipientIds: others, detail: `${engineer.full_name} · license ${when(state)}` });
       result.reminders++;

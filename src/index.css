@@ -1493,3 +1493,9 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .report-attachments ul { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; }
 .report-attachments li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .report-attachments small { color: var(--color-muted); font-size: 14px; }
+
+.appointment-confirmation { padding: 16px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); display: grid; gap: 12px; }
+.appointment-confirmation > label { display: flex; align-items: flex-start; gap: 10px; }
+.override-candidates small { overflow-wrap: anywhere; }
+.override-form .override-candidates input[type="radio"], .override-form .appointment-confirmation input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin-top: 3px; padding: 0; }
+.override-candidates label > span { min-width: 0; }

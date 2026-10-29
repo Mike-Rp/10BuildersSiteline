@@ -338,6 +338,8 @@ export const regeneratePassword = async (req, res) => {
       if (typeof req.body?.adminPassword !== "string" || !(await bcrypt.compare(req.body.adminPassword, admin.password_hash))) throw new HttpError(403, "Administrator password is incorrect.");
       const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
       if (!target) throw new HttpError(404, "Account not found.");
+      const resetMeta = (await client.query("select metadata from workspace_account_metadata where user_id=$1",[id])).rows[0]?.metadata || {};
+      if(req.body?.requestedAt !== undefined && resetMeta.passwordResetRequestedAt !== req.body.requestedAt) throw new HttpError(409,"This reset request has changed or was already completed. Refresh the requests.");
       const tempPassword = makeTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(
@@ -345,7 +347,9 @@ export const regeneratePassword = async (req, res) => {
           WHERE id = $1 AND COALESCE(is_deleted, false) = false RETURNING id`, [id, passwordHash, actor.id]);
       if (updated.rowCount === 0) throw new HttpError(404, "Account not found.");
       await client.query(`DELETE FROM users_token WHERE user_id = $1`, [id]); // old sessions stop working
-      await client.query("update workspace_account_metadata set metadata=metadata - 'passwordResetRequestedAt' where user_id=$1", [id]);
+      const history = [...(resetMeta.passwordResetHistory || [])];
+      if(resetMeta.passwordResetRequestedAt) history.push({requestedAt:resetMeta.passwordResetRequestedAt,completedAt:new Date().toISOString(),completedBy:actor.id});
+      await client.query("update workspace_account_metadata set metadata=(metadata - 'passwordResetRequestedAt' - 'passwordResetReadBy')||jsonb_build_object('passwordResetHistory',$2::jsonb) where user_id=$1", [id,JSON.stringify(history.slice(-20))]);
       return { id, temp_password: tempPassword };
     });
     return sendOk(res, "Temporary password issued.", 1, data);

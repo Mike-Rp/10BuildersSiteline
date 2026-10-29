@@ -1,3 +1,4 @@
+import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE, LICENSE_ACCESS_DISABLED_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { locationError, normalizeLocation, type OperatingLocation } from "../Thesis-Backend/src/domain/operating-location.js"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
@@ -857,10 +858,9 @@ export function applyWorkflow(
     actor && actor.status === "active",
     "This account is not eligible for an active session.",
   )
-  assert(
-    !LICENSE_COMMANDS.has(command.type) || !licenseExpired(actor),
-    LICENSE_PAUSED_MESSAGE,
-  )
+  const access = licenseAccessPolicy(actor.expiry)
+  assert(access.mode !== "disabled", LICENSE_ACCESS_DISABLED_MESSAGE)
+  assert(access.mode !== "view_only" || command.type === "view_document", LICENSE_VIEW_ONLY_MESSAGE)
   assert(
     actor.role === "opm" || actor.role === "spm",
     "This action requires an Office PM or Site PM session.",

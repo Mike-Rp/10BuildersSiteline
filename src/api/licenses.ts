@@ -29,10 +29,10 @@ export const fetchOverrideOptions = (projectId: string, stageId?: number | null)
   api<OverrideOptions>(
     "/licenses/override-options?project_id=" + encodeURIComponent(projectId) + (stageId ? "&stage_id=" + stageId : ""),
   )
-export const createOverride = (input: { projectId: string; stageId?: number | null; toUserId: string; reason: string }) =>
+export const createOverride = (input: { projectId: string; stageId?: number | null; toUserId: string; fromUserId: string; reason: string; appointmentSigned: boolean; signedOn: string }) =>
   api("/licenses/overrides", {
     method: "POST",
-    json: { project_id: input.projectId, stage_id: input.stageId ?? null, to_user_id: input.toUserId, reason: input.reason },
+    json: { project_id: input.projectId, stage_id: input.stageId ?? null, to_user_id: input.toUserId, reason: input.reason, from_user_id: input.fromUserId, appointment_signed: input.appointmentSigned, signed_on: input.signedOn },
   })
 export const acceptRequest = (id: number) => api("/licenses/requests/" + id + "/accept", { method: "POST", json: {} })
 export const declineRequest = (id: number, note: string) =>

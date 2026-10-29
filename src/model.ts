@@ -742,7 +742,7 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     a.status === "active" &&
     !a.assignmentHold &&
     a.eligibleForNewAssignment !== false &&
-    !licenseExpired(a) &&
+    Boolean(a.expiry) && daysUntil(a.expiry) > 30 &&
     workload(state, a.id, excluding) < state.rules.cap &&
     !(a.cooldown && a.cooldown > Date.now())
   )

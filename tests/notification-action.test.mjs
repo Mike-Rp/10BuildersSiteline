@@ -32,3 +32,7 @@ test("the adapter retains a license subject from the canonical anchor without tr
   assert.equal(mapEvent({ ...base, anchor_reference: `license:${self}:expiring_soon:2026-10-31` }).accountId, self)
   assert.equal(mapEvent({ ...base, anchor_reference: "license:not-a-user:expired", actor_user_id: other, detail: self }).accountId, undefined)
 })
+
+test('Admin password-reset notifications open the dedicated dashboard view',()=>{
+  assert.deepEqual(notificationAction(event({title:'Password reset requested',accountId:other}),{id:self,role:'admin'},[],[{id:other}],[]),{kind:'page',page:'Dashboard',label:'Review password reset requests'})
+})

@@ -76,6 +76,13 @@ async function request<T>(
           window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
         }
       }
+      if (response.status === 403 && token && getToken() === token) {
+        const failure = await response.clone().json().catch(() => undefined)
+        if (failure?.error?.code === "LICENSE_ACCESS_DISABLED") {
+          setToken("")
+          if (typeof window !== "undefined") window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: failure.error.message }))
+        }
+      }
       return consume(response)
     }, { signal: init.signal, timeoutMs: init.body instanceof FormData ? 120_000 : 30_000 })
   } catch (error) {

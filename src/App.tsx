@@ -350,6 +350,7 @@ function AppInner() {
     }
   }, [signedOut, actor.role, loginPortal, routePath])
   const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
+  const [resetRequestFocus,setResetRequestFocus]=useState(0)
   const [sessionMessage, setSessionMessage] = useState("")
   const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
   const [checkingSession, setCheckingSession] = useState(true)
@@ -1426,10 +1427,10 @@ function AppInner() {
       delayedCount={delayedProjects(active, scheduleToday).length}
       onDelayedProjects={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }}
       readinessAvailable={readinessAvailable}
-      overview={{ ...adminDashboardOverview(state), items: [
-        ...requests.map(request => ({ key: "password-reset:" + request.id, id: request.id, kind: "account" as const, category: "requests" as const, title: request.full_name, detail: "Password reset requested: " + request.email, label: "Reset password", icon: "shield" })),
-        ...adminDashboardOverview(state).items,
-      ] }}
+      overview={adminDashboardOverview(state)}
+      resetRequests={requests}
+      onOpenReset={openReset}
+      resetRequestFocus={resetRequestFocus}
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
       onMonthlyReport={() => setMonthlySummaryOpen(true)}
@@ -2250,7 +2251,7 @@ function AppInner() {
               {(() => {
                 const li = state.license?.overview?.find((i) => i.id === p.opmId)
                 const asg = li?.assignments.find((x) => x.projectId === p.id && x.role === "opm")
-                return li?.restricted && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
+                return li && li.daysToExpiry !== null && li.daysToExpiry <= 33 && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
               })()}
               <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === p.opmId)?.expiry} projectEnd={p.end} />
               <div className="phase-assignments">
@@ -2297,7 +2298,7 @@ function AppInner() {
                     {(() => {
                       const li = state.license?.overview?.find((i) => i.id === t.accountId)
                       const asg = li?.assignments.find((x) => x.projectId === p.id && x.role === "spm" && x.stage?.toLowerCase() === t.phase.toLowerCase())
-                      return li?.restricted && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
+                      return li && li.daysToExpiry !== null && li.daysToExpiry <= 33 && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
                     })()}
                   </div>
                 ))}
@@ -3177,7 +3178,7 @@ function AppInner() {
           onDone={async () => {
             setOverrideTarget(undefined)
             await reloadWorkspace()
-            setToast("Reassignment requested. Nothing moves until the replacement accepts.")
+            setToast("Office signing confirmed. The replacement is now assigned.")
           }}
         />
       )}
@@ -3389,7 +3390,8 @@ function AppInner() {
         action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Reports", "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)
-          if (action.kind === "project") setDialog({ kind: "project", id: action.id })
+          if (/password reset requested/i.test(selectedNotification.title)) { navigate("Dashboard"); setResetRequestFocus(value=>value+1) }
+          else if (action.kind === "project") setDialog({ kind: "project", id: action.id })
           else if (action.kind === "account") setDialog({ kind: "account", id: action.id })
           else if (action.kind === "page") {
             setDialog(undefined)

@@ -1,3 +1,4 @@
+import { licenseAccessPolicy, licensePolicyDay } from "../../domain/license-access.js";
 // License status is always CALCULATED from the expiry date against the server's local today.
 // Nothing here is stored or typed in by a person.
 import execute from "./query.utility.js";
@@ -7,7 +8,7 @@ export const DEFAULT_GRACE_DAYS = 30;
 
 const pad = (n) => String(n).padStart(2, "0");
 /** Local calendar day as YYYY-MM-DD. */
-export const localDay = (date = new Date()) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+export const localDay = (date = new Date()) => licensePolicyDay(date);
 const dayNumber = (iso) => {
   const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
   return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
@@ -39,6 +40,7 @@ export function computeLicenseStatus({ expiry, today = localDay(), reminderDays,
   const graceEnded = expired && daysBetween(graceEndsOn, today) > 0;
   const base = expired ? "expired" : daysToExpiry <= Math.max(...reminders) ? "expiring_soon" : "valid";
   return {
+    access: licenseAccessPolicy(day, today),
     status: renewalOpen ? "renewal_under_review" : base,
     base,
     restricted: expired,
@@ -97,3 +99,5 @@ export async function loadLicenseStates(userIds, { db, today = localDay() } = {}
   }
   return states;
 }
+
+export const needsLicenseReplacement = state => Number.isFinite(state.daysToExpiry) && state.daysToExpiry <= 33;

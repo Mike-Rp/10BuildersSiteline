@@ -14,6 +14,7 @@ const isIsoDate = (value) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value || "") && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
 export const publicState = (s) => ({
+  access: s.access,
   status: s.status, base: s.base, restricted: s.restricted, expiry: s.expiry, daysToExpiry: s.daysToExpiry,
   graceEndsOn: s.graceEndsOn, graceDaysLeft: s.graceDaysLeft, graceEnded: s.graceEnded,
   graceDays: s.rules.graceDays, reminderDays: s.rules.reminderDays, licenseNumber: s.licenseNumber,

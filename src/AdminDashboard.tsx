@@ -1,4 +1,6 @@
-import { useRef, useState, type ReactNode } from "react"
+import PasswordResetRequestPanel from "./PasswordResetRequestPanel"
+import type { PasswordResetRequest } from "./PasswordResetRequests"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Button, Empty, Icon } from "./ui"
 import type { DashboardCategory, DashboardItem } from "./admin-dashboard"
 import UrgentActionBanner from "./UrgentActionBanner"
@@ -12,7 +14,10 @@ const categories: ["all" | DashboardCategory, string][] = [
   ["all", "All"], ["requests", "Requests"], ["licenses", "Licenses"], ["updates", "Project updates"], ["intake", "Intake"],
 ]
 
-export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
+export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, resetRequests = [], onOpenReset = () => {}, resetRequestFocus = 0, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
+  resetRequests?: PasswordResetRequest[]
+  onOpenReset?: (id:string,requestedAt?:string) => void
+  resetRequestFocus?: number
   delayedCount?: number
   onDelayedProjects?: () => void
   readinessAvailable?: boolean
@@ -24,6 +29,11 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   onActivity: () => void
   activity: ReactNode
 }) {
+  const [attentionView,setAttentionView]=useState("priority")
+  const pendingResets=resetRequests.filter(r=>r.status!=='completed')
+  const resetUnread=pendingResets.filter(r=>!r.read_at).length
+  const followUpTotal=overview.items.length+pendingResets.length
+  useEffect(()=>{if(resetRequestFocus>0)setAttentionView("password")},[resetRequestFocus])
   const [category, setCategory] = useState<"all" | DashboardCategory>("all")
   const [page, setPage] = useState(1)
   const [blockersOnly, setBlockersOnly] = useState(false)
@@ -48,15 +58,26 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
       </div>
     </PageTitlePanel>
     <ExecutiveSummary
-      description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${overview.items.length} follow-up ${overview.items.length === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
+      description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${followUpTotal} follow-up ${followUpTotal === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
       metrics={[
         { label: "Active projects", value: overview.activeProjects, hint: "Open Active sites", icon: "building", onOpen: () => onNavigate("Active sites") },
         { label: "Projects in intake", value: overview.intakeProjects, hint: "Open Project intake", onOpen: () => onNavigate("Project intake") },
-        { label: "Follow-up items", value: overview.items.length, hint: "Review needs attention", icon: "alert", onOpen: showAttention },
+        { label: "Follow-up items", value: followUpTotal, hint: "Review needs attention", icon: "alert", onOpen: showAttention },
         { label: "Team accounts", value: overview.teamAccounts, hint: "Active and invited accounts", icon: "users", onOpen: () => onNavigate("Team") },
       ]}
     />
-    <UrgentActionBanner items={priorities.map(adminBannerItem)} label="Priority attention" className={readinessAvailable && blockers.length ? "ao-blocker-banner" : ""}
+    <div className="dashboard-attention-switch" role="tablist" aria-label="Dashboard attention views" onKeyDown={event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return
+      event.preventDefault()
+      const next=event.key==='Home'?'priority':event.key==='End'?'password':attentionView==='priority'?'password':'priority'
+      setAttentionView(next)
+      event.currentTarget.querySelector<HTMLButtonElement>(next==='priority'?'#priority-items-tab':'#password-requests-tab')?.focus()
+    }}>
+      <button id="priority-items-tab" role="tab" aria-selected={attentionView==='priority'} aria-controls="priority-items-panel" tabIndex={attentionView==='priority'?0:-1} onClick={()=>setAttentionView('priority')}>Priority items ({priorities.length})</button>
+      <button id="password-requests-tab" role="tab" aria-selected={attentionView==='password'} aria-controls="password-requests-panel" tabIndex={attentionView==='password'?0:-1} onClick={()=>setAttentionView('password')}>Password reset requests ({pendingResets.length}) {resetUnread>0 && <span className="reset-unread-dot" aria-label={resetUnread+' unread requests'}/>}</button>
+    </div>
+    <div id="priority-items-panel" role="tabpanel" aria-labelledby="priority-items-tab" hidden={attentionView!=='priority'}>
+      <UrgentActionBanner items={priorities.map(adminBannerItem)} label="Priority attention" className={readinessAvailable && blockers.length ? "ao-blocker-banner" : ""}
       description={`${readinessAvailable && blockers.length ? `${blockers.length} ${blockers.length === 1 ? "project cannot" : "projects cannot"} advance. ` : ""}Review urgent deadlines, license alerts and actions that need a decision.`}
       actionLabel={readinessAvailable && blockers.length ? blockers.length === 1 ? "Review issue" : "View blockers" : "Review priority items"}
       onOpen={item => { const source = priorities.find(priority => priority.key === item.key); if (source) onOpen(source) }}
@@ -64,6 +85,11 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
         if (readinessAvailable && blockers.length === 1) onOpen(blockers[0])
         else { setBlockersOnly(readinessAvailable && blockers.length > 0); setPriorityOnly(true); setPage(1); attentionHeading.current?.focus(); attentionHeading.current?.scrollIntoView?.({block:"nearest",behavior:"auto"}) }
       }} />
+      {!priorities.length && <Empty title="No priority items">Urgent deadlines and license alerts will appear here.</Empty>}
+    </div>
+    <div id="password-requests-panel" role="tabpanel" aria-labelledby="password-requests-tab" hidden={attentionView!=='password'}>
+      {attentionView==='password' && <PasswordResetRequestPanel requests={resetRequests} onOpen={onOpenReset}/>}
+    </div>
     <div className="ao-content">
       <section className="ao-panel" aria-labelledby="ao-attention-title">
         <header className="ao-panel-header"><div><h2 id="ao-attention-title" ref={attentionHeading} tabIndex={-1}>Needs attention</h2><p>Open an item to view its details and existing actions.</p></div><span className="ao-count" aria-label={`${overview.items.length + Number(delayedCount > 0)} attention items`}>{overview.items.length + Number(delayedCount > 0)}</span></header>

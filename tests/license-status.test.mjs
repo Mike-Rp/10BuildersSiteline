@@ -1,3 +1,4 @@
+import { LICENSE_ACCESS_DISABLED_MESSAGE, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 // Expired engineer license workflow: pure rules (status calculation, reminders, the pause gate, the assignment
 // warning and the local pre-check). Dates are fixed, so these never depend on when the tests run.
 import assert from "node:assert/strict"
@@ -110,7 +111,7 @@ test("the backend gate pauses an expired Office PM or Site PM and nobody else", 
       (error) => error.status === 403 && error.message === LICENSE_PAUSED_MESSAGE && error.errorCode === LICENSE_PAUSED_CODE,
     )
     // Valid through the expiry day itself, and with no license on file (that case is blocked from new assignments only).
-    await assertLicenseActive({ id: "u", role }, dbWith("2026-10-22"), TODAY)
+    await assert.rejects(assertLicenseActive({ id: "u", role }, dbWith("2026-10-22"), TODAY), {status:403})
     await assertLicenseActive({ id: "u", role }, dbWith(undefined), TODAY)
     await assertLicenseActive({ id: "u", role }, dbWith("2030-01-01"), TODAY)
   }
@@ -163,7 +164,7 @@ test("an expired license puts the engineer on hold for new assignments straight 
   }
 })
 
-test("the screen refuses to sign, submit or approve with an expired license, and allows reading and notes", () => {
+test("expired engineers cannot mutate or view workspace records after the company viewing period", () => {
   const state = initialState()
   const spm = state.accounts.find((a) => a.id === "a4")
   const opm = state.accounts.find((a) => a.id === "a2")
@@ -176,20 +177,14 @@ test("the screen refuses to sign, submit or approve with an expired license, and
       assert.ok(LICENSE_COMMANDS.has(type), `${type} is a license command`)
       assert.throws(
         () => applyWorkflow(expired(account), account.id, { type, projectId: "p1" }),
-        { message: LICENSE_PAUSED_MESSAGE },
+        { message: LICENSE_ACCESS_DISABLED_MESSAGE },
         `${account.id} ${type}`,
       )
     }
   }
-  // Declining, notes, photos and viewing stay open: they fail for ordinary reasons, never the pause.
-  for (const type of ["add_note", "view_document", "add_photo", "decline_assignment", "request_changes"]) {
-    assert.ok(!LICENSE_COMMANDS.has(type), `${type} is not a license command`)
-    try {
-      applyWorkflow(expired(spm), spm.id, { type, projectId: "missing-project" })
-    } catch (error) {
-      assert.notEqual(error.message, LICENSE_PAUSED_MESSAGE, type)
-    }
-  }
+  const viewOnly = {...state, accounts: state.accounts.map(a => a.id === spm.id ? {...a,expiry:inDays(28)} : a)}
+  assert.throws(() => applyWorkflow(viewOnly,spm.id,{type:"add_note",projectId:"p1"}),{message:LICENSE_VIEW_ONLY_MESSAGE})
+
 })
 
 test("every command the backend pauses is also paused by the screen", () => {
@@ -199,4 +194,16 @@ test("every command the backend pauses is also paused by the screen", () => {
   const names = [...list[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1])
   assert.ok(names.length >= 10)
   for (const name of names) assert.ok(LICENSE_COMMANDS.has(name), `${name} is paused by the backend but not by the screen`)
+})
+
+ test("new assignments exclude licenses expiring within 30 days for both engineer roles", () => {
+  const state = initialState()
+  for (const role of ["opm", "spm"]) {
+    const account = state.accounts.find(a => a.role === role)
+    for (const days of [-1, 0, 1, 29, 30, 31, 60]) {
+      const candidate = { ...account, status: "active", expiry: inDays(days), assignmentHold: false, eligibleForNewAssignment: true, cooldown: undefined }
+      const fixture = { ...state, projects: [], accounts: [candidate] }
+      assert.equal(eligible(fixture, candidate, role), days > 30, `${role}: ${days} days`)
+    }
+  }
 })

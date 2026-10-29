@@ -132,13 +132,32 @@ router.post("/auth/password-reset-request", async (req, res) => {
             if (!user) throw new HttpError(409, "Your account details have changed. Please look up your name again.");
             const pending = await db.query("select 1 from workspace_account_metadata where user_id=$1 and metadata->>'passwordResetRequestedAt' is not null", [user.id]);
             if (pending.rowCount) return;
-            await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('passwordResetRequestedAt',now()::text)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata", [user.id]);
+            await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('passwordResetRequestedAt',now()::text,'passwordResetReadBy','{}'::jsonb)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata", [user.id]);
             await event(db, user, null, "Password reset requested", user.full_name + " requested a password reset. Review Password reset requests on the dashboard.");
         });
         return sendOk(res, "Your request has been sent to the administrator.", 1, {});
     } catch (error) { return handleError(res, error); }
 });
-router.get("/accounts/password-reset-requests", endpoint(["admin"], async db => (await db.query("select u.id,u.full_name,u.email,m.metadata->>'passwordResetRequestedAt' as requested_at from users u join workspace_account_metadata m on m.user_id=u.id where m.metadata->>'passwordResetRequestedAt' is not null and not coalesce(u.is_deleted,false) order by m.metadata->>'passwordResetRequestedAt' asc limit 100")).rows));
+router.get("/accounts/password-reset-requests", endpoint(["admin"], async (db,user,req) => {
+    const rows=(await db.query(`select u.id,u.full_name,u.email,r.code as role,m.metadata from users u join roles r on r.id=u.role_id
+      join workspace_account_metadata m on m.user_id=u.id where not coalesce(u.is_deleted,false)
+      and (m.metadata->>'passwordResetRequestedAt' is not null or (m.metadata->'passwordResetHistory') is not null)`)).rows;
+    const pending=rows.filter(r=>r.metadata.passwordResetRequestedAt).map(r=>({id:r.id,full_name:r.full_name,email:r.email,role:r.role,status:'pending',
+      requested_at:r.metadata.passwordResetRequestedAt,read_at:r.metadata.passwordResetReadBy?.[user.id]?.requestedAt === r.metadata.passwordResetRequestedAt ? r.metadata.passwordResetReadBy[user.id].readAt : null}));
+    pending.sort((a,b)=>b.requested_at.localeCompare(a.requested_at));
+    if(req.query.include_completed !== 'true') return pending;
+    const completed=rows.flatMap(r=>(r.metadata.passwordResetHistory || []).map(h=>({id:r.id,full_name:r.full_name,email:r.email,role:r.role,status:'completed',requested_at:h.requestedAt,completed_at:h.completedAt,completed_by:h.completedBy,read_at:h.completedAt}))).sort((a,b)=>b.completed_at.localeCompare(a.completed_at)).slice(0,20);
+    return [...pending,...completed];
+}));
+router.post("/accounts/:id/password-reset-requests/read", endpoint(["admin"], async(db,user,req)=>{
+    if(!isUuid(req.params.id) || typeof req.body?.requestedAt !== 'string') throw new HttpError(400,'Invalid reset request.');
+    await db.query('select id from users where id=$1 for update',[req.params.id]);
+    const meta=(await db.query('select metadata from workspace_account_metadata where user_id=$1',[req.params.id])).rows[0]?.metadata;
+    if(!meta?.passwordResetRequestedAt || meta.passwordResetRequestedAt !== req.body.requestedAt) throw new HttpError(409,'This request has changed or was completed. Refresh the requests.');
+    const readAt=new Date().toISOString();
+    await db.query(`update workspace_account_metadata set metadata=jsonb_set(metadata,'{passwordResetReadBy}',coalesce(metadata->'passwordResetReadBy','{}'::jsonb)||$2::jsonb) where user_id=$1`,[req.params.id,JSON.stringify({[user.id]:{requestedAt:req.body.requestedAt,readAt}})]);
+    return {read_at:readAt};
+}));
 router.post("/auth/login", login);
 router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);

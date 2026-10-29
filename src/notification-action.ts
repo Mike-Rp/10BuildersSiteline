@@ -9,6 +9,7 @@ export type NotificationAction = { label: string } & (
 
 // Use current authorized workspace records, never IDs or URLs parsed from message text.
 export function notificationAction(event: Event, actor: Pick<Account, "id" | "role">, projects: Pick<Project, "id" | "name">[], accounts: Pick<Account, "id">[], pages: string[]): NotificationAction | undefined {
+  if (actor.role === "admin" && /password reset requested/i.test(event.title)) return {kind:"page",page:"Dashboard",label:"Review password reset requests"}
   if (event.projectId) {
     if (!projects.some(project => project.id === event.projectId)) return
     return { kind: "project", id: event.projectId, label: actor.role === "client" ? "Open project history" : "Open project" }

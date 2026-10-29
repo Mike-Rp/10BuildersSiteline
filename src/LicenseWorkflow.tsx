@@ -1,3 +1,4 @@
+import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 // Expired-license workflow screens. All rules (who is paused, when an override opens, who may be suggested) are
 // enforced by the backend; these components only show the state and send the requests.
 import { useEffect, useState, type ReactNode } from "react"
@@ -17,6 +18,13 @@ import type {
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : "Something went wrong. Try again.")
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
+const appointmentNote = (note: string) => {
+  try {
+    const audit = JSON.parse(note)
+    if (audit.appointmentSigned) return `Office appointment signed ${dateLabel(audit.signedOn)} · confirmed by Admin`
+  } catch { /* Historical free-text response. */ }
+  return note
+}
 
 /** Warning shown while assigning: the engineer's license ends before the project does. Never blocks. */
 export function LicenseAssignmentWarning({ expiry, projectEnd }: { expiry?: string; projectEnd?: string }) {
@@ -43,30 +51,23 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
   let icon = "clock"
   let title = ""
   let detail: ReactNode = null
-  if (license.status === "renewal_under_review") {
-    tone = "info"
-    icon = "shield"
+  const policy = licenseAccessPolicy(license.expiry)
+  if (policy.mode === "view_only") {
+    title = "Viewing-only access · " + plural(policy.viewingDaysLeft || 0, "day") + " remaining"
+    detail = "Under company policy, submissions and approvals are disabled. Workspace access ends on " + dateLabel(policy.disabledOn || "") + ". Your past work stays on record."
+  } else if (policy.mode === "disabled") {
+    title = "Workspace access restricted"
+    detail = "Contact Admin to verify your renewed license and restore eligible access."
+  } else if (policy.prepareReplacement) {
+    title = "Replacement preparation notice"
+    detail = "Admin is preparing a replacement. Viewing-only access begins on " + dateLabel(policy.noticeOn || "") + "; workspace access ends on " + dateLabel(policy.disabledOn || "") + " unless renewal is verified."
+  } else if (license.status === "renewal_under_review") {
     title = "Renewal under review"
-    detail = license.restricted
-      ? `${LICENSE_PAUSED_MESSAGE}. An Administrator is reviewing your license renewal.`
-      : `An Administrator is reviewing your license renewal. Your current license expires on ${expiry}.`
-  } else if (license.restricted && license.graceEnded) {
-    tone = "red"
-    icon = "alert"
-    title = "Your license was not renewed"
-    detail = `${LICENSE_PAUSED_MESSAGE}. The grace period ended on ${dateLabel(license.graceEndsOn || license.expiry)}, so an Administrator may reassign your work. Your past work and approvals stay on record.`
-  } else if (license.restricted) {
-    tone = "red"
-    icon = "alert"
-    title = `License expired on ${expiry}`
-    detail = `${LICENSE_PAUSED_MESSAGE}. ${plural(license.graceDaysLeft ?? 0, "day")} left in the grace period. You keep your assignments and can still view everything.`
+    detail = "An Administrator is verifying your renewed license."
   } else if (license.status === "expiring_soon") {
-    const days = daysUntil(license.expiry)
-    title = days === 0 ? "Your license expires today" : `Your license expires in ${plural(days, "day")}`
-    detail = `PRC license valid until ${expiry}.`
-  } else {
-    return null
-  }
+    title = "Your license expires in " + plural(daysUntil(license.expiry), "day")
+    detail = "PRC license valid until " + expiry + "."
+  } else return null
   return (
     <section className={`license-banner ${tone}`} role="status" aria-label="License status">
       <span className="license-banner-icon">
@@ -196,6 +197,8 @@ export function OverrideDialog({
   const [options, setOptions] = useState<OverrideOptions>()
   const [picked, setPicked] = useState("")
   const [reason, setReason] = useState("")
+  const [signed, setSigned] = useState(false)
+  const [signedOn, setSignedOn] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   useEffect(() => {
@@ -216,9 +219,10 @@ export function OverrideDialog({
     e.preventDefault()
     if (!picked) return setError("Choose a replacement.")
     if (!reason.trim()) return setError("A reason is required. It is visible to Administrators only.")
+    if (!signed || !signedOn) return setError("Confirm the appointment was signed at the office and enter its signing date.")
     setBusy(true)
     try {
-      await licenses.createOverride({ projectId: target.projectId, stageId: target.stageId, toUserId: picked, reason: reason.trim() })
+      await licenses.createOverride({ projectId: target.projectId, stageId: target.stageId, toUserId: picked, fromUserId: options!.current.id, reason: reason.trim(), appointmentSigned: signed, signedOn })
       onDone()
     } catch (err) {
       setError(messageOf(err))
@@ -228,7 +232,7 @@ export function OverrideDialog({
   const place = options ? (options.role === "opm" ? "Office PM role" : options.stage) : ""
   return (
     <Modal
-      title="Override assignment"
+      title="Prepare engineer replacement"
       subtitle={options ? `${options.project.name} · ${place}` : "Loading…"}
       onClose={onClose}
       wide
@@ -248,7 +252,7 @@ export function OverrideDialog({
             <strong>{options.current.name}</strong>
             {options.isLead && <Badge tone="amber">Lead Site PM</Badge>}
             <small>
-              License expired {options.current.expiry ? dateLabel(options.current.expiry) : ""}
+              License expiry {options.current.expiry ? dateLabel(options.current.expiry) : ""}
               {options.current.reason ? ` · ${options.current.reason}` : ""}
             </small>
             {options.summary.required !== null && (
@@ -261,16 +265,7 @@ export function OverrideDialog({
             <div className="notice neutral">
               <Icon name="clock" />
               <p>
-                {options.current.restricted
-                  ? `The grace period ends on ${options.current.graceEndsOn ? dateLabel(options.current.graceEndsOn) : "a later date"}. Override opens after that.`
-                  : "This engineer's license is valid, so no override is needed."}
-              </p>
-            </div>
-          ) : options.pending ? (
-            <div className="notice">
-              <Icon name="clock" />
-              <p>
-                Waiting for {options.pending.to_name} to accept. The current engineer stays on record and pending work stays where it is.
+                Replacement becomes available when the license has 33 days or fewer remaining.
               </p>
             </div>
           ) : (
@@ -288,6 +283,7 @@ export function OverrideDialog({
                     <input type="radio" name="replacement" checked={picked === c.id} onChange={() => setPicked(c.id)} />
                     <span>
                       <strong>{c.name}</strong>
+                      <small>Contact number: {c.phone || "Not on file"} · Email: {c.email || "Not on file"}</small>
                       {c.best && <Badge tone="green">Best match</Badge>}
                       <small>
                         {options.role === "spm" ? `${c.matchPercent}% discipline match · ` : ""}
@@ -306,14 +302,20 @@ export function OverrideDialog({
               <Field label="Reason (visible to Administrators only) *" wide>
                 <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
               </Field>
+              <section className="appointment-confirmation">
+                <h3>Office appointment confirmation</h3>
+                <p>Contact the chosen engineer and arrange signing at the office. Confirm only after the appointment is signed.</p>
+                <label><input type="checkbox" checked={signed} onChange={e => setSigned(e.target.checked)} /> I confirm the project-specific appointment was signed at the office.</label>
+                <Field label="Actual signing date"><input type="date" value={signedOn} max={new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())} onChange={e => setSignedOn(e.target.value)} required /></Field>
+              </section>
               <div className="notice neutral what-happens">
                 <Icon name="shield" />
                 <div>
                   <strong>What happens</strong>
                   <ul>
                     <li>Past approvals stay valid.</li>
-                    <li>Pending activities move to the replacement once they accept.</li>
-                    <li>The replacement must accept before anything changes.</li>
+                    <li>Pending activities move to the replacement when you approve the switch.</li>
+                    <li>Your approval confirms office signing and switches the assignment immediately. No in-system acceptance is needed.</li>
                     {options.isLead && <li>The Lead Site PM designation moves with this phase.</li>}
                     <li>The original engineer stays on record.</li>
                     <li>The client is not notified.</li>
@@ -329,7 +331,7 @@ export function OverrideDialog({
                 <p key={p.id}>
                   {p.to_name} · {p.status.replace(/_/g, " ")} · {dateLabel(p.requested_at.slice(0, 10))}
                   <small>Reason: {p.reason}</small>
-                  {p.response_note && <small>Reply: {p.response_note}</small>}
+                  {p.response_note && <small>{appointmentNote(p.response_note)}</small>}
                 </p>
               ))}
             </section>
@@ -340,10 +342,10 @@ export function OverrideDialog({
             </p>
           )}
           <div className="modal-actions">
-            <Button onClick={onClose}>{options.available && !options.pending ? "Cancel" : "Close"}</Button>
-            {options.available && !options.pending && (
-              <Button type="submit" variant="primary" disabled={busy || !options.candidates.length}>
-                Request reassignment
+            <Button onClick={onClose}>{options.available ? "Cancel" : "Close"}</Button>
+            {options.available && (
+              <Button type="submit" variant="primary" disabled={busy || !options.candidates.length || !signed || !signedOn}>
+                Approve & switch engineer
               </Button>
             )}
           </div>
@@ -498,17 +500,17 @@ export function PhaseLicenseFlag({
     <div className="phase-flag" role="note">
       <Icon name="alert" size={16} />
       <span>
-        License expired {expired} ·{" "}
-        {item.graceEnded ? "Not renewed after the grace period" : `${plural(item.graceDaysLeft ?? 0, "day")} left in the grace period`}
+        License expiry {expired} ·{" "}
+        {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? "Replacement overdue; new assignments disabled" : "Prepare replacement before the 30-day notice"}
       </span>
-      {item.graceEnded ? (
+      {item.daysToExpiry !== null && item.daysToExpiry <= 33 ? (
         assignment.pendingOverrideId ? (
           <Badge tone="amber">Waiting for replacement</Badge>
         ) : (
-          <Button onClick={() => onOverride({ projectId: assignment.projectId, stageId: assignment.stageId })}>Override assignment</Button>
+          <Button onClick={() => onOverride({ projectId: assignment.projectId, stageId: assignment.stageId })}>Prepare replacement</Button>
         )
       ) : (
-        <small>Override opens {item.graceEndsOn ? dateLabel(item.graceEndsOn) : "after the grace period"}.</small>
+        <small>Replacement preparation opens 33 days before license expiry.</small>
       )}
     </div>
   )
@@ -529,18 +531,15 @@ export function LicenseProfileBlock({
   if (!item) return null
   return (
     <div className="license-profile">
-      {item.restricted && !item.graceEnded && (
+      {item.daysToExpiry !== null && item.daysToExpiry <= 33 && (
         <p className="license-warning">
           <Icon name="alert" size={16} />
           <span>
-            Expired · {plural(item.graceDaysLeft ?? 0, "day")} left in the grace period. Signing and approving are paused. Override opens{" "}
-            {item.graceEndsOn ? dateLabel(item.graceEndsOn) : "after the grace period"}.
+            {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? "New assignments disabled. Replace this engineer or verify their renewed license." : "Prepare and contact a replacement before the 30-day notice."}
           </span>
         </p>
       )}
-      {item.restricted && item.graceEnded && (
-        <p className="error">Not renewed after the grace period. Signing and approving stay paused; assignments need cover.</p>
-      )}
+      {item.expiry && <p className="license-note">License expiry: {dateLabel(item.expiry)} · Viewing-only starts: {dateLabel(licenseAccessPolicy(item.expiry).noticeOn || "")} · Workspace access ends: {dateLabel(licenseAccessPolicy(item.expiry).disabledOn || "")}</p>}
       {reviewing && (
         <p className="license-warning">
           <Icon name="shield" size={16} />
@@ -558,9 +557,8 @@ export function LicenseProfileBlock({
               {a.pendingOverrideId ? (
                 <Badge tone="amber">Waiting for replacement</Badge>
               ) : (
-                item.graceEnded &&
-                item.restricted && (
-                  <Button onClick={() => onOverride({ projectId: a.projectId, stageId: a.stageId })}>Override assignment</Button>
+                item.daysToExpiry !== null && item.daysToExpiry <= 33 && (
+                  <Button onClick={() => onOverride({ projectId: a.projectId, stageId: a.stageId })}>Replace engineer</Button>
                 )
               )}
             </span>

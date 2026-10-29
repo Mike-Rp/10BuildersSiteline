@@ -1,3 +1,4 @@
+import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSignOutConfirmation from "./useSignOutConfirmation"
@@ -463,6 +464,7 @@ export default function RoleWorkspace({
     ],
   })
   async function act(command: WorkflowCommand, success?: string) {
+    if (licenseAccessPolicy(actor.expiry).mode !== "normal" && command.type !== "view_document") { setError(LICENSE_VIEW_ONLY_MESSAGE); return false }
     // Guard synchronously: a second click can arrive before React renders disabled controls.
     if (savingRef.current) return false
     savingRef.current = true
