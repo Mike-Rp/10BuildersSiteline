@@ -563,7 +563,6 @@ export default function RoleWorkspace({
             </div>
             <h1>
               {title}
-              <span className="heading-dot">.</span>
             </h1>
           </div>
           {action}

@@ -61,7 +61,6 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 }
 #root :is(button, a, summary, input, select, textarea):focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
 #root button:disabled { opacity: 1; background: var(--color-canvas); border-color: var(--color-line); color: var(--color-muted); box-shadow: none; }
-#root .heading-dot { color: inherit; }
 #root .eyebrow { color: var(--color-muted); font-size: var(--text-caption); font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
 
 /* A quiet, architectural frame; navigation is legible rather than compressed. */

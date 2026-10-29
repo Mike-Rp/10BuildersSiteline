@@ -86,8 +86,11 @@ test("both login pages use the approved branding and submit to their own server 
       assert.equal(requests.at(-1).body.email,'person@example.test')
       assert.match(document.querySelector('.login-error').textContent,/correct sign-in page/)
       assert.equal(client.getToken(),'')
-      await act(()=>document.querySelector('.login-help a').click())
-      assert.ok(document.querySelector('[role="dialog"][aria-label="Request a password reset"]'))
+      if(admin) assert.equal(document.querySelector('.login-help'),null)
+      else {
+        await act(()=>document.querySelector('.login-help a').click())
+        assert.ok(document.querySelector('[role="dialog"][aria-label="Request a password reset"]'))
+      }
       await act(()=>root.render(null))
     }
   } finally {

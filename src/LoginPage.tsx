@@ -222,9 +222,9 @@ export default function LoginPage({
                   ⚠ {SIGN_IN_MESSAGES.capsLock}
                 </small>
               )}
-              <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>{admin ? "Need help signing in?" : "Forgot password?"}</a>
-              </p>
+              {!admin && <p className="login-help">
+                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+              </p>}
               {error && (
                 <div className="login-error" role="alert">
                   <Icon name="alert" size={18} />

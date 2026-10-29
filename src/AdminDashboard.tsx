@@ -41,7 +41,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   }
   return <div className="admin-overview">
     <header className="ao-heading">
-      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Dashboard<span>.</span></h1></div>
+      <div className="ao-title-card"><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Dashboard</h1></div>
       <div className="dashboard-actions">
         <Button icon="doc" onClick={onMonthlyReport}>Monthly report</Button>
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>

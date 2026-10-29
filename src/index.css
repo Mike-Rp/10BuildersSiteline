@@ -122,7 +122,6 @@ kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--
 .mid-dot { color: var(--color-muted); padding: 0 4px; }
 .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 29px; }
 .eyebrow { color: var(--color-muted); font-weight: 600; font-size: 14px; letter-spacing: 1.55px; margin-bottom: 8px; }
-.heading-dot { color: var(--color-muted); }
 .page-heading p { color: var(--color-muted); font-size: 14px; margin-top: 8px; }
 .page-heading > .button { min-height: 40px; padding-inline: 15px; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 17px; margin-bottom: 22px; }
