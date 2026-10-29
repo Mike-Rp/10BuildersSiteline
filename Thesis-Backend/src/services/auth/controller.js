@@ -9,10 +9,11 @@ import { authenticate } from "../../common/utilities/auth.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError,sendOk,sendError,handleError,requireUser } from "../../common/utilities/access.utility.js";
 
-export const login = (req,res) => signIn(req,res,false);
-export const adminLogin = (req,res) => signIn(req,res,true);
+export const login = (req,res) => signIn(req,res,["client"]);
+export const staffLogin = (req,res) => signIn(req,res,["opm","spm"]);
+export const adminLogin = (req,res) => signIn(req,res,["admin"]);
 
-async function signIn(req,res,adminOnly) {
+async function signIn(req,res,permittedRoles) {
   try {
     const {email,password}=req.body || {};
     if(typeof email!=="string" || !email.trim() || typeof password!=="string" || !password) {
@@ -28,7 +29,7 @@ async function signIn(req,res,adminOnly) {
       if(!u || !["active","invited"].includes(u.status) || !(await bcrypt.compare(password,u.password_hash))) {
         throw new HttpError(401,"Invalid credentials or unavailable account.");
       }
-      const permitted = adminOnly ? u.role === "admin" : ["opm","spm","client"].includes(u.role);
+      const permitted = permittedRoles.includes(u.role);
       if(!permitted) throw new HttpError(403,"This account cannot sign in through this page. Use the correct sign-in page.","LOGIN_PORTAL_MISMATCH");
       if(u.role==="client" && u.status==="invited") {
         const ready=await client.query(

@@ -88,8 +88,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(logoutCalls(), baseline + 1, "confirm sends exactly one logout request")
         assert.equal(client.getToken(), "")
         assert.ok(!!document.querySelector("form.login-form"), `Confirmed ${role} logout must return to login`)
-        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : '/login')
-        assert.equal(!!document.querySelector('.admin-access-badge'), role === 'admin')
+        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : role === 'client' ? '/login' : '/staff/login')
+        assert.equal(!!document.querySelector('.admin-access-badge'), role !== 'client')
         await act(() => root.render(null))
       }
     }

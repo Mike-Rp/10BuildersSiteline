@@ -98,7 +98,7 @@ test("expired engineer license workflow", { skip: !available && "Thesis-Backend 
   const idOf = (who) => ids[EMAIL[who]]
   const tokens = {}
   for (const who of Object.keys(EMAIL)) {
-    const r = await fetch(base + (who === "admin" ? "/auth/admin/login" : "/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: EMAIL[who], password: "Password@123" }) })
+    const r = await fetch(base + (who === "admin" ? "/auth/admin/login" : who === "client" ? "/auth/login" : "/auth/staff/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: EMAIL[who], password: "Password@123" }) })
     const b = await r.json()
     tokens[who] = b.data?.token || b.token
     assert.ok(tokens[who], "signed in " + who)

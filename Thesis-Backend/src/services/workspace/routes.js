@@ -15,7 +15,7 @@ import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, requireLogin, hasProjectAccess, HttpError, handleError, sendOk, isUuid, paging } from "../../common/utilities/access.utility.js";
-import { login, adminLogin, logout, reset } from "../auth/controller.js";
+import { login, staffLogin, adminLogin, logout, reset } from "../auth/controller.js";
 import { getSubcontractors, createSubcontractor } from "../subcontractors/controller.js";
 import subcontractors from "../subcontractors/routes.js";
 import phases from "../progress/phase.routes.js";
@@ -138,6 +138,7 @@ router.post("/auth/password-reset-request", async (req, res) => {
 });
 router.get("/accounts/password-reset-requests", endpoint(["admin"], async db => (await db.query("select u.id,u.full_name,u.email,m.metadata->>'passwordResetRequestedAt' as requested_at from users u join workspace_account_metadata m on m.user_id=u.id where m.metadata->>'passwordResetRequestedAt' is not null and not coalesce(u.is_deleted,false) order by m.metadata->>'passwordResetRequestedAt' asc limit 100")).rows));
 router.post("/auth/login", login);
+router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);
 router.post("/auth/logout", logout);
 router.post("/auth/reset-password", requireLogin, reset);

@@ -30,19 +30,20 @@ test("login portals enforce database roles before creating or replacing sessions
   for(const role of ['admin','opm','spm','client']){
     const user=accounts.find(account=>account.role===role)
     assert.ok(user,role)
-    const path=role==='admin'?'/auth/admin/login':'/auth/login'
-    const wrongPath=role==='admin'?'/auth/login':'/auth/admin/login'
+    const path=role==='admin'?'/auth/admin/login':role==='client'?'/auth/login':'/auth/staff/login'
     const credentials={email:user.email,password:'Password@123',replace_session:true}
     const accepted=await post(path,credentials)
     assert.equal(accepted.response.status,200,JSON.stringify(accepted.body))
     assert.equal(accepted.body.data.user.role,role)
     const before=(await db.query('select u.last_login_at,t.token from users u join users_token t on t.user_id=u.id where u.id=$1',[user.id])).rows[0]
-    const rejected=await post(wrongPath,{...credentials,role:role==='admin'?'opm':'admin',portal:role==='admin'?'workspace':'admin'})
-    assert.equal(rejected.response.status,403)
-    assert.equal(rejected.body.error.code,'LOGIN_PORTAL_MISMATCH')
-    assert.equal(rejected.body.data?.token,undefined)
-    const after=(await db.query('select u.last_login_at,t.token from users u join users_token t on t.user_id=u.id where u.id=$1',[user.id])).rows[0]
-    assert.deepEqual(after,before,'A wrong portal must not update login timestamps or replace a valid session')
+    for(const wrongPath of ['/auth/login','/auth/staff/login','/auth/admin/login'].filter(value=>value!==path)){
+      const rejected=await post(wrongPath,{...credentials,role:role==='admin'?'opm':'admin',portal:role==='admin'?'staff':'admin'})
+      assert.equal(rejected.response.status,403)
+      assert.equal(rejected.body.error.code,'LOGIN_PORTAL_MISMATCH')
+      assert.equal(rejected.body.data?.token,undefined)
+      const after=(await db.query('select u.last_login_at,t.token from users u join users_token t on t.user_id=u.id where u.id=$1',[user.id])).rows[0]
+      assert.deepEqual(after,before,'A wrong portal must not update login timestamps or replace a valid session')
+    }
     if(role!=='admin'){
       const protectedPage=await fetch(base+'/accounts/password-reset-requests',{headers:{Authorization:'Bearer '+accepted.body.data.token}})
       assert.equal(protectedPage.status,403,'Signing in as staff or client never grants admin API permissions')
@@ -50,16 +51,12 @@ test("login portals enforce database roles before creating or replacing sessions
   }
   const admin=accounts.find(account=>account.role==='admin')
   assert.equal((await post('/auth',{email:admin.email,password:'Password@123',replace_session:true,role:'opm'})).response.status,403,'Legacy public sign-in cannot bypass portal restrictions')
-  for(const path of ['/auth/login','/auth/admin/login']){
-    const wrong=await post(path,{email:admin.email,password:'incorrect-password'})
-    assert.equal(wrong.response.status,401)
-    assert.match(wrong.body.error.message,/Invalid credentials/)
+  const wrong=await post('/auth/staff/login',{email:admin.email,password:'incorrect-password'})
+  assert.equal(wrong.response.status,401)
+  assert.match(wrong.body.error.message,/Invalid credentials/)
+  for(const path of ['/auth/login','/auth/staff/login','/auth/admin/login']){
+    const limited=await post(path,{email:admin.email,password:'incorrect-password'})
+    assert.equal(limited.response.status,429,'All portals share the failed-login limit')
+    assert.ok(limited.response.headers.get('Retry-After'))
   }
-  let limited
-  for(let attempt=0;attempt<12;attempt++){
-    limited=await post('/auth/admin/login',{email:admin.email,password:'incorrect-password'})
-    if(limited.response.status===429)break
-  }
-  assert.equal(limited.response.status,429,'The admin endpoint is covered by failed-login throttling')
-  assert.ok(limited.response.headers.get('Retry-After'))
 })

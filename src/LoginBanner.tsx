@@ -5,8 +5,14 @@ const slides = [
   { image: "teams", label: "Team coordination", description: "Review phase assignments, confirmations, and updates with your project team." },
   { image: "documents", label: "Document management", description: "Access the plans, reports, and documents available to your account." },
 ]
+const clientSlides = [
+  { image: "construction", label: "Your project, in view", description: "Follow overall progress, project milestones, and approved updates." },
+  { image: "teams", label: "Stay connected", description: "Keep up with your project team and the latest site updates." },
+  { image: "documents", label: "Project documents, together", description: "Find the approved plans, reports, and files shared with you." },
+]
 
-export default function LoginBanner({ background = false }: { background?: boolean }) {
+export default function LoginBanner({ background = false, client = false }: { background?: boolean; client?: boolean }) {
+  const items = client ? clientSlides : slides
   const [active, setActive] = useState(background ? 1 : 0)
   const [visible, setVisible] = useState(true)
   const [desktop, setDesktop] = useState(false)
@@ -17,7 +23,7 @@ export default function LoginBanner({ background = false }: { background?: boole
     const wide = window.matchMedia("(min-width: 761px)")
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)")
     const sync = () => {
-      setDesktop(background || wide.matches)
+      setDesktop(background || client || wide.matches)
       setReducedMotion(reduced.matches)
       setVisible(!document.hidden)
     }
@@ -30,7 +36,7 @@ export default function LoginBanner({ background = false }: { background?: boole
       reduced.removeEventListener("change", sync)
       document.removeEventListener("visibilitychange", sync)
     }
-  }, [background])
+  }, [background, client])
 
   useEffect(() => {
     if (!desktop || reducedMotion || !visible) return
@@ -38,13 +44,13 @@ export default function LoginBanner({ background = false }: { background?: boole
     return () => window.clearInterval(timer)
   }, [desktop, reducedMotion, visible])
 
-  const slide = slides[active]
-  const photos = slides.map((item, index) => (
+  const slide = items[active]
+  const photos = items.map((item, index) => (
     <picture key={item.image} className={`login-photo login-banner-image${index === active ? " is-active" : ""}`} aria-hidden="true">
-      {!background && <source media="(max-width: 760px)" srcSet="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" />}
+      {!background && !client && <source media="(max-width: 760px)" srcSet="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" />}
       <img src={`/images/login-${item.image}-1120.webp`}
         srcSet={`/images/login-${item.image}-720.webp 720w, /images/login-${item.image}-1120.webp 1120w`}
-        sizes={background ? "100vw" : "(max-width: 1200px) 50vw, 640px"}
+        sizes={background ? "100vw" : client ? "(max-width: 760px) 100vw, (max-width: 1200px) 50vw, 640px" : "(max-width: 1200px) 50vw, 640px"}
         width="1120" height="1400" alt="" decoding="async" />
     </picture>
   ))
@@ -57,7 +63,7 @@ export default function LoginBanner({ background = false }: { background?: boole
     >
       {photos}
       <div className="login-photo-caption">
-        <p className="login-banner-brand">SITELINE · 10 Builders</p>
+        <p className="login-banner-brand">{client ? "Building with confidence" : "SITELINE · 10 Builders"}</p>
         <div role="group" aria-roledescription="slide" aria-label={`${active + 1} of ${slides.length}`} aria-live="off">
           <h2>{slide.label}</h2>
           <p className="login-banner-description">{slide.description}</p>

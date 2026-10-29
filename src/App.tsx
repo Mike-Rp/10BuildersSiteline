@@ -37,7 +37,7 @@ import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { currentLoginPortal, type LoginPortal } from "./login-portal"
+import { currentLoginPortal, loginPortalForRole, loginPath, workspacePath, type LoginPortal } from "./login-portal"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -321,14 +321,14 @@ function AppInner() {
     return () => window.removeEventListener("popstate", changed)
   }, [])
   useEffect(() => {
-    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : "SITELINE | 10 Builders"
+    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : loginPortal === "staff" ? "SITELINE Staff | 10 Builders" : "SITELINE | 10 Builders"
   }, [loginPortal])
   const navigation = useSidebarNavigation(!signedOut && actor.role === "admin")
   useEffect(() => {
     if (signedOut) return
-    const portal = actor.role === "admin" ? "admin" : "workspace"
+    const portal = loginPortalForRole(actor.role)
     if (portal !== loginPortal) {
-      window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
+      window.history.replaceState(null, "", workspacePath(portal))
       setLoginPortal(portal)
     }
   }, [signedOut, actor.role, loginPortal])
@@ -378,7 +378,7 @@ function AppInner() {
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   useEffect(() => {
-    const signInPage = /^\/(?:admin\/)?login\/?$/i.test(window.location.pathname)
+    const signInPage = /^\/(?:(?:admin|staff)\/)?login\/?$/i.test(window.location.pathname)
     if (signInPage || !tokenUser()) {
       setCheckingSession(false)
       return
@@ -618,9 +618,9 @@ function AppInner() {
       stateRef.current = loaded
       setState(loaded)
       setReadinessAvailable(true)
-      const portal = account.role === "admin" ? "admin" : "workspace"
+      const portal = loginPortalForRole(account.role)
       if (currentLoginPortal() !== portal || /\/login\/?$/i.test(window.location.pathname)) {
-        window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
+        window.history.replaceState(null, "", workspacePath(portal))
       }
       setLoginPortal(portal)
       return account
@@ -671,7 +671,7 @@ function AppInner() {
   }
   function endSession() {
     const portal = currentLoginPortal()
-    window.history.replaceState(null, "", portal === "admin" ? "/admin/login" : "/login")
+    window.history.replaceState(null, "", loginPath(portal))
     setLoginPortal(portal)
     clearSession()
     setSelectedNotification(undefined)

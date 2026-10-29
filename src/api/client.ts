@@ -160,7 +160,7 @@ export async function login(email: string, password: string, replaceSession = fa
       status: string
       temp_password_issued: boolean
     }
-  }>(portal === "admin" ? "/auth/admin/login" : "/auth/login", { method: "POST", json: { email: email.trim(), password, ...(replaceSession ? { replace_session: true } : {}) } })
+  }>(portal === "client" ? "/auth/login" : `/auth/${portal}/login`, { method: "POST", json: { email: email.trim(), password, ...(replaceSession ? { replace_session: true } : {}) } })
   setToken(data.token)
   return data.user
 }
