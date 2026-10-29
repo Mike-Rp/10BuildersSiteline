@@ -55,12 +55,12 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
     try {
       const result = await api<{ csv?: string; summary?: MonthlySummary; view?: SummaryView }>("/reports/monthly-summary/export", { method: "POST", json: { snapshot: data.snapshot, format: format === "pdf" ? "print" : format, filters: view.filters } })
       if (current !== revision.current) return
-      if (format === "csv") downloadBlob(new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" }), `SiteCore monthly summary — ${data.summary.period.month}.csv`)
+      if (format === "csv") downloadBlob(new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" }), `10BuildLine monthly summary — ${data.summary.period.month}.csv`)
       else if (format === "pdf" && result.summary && result.view) {
         const { createReportPdf } = await import("./report-pdf")
         const blob = await createReportPdf(summaryPrintDocument(result.summary, result.view), true)
         if (current !== revision.current) return
-        downloadBlob(blob, `SiteCore monthly summary — ${data.summary.period.month}.pdf`)
+        downloadBlob(blob, `10BuildLine monthly summary — ${data.summary.period.month}.pdf`)
       }
       else if (result.summary && result.view) {
         printFrame.current?.remove()

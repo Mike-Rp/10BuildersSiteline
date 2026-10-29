@@ -100,7 +100,7 @@ export default function LoginPage({
       <nav className="login-portal-nav" aria-label="Sign-in portals">
         {internal ? <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : "STAFF"} PORTAL</span> : <div className="login-brand">
           <span className="brand-mark company-logo-mark"><img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="36" height="54" /></span>
-          <span><strong>SiteCore</strong><small>10 Builders and Development Corporation</small></span>
+          <span><strong>10BuildLine</strong><small>10 Builders and Development Corporation</small></span>
         </div>}
         <div className="login-portal-links">
           <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
@@ -153,7 +153,7 @@ export default function LoginPage({
               <img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="50" height="76" />
             </span>
             <span>
-              <strong>SiteCore</strong>
+              <strong>10BuildLine</strong>
               <small>10 Builders and Development Corporation</small>
             </span>
           </div>}
@@ -161,8 +161,8 @@ export default function LoginPage({
           <div className="login-content">
             <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>
             <div className="login-heading">
-              <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to SiteCore"}</h1>
-              <p>{admin ? "Use your administrator account to manage the SiteCore workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
+              <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to 10BuildLine"}</h1>
+              <p>{admin ? "Use your administrator account to manage the 10BuildLine workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
             </div>
 
             {internal && <nav className="login-role-selector" aria-label="Staff and administrator sign-in">

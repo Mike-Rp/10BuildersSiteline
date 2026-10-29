@@ -3520,7 +3520,7 @@ export default function RoleWorkspace({
             <ExtensionWorkflow actor={actor} />
             <Panel
               title="Upcoming responsibilities"
-              subtitle="Timers run while SiteCore is open and are checked again on reload."
+              subtitle="Timers run while 10BuildLine is open and are checked again on reload."
             >
               {deadlineList()}
             </Panel>
@@ -3624,7 +3624,7 @@ export default function RoleWorkspace({
             10
           </span>
           <div>
-            SiteCore<small>10 BUILDERS</small>
+            10BuildLine<small>10 BUILDERS</small>
           </div>
           <Button className="sidebar-close role-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
         </div>
@@ -3735,7 +3735,7 @@ export default function RoleWorkspace({
           {renderPage()}
           <div className="workspace-footer">
             <span>
-              SiteCore <span>Built for the work ahead.</span>
+              10BuildLine <span>Built for the work ahead.</span>
             </span>
           </div>
         </main>
@@ -4071,7 +4071,7 @@ export default function RoleWorkspace({
             <span className="brand-mark">
               <Icon name="building" size={28} />
             </span>
-            <h1>SiteCore</h1>
+            <h1>10BuildLine</h1>
             <p>{actor.name}, your session has ended.</p>
             <Button variant="primary" onClick={onResume}>
               Sign in again

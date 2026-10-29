@@ -35,14 +35,14 @@ export function reportPdfDefinition(html: string, landscape = false): TDocumentD
   }
   return {
     pageSize: "A4", pageOrientation: landscape ? "landscape" : "portrait", pageMargins: [36, 36, 36, 42],
-    info: { title: doc.title, author: "SiteCore · 10 Builders" },
+    info: { title: doc.title, author: "10BuildLine · 10 Builders" },
     defaultStyle: { font: "Roboto", fontSize: landscape ? 9 : 10, lineHeight: 1.2, color: "#172B4D" },
     styles: {
       title: { fontSize: 20, bold: true, margin: [0, 0, 0, 10] },
       heading: { fontSize: 13, bold: true, margin: [0, 10, 0, 6] },
       body: { margin: [0, 0, 0, 8] },
     },
-    footer: (page, pages) => ({ text: `SiteCore · ${page} / ${pages}`, alignment: "right", margin: [36, 12, 36, 0], fontSize: 8, color: "#52637A" }),
+    footer: (page, pages) => ({ text: `10BuildLine · ${page} / ${pages}`, alignment: "right", margin: [36, 12, 36, 0], fontSize: 8, color: "#52637A" }),
     content,
   }
 }

@@ -41,7 +41,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     const client = await server.ssrLoadModule("/src/api/client.ts")
     const click = async element => { assert.ok(!!element, "Expected a sign-out control"); await act(() => element.click()) }
     const logoutCalls = () => calls.filter(c => c.path === "/auth/logout").length
-    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Sign out of SiteCore?"]')
+    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Sign out of 10BuildLine?"]')
     const confirmButton = () => [...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Sign out")
     for (const role of ["admin", "opm", "spm", "client"]) {
       for (const mobile of [false, true]) {
@@ -56,7 +56,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.ok(!!document.querySelector('.sidebar [aria-label="Sign out"]'), `Missing exit for ${role}, mobile=${mobile}`)
         assert.equal(w.location.pathname.startsWith('/admin'), role === 'admin', 'restored sessions use the portal for the verified account role')
         assert.equal(w.location.pathname, `/${role}`)
-        // A fresh login adds the role workspace after SiteCore's landing page.
+        // A fresh login adds the role workspace after 10BuildLine's landing page.
         // Exercise real browser traversal against the mounted application.
         w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")
         w.history.pushState(null, "", `/${role}`)
@@ -66,7 +66,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           await moved
         })
         await traverse("back")
-        assert.ok(document.querySelector("form.login-form"), "Back must display SiteCore's landing page")
+        assert.ok(document.querySelector("form.login-form"), "Back must display 10BuildLine's landing page")
         assert.equal(client.getToken(), token, "Back is navigation, not sign out")
         const type = async (input, value) => act(() => {
           Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(input, value)

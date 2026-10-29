@@ -102,7 +102,7 @@ export async function downloadDoc(doc: Doc) {
     file ||
       new Blob(
         [
-          `SiteCore · DOCUMENT RECORD\n\n${doc.label}\nFilename: ${doc.name}\nOwner: ${doc.owner}\nDate: ${doc.date}\n\nThis record has no attached original file. Documents uploaded in SiteCore download their actual file.`,
+          `10BuildLine · DOCUMENT RECORD\n\n${doc.label}\nFilename: ${doc.name}\nOwner: ${doc.owner}\nDate: ${doc.date}\n\nThis record has no attached original file. Documents uploaded in 10BuildLine download their actual file.`,
         ],
         { type: "text/plain" },
       ),

@@ -18,7 +18,7 @@ test("the login shell and robots response consistently keep the portal out of se
   try {
     const html = await vite.transformIndexHtml("/", read("../index.html"))
     assert.match(html, /<html lang="en">/)
-    assert.match(html, /<title>SiteCore \| 10 Builders<\/title>/)
+    assert.match(html, /<title>10BuildLine \| 10 Builders<\/title>/)
     assert.match(html, /name="robots" content="noindex, nofollow"/)
     assert.match(html, /rel="canonical" href="https:\/\/10builderssiteline\.vercel\.app\/"/)
     assert.match(html, /property="og:url"/)

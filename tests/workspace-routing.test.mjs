@@ -3,7 +3,7 @@ import test from "node:test"
 import { JSDOM } from "jsdom"
 import { isLandingPath, navigateToWorkspace } from "../src/login-portal.ts"
 
-test("fresh logins retain a SiteCore landing entry; session restores do not add entries", async () => {
+test("fresh logins retain a 10BuildLine landing entry; session restores do not add entries", async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "window")
   const dom = new JSDOM("", {url:"https://siteline.example/"})
   Object.defineProperty(globalThis,"window",{value:dom.window,configurable:true})

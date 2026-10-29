@@ -58,12 +58,12 @@ export default function LoginBanner({ background = false, client = false }: { ba
   return (
     <aside
       className="login-info login-banner"
-      aria-label="Explore SiteCore"
+      aria-label="Explore 10BuildLine"
       aria-roledescription="carousel"
     >
       {photos}
       <div className="login-photo-caption">
-        <p className="login-banner-brand">{client ? "Building with confidence" : "SiteCore · 10 Builders"}</p>
+        <p className="login-banner-brand">{client ? "Building with confidence" : "10BuildLine · 10 Builders"}</p>
         <div role="group" aria-roledescription="slide" aria-label={`${active + 1} of ${slides.length}`} aria-live="off">
           <h2>{slide.label}</h2>
           <p className="login-banner-description">{slide.description}</p>
