@@ -150,7 +150,7 @@ export default function LoginPage({
               <img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="50" height="76" />
             </span>
             <span>
-              <strong>SITELINE</strong>
+              <strong>BuildAxis</strong>
               <small>10 Builders and Development Corporation</small>
             </span>
           </div>
@@ -158,8 +158,8 @@ export default function LoginPage({
           <div className="login-content">
             <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>
             <div className="login-heading">
-              <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to SITELINE"}</h1>
-              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
+              <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to BuildAxis"}</h1>
+              <p>{admin ? "Use your administrator account to manage the BuildAxis workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
             </div>
 
             {internal && <nav className="login-role-selector" aria-label="Staff and administrator sign-in">

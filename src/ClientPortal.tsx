@@ -615,7 +615,7 @@ export default function ClientPortal({
             10
           </span>
           <div>
-            Siteline<small>10 BUILDERS</small>
+            BuildAxis<small>10 BUILDERS</small>
           </div>
           <Button className="sidebar-close client-nav-close" variant="icon-button" icon="close" aria-label="Close Client navigation" onClick={navigation.close} />
         </div>
@@ -780,7 +780,7 @@ export default function ClientPortal({
           {siteDetails && project && <Modal wide title={project.name} subtitle="Project details" onClose={() => setSiteDetails(false)}>{projectDetails()}</Modal>}
           <div className="workspace-footer">
             <span>
-              SITELINE <span>Built for the work ahead.</span>
+              BuildAxis <span>Built for the work ahead.</span>
             </span>
           </div>
         </main>
@@ -830,7 +830,7 @@ export default function ClientPortal({
             <span className="brand-mark">
               <Icon name="building" size={30} />
             </span>
-            <h1>SITELINE</h1>
+            <h1>BuildAxis</h1>
             <p>Your session has ended.</p>
             <Button variant="primary" onClick={onResume}>
               Sign in again

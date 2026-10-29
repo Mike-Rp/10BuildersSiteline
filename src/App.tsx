@@ -339,7 +339,7 @@ function AppInner() {
     return () => window.removeEventListener("popstate", changed)
   }, [])
   useEffect(() => {
-    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : loginPortal === "staff" ? "SITELINE Staff | 10 Builders" : "SITELINE | 10 Builders"
+    document.title = loginPortal === "admin" ? "BuildAxis Admin | 10 Builders" : loginPortal === "staff" ? "BuildAxis Staff | 10 Builders" : "BuildAxis | 10 Builders"
   }, [loginPortal])
   const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin")
   useEffect(() => {
@@ -2922,7 +2922,7 @@ function AppInner() {
             10
           </span>
           <div>
-            Siteline<small>10 BUILDERS</small>
+            BuildAxis<small>10 BUILDERS</small>
           </div>
           <Button className="sidebar-close admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
         </div>

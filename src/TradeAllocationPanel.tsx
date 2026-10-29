@@ -676,7 +676,7 @@ export default function TradeAllocationPanel({
           <p>
             {action.type === "release_allocation_company"
               ? "The agreed phase scope is complete. Formal release frees this project’s commitment slot."
-              : "Contact the company outside SITELINE and record its actual response. Acceptance reserves a project slot; it does not activate the project."}
+              : "Contact the company outside BuildAxis and record its actual response. Acceptance reserves a project slot; it does not activate the project."}
           </p>
           <Field label="Contact or response details">
             <textarea
