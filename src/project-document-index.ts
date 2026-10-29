@@ -106,7 +106,7 @@ export function projectDocumentIndex(
           id: "agreements",
           name: "Project Agreements",
           description:
-            "Client, owner, contractor, and subcontractor agreements.",
+            "Client, owner, and contractor agreements.",
           files: [] as ProjectDocumentFile[],
         },
         {

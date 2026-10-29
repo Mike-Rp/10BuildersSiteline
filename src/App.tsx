@@ -874,6 +874,7 @@ function AppInner() {
     return updateAccount({ ...a, docs: [...a.docs, d] })
   }
   function addEngagement(p: Project, a: Account, d: Doc) {
+    if (a.role !== "spm") return
     return commit(
       (s) => ({
         ...s,
@@ -2381,12 +2382,12 @@ function AppInner() {
           <DocumentList docs={p.docs} onPreview={previewDoc} />
         </section>
         <section className="detail-section">
-          <h3>Engineer engagement agreements</h3>
+          <h3>Site PM appointment agreements</h3>
           <p className="section-description">
-            Project-specific appointments for assigned Office PMs and Site PMs.
+            Project-specific appointments for assigned Site PMs.
           </p>
           {staff
-            .filter((a) => a.role === "opm" || a.role === "spm")
+            .filter((a) => a.role === "spm")
             .map((a) => (
               <div className="engagement-row" key={a.id}>
                 <span className="avatar small">{initials(a.name)}</span>
