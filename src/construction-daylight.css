@@ -640,7 +640,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .sidebar .brand-mark { width: 42px; height: 42px; border-radius: 8px; background: var(--chrome-hover); color: var(--chrome-foreground); font-size: 18px; letter-spacing: -.5px; }
 #root .sidebar .brand { gap: 8px; }
 #root .sidebar .brand > .brand-mark { flex-shrink: 0; }
-#root .sidebar .brand > div { flex: 1; min-width: 0; }
+#root .sidebar .brand > div { flex: 1; min-width: 0; font-size: 18px; letter-spacing: -.4px; white-space: nowrap; }
 #root .sidebar .brand > .sidebar-close { flex: none; margin-left: auto; width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
 #root .app-shell .sidebar-toggle { display: inline-flex; flex: none; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
 #root .app-shell .topbar :is(.sidebar-toggle, .mobile-menu)[hidden] { display: none; }
@@ -773,7 +773,7 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .app-shell .nav-item > svg { flex-shrink: 0; }
 #root .app-shell .nav-group-label { font-size: 15px; font-weight: 600; letter-spacing: .6px; }
 #root .app-shell .sidebar-person :is(strong, small) { font-size: 16px; line-height: 1.5; }
-#root .app-shell .sidebar .brand small { font-size: 14px; letter-spacing: .8px; }
+#root .app-shell .sidebar .brand small { font-size: 11px; letter-spacing: .6px; }
 #root .app-shell .eyebrow { font-size: 15px; letter-spacing: .8px; }
 #root .app-shell .page-heading .eyebrow { font-size: 20px; line-height: 1.4; }
 #root .app-shell .metric-card { min-height: 0; }
