@@ -15,7 +15,7 @@ test("fresh logins retain a SITELINE landing entry; session restores do not add 
   }
   try {
     for (const role of ["admin","opm","spm","client"]) {
-      const landing = role === "admin" ? "/admin/login" : "/"
+      const landing = role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login"
       w.history.replaceState(null,"",landing)
       const count = w.history.length
       assert.equal(navigateToWorkspace(role,true),`/${role}`)

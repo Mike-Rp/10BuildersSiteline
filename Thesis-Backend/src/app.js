@@ -92,7 +92,7 @@ app.use((req, res, next) => {
   next();
 });
 app.post(/^\/api\/v1\/accounts\/[^/]+\/regenerate-password$/, loginFailureLimiter({ max: 5 }));
-app.post([`${apiURL}/auth`, `${apiURL}/auth/admin`, '/api/v1/auth/login', '/api/v1/auth/admin/login'], loginFailureLimiter());
+app.post([`${apiURL}/auth`, `${apiURL}/auth/admin`, '/api/v1/auth/login', '/api/v1/auth/staff/login', '/api/v1/auth/admin/login'], loginFailureLimiter());
  
 app.get('/api/v1/health',async(req,res)=>{try{await (await databasePool()).query('select 1');res.json({ok:true,database:true});}catch{res.status(503).json({ok:false,database:false});}});
 app.use(`${apiURL}/cron`, cronRoutes);

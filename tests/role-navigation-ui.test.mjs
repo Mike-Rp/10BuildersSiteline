@@ -43,6 +43,8 @@ test("Office and Site PM navigation alternates controls across every module on d
           assert.equal(sidebar.hasAttribute('inert'),false)
           await click([...sidebar.querySelectorAll('nav .nav-item')].find(button=>button.getAttribute('aria-label')===label))
           assert.equal(document.querySelector('.breadcrumb strong').textContent,label)
+          assert.equal(document.querySelectorAll('main h1').length,1,`${role} ${label}: each module has one main heading`)
+          assert.ok(document.querySelector('main .page-title-panel h1'),`${role} ${label}: the module uses the shared title panel`)
           assert.equal(menu.hidden,!compact,`${role} ${label}: desktop stays open and mobile navigation closes after selection`)
           if(!menu.hidden){
             await click(menu)

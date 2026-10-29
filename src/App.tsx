@@ -10,6 +10,7 @@ import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
+import PageTitlePanel from "./PageTitlePanel"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -38,7 +39,7 @@ import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { currentLoginPortal, isLandingPath, navigateToWorkspace, workspacePath, type LoginPortal } from "./login-portal"
+import { currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, workspacePath, type LoginPortal } from "./login-portal"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -324,8 +325,8 @@ function AppInner() {
   const [routePath, setRoutePath] = useState(() => window.location.pathname)
   useEffect(() => {
     const changed = () => {
-      if (!getToken() && /^\/(admin|opm|spm|client)\/?$/i.test(window.location.pathname)) {
-        window.history.replaceState(null, "", currentLoginPortal() === "admin" ? "/admin/login" : "/login")
+      if (!getToken() && /^\/(admin|staff|opm|spm|client)\/?$/i.test(window.location.pathname)) {
+        window.history.replaceState(null, "", loginPath(currentLoginPortal()))
       }
       setRoutePath(window.location.pathname)
       setLoginPortal(currentLoginPortal())
@@ -338,12 +339,12 @@ function AppInner() {
     return () => window.removeEventListener("popstate", changed)
   }, [])
   useEffect(() => {
-    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : "SITELINE | 10 Builders"
+    document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : loginPortal === "staff" ? "SITELINE Staff | 10 Builders" : "SITELINE | 10 Builders"
   }, [loginPortal])
   const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin")
   useEffect(() => {
     if (signedOut || isLandingPath(routePath)) return
-    const portal = actor.role === "admin" ? "admin" : "workspace"
+    const portal = loginPortalForRole(actor.role)
     if (routePath !== workspacePath(actor.role)) {
       setRoutePath(navigateToWorkspace(actor.role))
       setLoginPortal(portal)
@@ -397,7 +398,7 @@ function AppInner() {
   const sessionLoadVersion = useRef(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   useEffect(() => {
-    const signInPage = /^\/(?:admin\/)?login\/?$/i.test(window.location.pathname)
+    const signInPage = /^\/(?:(?:admin|staff)\/)?login\/?$/i.test(window.location.pathname)
     if (signInPage || !tokenUser()) {
       setCheckingSession(false)
       return
@@ -651,7 +652,7 @@ function AppInner() {
       stateRef.current = loaded
       setState(loaded)
       setReadinessAvailable(true)
-      const portal = account.role === "admin" ? "admin" : "workspace"
+      const portal = loginPortalForRole(account.role)
       if (!freshLogin) setRoutePath(navigateToWorkspace(account.role))
       setLoginPortal(portal)
       return account
@@ -684,7 +685,7 @@ function AppInner() {
       return account
     })
     setRoutePath(navigateToWorkspace(account.role, true))
-    setLoginPortal(account.role === "admin" ? "admin" : "workspace")
+    setLoginPortal(loginPortalForRole(account.role))
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
@@ -704,7 +705,7 @@ function AppInner() {
   }
   function endSession() {
     const portal = currentLoginPortal()
-    window.history.replaceState(null, "", portal === "admin" ? "/admin/login" : "/login")
+    window.history.replaceState(null, "", loginPath(portal))
     setRoutePath(window.location.pathname)
     setLoginPortal(portal)
     clearSession()
@@ -1447,20 +1448,9 @@ function AppInner() {
   function pageHeading(title: string, action?: ReactNode) {
     return (
       <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            {["Team", "Settings", "Archive", "Activity log"].includes(page)
-              ? "ORGANIZATION"
-              : "CONSTRUCTION OPERATIONS"}
-          </div>
-          <h1>
-            {title}
-            <span className="heading-dot">.</span>
-          </h1>
-        </div>
+      <PageTitlePanel title={title} eyebrow={["Team", "Settings", "Archive", "Activity log"].includes(page) ? "ORGANIZATION" : "CONSTRUCTION OPERATIONS"}>
         {action}
-      </div>
+      </PageTitlePanel>
       <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />
       </>
     )

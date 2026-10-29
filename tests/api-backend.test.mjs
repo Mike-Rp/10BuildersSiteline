@@ -96,7 +96,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   const asUser = async (email) => {
     setToken("")
     const role = (await db.query("select r.code from users u join roles r on r.id=u.role_id where lower(u.email::text)=lower($1)", [email])).rows[0]?.code
-    const user = await login(email, "Password@123", true, role === "admin" ? "admin" : "workspace") // test role switches explicitly replace the earlier session
+    const user = await login(email, "Password@123", true, role === "admin" ? "admin" : role === "client" ? "client" : "staff") // test role switches explicitly replace the earlier session
     return { user, state: await loadState(user) }
   }
   const names = (state) => state.projects.map((p) => p.name).sort()

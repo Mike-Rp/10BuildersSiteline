@@ -12,7 +12,7 @@ export default function LoginPage({
   checkingSession = false,
   workspaceRole,
   sessionMessage,
-  portal = "workspace",
+  portal = "client",
   onSignIn,
 }: {
   checkingSession?: boolean
@@ -43,6 +43,8 @@ export default function LoginPage({
   const [submitted, setSubmitted] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
   const admin = portal === "admin"
+  const staff = portal === "staff"
+  const internal = admin || staff
   // Field errors appear on submit and when a field is left (blur).
   const fieldErrors = validateSignInFields(email, password)
   const emailError =
@@ -93,8 +95,18 @@ export default function LoginPage({
     setDeviceNotice("Your current device will stay signed in.")
   }
   return (
-    <main className={`login-page login-redesign${admin ? " admin-login" : ""}`}>
-      {admin && <LoginBanner background />}
+    <main className={`login-page login-redesign${internal ? " admin-login" : " client-login"}`}>
+      {internal && <LoginBanner background />}
+      <nav className="login-portal-nav" aria-label="Sign-in portals">
+        <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : staff ? "STAFF" : "CLIENT"} PORTAL</span>
+        <div className="login-portal-links">
+          {staff && <a className="login-portal-switch" href="/admin/login"><Icon name="shield" size={17} />Administrator sign-in</a>}
+          <a className="login-portal-switch" href={staff ? "/login" : "/staff/login"}>
+            <Icon name={staff ? "home" : "shield"} size={17} />
+            {staff ? "Client sign-in" : "Staff sign-in"}
+          </a>
+        </div>
+      </nav>
       {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
         <p>Your account is already logged in on another device.</p>
         <p className="subsection">Choose where you want to continue. Logging in on this device will sign out the other device.</p>
@@ -145,16 +157,16 @@ export default function LoginPage({
           </div>
 
           <div className="login-content">
-            {admin && <div className="admin-access-badge"><Icon name="shield" size={16} />Administrator access</div>}
+            <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>
             <div className="login-heading">
-              <h1>{admin ? "Administrator sign-in" : "Welcome to SITELINE"}</h1>
-              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : "Enter the work email and password issued by your administrator."}</p>
+              <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to SITELINE"}</h1>
+              <p>{admin ? "Use your administrator account to manage the SITELINE workspace." : staff ? "For Office Project Managers and Site Project Managers." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
             </div>
 
             <form className="login-form" onSubmit={submit} noValidate>
               {(deviceNotice || sessionMessage) && <p className="notice" role="status">{deviceNotice || sessionMessage}</p>}
               <Field
-                label={admin ? "Administrator email" : "Work Email"}
+                label={admin ? "Administrator email" : staff ? "Work email" : "Client email"}
                 error={emailError ? `⚠ ${emailError}` : undefined}
               >
                 <input
@@ -164,7 +176,7 @@ export default function LoginPage({
                   spellCheck={false}
                   // "username" is the standard token that lets password managers fill the sign-in identifier, which is an email here.
                   autoComplete="username"
-                  placeholder={admin ? "admin@10builders.com" : "name@10builders.com"}
+                  placeholder={admin ? "admin@10builders.com" : staff ? "name@10builders.com" : "Your registered email"}
                   value={email}
                   disabled={loading || checkingSession}
                   onChange={(event) => {
@@ -222,9 +234,9 @@ export default function LoginPage({
                   ⚠ {SIGN_IN_MESSAGES.capsLock}
                 </small>
               )}
-              <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>{admin ? "Need help signing in?" : "Forgot password?"}</a>
-              </p>
+              {!admin && <p className="login-help">
+                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+              </p>}
               {error && (
                 <div className="login-error" role="alert">
                   <Icon name="alert" size={18} />
@@ -240,19 +252,15 @@ export default function LoginPage({
                   ? "Checking session…"
                   : loading
                     ? "Signing in…"
-                    : admin ? "Sign in to administration" : "Log In"}
+                    : admin ? "Sign in to administration" : staff ? "Sign in to workspace" : "Sign in to your project"}
               </Button>
             </form>
-            <a className="button login-portal-switch" href={admin ? "/login" : "/admin/login"}>
-              <Icon name={admin ? "home" : "shield"} size={18} />
-              {admin ? "Back to regular sign-in" : "Administrator sign-in"}
-            </a>
-            {admin && <p className="admin-restricted-note"><Icon name="lock" size={15} /><span>Restricted to authorized 10 Builders administrators.</span></p>}
+            {internal ? <p className="admin-restricted-note"><Icon name="lock" size={15} /><span>{admin ? "Restricted to authorized 10 Builders administrators." : "Access is based on your assigned account role."}</span></p> : <p className="client-login-note">Use the client account issued by 10 Builders.</p>}
           </div>
 
         </section>
 
-        {!admin && <LoginBanner />}
+        {!internal && <LoginBanner client />}
       </div>
     </main>
   )

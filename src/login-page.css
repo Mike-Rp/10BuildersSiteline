@@ -123,8 +123,6 @@
 }
 
 #root .login-redesign .login-help a { text-decoration: underline; text-underline-offset: 3px; }
-#root .login-redesign .login-portal-switch { width: 100%; min-height: 44px; margin-top: 16px; border: 1px solid #c7d2df; border-radius: 8px; color: #172b4d; font-weight: 600; text-align: center; text-decoration: none; white-space: normal; }
-#root .login-redesign .login-portal-switch:hover { background: #eef3f8; border-color: #526b87; }
 
 #root .login-redesign .company-logo-mark { flex: none; width: 50px; height: 76px; background: transparent; border: 0; border-radius: 0; }
 #root .login-redesign .company-logo-mark img { display: block; width: 50px; height: 76px; object-fit: contain; }
@@ -147,7 +145,6 @@
 #root .admin-login .login-form { gap: clamp(10px, 1.6dvh, 18px); }
 #root .admin-login .login-form input, #root .admin-login .login-submit { min-height: clamp(44px, 6.5dvh, 50px); }
 #root .admin-login .login-form input { line-height: 1.4; }
-#root .admin-login .login-portal-switch { margin-top: clamp(10px, 1.6dvh, 16px); }
 #root .admin-login .admin-access-badge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid #e6d5b5; border-radius: 5px; background: #fcf8f0; color: #795621; font-size: 11px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase; }
 #root .admin-login .admin-restricted-note { display: flex; align-items: flex-start; gap: 8px; margin: clamp(12px, 2dvh, 22px) 0 0; padding-top: clamp(10px, 1.5dvh, 18px); border-top: 1px solid #e3e9f0; color: #6a7b90; font-size: 12px; line-height: 1.7; }
 #root .admin-login .admin-restricted-note svg { flex: none; margin-top: 2px; }
@@ -169,4 +166,62 @@
   #root .admin-login .login-brand small { font-size: 12px; line-height: 1.4; }
   #root .admin-login .login-heading h1 { font-size: 22px; }
   #root .admin-login .admin-restricted-note { line-height: 1.5; }
+}
+
+/* Portal navigation stays separate from the credential form. */
+#root .login-redesign { position: relative; min-height: 100dvh; padding-top: 86px; padding-bottom: 40px; }
+#root .login-redesign .login-portal-nav { position: absolute; inset: 24px 36px auto; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #59708c; }
+#root .login-redesign .login-portal-label { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; letter-spacing: 1px; }
+#root .login-redesign .login-portal-label::before { content: ""; width: 20px; height: 2px; background: #c9a564; }
+#root .login-redesign .login-portal-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+#root .login-redesign .login-portal-switch { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid #bccbdc; background: #ffffffd9; color: #183555; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; }
+#root .login-redesign .login-portal-switch svg { flex: none; }
+#root .login-redesign .login-portal-switch:hover { background: #fff; border-color: #c9a564; }
+#root .login-redesign .login-portal-switch:focus-visible { outline: 3px solid #c9a564; outline-offset: 3px; }
+#root .admin-login .login-portal-nav { color: #e1e8f0; }
+#root .admin-login .login-portal-switch { background: #10283e66; border-color: #ffffff80; color: #fff; backdrop-filter: blur(12px); }
+#root .admin-login .login-portal-switch:hover { background: #244763; }
+
+/* The client portal frames the photo carousel with a subtle blueprint background. */
+#root .client-login { isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 82% 55%, #b8ccdc 0%, #e4ecf3 40%, #f1f4f7 75%); }
+#root .client-login::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(#54799c12 1px, transparent 1px), linear-gradient(90deg, #54799c12 1px, transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(90deg, transparent 20%, #000); }
+#root .client-login::after { content: ""; position: absolute; width: 640px; height: 640px; right: -150px; top: 120px; z-index: -1; pointer-events: none; border: 1px solid #c9a56490; box-shadow: 0 0 0 50px #ffffff30, 0 0 0 51px #799ab32b; transform: rotate(22deg); }
+#root .client-login .login-card { position: relative; min-height: 670px; box-shadow: 0 24px 80px #14365418; }
+#root .client-login .login-panel { padding: 32px 46px; }
+#root .client-login .login-content { margin-top: 26px; padding-bottom: 0; }
+#root .client-login .login-heading { margin: 14px 0 24px; }
+#root .client-login .login-heading h1 { font-size: 30px; line-height: 1.25; }
+#root .client-login .login-heading p { font-size: 14px; line-height: 1.65; }
+#root .client-login .client-access-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid #d6e2ef; border-radius: 5px; background: #f0f5fa; color: #3f617f; font-size: 11px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase; }
+#root .client-login .client-login-note { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e3e9f0; color: #6a7b90; font-size: 12px; line-height: 1.6; }
+#root .client-login .login-info { flex-basis: 54%; border: 1px solid #ffffffaa; box-shadow: 0 6px 24px #142b4030; }
+#root .client-login .login-info::after { background: linear-gradient(180deg, #0d213810 5%, #0d213800 30%, #0b2038ec 100%); }
+#root .client-login .login-banner-brand { color: #e8d3a7; letter-spacing: 1.3px; font-size: 12px; text-transform: uppercase; }
+#root .client-login .login-banner-indicator.is-active { background: #ddbc7e; }
+@media(max-width:760px) {
+  #root .login-redesign { padding-top: 76px; padding-bottom: 24px; }
+  #root .login-redesign .login-portal-nav { inset: 16px 20px auto; }
+  #root .login-redesign .login-portal-label { font-size: 10px; }
+  #root .login-redesign .login-portal-switch { padding: 10px 12px; font-size: 12px; }
+  #root .client-login .login-card { min-height: 0; }
+  #root .client-login .login-panel { padding: 24px; }
+  #root .client-login .login-heading h1 { font-size: 26px; }
+  #root .client-login .login-info { display: flex; flex: none; min-height: 260px; border-radius: 0 0 16px 16px; padding: 22px; }
+  #root .client-login .login-photo-caption { padding-top: 30px; }
+  #root .client-login .login-banner [aria-roledescription="slide"] { min-height: 90px; }
+  #root .client-login .login-banner-description { min-height: 0; font-size: 14px; }
+  #root .client-login .login-banner-footer { margin-top: 12px; padding-top: 6px; }
+  #root .client-login .login-banner-indicators { padding: 10px 0; }
+}
+@media(max-width:600px) {
+  #root .login-redesign .login-portal-label { display: none; }
+  #root .login-redesign .login-portal-links { width: 100%; gap: 8px; }
+}
+@media(max-width:360px) {
+  #root .login-redesign .login-portal-links { gap: 6px; }
+  #root .login-redesign .login-portal-switch { padding-inline: 8px; gap: 6px; font-size: 11px; }
+}
+@media(max-height:700px) {
+  #root .admin-login { padding-top: 68px; padding-bottom: 12px; }
+  #root .admin-login .login-portal-nav { top: 12px; }
 }

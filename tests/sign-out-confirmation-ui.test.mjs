@@ -22,7 +22,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     const method = init?.method || "GET"
     calls.push({ path, method })
     if (path === "/auth/me") return Response.json(user)
-    if (path === "/auth/login" || path === "/auth/admin/login") {
+    if (path === "/auth/login" || path === "/auth/admin/login" || path === "/auth/staff/login") {
       return Response.json({user,token:`test.${Buffer.from(JSON.stringify({sub:user.id,details:{id:user.id,role:user.role}})).toString("base64url")}.test`})
     }
     if (path === "/auth/logout") return Response.json({ ok: true })
@@ -58,7 +58,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(w.location.pathname, `/${role}`)
         // A fresh login adds the role workspace after SITELINE's landing page.
         // Exercise real browser traversal against the mounted application.
-        w.history.replaceState(null, "", role === "admin" ? "/admin/login" : "/")
+        w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")
         w.history.pushState(null, "", `/${role}`)
         const traverse = direction => act(async () => {
           const moved = new Promise(resolve => w.addEventListener("popstate", resolve, {once:true}))
@@ -126,8 +126,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(w.localStorage.getItem(`siteline-recent-projects:${user.id}`), null)
         assert.equal(w.sessionStorage.getItem(`siteline-dashboard-session-greeting:${user.id}`), null)
         assert.ok(!!document.querySelector("form.login-form"), `Confirmed ${role} logout must return to login`)
-        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : '/login')
-        assert.equal(!!document.querySelector('.admin-access-badge'), role === 'admin')
+        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : role === 'client' ? '/login' : '/staff/login')
+        assert.equal(!!document.querySelector('.admin-access-badge'), role !== 'client')
         await act(() => root.render(null))
       }
     }

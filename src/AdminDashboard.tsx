@@ -5,6 +5,7 @@ import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems } from "./urgent-actions"
 import { DelayedProjectsRow } from "./ScheduleStatus"
 import ExecutiveSummary from "./ExecutiveSummary"
+import PageTitlePanel from "./PageTitlePanel"
 import "./admin-dashboard.css"
 
 const categories: ["all" | DashboardCategory, string][] = [
@@ -40,13 +41,12 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
     attentionHeading.current?.scrollIntoView?.({ block: "nearest", behavior: "auto" })
   }
   return <div className="admin-overview">
-    <header className="ao-heading">
-      <div><span className="ao-eyebrow">ADMINISTRATOR WORKSPACE</span><h1>Dashboard<span>.</span></h1></div>
+    <PageTitlePanel title="Dashboard" eyebrow="ADMINISTRATOR WORKSPACE">
       <div className="dashboard-actions">
         <Button icon="doc" onClick={onMonthlyReport}>Monthly report</Button>
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
       </div>
-    </header>
+    </PageTitlePanel>
     <ExecutiveSummary
       description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${overview.items.length} follow-up ${overview.items.length === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
       metrics={[
