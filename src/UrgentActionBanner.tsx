@@ -10,12 +10,13 @@ export function useUrgencyNow() {
   return now
 }
 
-export default function UrgentActionBanner({ items, title = "Priority items need your attention", label = "Priority action items", description, actionLabel = "Review priority items", onReview, onOpen, className = "", note, soonLabel = "due soon", overdueLabel = "overdue / expired" }: {
+export default function UrgentActionBanner({ items, title = "Priority items need your attention", label = "Priority action items", description, actionLabel = "Review priority items", onReview, onOpen, showReviewButton = true, className = "", note, soonLabel = "due soon", overdueLabel = "overdue / expired" }: {
   items: UrgentItem[]
   title?: string
   label?: string
   description?: string
   actionLabel?: string
+  showReviewButton?: boolean
   onReview?: () => void
   onOpen: (item: UrgentItem) => void
   className?: string
@@ -37,7 +38,7 @@ export default function UrgentActionBanner({ items, title = "Priority items need
         <p>{description || `${items.length} ${items.length === 1 ? "item needs" : "items need"} attention in your current workspace.`}</p>
         <div className="urgent-banner-summary">{overdue > 0 && <Badge tone="red">{overdue} {overdueLabel}</Badge>}{soon > 0 && <Badge tone="amber">{soon} {soonLabel}</Badge>}{blocked > 0 && <Badge tone="red">{blocked} blocked</Badge>}{note && <span>{note}</span>}</div>
       </div>
-      <Button variant="primary" icon="arrow" onClick={onReview || (() => onOpen(sorted[0]))}>{actionLabel}</Button>
+      {showReviewButton && <Button variant="primary" icon="arrow" onClick={onReview || (() => onOpen(sorted[0]))}>{actionLabel}</Button>}
     </div>
     <div className="urgent-banner-items">{sorted.slice(0, expanded ? sorted.length : 3).map(item => <button key={item.key} type="button" className="urgent-banner-item" aria-label={item.actionLabel || `Open priority item: ${item.title}`} onClick={() => onOpen(item)}>
       <span className="urgent-item-copy"><strong>{item.title}</strong><span>{item.detail}</span></span>

@@ -1,3 +1,4 @@
+import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
@@ -397,6 +398,7 @@ function AppInner() {
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
+  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
   useEffect(() => {
     const signInPage = /^\/(?:(?:admin|staff)\/)?login\/?$/i.test(window.location.pathname)
     if (signInPage || !tokenUser()) {
@@ -1430,6 +1432,7 @@ function AppInner() {
       overview={adminDashboardOverview(state)}
       resetRequests={requests}
       onOpenReset={openReset}
+      onCompletedProjects={() => {navigate("Archive");setTab("closed")}}
       resetRequestFocus={resetRequestFocus}
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
@@ -2969,7 +2972,7 @@ function AppInner() {
           onClick={navigation.closeMobile}
         />
       )}
-      <div className="main-shell">
+      <div className="main-shell" ref={swipe.ref}>
         <header className="topbar">
           <div className="breadcrumb">
             <Button

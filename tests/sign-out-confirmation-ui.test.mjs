@@ -7,7 +7,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/", pretendToBeVisual: true })
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, Node: w.Node,
-    sessionStorage: w.sessionStorage, localStorage: w.localStorage, IS_REACT_ACT_ENVIRONMENT: true })) {
+    getComputedStyle:w.getComputedStyle.bind(w), sessionStorage: w.sessionStorage, localStorage: w.localStorage, IS_REACT_ACT_ENVIRONMENT: true })) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
   }
@@ -41,11 +41,22 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     const client = await server.ssrLoadModule("/src/api/client.ts")
     const click = async element => { assert.ok(!!element, "Expected a sign-out control"); await act(() => element.click()) }
     const logoutCalls = () => calls.filter(c => c.path === "/auth/logout").length
+    let swipeClock=1000
+    const swipe=async direction=>act(()=>{
+      const target=document.querySelector('.main-shell h1') || document.querySelector('.main-shell')
+      assert.ok(target,'workspace swipe surface')
+      const touch=(x)=>({identifier:1,clientX:x,clientY:180})
+      const event=(type,x,time)=>{const e=new w.Event(type,{bubbles:true,cancelable:true});Object.defineProperties(e,{touches:{value:type==='touchend'?[]:[touch(x)]},changedTouches:{value:[touch(x)]},timeStamp:{value:time}});target.dispatchEvent(e)}
+      const start=direction==='right'?100:300,end=direction==='right'?300:100
+      event('touchstart',start,swipeClock);event('touchmove',end,swipeClock+60);event('touchend',end,swipeClock+140);swipeClock+=300
+    })
+
     const confirmation = () => document.querySelector('[role="dialog"][aria-label="Sign out of 10BuildLine?"]')
     const confirmButton = () => [...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Sign out")
     for (const role of ["admin", "opm", "spm", "client"]) {
       for (const mobile of [false, true]) {
         compact = mobile
+        Object.defineProperty(w,"innerWidth",{value:mobile?390:1366,configurable:true})
         user = { id: `signout-${role}`, role, full_name: `Test ${role}`, email: `${role}@example.invalid`, status: "active", date_added: "2026-01-01" }
         // Restore a workspace refresh, rather than an explicit sign-in page.
         w.history.replaceState(null, "", role === "admin" ? "/admin" : "/")
@@ -56,6 +67,19 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.ok(!!document.querySelector('.sidebar [aria-label="Sign out"]'), `Missing exit for ${role}, mobile=${mobile}`)
         assert.equal(w.location.pathname.startsWith('/admin'), role === 'admin', 'restored sessions use the portal for the verified account role')
         assert.equal(w.location.pathname, `/${role}`)
+        const beforeSwipeLogout=logoutCalls()
+        await click([...document.querySelectorAll('.sidebar .nav-item')].find(el=>el.textContent.trim().startsWith('Active sites')))
+        await swipe('right')
+        assert.match(document.querySelector('.sidebar .nav-item.active').textContent,role==='client'?/Overview/:/Dashboard/)
+        assert.equal(confirmation(),null)
+        await swipe('right')
+        assert.ok(confirmation(),role+' second swipe opens the existing confirmation')
+        await click([...confirmation().querySelectorAll('button')].find(el=>el.textContent.trim()==='Cancel'))
+        assert.equal(logoutCalls(),beforeSwipeLogout,'swipe cancellation keeps the session')
+        assert.equal(client.getToken(),token)
+        await swipe('left')
+        assert.match(document.querySelector('.sidebar .nav-item.active').textContent,/Active sites/)
+        await swipe('right')
         // A fresh login adds the role workspace after 10BuildLine's landing page.
         // Exercise real browser traversal against the mounted application.
         w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")

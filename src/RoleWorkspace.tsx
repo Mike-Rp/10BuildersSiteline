@@ -1,3 +1,4 @@
+import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
@@ -497,6 +498,7 @@ export default function RoleWorkspace({
     navigation.closeMobile()
     setBell(false)
   }
+  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:roleNav.map(([label])=>label),enabled:!paused && !extensionDemo,blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
   // Old SPM responses links open the Site PM responses tab of Confirmation queue.
   function openSiteResponses() {
     navigate("Confirmation queue")
@@ -3675,7 +3677,7 @@ export default function RoleWorkspace({
           onClick={navigation.closeMobile}
         />
       )}
-      <div className="main-shell">
+      <div className="main-shell" ref={swipe.ref}>
         <header className="topbar">
           <div className="breadcrumb">
             <Button
@@ -4059,6 +4061,7 @@ export default function RoleWorkspace({
           />}
         </div>
       )}
+      {swipe.dialog}
       {signOut.dialog}
       {idleWarning && !paused && (
         <div className="session-warning">

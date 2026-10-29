@@ -1,3 +1,4 @@
+import useSwipeNavigation from "./useSwipeNavigation"
 import { LoadingRoleProvider } from "./LoadingSkeleton"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
@@ -179,6 +180,7 @@ export default function ClientPortal({
     setBell(false)
     setError("")
   }
+  const swipe = useSwipeNavigation({identity:actor.id,page,dashboard:"Project Overview",allowedPages:NAV.map(([label])=>label),enabled:!paused,blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
   function openDocument(
     documentId: string,
     kind: Viewer["kind"] = "document",
@@ -658,7 +660,7 @@ export default function ClientPortal({
           onClick={navigation.closeMobile}
         />
       )}
-      <div className="main-shell">
+      <div className="main-shell" ref={swipe.ref}>
         <header className="topbar">
           <div className="breadcrumb">
             <Button
@@ -816,6 +818,7 @@ export default function ClientPortal({
           />
         </div>
       )}
+      {swipe.dialog}
       {signOut.dialog}
       {idleWarning && !paused && (
         <div className="session-warning">

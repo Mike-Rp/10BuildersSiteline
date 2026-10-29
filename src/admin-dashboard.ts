@@ -76,6 +76,7 @@ export function adminDashboardOverview(state: State, now = Date.now()) {
     })),
   ]
   return {
+    completedProjects: state.projects.filter(p => p.status === "completed").length,
     activeProjects: state.projects.filter(p => p.status === "active").length,
     intakeProjects: intake.length,
     teamAccounts: state.accounts.filter(a => ["active", "invited"].includes(a.status)).length,
