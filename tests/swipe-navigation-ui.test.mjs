@@ -59,7 +59,7 @@ test('workspace swipes validate intent, protect edits and never change browser h
       assert.equal(w.history.length,history);assert.equal(w.location.pathname,'/admin')
     })
     await t.test('short, vertical, diagonal, slow, tap-like, cancelled and multi-touch gestures do nothing',async()=>{
-      for(const options of [{dx:30},{dx:100,dy:120},{dx:110,dy:80},{duration:1100},{duration:20}]){await render();await swipe('right',options);assert.equal(page(),'Documents')}
+      for(const options of [{dx:30},{dx:100,dy:120},{dx:110,dy:80},{duration:1600},{duration:20}]){await render();await swipe('right',options);assert.equal(page(),'Documents')}
       await render()
       await act(()=>{emit(canvas(),'touchstart',[touch(100)],[],clock);emit(canvas(),'touchcancel',[],[],clock+40);emit(canvas(),'touchend',[],[touch(300)],clock+150)})
       assert.equal(page(),'Documents')
@@ -82,6 +82,34 @@ test('workspace swipes validate intent, protect edits and never change browser h
       await act(()=>{const field=document.querySelector('textarea');field.dispatchEvent(new w.FocusEvent('focusin',{bubbles:true}));field.value='Unsaved note';field.dispatchEvent(new w.Event('input',{bubbles:true}))})
       await swipe();assert.equal(page(),'Documents');assert.match(document.querySelector('[role=dialog]').textContent,/Leaving may discard/)
       await click('Stay here');assert.equal(page(),'Documents');await swipe();await click('Leave page');assert.equal(page(),'Dashboard')
+    })
+
+    await t.test('mouse drags work, taps remain normal, and dragging a card never also clicks it',async()=>{
+      await render()
+      const target=[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Team')
+      await act(()=>{
+        const pointer=(type,x,buttons)=>{const e=new w.Event(type,{bubbles:true,cancelable:true});Object.defineProperties(e,{pointerType:{value:'mouse'},pointerId:{value:7},button:{value:0},buttons:{value:buttons},isPrimary:{value:true},clientX:{value:x},clientY:{value:180},timeStamp:{value:clock+(type==='pointerdown'?0:type==='pointermove'?60:150)}});target.dispatchEvent(e)}
+        pointer('pointerdown',100,1);pointer('pointermove',280,1);pointer('pointerup',280,0)
+      })
+      assert.equal(page(),'Dashboard')
+      await act(()=>target.click());assert.equal(page(),'Dashboard','synthetic post-drag click is suppressed')
+      await act(()=>target.click());assert.equal(page(),'Team','ordinary click still works')
+    })
+    await t.test('trackpad horizontal streams navigate once after momentum, while vertical scrolling and pinch stay native',async()=>{
+      await render()
+      const wheel=async(dx,dy=0,extra={})=>act(()=>canvas().dispatchEvent(new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:200,clientY:180,deltaX:dx,deltaY:dy,...extra})))
+      const settle=()=>act(()=>new Promise(resolve=>setTimeout(resolve,260)))
+      await wheel(-60);await wheel(-60);await wheel(-40);await settle()
+      assert.equal(page(),'Dashboard');assert.equal(document.querySelector('[role=dialog]'),null,'momentum does not cause a second action')
+      await wheel(180);await settle();assert.equal(page(),'Documents','opposite horizontal scroll restores the module')
+      await wheel(0,180);await settle();assert.equal(page(),'Documents')
+      await wheel(-180,0,{ctrlKey:true});await settle();assert.equal(page(),'Documents')
+    })
+    await t.test('phone swipes can start on cards without activating their buttons',async()=>{
+      await render()
+      const target=[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Team')
+      await swipe('right',{target});assert.equal(page(),'Dashboard')
+      await act(()=>target.click());assert.equal(page(),'Dashboard')
     })
     await t.test('disabled sessions, changed identity and revoked permissions never restore an unauthorized module',async()=>{
       await render({enabled:false});await swipe();assert.equal(page(),'Documents')
