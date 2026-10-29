@@ -23,6 +23,8 @@ Run the processes separately with `npm run dev:web` and `npm run dev:api`. Check
 
 Office PMs, Site PMs and Clients sign in at `/login` (also the signed-out `/` page). Administrators use `/admin/login`. A secondary button below each login form switches to the other sign-in page. Successful sessions use `/admin` for administrators and `/` for other roles, and sign-out returns to the appropriate login page.
 
+Opening `/login` or `/admin/login` always shows the sign-in form and waits for a submitted login, even if this tab has a saved session. Switching pages does not submit credentials or restore the dashboard. Refreshing a workspace at `/` or `/admin` still restores a valid session; visiting a sign-in page alone does not revoke it.
+
 Deploy the frontend and Express backend together. Regular sign-in posts to `/api/v1/auth/login`, and administrator sign-in posts to `/api/v1/auth/admin/login`. Both validate the account's database role before issuing or replacing a session, share failed-login throttling, and preserve password recovery and first-login password changes. This change needs no database migration.
 
 Accounts must exist in the selected database. The app does not create demo accounts during login. In the optional demo seed, Patricia's login is `patricia.domingo@10builders.com` / `Password@123`; other databases may contain different accounts.

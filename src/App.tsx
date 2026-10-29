@@ -369,14 +369,16 @@ function AppInner() {
   const selectedAccount = state.accounts.find((a) => a.id === dialog?.id)
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
-  // Restores the signed-in session after a refresh. Only a rejected token or an
+  // Explicit sign-in pages wait for credentials; workspace refreshes can restore
+  // the signed-in session. Only a rejected token or an
   // account that may no longer sign in ends the session; a server or network
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   useEffect(() => {
-    if (!tokenUser()) {
+    const signInPage = /^\/(?:admin\/)?login\/?$/i.test(window.location.pathname)
+    if (signInPage || !tokenUser()) {
       setCheckingSession(false)
       return
     }

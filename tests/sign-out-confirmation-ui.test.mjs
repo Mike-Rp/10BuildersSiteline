@@ -44,6 +44,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
       for (const mobile of [false, true]) {
         compact = mobile
         user = { id: `signout-${role}`, role, full_name: `Test ${role}`, email: `${role}@example.invalid`, status: "active", date_added: "2026-01-01" }
+        // Restore a workspace refresh, rather than an explicit sign-in page.
+        w.history.replaceState(null, "", role === "admin" ? "/admin" : "/")
         const token = `test.${Buffer.from(JSON.stringify({ sub: user.id, details: { id: user.id, role } })).toString("base64url")}.test`
         client.setToken(token)
         await act(async () => { root.render(React.createElement(App, { key: `${role}-${mobile}` })); await new Promise(resolve => setTimeout(resolve, 25)) })

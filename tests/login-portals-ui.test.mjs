@@ -9,6 +9,43 @@ test("only the admin path selects the administrator login", () => {
   for (const path of ["/", "/login", "/administrator", "/projects/admin"]) assert.equal(loginPortalForPath(path), "workspace")
 })
 
+test("explicit sign-in pages wait for credentials even when this tab has a saved session", {timeout:30000}, async () => {
+  const dom = new JSDOM('<div id="root"></div>', {url:"http://localhost/admin/login",pretendToBeVisual:true})
+  const w=dom.window, previous=new Map()
+  for(const [key,value] of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Node:w.Node,sessionStorage:w.sessionStorage,IS_REACT_ACT_ENVIRONMENT:true})) {
+    previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,writable:true,configurable:true})
+  }
+  w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
+  const originalFetch=globalThis.fetch, requests=[]
+  globalThis.fetch=async(url)=>{requests.push(String(url));return Response.json({message:"No automatic sign-in expected"},{status:503})}
+  const server=await createServer({server:{middlewareMode:true,hmr:false,watch:null},appType:"custom",logLevel:"silent",optimizeDeps:{noDiscovery:true,include:[]}})
+  const {default:React,act}=await import("react"),{createRoot}=await import("react-dom/client")
+  const root=createRoot(document.getElementById("root"))
+  try {
+    const {default:App}=await server.ssrLoadModule("/src/App.tsx")
+    const client=await server.ssrLoadModule("/src/api/client.ts")
+    for(const role of ["admin","opm","spm","client"]) {
+      const token=`test.${Buffer.from(JSON.stringify({sub:`saved-${role}`,details:{id:`saved-${role}`,role}})).toString("base64url")}.test`
+      for(const path of ["/login","/admin/login","/admin/login/?source=switch"]) {
+        w.history.replaceState(null,"",path)
+        client.setToken(token)
+        await act(()=>root.render(React.createElement(App,{key:role+path})))
+        assert.equal(requests.length,0,"Visiting a sign-in page must not fetch or restore a cached account")
+        assert.ok(document.querySelector('form.login-form'),`Expected a form at ${path} for saved ${role}`)
+        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/')?'Administrator sign-in':'Welcome to SITELINE')
+        assert.equal(w.location.pathname,new URL(path,w.location.origin).pathname)
+        for(const input of document.querySelectorAll('form.login-form input')) assert.equal(input.value,"")
+        assert.equal(client.getToken(),token,"Opening a login form must not revoke an existing session")
+        await act(()=>root.render(null))
+      }
+    }
+    client.setToken("")
+  } finally {
+    await act(()=>root.unmount());await server.close();dom.window.close();globalThis.fetch=originalFetch
+    for(const [key,value]of previous)value?Object.defineProperty(globalThis,key,value):delete globalThis[key]
+  }
+})
+
 test("both login pages use the approved branding and submit to their own server entry point", {timeout:30000}, async () => {
   const dom = new JSDOM('<div id="root"></div>', {url:"http://localhost/login",pretendToBeVisual:true})
   const w=dom.window, previous=new Map()
