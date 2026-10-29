@@ -1,0 +1,2711 @@
+{
+  "scope": {
+    "accounts": 316,
+    "roles": {
+      "admin": 50,
+      "client": 25,
+      "opm": 120,
+      "spm": 121
+    },
+    "mismatches": [
+      {
+        "account": 195,
+        "role": "spm",
+        "kind": "workspace",
+        "expected": 0,
+        "actual": 1,
+        "status": 200,
+        "declinedOnly": true
+      }
+    ],
+    "unexpectedLogins": []
+  },
+  "metrics": [
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 123.75,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 100.89,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 101.35,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.4,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 101.69,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.64,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 86.2,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 99.43,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.15,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.67,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 102.22,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 102.56,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.62,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.09,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.84,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 102.49,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 101.97,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.91,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 86.32,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 105.21,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 101.24,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.28,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 119.94,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.26,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 88.06,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 85.82,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.08,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 102.85,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 99.22,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.73,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.83,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.12,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 87.68,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.2,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 105.75,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 102.89,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 105.42,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.49,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 87.57,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.84,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 88.45,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 88.53,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 86.24,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 104.64,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 87.09,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 101.88,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 105.49,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 103.84,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 105.69,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "admin",
+      "status": 200,
+      "ms": 86.47,
+      "bytes": 610642,
+      "projects": 50
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 12.73,
+      "bytes": 17036,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.92,
+      "bytes": 17761,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.77,
+      "bytes": 17719,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.9,
+      "bytes": 17039,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.06,
+      "bytes": 17003,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.09,
+      "bytes": 8538,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.95,
+      "bytes": 8532,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.02,
+      "bytes": 8564,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.96,
+      "bytes": 9253,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.5,
+      "bytes": 8547,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.91,
+      "bytes": 8582,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.63,
+      "bytes": 8560,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.93,
+      "bytes": 8547,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.08,
+      "bytes": 8575,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.37,
+      "bytes": 9281,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.06,
+      "bytes": 8556,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.65,
+      "bytes": 8560,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.28,
+      "bytes": 8544,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.67,
+      "bytes": 8556,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 8.4,
+      "bytes": 8606,
+      "projects": 1
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.75,
+      "bytes": 16255,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.45,
+      "bytes": 15540,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 10,
+      "bytes": 15523,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.15,
+      "bytes": 15529,
+      "projects": 2
+    },
+    {
+      "role": "client",
+      "status": 200,
+      "ms": 9.77,
+      "bytes": 15530,
+      "projects": 2
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.22,
+      "bytes": 14205,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.1,
+      "bytes": 14216,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.31,
+      "bytes": 15618,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.84,
+      "bytes": 15047,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 16.12,
+      "bytes": 14660,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.8,
+      "bytes": 13772,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.27,
+      "bytes": 13993,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.09,
+      "bytes": 13607,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.07,
+      "bytes": 14577,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.88,
+      "bytes": 13984,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.39,
+      "bytes": 14438,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.91,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.71,
+      "bytes": 13555,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.57,
+      "bytes": 14055,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.83,
+      "bytes": 14595,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.2,
+      "bytes": 13608,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.5,
+      "bytes": 14019,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 16.11,
+      "bytes": 14378,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 17.03,
+      "bytes": 14004,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.6,
+      "bytes": 13638,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 16.11,
+      "bytes": 15006,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.22,
+      "bytes": 13551,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.93,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.93,
+      "bytes": 13970,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.17,
+      "bytes": 14347,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.65,
+      "bytes": 14015,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.87,
+      "bytes": 14582,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.93,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.14,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.77,
+      "bytes": 13539,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.22,
+      "bytes": 9038,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.84,
+      "bytes": 9068,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.05,
+      "bytes": 10040,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.89,
+      "bytes": 9037,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.78,
+      "bytes": 9065,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.77,
+      "bytes": 10035,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.46,
+      "bytes": 10021,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 13.75,
+      "bytes": 10068,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 17.01,
+      "bytes": 11046,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.37,
+      "bytes": 10076,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.36,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.89,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.92,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.84,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.01,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.67,
+      "bytes": 13159,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.65,
+      "bytes": 13189,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.28,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 14.91,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 15.47,
+      "bytes": 13193,
+      "projects": 1
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.09,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.88,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.28,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.13,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.94,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.78,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.84,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.8,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.78,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.68,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.02,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.85,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.38,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.23,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.9,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.74,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.75,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.69,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.8,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.96,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.07,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.5,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.82,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.15,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.44,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.78,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.78,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.52,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.88,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.69,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.94,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.97,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.15,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.45,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.44,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.08,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.12,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.51,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.3,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.85,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.95,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.42,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.74,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.68,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 12.64,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.11,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.32,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.75,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.05,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.58,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.33,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.26,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 5.96,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.73,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.11,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.31,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.25,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.44,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.11,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 3.76,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "opm",
+      "status": 200,
+      "ms": 4.08,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.61,
+      "bytes": 14015,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.85,
+      "bytes": 14205,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.11,
+      "bytes": 14205,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.09,
+      "bytes": 14216,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.84,
+      "bytes": 14216,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.8,
+      "bytes": 15618,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.45,
+      "bytes": 15618,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.76,
+      "bytes": 15047,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.84,
+      "bytes": 15047,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.82,
+      "bytes": 14660,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.55,
+      "bytes": 14660,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.13,
+      "bytes": 13772,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.03,
+      "bytes": 13772,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.86,
+      "bytes": 13993,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.78,
+      "bytes": 13993,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.4,
+      "bytes": 13607,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.11,
+      "bytes": 13607,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.6,
+      "bytes": 14577,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.85,
+      "bytes": 14577,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.84,
+      "bytes": 13984,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.32,
+      "bytes": 13984,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.45,
+      "bytes": 14438,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.13,
+      "bytes": 14438,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.31,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.02,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.92,
+      "bytes": 13555,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.99,
+      "bytes": 13555,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.35,
+      "bytes": 14055,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.13,
+      "bytes": 14055,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.38,
+      "bytes": 14595,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.52,
+      "bytes": 14595,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.9,
+      "bytes": 13608,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.04,
+      "bytes": 13608,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 23.61,
+      "bytes": 14019,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.99,
+      "bytes": 14019,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.8,
+      "bytes": 14378,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.15,
+      "bytes": 14378,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.37,
+      "bytes": 14004,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.33,
+      "bytes": 14004,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.22,
+      "bytes": 13638,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.43,
+      "bytes": 13638,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.08,
+      "bytes": 15006,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.68,
+      "bytes": 15006,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.45,
+      "bytes": 13551,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.22,
+      "bytes": 13551,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.11,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.26,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.2,
+      "bytes": 13970,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.38,
+      "bytes": 13970,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.19,
+      "bytes": 14347,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.76,
+      "bytes": 14347,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.31,
+      "bytes": 14015,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.64,
+      "bytes": 14015,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14,
+      "bytes": 14582,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.88,
+      "bytes": 14582,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.53,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.69,
+      "bytes": 14007,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.68,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.79,
+      "bytes": 13580,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.61,
+      "bytes": 13539,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 17.19,
+      "bytes": 13539,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.76,
+      "bytes": 9038,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.32,
+      "bytes": 9038,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.39,
+      "bytes": 9068,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.81,
+      "bytes": 9068,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.15,
+      "bytes": 10040,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.48,
+      "bytes": 10040,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.41,
+      "bytes": 9037,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.35,
+      "bytes": 9037,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.13,
+      "bytes": 9065,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.97,
+      "bytes": 9065,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.56,
+      "bytes": 10035,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.57,
+      "bytes": 10035,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.07,
+      "bytes": 10021,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.28,
+      "bytes": 10021,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.25,
+      "bytes": 10068,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.71,
+      "bytes": 10068,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.94,
+      "bytes": 11046,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.75,
+      "bytes": 11046,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.62,
+      "bytes": 10076,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.89,
+      "bytes": 10076,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.78,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.74,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.94,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.29,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.99,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.72,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.77,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.05,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.92,
+      "bytes": 13159,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.64,
+      "bytes": 13159,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15.03,
+      "bytes": 13189,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.07,
+      "bytes": 13189,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.44,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.85,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.35,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 15,
+      "bytes": 13151,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 14.72,
+      "bytes": 13193,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 13.78,
+      "bytes": 13193,
+      "projects": 1
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.67,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.21,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.44,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.12,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.01,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.03,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.11,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.03,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.23,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.06,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.95,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.54,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.66,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.68,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.09,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.16,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 4.06,
+      "bytes": 70,
+      "projects": 0
+    },
+    {
+      "role": "spm",
+      "status": 200,
+      "ms": 3.7,
+      "bytes": 70,
+      "projects": 0
+    }
+  ],
+  "browser": {
+    "admin": {
+      "smallTextCount": 26,
+      "smallTextExamples": [
+        {
+          "tag": "SPAN",
+          "cls": "ao-eyebrow",
+          "font": "10px",
+          "text": "ADMINISTRATOR WORKSPACE"
+        },
+        {
+          "tag": "P",
+          "cls": "",
+          "font": "13px",
+          "text": "Your current workload, open decisions,"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Active projects"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Projects in intake"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Team accounts"
+        },
+        {
+          "tag": "P",
+          "cls": "",
+          "font": "12px",
+          "text": "Open an item to view its details and e"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "",
+          "font": "11px",
+          "text": "All"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "",
+          "font": "11px",
+          "text": "Requests"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "",
+          "font": "11px",
+          "text": "Licenses"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "",
+          "font": "11px",
+          "text": "Project updates"
+        }
+      ],
+      "undersizedTargets": 22,
+      "targetExamples": [
+        {
+          "label": "Dashboard",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Active sites",
+          "width": 222,
+          "height": 47
+        },
+        {
+          "label": "Project intake",
+          "width": 222,
+          "height": 47
+        },
+        {
+          "label": "Documents",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Directory",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Team",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Archive",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Settings",
+          "width": 222,
+          "height": 46
+        },
+        {
+          "label": "Sign out",
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Search workspace",
+          "width": 142,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false,
+      "connectedIndicator": false
+    },
+    "spm": {
+      "smallTextCount": 13,
+      "smallTextExamples": [
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Active projects"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Average recorded progress"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "12px",
+          "text": "Requiring attention"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "11px",
+          "text": "1"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "11px",
+          "text": "1"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "as-type",
+          "font": "10px",
+          "text": "Residential"
+        },
+        {
+          "tag": "SPAN",
+          "cls": "",
+          "font": "11px",
+          "text": "Recorded progress"
+        },
+        {
+          "tag": "STRONG",
+          "cls": "",
+          "font": "11px",
+          "text": "33%"
+        },
+        {
+          "tag": "DT",
+          "cls": "",
+          "font": "10px",
+          "text": "Lead Site PM"
+        },
+        {
+          "tag": "DD",
+          "cls": "",
+          "font": "12px",
+          "text": "Adrian Aguilar (SPM 001)"
+        }
+      ],
+      "undersizedTargets": 0,
+      "targetExamples": [],
+      "horizontalOverflow": false,
+      "connectedIndicator": false
+    },
+    "outageRestore": {
+      "text": "Your session is still active, but the workspace could not be loaded.RetrySign out",
+      "retry": true,
+      "skeleton": false
+    }
+  },
+  "rls": [
+    {
+      "relname": "activity_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "activity_types",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "assignment_confirmations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "audit_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "certification_types",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "contracts",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "disciplines",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "document_types",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "notification_recipients",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pending_progress_updates",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pending_rework_requests",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "pending_subcontractor_requests",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "phase_checklist_templates",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "phase_schema_migrations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_documents",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_engineers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_notes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_checklist_items",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_checklists",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_evidence",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_files",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_submission_files",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_team",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_update_files",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_phase_updates",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_photos",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_progress_history",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_stage_discipline_links",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_stages",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_subcontractor_assignments",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_subcontractor_matches",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_subcontractor_selections",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_type_required_certifications",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_type_stages",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "project_types",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "projects",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "roles",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "share_link_access_log",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "share_link_excluded_documents",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "share_links",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "stored_files",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "subcontractor_workers",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "subcontractors",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "trade_required_certifications",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "trades",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_certifications",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_client_project_links",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_discipline_scopes",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_licenses",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_project_type_specializations",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "user_sessions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "users",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "users_token",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "worker_certifications",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "worker_employment_history",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "workspace_account_metadata",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "workspace_company_metadata",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "workspace_project_metadata",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "workspace_settings",
+      "relrowsecurity": true
+    }
+  ],
+  "seed": {
+    "projects": {
+      "n": 50,
+      "missing_end_dates": 50,
+      "distinct_starts": 2
+    },
+    "licenses": {
+      "expired_current": 0
+    },
+    "unconfiguredPhases": [
+      {
+        "type": "Commercial",
+        "code": "Envelope / Curtain Wall"
+      },
+      {
+        "type": "Commercial",
+        "code": "Fire & Life Safety"
+      },
+      {
+        "type": "Mixed-Use",
+        "code": "Envelope / Curtain Wall"
+      },
+      {
+        "type": "Mixed-Use",
+        "code": "Fire & Life Safety"
+      },
+      {
+        "type": "Mixed-Use",
+        "code": "Landscape & Site Works"
+      },
+      {
+        "type": "Residential",
+        "code": "Envelope"
+      },
+      {
+        "type": "Residential",
+        "code": "Landscape & Site Works"
+      }
+    ]
+  }
+}

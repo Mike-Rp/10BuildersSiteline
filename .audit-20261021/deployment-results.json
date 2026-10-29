@@ -1,0 +1,24 @@
+[
+  {
+    "path": "/api/v1/health",
+    "status": 200,
+    "type": "application/json; charset=utf-8",
+    "bytes": 27,
+    "health": {
+      "ok": true,
+      "database": true
+    }
+  },
+  {
+    "path": "/",
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "bytes": 987
+  },
+  {
+    "path": "/audit-spa-route",
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "bytes": 987
+  }
+]

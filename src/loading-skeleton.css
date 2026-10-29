@@ -16,7 +16,7 @@
 .workspace-skeleton .nav-item { cursor: default; }
 .workspace-skeleton .nav-item:hover { background: transparent; }
 .skeleton-nav { display: grid; gap: 27px; padding: 35px 15px; }
-.skeleton-nav .skeleton-line { background: #ffffff26; }
+.skeleton-nav .skeleton-line { background: #dce4ec; }
 .skeleton-workspace-content { width: 100%; }
 .skeleton-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
 .skeleton-heading h1 { font-size: 30px; color: #102c4c; margin: 0 0 10px; }

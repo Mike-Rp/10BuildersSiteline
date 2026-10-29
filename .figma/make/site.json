@@ -1,7 +1,10 @@
 {
   "title": "SITELINE | 10 Builders",
+  "language": "en",
+  "url": "https://10builderssiteline.vercel.app/",
   "icons": { "icon": "/images/10-builders-logo.png" },
-  "description": "Manage construction projects efficiently with role-based access for administrators, project managers, and clients, ensuring seamless coordination and progress tracking.",
+  "description": "Private construction project portal for 10 Builders. Authorized users can manage project documents, site progress, and team assignments.",
+  "openGraph": { "image": "/images/login-construction-1120.webp" },
   "robots": {
     "index": false
   },

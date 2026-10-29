@@ -1,5 +1,6 @@
 import { resolveApiBase } from "./base.ts"
 import { currentLoginPortal, type LoginPortal } from "../login-portal.ts"
+import { RequestTimeoutError, withRequestDeadline } from "./request-deadline.ts"
 
 // The backend is required. Missing configuration never enables demo data.
 let base = resolveApiBase(import.meta.env?.VITE_API_URL, Boolean(import.meta.env?.PROD))
@@ -48,10 +49,11 @@ type Envelope<T> = {
   data: T
 }
 
-async function request(
+async function request<T>(
   path: string,
-  init: RequestInit = {},
-): Promise<Response> {
+  init: RequestInit,
+  consume: (response: Response) => Promise<T>,
+): Promise<T> {
   if (!base) throw new ApiError("The API address is not configured.", 0)
   const headers = new Headers(init.headers)
   const token = getToken()
@@ -62,23 +64,29 @@ async function request(
     !headers.has("Content-Type")
   )
     headers.set("Content-Type", "application/json")
-  let response: Response
   try {
-    response = await fetch(base + path, { ...init, headers })
-  } catch {
+    return await withRequestDeadline(async signal => {
+      const response = await fetch(base + path, { ...init, headers, signal, cache: "no-store" })
+      signal.throwIfAborted()
+      if (response.status === 401 && token && getToken() === token) {
+        const error = await response.clone().json().catch(() => undefined)
+        signal.throwIfAborted()
+        setToken("")
+        if (error?.error?.code === "SESSION_REPLACED" && typeof window !== "undefined") {
+          window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
+        }
+      }
+      return consume(response)
+    }, { signal: init.signal, timeoutMs: init.body instanceof FormData ? 120_000 : 30_000 })
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error instanceof RequestTimeoutError) throw new ApiError(error.message, 0, "REQUEST_TIMEOUT")
+    if (init.signal?.aborted) throw error
     throw new ApiError(
       "Cannot reach the server. Check that the backend is running.",
       0,
     )
   }
-  if (response.status === 401 && token && getToken() === token) {
-    const error = await response.clone().json().catch(() => undefined)
-    setToken("")
-    if (error?.error?.code === "SESSION_REPLACED" && typeof window !== "undefined") {
-      window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
-    }
-  }
-  return response
 }
 
 export async function api<T = unknown>(
@@ -86,25 +94,26 @@ export async function api<T = unknown>(
   init: RequestInit & { json?: unknown } = {},
 ): Promise<T> {
   const { json, ...rest } = init
-  const response = await request(path, {
+  return request(path, {
     ...rest,
     body: json === undefined ? rest.body : JSON.stringify(json),
+  }, async response => {
+    let body: Envelope<T> & { error?: { message?: string; code?: string } } | undefined
+    try {
+      body = await response.json()
+    } catch {
+      body = undefined
+    }
+    if (!response.ok)
+      throw new ApiError(
+        body?.error?.message ||
+          body?.message ||
+          `Request failed (${response.status}).`,
+        response.status,
+        body?.error?.code,
+      )
+    return (body?.data ?? body as unknown) as T
   })
-  let body: Envelope<T> & { error?: { message?: string; code?: string } } | undefined
-  try {
-    body = await response.json()
-  } catch {
-    body = undefined
-  }
-  if (!response.ok)
-    throw new ApiError(
-      body?.error?.message ||
-        body?.message ||
-        `Request failed (${response.status}).`,
-      response.status,
-      body?.error?.code,
-    )
-  return (body?.data ?? body as unknown) as T
 }
 
 // One page of a server-paginated list. Returns the whole envelope, because the
@@ -113,20 +122,21 @@ export async function apiEnvelope(
   path: string,
   init: RequestInit = {},
 ): Promise<unknown> {
-  const response = await request(path, init)
-  let body: { error?: { message?: string; code?: string }; message?: string } | undefined
-  try {
-    body = await response.json()
-  } catch {
-    body = undefined
-  }
-  if (!response.ok)
-    throw new ApiError(
-      body?.error?.message || body?.message || `Request failed (${response.status}).`,
-      response.status,
-      body?.error?.code,
-    )
-  return body
+  return request(path, init, async response => {
+    let body: { error?: { message?: string; code?: string }; message?: string } | undefined
+    try {
+      body = await response.json()
+    } catch {
+      body = undefined
+    }
+    if (!response.ok)
+      throw new ApiError(
+        body?.error?.message || body?.message || `Request failed (${response.status}).`,
+        response.status,
+        body?.error?.code,
+      )
+    return body
+  })
 }
 
 // Lists: asks for large pages and follows page numbers until the data repeats.
@@ -198,8 +208,7 @@ export function tokenUser(): {
 
 // Authenticated download of any API path (for example a license renewal document).
 export async function downloadBlob(path: string): Promise<Blob | undefined> {
-  const response = await request(path)
-  return response.ok ? response.blob() : undefined
+  return request(path, {}, response => response.ok ? response.blob() : Promise.resolve(undefined))
 }
 
 // Authenticated file download (documents, photos).
@@ -216,6 +225,5 @@ export async function downloadApiFile(
   const url = fileUrls.get(docId)
   if (!url) return undefined
   const path = url.replace(/^https?:\/\/[^/]+/, "").replace(/^\/api\/v1/, "")
-  const response = await request(path)
-  return response.ok ? response.blob() : undefined
+  return downloadBlob(path)
 }

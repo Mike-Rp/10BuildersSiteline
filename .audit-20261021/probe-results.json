@@ -1,0 +1,215 @@
+[
+  {
+    "name": "health",
+    "expected": 200,
+    "actual": 200,
+    "result": "PASS"
+  },
+  {
+    "name": "CORS restricted origin",
+    "expected": "Reject unrelated origins",
+    "actual": {
+      "status": 204,
+      "allowOrigin": "*"
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "unauthenticated project request",
+    "expected": 401,
+    "actual": 401,
+    "result": "PASS"
+  },
+  {
+    "name": "server-side five-attempt lockout",
+    "expected": "429 or equivalent blocks subsequent correct login",
+    "actual": {
+      "failures": [
+        401,
+        401,
+        401,
+        401,
+        401,
+        401
+      ],
+      "seventh": 200
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "unknown and wrong-password messages identical",
+    "expected": "same status and message",
+    "actual": {
+      "unknown": 401,
+      "wrong": 401,
+      "equal": true
+    },
+    "result": "PASS"
+  },
+  {
+    "name": "inactive account rejected",
+    "expected": 401,
+    "actual": 401,
+    "result": "PASS"
+  },
+  {
+    "name": "inactive-specific safe message",
+    "expected": "inactive-specific after verified password",
+    "actual": "Invalid credentials or unavailable account.",
+    "result": "FAIL"
+  },
+  {
+    "name": "anonymous /engineer/licenses",
+    "expected": "401/403",
+    "actual": {
+      "status": 200,
+      "rows": 10
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "anonymous /engineer/certifications",
+    "expected": "401/403",
+    "actual": {
+      "status": 200,
+      "rows": 6
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "expired token refresh rejected",
+    "expected": "401/403",
+    "actual": {
+      "modernRead": 401,
+      "refresh": 200
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "server rejects past intake start",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "server rejects intake beyond ten years",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "server enforces OPM type match",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "only three project types allowed",
+    "expected": "4xx",
+    "actual": 201,
+    "result": "FAIL"
+  },
+  {
+    "name": "server rejects end before start",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "client cannot read pending project by direct ID",
+    "expected": "404/403",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "SPM acceptance waits for six docs and Lead",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "contact waits for all prior gates",
+    "expected": "4xx",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "stale expectedVersion rejected",
+    "expected": 409,
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "OPM is recognized as activation actor",
+    "expected": "Actor allowed; prerequisites may block with 409",
+    "actual": 403,
+    "result": "FAIL"
+  },
+  {
+    "name": "declined company cannot be recontacted",
+    "expected": 409,
+    "actual": 409,
+    "result": "PASS"
+  },
+  {
+    "name": "accepted company locked",
+    "expected": 409,
+    "actual": 409,
+    "result": "PASS"
+  },
+  {
+    "name": "ordered API path reaches active",
+    "expected": "active",
+    "actual": {
+      "contact": 200,
+      "accepted": 200,
+      "agreement": 200,
+      "lifecycle": "active"
+    },
+    "result": "PASS"
+  },
+  {
+    "name": "activation waits for explicit OPM activation",
+    "expected": "spm_review after agreement upload",
+    "actual": "active",
+    "result": "FAIL"
+  },
+  {
+    "name": "client sees activated project",
+    "expected": true,
+    "actual": true,
+    "result": "PASS"
+  },
+  {
+    "name": "OPM allocation is read-only and one company enforced",
+    "expected": "403 and one active company",
+    "actual": {
+      "status": 200,
+      "activeCompanies": 2
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "anonymous license writes denied",
+    "expected": "401/403 and no data change",
+    "actual": {
+      "status": 200,
+      "added": 1
+    },
+    "result": "FAIL"
+  },
+  {
+    "name": "password-reset endpoint absent",
+    "expected": "404/405",
+    "actual": 200,
+    "result": "FAIL"
+  },
+  {
+    "name": "seed/workflow quality",
+    "actual": {
+      "projects": 14,
+      "missing_end_dates": 12,
+      "unconfiguredTypePhases": 7
+    }
+  }
+]

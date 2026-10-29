@@ -1,7 +1,7 @@
+import { LoadingRoleProvider } from "./LoadingSkeleton"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useSignOutConfirmation from "./useSignOutConfirmation"
-import { LoadingRoleProvider } from "./LoadingSkeleton"
 import UrgentActionBanner from "./UrgentActionBanner"
 import { clientExecutiveSummary } from "./client-executive-summary"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"

@@ -21,6 +21,8 @@ import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeti
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
 import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
+import { clearStoredAccountPreferences, clearStoredWorkspaceData } from "./browser-data"
+import { createInFlight } from "./api/in-flight"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
 import { adminDashboardOverview } from "./admin-dashboard"
@@ -36,13 +38,14 @@ import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { currentLoginPortal, type LoginPortal } from "./login-portal"
+import { currentLoginPortal, isLandingPath, navigateToWorkspace, workspacePath, type LoginPortal } from "./login-portal"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
 import {
   api,
   ApiError,
+  getToken,
   SESSION_REPLACED_EVENT,
   login as apiLogin,
   logout as apiLogout,
@@ -270,6 +273,10 @@ const ACCOUNT_UNAVAILABLE_MESSAGE = SIGN_IN_MESSAGES.inactive
 const INVALID_CREDENTIALS_MESSAGE = SIGN_IN_MESSAGES.mismatch
 const signInAttempts = localAttemptStore()
 function AppInner() {
+  useEffect(() => {
+    clearStoredWorkspaceData()
+    if (!getToken()) clearStoredAccountPreferences()
+  }, [])
   const scheduleToday = useScheduleToday()
   const [activeSitesScheduleFilter, setActiveSitesScheduleFilter] = useState<"" | "delayed">("")
   const [state, setState] = useState<State>(emptyState)
@@ -314,23 +321,34 @@ function AppInner() {
   }>()
   const [signedOut, setSignedOut] = useState(true)
   const [loginPortal, setLoginPortal] = useState<LoginPortal>(currentLoginPortal)
+  const [routePath, setRoutePath] = useState(() => window.location.pathname)
   useEffect(() => {
-    const changed = () => setLoginPortal(currentLoginPortal())
+    const changed = () => {
+      if (!getToken() && /^\/(admin|opm|spm|client)\/?$/i.test(window.location.pathname)) {
+        window.history.replaceState(null, "", currentLoginPortal() === "admin" ? "/admin/login" : "/login")
+      }
+      setRoutePath(window.location.pathname)
+      setLoginPortal(currentLoginPortal())
+      setDialog(undefined)
+      setPreview(undefined)
+      setConfirmation(undefined)
+      setNotifications(false)
+    }
     window.addEventListener("popstate", changed)
     return () => window.removeEventListener("popstate", changed)
   }, [])
   useEffect(() => {
     document.title = loginPortal === "admin" ? "SITELINE Admin | 10 Builders" : "SITELINE | 10 Builders"
   }, [loginPortal])
-  const navigation = useSidebarNavigation(!signedOut && actor.role === "admin")
+  const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin")
   useEffect(() => {
-    if (signedOut) return
+    if (signedOut || isLandingPath(routePath)) return
     const portal = actor.role === "admin" ? "admin" : "workspace"
-    if (portal !== loginPortal) {
-      window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
+    if (routePath !== workspacePath(actor.role)) {
+      setRoutePath(navigateToWorkspace(actor.role))
       setLoginPortal(portal)
     }
-  }, [signedOut, actor.role, loginPortal])
+  }, [signedOut, actor.role, loginPortal, routePath])
   const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
   const [sessionMessage, setSessionMessage] = useState("")
   const [welcomeGreeting, setWelcomeGreeting] = useState<LoginGreeting>()
@@ -375,6 +393,8 @@ function AppInner() {
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
   const [restoreAttempt, setRestoreAttempt] = useState(0)
+  const sessionRestore = useRef(createInFlight<Account>())
+  const sessionLoadVersion = useRef(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   useEffect(() => {
     const signInPage = /^\/(?:admin\/)?login\/?$/i.test(window.location.pathname)
@@ -385,8 +405,13 @@ function AppInner() {
     let cancelled = false
     setCheckingSession(true)
     setRestoreError("")
-    api<Parameters<typeof startApiSession>[0]>("/auth/me")
-      .then(startApiSession)
+    const token = getToken()
+    sessionRestore.current.run(token, () =>
+      api<Parameters<typeof startApiSession>[0]>("/auth/me").then(user => {
+        if (getToken() !== token) throw new ApiError("Your session has changed. Sign in again.", 401)
+        return startApiSession(user)
+      }),
+    )
       .then((account) => {
         if (cancelled) return
         setSessionId(account.id)
@@ -394,7 +419,7 @@ function AppInner() {
         setSignedOut(false)
       })
       .catch((error) => {
-        if (cancelled) return
+        if (cancelled || (getToken() && getToken() !== token)) return
         const transient =
           error instanceof TypeError ||
           (error instanceof ApiError && (error.status === 0 || error.status >= 500))
@@ -587,6 +612,10 @@ function AppInner() {
     else setDialog({ kind: "account", id: userId })
   }
   function clearSession() {
+    clearStoredAccountPreferences()
+    sessionRestore.current.clear()
+    sessionLoadVersion.current += 1
+    setLoadingWorkspaceRole(undefined)
     resetListMemory()
     try {
       sessionStorage.removeItem(SESSION_KEY)
@@ -600,12 +629,17 @@ function AppInner() {
     role: Account["role"]
     full_name?: string
     email?: string
-  }): Promise<Account> {
+  }, freshLogin = false): Promise<Account> {
+    const requestToken = getToken()
+    const version = ++sessionLoadVersion.current
     setLoadingWorkspaceRole(user.role)
     setReadinessAvailable(false)
     try {
       setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
       const loaded = await loadApiState(user)
+      if (getToken() !== requestToken || version !== sessionLoadVersion.current) {
+        throw new ApiError("Your session has changed. Sign in again.", 401)
+      }
       const account = loaded.accounts.find((a) => a.id === user.id)
       try {
         if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
@@ -618,13 +652,11 @@ function AppInner() {
       setState(loaded)
       setReadinessAvailable(true)
       const portal = account.role === "admin" ? "admin" : "workspace"
-      if (currentLoginPortal() !== portal || /\/login\/?$/i.test(window.location.pathname)) {
-        window.history.replaceState(null, "", portal === "admin" ? "/admin" : "/")
-      }
+      if (!freshLogin) setRoutePath(navigateToWorkspace(account.role))
       setLoginPortal(portal)
       return account
     } finally {
-      setLoadingWorkspaceRole(undefined)
+      if (version === sessionLoadVersion.current) setLoadingWorkspaceRole(undefined)
     }
   }
   async function signIn(email: string, password: string, replaceSession = false) {
@@ -644,13 +676,15 @@ function AppInner() {
     }
     let account: Account
     try {
-      account = await startApiSession(user)
+      account = await startApiSession(user, true)
     } catch (error) {
       await apiLogout()
       throw error
     }
       return account
     })
+    setRoutePath(navigateToWorkspace(account.role, true))
+    setLoginPortal(account.role === "admin" ? "admin" : "workspace")
     setDialog(undefined)
     setPreview(undefined)
     setConfirmation(undefined)
@@ -671,6 +705,7 @@ function AppInner() {
   function endSession() {
     const portal = currentLoginPortal()
     window.history.replaceState(null, "", portal === "admin" ? "/admin/login" : "/login")
+    setRoutePath(window.location.pathname)
     setLoginPortal(portal)
     clearSession()
     setSelectedNotification(undefined)
@@ -2786,7 +2821,7 @@ function AppInner() {
         )}
       </main>
     )
-  if (signedOut || !actor.id)
+  if (signedOut || !actor.id || isLandingPath(routePath))
     return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {

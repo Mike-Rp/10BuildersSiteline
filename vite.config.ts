@@ -49,6 +49,7 @@ react(),
 
 type FigmaSiteConfiguration = {
   title?: string
+  url?: string
   description?: string
   language?: string
   robots?: {
@@ -90,23 +91,36 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
   const description = config.description ?? ''
   // Imported HTML keeps its own favicon; new Makes default to the Make product icon.
   const favicon = config.icons?.icon ?? '/favicon.svg'
-  const socialImage = config.openGraph?.image ?? ''
+  const canonicalUrl = config.url ? new URL(config.url).href : ''
+  const socialImage = config.openGraph?.image
+    ? (canonicalUrl ? new URL(config.openGraph.image, canonicalUrl).href : config.openGraph.image)
+    : ''
   const language = sanitizeHtmlValue(config.language) || 'en'
   const googleAnalyticsId = sanitizeHtmlValue(config.analytics?.googleAnalyticsId)
   const headStart = config.customScripts?.headStart ?? ''
   const headEnd = config.customScripts?.headEnd ?? ''
   const bodyStart = config.customScripts?.bodyStart ?? ''
   const bodyEnd = config.customScripts?.bodyEnd ?? ''
-  const robotsTxt = config.robots?.index === false ? 'User-agent: *\nDisallow: /\n' : ''
+  // Crawlers must be able to read the noindex tag/header. Disallowing the shell
+  // in robots.txt can leave its URL indexed without letting Google see noindex.
+  // Access to all workspace data remains protected by the API's authentication.
+  const robotsTxt = config.robots?.index === false ? 'User-agent: *\nAllow: /\n' : ''
 
   return {
     name: 'figma-site-configuration',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        if (config.robots?.index === false) res.setHeader('X-Robots-Tag', 'noindex, nofollow')
         if (!robotsTxt || req.url?.split('?')[0] !== '/robots.txt') return next()
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8')
         res.end(robotsTxt)
+      })
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        if (config.robots?.index === false) res.setHeader('X-Robots-Tag', 'noindex, nofollow')
+        next()
       })
     },
     generateBundle() {
@@ -136,14 +150,21 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
         if (config.robots?.index === false) {
           tags.push({ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' }, injectTo: 'head' })
         }
+        if (canonicalUrl) {
+          tags.push({ tag: 'link', attrs: { rel: 'canonical', href: canonicalUrl }, injectTo: 'head' })
+          tags.push({ tag: 'meta', attrs: { property: 'og:url', content: canonicalUrl }, injectTo: 'head' })
+        }
+        tags.push({ tag: 'meta', attrs: { property: 'og:type', content: 'website' }, injectTo: 'head' })
         if (favicon) {
           tags.push({ tag: 'link', attrs: { rel: 'icon', href: favicon }, injectTo: 'head' })
         }
         if (title) {
           tags.push({ tag: 'meta', attrs: { property: 'og:title', content: title }, injectTo: 'head' })
+          tags.push({ tag: 'meta', attrs: { name: 'twitter:title', content: title }, injectTo: 'head' })
         }
         if (description) {
           tags.push({ tag: 'meta', attrs: { property: 'og:description', content: description }, injectTo: 'head' })
+          tags.push({ tag: 'meta', attrs: { name: 'twitter:description', content: description }, injectTo: 'head' })
         }
         if (socialImage) {
           tags.push(

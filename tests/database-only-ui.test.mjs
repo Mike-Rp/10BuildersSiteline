@@ -86,6 +86,10 @@ test(
       rules: {},
     })
     w.localStorage.setItem("siteline-admin-workspace-v1", cached)
+    w.sessionStorage.setItem("siteline-workspace-v1", cached)
+    w.localStorage.setItem("siteline-recent-projects:old-user", '["private-project-id"]')
+    w.sessionStorage.setItem("siteline-dashboard-session-greeting:old-user", "Welcome, Old User")
+    w.localStorage.setItem("unrelated-setting", "preserve")
     w.sessionStorage.setItem("siteline-session-account", "a1")
     const calls = []
     t.mock.method(globalThis, "fetch", async (url, init) => {
@@ -165,6 +169,10 @@ test(
       w.document.body.textContent,
       /Cached Demo Admin|Cached Demo Site/,
     )
-    assert.equal(w.localStorage.getItem("siteline-admin-workspace-v1"), cached)
+    assert.equal(w.localStorage.getItem("siteline-admin-workspace-v1"), null)
+    assert.equal(w.sessionStorage.getItem("siteline-workspace-v1"), null)
+    assert.equal(w.localStorage.getItem("siteline-recent-projects:old-user"), null)
+    assert.equal(w.sessionStorage.getItem("siteline-dashboard-session-greeting:old-user"), null)
+    assert.equal(w.localStorage.getItem("unrelated-setting"), "preserve")
   },
 )

@@ -1,4 +1,5 @@
 import workspaceRoutes from "./services/workspace/routes.js";
+import { workspaceReferences } from "./services/workspace/reference-cache.utility.js";
 import { get as databasePool } from "./common/pool-manager.js";
 import 'dotenv/config';
 import express, { json, urlencoded } from 'express';
@@ -30,6 +31,23 @@ types.setTypeParser(1082, (val) => val);
 const apiURL = process.env.API_URL || '/api/v1';
  
 const app = express();
+
+// The Express app serves authenticated data, not public static assets. Apply
+// these headers before parsers/auth so errors and downloads are protected too.
+app.use((req, res, next) => {
+  res.set({
+    "Cache-Control": "private, no-store",
+    "CDN-Cache-Control": "no-store",
+    "Vercel-CDN-Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+  });
+  if (req.method === "POST" && ["/api/v1/auth/login", "/api/v1/auth/admin/login", `${apiURL}/auth`].includes(req.path)) {
+    res.once("finish", () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) workspaceReferences.clear();
+    });
+  }
+  next();
+});
 
  
 const swaggerUiOptions = {

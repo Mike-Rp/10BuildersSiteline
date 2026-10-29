@@ -1,4 +1,5 @@
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
+import { workspaceReferences } from "./reference-cache.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import { locationError, normalizeLocation, sameLocationRecord } from "../../domain/operating-location.js";
@@ -169,15 +170,7 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     const companyMeta = user.role === "client" ? [] : (await db.query("select subcontractor_id as id,metadata from workspace_company_metadata")).rows;
     const selections = user.role === "client" ? [] : (await db.query("select * from project_subcontractor_selections where project_id=any($1::uuid[])", [allowed])).rows;
     const map = rows => Object.fromEntries(rows.map(r => [r.id, r.metadata]));
-    const references = (await db.query(`select pt.code as type,s.code as name,w.sort_order,
- coalesce(array_agg(distinct d.code) filter(where d.code is not null),'{}') as disciplines
- from project_types pt join project_type_stages w on w.project_type_id=pt.id join project_stages s on s.id=w.project_stage_id
- left join project_stage_discipline_links l on l.project_type_id=pt.id and l.project_stage_id=s.id
- left join disciplines d on d.id=l.discipline_id group by pt.code,s.code,w.sort_order order by w.sort_order`)).rows;
-    const backendPhases = {};
-    for (const row of references)
-        (backendPhases[row.type] ??= []).push({ name: row.name, disciplines: row.disciplines });
-    const referenceDisciplines = (await db.query("select code from disciplines order by code")).rows.map(r => r.code);
+    const { backendPhases, referenceDisciplines } = await workspaceReferences.get(db);
     const accountDetails = user.role === "admin" ? (await db.query(`select u.id,
  (select to_jsonb(l) from user_licenses l where l.user_id=u.id and l.superseded_at is null order by l.created_at desc limit 1) as license,
  array(select c.code from user_certifications x join certification_types c on c.id=x.certification_type_id where x.user_id=u.id) as certifications

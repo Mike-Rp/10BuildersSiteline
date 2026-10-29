@@ -1,0 +1,6330 @@
+[
+  {
+    "role": "anonymous",
+    "path": "/api/v1/health",
+    "status": 200,
+    "ms": 18.97,
+    "bytes": 27
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 81.94,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 4.15,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 68.37,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 49.7,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 55.38,
+    "bytes": 3290
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 59.31,
+    "bytes": 3837
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 69.52,
+    "bytes": 8251
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 8.52,
+    "bytes": 4933
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.94,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 24.71,
+    "bytes": 26111
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 29.98,
+    "bytes": 3290
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 32.89,
+    "bytes": 1502
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 39.54,
+    "bytes": 3880
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.18,
+    "bytes": 637
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.58,
+    "bytes": 1099
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 25.88,
+    "bytes": 38250
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 30.64,
+    "bytes": 3290
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 32.5,
+    "bytes": 1050
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 39.5,
+    "bytes": 3880
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 14.84,
+    "bytes": 642
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.13,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.02,
+    "bytes": 19728
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.68,
+    "bytes": 3290
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.3,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.65,
+    "bytes": 3880
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.96,
+    "bytes": 662
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.69,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 3.48,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 13.04,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 15.02,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 20.78,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.54,
+    "bytes": 509
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.42,
+    "bytes": 1084
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 3.8,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 14.39,
+    "bytes": 20995
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 16.93,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 22.22,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.5,
+    "bytes": 679
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.7,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 4.35,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 25.4,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.88,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.21,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.52,
+    "bytes": 509
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.07,
+    "bytes": 1097
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 23.28,
+    "bytes": 30859
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 27.43,
+    "bytes": 3290
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.96,
+    "bytes": 1028
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 35.78,
+    "bytes": 3880
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.59,
+    "bytes": 662
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files/:id/content",
+    "status": 200,
+    "ms": 4.07,
+    "bytes": 426
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.32,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.61,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.63,
+    "bytes": 3290
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.36,
+    "bytes": 3837
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.66,
+    "bytes": 8251
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.36,
+    "bytes": 5065
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.05,
+    "bytes": 446
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.26,
+    "bytes": 204
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 3.43,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 201,
+    "ms": 231.51,
+    "bytes": 292
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 3.4,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.59,
+    "bytes": 421
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 9.72,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 201,
+    "ms": 3.51,
+    "bytes": 202
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors/:id/workspace",
+    "status": 200,
+    "ms": 5.68,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.61,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.79,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.54,
+    "bytes": 3837
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.55,
+    "bytes": 8921
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.19,
+    "bytes": 5465
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files/:id/content",
+    "status": 200,
+    "ms": 2.91,
+    "bytes": 37
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/settings",
+    "status": 200,
+    "ms": 6.03,
+    "bytes": 91
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.48,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.48,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.32,
+    "bytes": 4231
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 36.57,
+    "bytes": 8921
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.29,
+    "bytes": 5465
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.1,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.42,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.08,
+    "bytes": 4231
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.91,
+    "bytes": 8921
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.64,
+    "bytes": 5465
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 400,
+    "ms": 17.02,
+    "bytes": 181
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 64.7,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.11,
+    "bytes": 68010
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.07,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.72,
+    "bytes": 4231
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.47,
+    "bytes": 8921
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.93,
+    "bytes": 5465
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.94,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.06,
+    "bytes": 642
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.07,
+    "bytes": 238
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 6.59,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.96,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.72,
+    "bytes": 650
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.65,
+    "bytes": 252
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 7.45,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.78,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.29,
+    "bytes": 662
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.74,
+    "bytes": 247
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 7.27,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.41,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.73,
+    "bytes": 662
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.18,
+    "bytes": 247
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 8.5,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.45,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.08,
+    "bytes": 635
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.88,
+    "bytes": 240
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 8.59,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 20.9,
+    "bytes": 362
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/workspace",
+    "status": 200,
+    "ms": 4.67,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 35.51,
+    "bytes": 74229
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 40.59,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 42.26,
+    "bytes": 4231
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 48.13,
+    "bytes": 10796
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.25,
+    "bytes": 5489
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.35,
+    "bytes": 1099
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.93,
+    "bytes": 44469
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.44,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.93,
+    "bytes": 1050
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.18,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.75,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations",
+    "status": 200,
+    "ms": 2.56,
+    "bytes": 491
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations/6/accept",
+    "status": 200,
+    "ms": 9.3,
+    "bytes": 137
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.63,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.83,
+    "bytes": 44621
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.64,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.08,
+    "bytes": 1050
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.5,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.14,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 11.29,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.69,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19,
+    "bytes": 44795
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.03,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.55,
+    "bytes": 1473
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.57,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.1,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.22,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 5.55,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 22.08,
+    "bytes": 44969
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 27.21,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.99,
+    "bytes": 1896
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 35.2,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.39,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 23.21,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.97,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.49,
+    "bytes": 45143
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.41,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.81,
+    "bytes": 2319
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.31,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.41,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.78,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.53,
+    "bytes": 45317
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.82,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.44,
+    "bytes": 2742
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.04,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.31,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.27,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.55,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.31,
+    "bytes": 45491
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.76,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.37,
+    "bytes": 3165
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.27,
+    "bytes": 4604
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.05,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 9.71,
+    "bytes": 102
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.32,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.72,
+    "bytes": 75425
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.15,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.18,
+    "bytes": 6770
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.71,
+    "bytes": 10796
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.23,
+    "bytes": 5489
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.62,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.02,
+    "bytes": 37470
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.05,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.59,
+    "bytes": 543
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 45.52,
+    "bytes": 4603
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.6,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.98,
+    "bytes": 2255
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/1/accept",
+    "status": 200,
+    "ms": 7.53,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/2/accept",
+    "status": 200,
+    "ms": 6.12,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.75,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.21,
+    "bytes": 27191
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.2,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.93,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.43,
+    "bytes": 4603
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.72,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.88,
+    "bytes": 2259
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/3/accept",
+    "status": 200,
+    "ms": 6.32,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/4/accept",
+    "status": 200,
+    "ms": 6.11,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.67,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.15,
+    "bytes": 71803
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.99,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.95,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.37,
+    "bytes": 4603
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.93,
+    "bytes": 723
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.08,
+    "bytes": 2263
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/5/accept",
+    "status": 200,
+    "ms": 5.95,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.03,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.69,
+    "bytes": 71827
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.09,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.6,
+    "bytes": 975
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 34.28,
+    "bytes": 4603
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.7,
+    "bytes": 696
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.88,
+    "bytes": 2265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/6/accept",
+    "status": 200,
+    "ms": 6.42,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/7/accept",
+    "status": 200,
+    "ms": 8.51,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.26,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.22,
+    "bytes": 75593
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.42,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 40.99,
+    "bytes": 6770
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 46.52,
+    "bytes": 10796
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.57,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.34,
+    "bytes": 2269
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.93,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.1,
+    "bytes": 37638
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.26,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.77,
+    "bytes": 543
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.15,
+    "bytes": 4603
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.92,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 9.22,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.78,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.93,
+    "bytes": 37638
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.61,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.63,
+    "bytes": 1385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.03,
+    "bytes": 4818
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.44,
+    "bytes": 711
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.38,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.2,
+    "bytes": 27311
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 21.96,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.37,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.56,
+    "bytes": 4818
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.81,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/notes",
+    "status": 201,
+    "ms": 3.11,
+    "bytes": 185
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.61,
+    "bytes": 27590
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.19,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.89,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.72,
+    "bytes": 4818
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.54,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.11,
+    "bytes": 170
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files/:id/content",
+    "status": 200,
+    "ms": 2.94,
+    "bytes": 27
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/phase-files",
+    "status": 201,
+    "ms": 7.43,
+    "bytes": 196
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/10/submit",
+    "status": 201,
+    "ms": 8.38,
+    "bytes": 240
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.5,
+    "bytes": 1099
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 32.89,
+    "bytes": 46238
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 36.55,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 38.33,
+    "bytes": 4431
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 43.43,
+    "bytes": 4819
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.48,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/phase-overview",
+    "status": 200,
+    "ms": 9,
+    "bytes": 3369
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/7/approve",
+    "status": 200,
+    "ms": 8.74,
+    "bytes": 195
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.16,
+    "bytes": 46571
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.98,
+    "bytes": 3744
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.54,
+    "bytes": 4431
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.87,
+    "bytes": 4819
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.58,
+    "bytes": 681
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.31,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.65,
+    "bytes": 76331
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.59,
+    "bytes": 3744
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.29,
+    "bytes": 7612
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.53,
+    "bytes": 11011
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.88,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/workspace",
+    "status": 200,
+    "ms": 6.99,
+    "bytes": 51
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.75,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.48,
+    "bytes": 38434
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.27,
+    "bytes": 3744
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.64,
+    "bytes": 1385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.6,
+    "bytes": 4818
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.9,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.36,
+    "bytes": 102
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.25,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.99,
+    "bytes": 76389
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.76,
+    "bytes": 4195
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.3,
+    "bytes": 8033
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.98,
+    "bytes": 11309
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.79,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors/:id/workspace",
+    "status": 200,
+    "ms": 3.33,
+    "bytes": 51
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.12,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 31.53,
+    "bytes": 38434
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 35.59,
+    "bytes": 4243
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 37.46,
+    "bytes": 1806
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 42.67,
+    "bytes": 5116
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.97,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.73,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.01,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.4,
+    "bytes": 170
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 15.99,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.41,
+    "bytes": 5591
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 409,
+    "ms": 4.29,
+    "bytes": 197
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.89,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.83,
+    "bytes": 78171
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.86,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.5,
+    "bytes": 9297
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.95,
+    "bytes": 11643
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.69,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.85,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/workspace",
+    "status": 200,
+    "ms": 8.1,
+    "bytes": 51
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.07,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.7,
+    "bytes": 40224
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.06,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.97,
+    "bytes": 3070
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.42,
+    "bytes": 5675
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.91,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files/:id/content",
+    "status": 200,
+    "ms": 3.7,
+    "bytes": 25
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.49,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 409,
+    "ms": 4.87,
+    "bytes": 219
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.17,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.53,
+    "bytes": 78179
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.01,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.65,
+    "bytes": 9764
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.51,
+    "bytes": 12112
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.41,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 30,
+    "bytes": 102
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.56,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 17.7,
+    "bytes": 40224
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 21.72,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.68,
+    "bytes": 3537
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.82,
+    "bytes": 6062
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.01,
+    "bytes": 711
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.43,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 16.25,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.29,
+    "bytes": 8823
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.14,
+    "bytes": 40526
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.93,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.56,
+    "bytes": 4391
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.61,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.26,
+    "bytes": 711
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.47,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.62,
+    "bytes": 30199
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.11,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.84,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.7,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.32,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/phase-updates",
+    "status": 201,
+    "ms": 10.32,
+    "bytes": 436
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.36,
+    "bytes": 30653
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.4,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.06,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.45,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.83,
+    "bytes": 701
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.24,
+    "bytes": 1099
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.79,
+    "bytes": 49175
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.18,
+    "bytes": 4265
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.49,
+    "bytes": 7900
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.85,
+    "bytes": 6202
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.68,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/phase-updates/1/approve",
+    "status": 200,
+    "ms": 12.58,
+    "bytes": 195
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.21,
+    "bytes": 48987
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.26,
+    "bytes": 4265
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.21,
+    "bytes": 7900
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.89,
+    "bytes": 6202
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.8,
+    "bytes": 681
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/phase-files/:id",
+    "status": 200,
+    "ms": 4.11,
+    "bytes": 70
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.11,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.15,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.86,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.63,
+    "bytes": 11081
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 34.07,
+    "bytes": 12394
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.96,
+    "bytes": 5555
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 201,
+    "ms": 237.76,
+    "bytes": 297
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 2.96,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 238.82,
+    "bytes": 1121
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth/reset-password",
+    "status": 400,
+    "ms": 3,
+    "bytes": 179
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth/reset-password",
+    "status": 200,
+    "ms": 229.61,
+    "bytes": 60
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth/me",
+    "status": 200,
+    "ms": 2.8,
+    "bytes": 234
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.13,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.32,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.38,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.01,
+    "bytes": 11081
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.21,
+    "bytes": 12621
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.01,
+    "bytes": 5981
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.65,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/resignation",
+    "status": 200,
+    "ms": 7.41,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 25.52,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 29.77,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 31.39,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 37.26,
+    "bytes": 13226
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.71,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 1.91,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.56,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.48,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.67,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.32,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.6,
+    "bytes": 13226
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.48,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/preferences",
+    "status": 200,
+    "ms": 2.88,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.4,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.86,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.56,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.91,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.6,
+    "bytes": 5984
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.47,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 2.78,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 40.37,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 42.01,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 46.5,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.6,
+    "bytes": 509
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/settings",
+    "status": 403,
+    "ms": 1.84,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/files",
+    "status": 403,
+    "ms": 2.6,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/projects/:id/documents",
+    "status": 404,
+    "ms": 2.39,
+    "bytes": 129
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.88,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.63,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.08,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.19,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.52,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.54,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.01,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.51,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.25,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.68,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.57,
+    "bytes": 5984
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.03,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 2.64,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 10.52,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 11.71,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 15.25,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.14,
+    "bytes": 509
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 8.58,
+    "bytes": 7182
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.64,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.24,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.14,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.7,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.77,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.14,
+    "bytes": 5984
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.69,
+    "bytes": 1099
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.31,
+    "bytes": 48987
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.04,
+    "bytes": 4265
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.7,
+    "bytes": 7900
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.97,
+    "bytes": 6202
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.86,
+    "bytes": 681
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.76,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.11,
+    "bytes": 30465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.77,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.8,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.09,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.74,
+    "bytes": 701
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.96,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 26.69,
+    "bytes": 75029
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 31.17,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 32.56,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 37.96,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.27,
+    "bytes": 723
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.52,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 2.84,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 10.85,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 12.32,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 16.35,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.68,
+    "bytes": 509
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.76,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.03,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.7,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.68,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.62,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.12,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.28,
+    "bytes": 4995
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.88,
+    "bytes": 1476
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.21,
+    "bytes": 1467
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.05,
+    "bytes": 1501
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.11,
+    "bytes": 1044
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.31,
+    "bytes": 1074
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.23,
+    "bytes": 169
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.65,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.35,
+    "bytes": 30465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.33,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.8,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.07,
+    "bytes": 6201
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.24,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts",
+    "status": 403,
+    "ms": 1.77,
+    "bytes": 193
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.18,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.98,
+    "bytes": 78747
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.13,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.91,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.92,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.85,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 46.41,
+    "bytes": 78741
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 50.49,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 52.13,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 57.65,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.62,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.23,
+    "bytes": 78821
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.48,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.2,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.39,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.74,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.03,
+    "bytes": 78820
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.68,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.4,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.94,
+    "bytes": 13296
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.07,
+    "bytes": 5984
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.1,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 2.77,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 12.74,
+    "bytes": 7182
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 14.38,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 19.29,
+    "bytes": 3880
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.33,
+    "bytes": 509
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 8.61,
+    "bytes": 7182
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 70.17,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.93,
+    "bytes": 83384
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.36,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.13,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.68,
+    "bytes": 13855
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.66,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.35,
+    "bytes": 3066
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.45,
+    "bytes": 474
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.92,
+    "bytes": 4072
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.05,
+    "bytes": 496
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 5.96,
+    "bytes": 3213
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.91,
+    "bytes": 496
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.24,
+    "bytes": 9098
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.79,
+    "bytes": 496
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 8.44,
+    "bytes": 3436
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 4.31,
+    "bytes": 496
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 9.3,
+    "bytes": 3985
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 4.68,
+    "bytes": 496
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.19,
+    "bytes": 3057
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 5.32,
+    "bytes": 474
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/phase-overview",
+    "status": 400,
+    "ms": 4.25,
+    "bytes": 219
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/confirmations/projects/:id/phase-team",
+    "status": 200,
+    "ms": 2.73,
+    "bytes": 2369
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/archive/phase-assignments/89/reassign",
+    "status": 200,
+    "ms": 6.5,
+    "bytes": 238
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.96,
+    "bytes": 83455
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.03,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.63,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.83,
+    "bytes": 13855
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.84,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 5.6,
+    "bytes": 4121
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 422,
+    "ms": 2.76,
+    "bytes": 257
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 17.91,
+    "bytes": 363
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 5.99,
+    "bytes": 2486
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.38,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 2.94,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 10.49,
+    "bytes": 7689
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 11.7,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 15.9,
+    "bytes": 4439
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.93,
+    "bytes": 509
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 8.08,
+    "bytes": 7689
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.5,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.66,
+    "bytes": 90418
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.66,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.43,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.37,
+    "bytes": 13855
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.6,
+    "bytes": 5984
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/health",
+    "status": 200,
+    "ms": 0.71,
+    "bytes": 27
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/workspace/project-data",
+    "status": 204,
+    "ms": 0.76,
+    "bytes": 0
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/projects",
+    "status": 401,
+    "ms": 0.59,
+    "bytes": 149
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 59.2,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 58.69,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 59.29,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 58.84,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 58.98,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 60.43,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.67,
+    "bytes": 1114
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 1.88,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 64.88,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 401,
+    "ms": 2.15,
+    "bytes": 185
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/engineer/licenses",
+    "status": 200,
+    "ms": 17.62,
+    "bytes": 5180
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/engineer/certifications",
+    "status": 200,
+    "ms": 3.67,
+    "bytes": 1984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 401,
+    "ms": 29.98,
+    "bytes": 149
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/auth",
+    "status": 200,
+    "ms": 3.24,
+    "bytes": 578
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.42,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.28,
+    "bytes": 90418
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.31,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.37,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.09,
+    "bytes": 13855
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.48,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.1,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.39,
+    "bytes": 701
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.72,
+    "bytes": 247
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 9.81,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.8,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.27,
+    "bytes": 662
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.59,
+    "bytes": 247
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 7.39,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.75,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.19,
+    "bytes": 637
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 6.71,
+    "bytes": 233
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 5.77,
+    "bytes": 51
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 5.51,
+    "bytes": 170
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.24,
+    "bytes": 681
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 7.48,
+    "bytes": 238
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts/:id/workspace",
+    "status": 200,
+    "ms": 5.98,
+    "bytes": 51
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.86,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 22.02,
+    "bytes": 90418
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.6,
+    "bytes": 4265
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 29.12,
+    "bytes": 11505
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 36,
+    "bytes": 14583
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 4.03,
+    "bytes": 5984
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 20.68,
+    "bytes": 373
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 19.86,
+    "bytes": 373
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 19.24,
+    "bytes": 374
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake/drafts",
+    "status": 201,
+    "ms": 3.52,
+    "bytes": 163
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 19.09,
+    "bytes": 374
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/:id/workspace",
+    "status": 200,
+    "ms": 4.35,
+    "bytes": 51
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.42,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 3.43,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 11.55,
+    "bytes": 7689
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 12.82,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 16.84,
+    "bytes": 4439
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.21,
+    "bytes": 861
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 7.36,
+    "bytes": 2349
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.33,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.42,
+    "bytes": 48380
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.43,
+    "bytes": 4265
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.82,
+    "bytes": 1502
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.83,
+    "bytes": 5465
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.51,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations",
+    "status": 200,
+    "ms": 2.09,
+    "bytes": 713
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations/11/accept",
+    "status": 200,
+    "ms": 7.93,
+    "bytes": 138
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.22,
+    "bytes": 1097
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.58,
+    "bytes": 60831
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.94,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.56,
+    "bytes": 1028
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.98,
+    "bytes": 5465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.71,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.77,
+    "bytes": 496
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/2/accept",
+    "status": 200,
+    "ms": 5.47,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.32,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.51,
+    "bytes": 60625
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.43,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 23.71,
+    "bytes": 51
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.74,
+    "bytes": 6873
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 33.46,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.09,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.12,
+    "bytes": 102
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.53,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.39,
+    "bytes": 48576
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.56,
+    "bytes": 4265
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.05,
+    "bytes": 2344
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.91,
+    "bytes": 5680
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.45,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 5.23,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 9.51,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.29,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 11.46,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 5.18,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.82,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 5.26,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 10.09,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.35,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 9.84,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.85,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.57,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 403,
+    "ms": 3.87,
+    "bytes": 161
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 64.34,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.96,
+    "bytes": 61693
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.78,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.1,
+    "bytes": 892
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.03,
+    "bytes": 7089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.28,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 5.78,
+    "bytes": 2627
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/1/accept",
+    "status": 200,
+    "ms": 5.8,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.54,
+    "bytes": 1097
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.78,
+    "bytes": 61923
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.73,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.05,
+    "bytes": 1028
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 28.71,
+    "bytes": 5680
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.17,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.43,
+    "bytes": 2629
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/2/accept",
+    "status": 200,
+    "ms": 5.27,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/3/accept",
+    "status": 200,
+    "ms": 4.86,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/4/accept",
+    "status": 200,
+    "ms": 5.47,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/9/accept",
+    "status": 200,
+    "ms": 5.12,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/5/accept",
+    "status": 200,
+    "ms": 6.11,
+    "bytes": 147
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/10/accept",
+    "status": 200,
+    "ms": 5.65,
+    "bytes": 148
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/11/accept",
+    "status": 200,
+    "ms": 5.04,
+    "bytes": 148
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/7/accept",
+    "status": 200,
+    "ms": 5.77,
+    "bytes": 147
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.44,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.52,
+    "bytes": 61909
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.5,
+    "bytes": 4265
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.25,
+    "bytes": 892
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.59,
+    "bytes": 7089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.28,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 409,
+    "ms": 5.05,
+    "bytes": 151
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.72,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 6.5,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 409,
+    "ms": 4.83,
+    "bytes": 197
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.76,
+    "bytes": 170
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 13.01,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 5.92,
+    "bytes": 2979
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.74,
+    "bytes": 1064
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/subcontractors",
+    "status": 403,
+    "ms": 3.01,
+    "bytes": 193
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 11.32,
+    "bytes": 14263
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 13.1,
+    "bytes": 51
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 17.26,
+    "bytes": 4439
+  },
+  {
+    "role": "client",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.4,
+    "bytes": 861
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 89.75,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.29,
+    "bytes": 51639
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.26,
+    "bytes": 4352
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.76,
+    "bytes": 6147
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.03,
+    "bytes": 6014
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.43,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractor-requests/:id/approve",
+    "status": 200,
+    "ms": 8.21,
+    "bytes": 197
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.43,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.89,
+    "bytes": 125524
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.72,
+    "bytes": 4385
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.66,
+    "bytes": 16149
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.11,
+    "bytes": 15240
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.83,
+    "bytes": 6124
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 18.54,
+    "bytes": 374
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.82,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 18.38,
+    "bytes": 58908
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 22.41,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24,
+    "bytes": 6147
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.17,
+    "bytes": 6014
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.59,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/archive/projects/:id/changes-requested",
+    "status": 201,
+    "ms": 5.3,
+    "bytes": 209
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations/12/accept",
+    "status": 200,
+    "ms": 7.65,
+    "bytes": 138
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.49,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.23,
+    "bytes": 132687
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.49,
+    "bytes": 4385
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.37,
+    "bytes": 16149
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 34.38,
+    "bytes": 15240
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.51,
+    "bytes": 6159
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 17.66,
+    "bytes": 374
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.06,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 48.36,
+    "bytes": 66071
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 52.74,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 54.23,
+    "bytes": 6147
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 59.57,
+    "bytes": 6014
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.41,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations",
+    "status": 200,
+    "ms": 2.05,
+    "bytes": 713
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations/13/accept",
+    "status": 200,
+    "ms": 7.54,
+    "bytes": 138
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.25,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 7.85,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 4.03,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.3,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.89,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.69,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.77,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.34,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.9,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.04,
+    "bytes": 102
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 3.84,
+    "bytes": 170
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 8.58,
+    "bytes": 102
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.5,
+    "bytes": 1097
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.48,
+    "bytes": 79560
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.57,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 24.87,
+    "bytes": 1028
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 29.73,
+    "bytes": 6056
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.72,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/stages",
+    "status": 200,
+    "ms": 3.18,
+    "bytes": 496
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/confirmations/projects/:id/phase-team/2/decline",
+    "status": 200,
+    "ms": 5.27,
+    "bytes": 145
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.67,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.6,
+    "bytes": 140911
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.29,
+    "bytes": 4385
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.53,
+    "bytes": 18687
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.98,
+    "bytes": 15282
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.54,
+    "bytes": 6194
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/archive/phase-assignments/168/reassign",
+    "status": 200,
+    "ms": 5.79,
+    "bytes": 239
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.4,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.72,
+    "bytes": 140889
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.11,
+    "bytes": 4385
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.92,
+    "bytes": 18687
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.21,
+    "bytes": 15282
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.75,
+    "bytes": 6194
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 17.96,
+    "bytes": 374
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.48,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.8,
+    "bytes": 74273
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.87,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.44,
+    "bytes": 8685
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.55,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.79,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations",
+    "status": 200,
+    "ms": 2.35,
+    "bytes": 713
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/confirmations/14/accept",
+    "status": 200,
+    "ms": 7.23,
+    "bytes": 138
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.34,
+    "bytes": 1114
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.39,
+    "bytes": 148052
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.9,
+    "bytes": 4385
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.16,
+    "bytes": 18687
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 34,
+    "bytes": 15282
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/accounts",
+    "status": 200,
+    "ms": 3.53,
+    "bytes": 6229
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/archive/maintenance",
+    "status": 200,
+    "ms": 23.12,
+    "bytes": 139
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/archive/assignments/escalated",
+    "status": 200,
+    "ms": 3.52,
+    "bytes": 350
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 422,
+    "ms": 3.86,
+    "bytes": 299
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 18.14,
+    "bytes": 374
+  },
+  {
+    "role": "admin",
+    "path": "/api/v1/projects/intake",
+    "status": 200,
+    "ms": 18.74,
+    "bytes": 374
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 66.16,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 26.08,
+    "bytes": 100480
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 31.38,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 33.33,
+    "bytes": 2156
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 75.79,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 8.26,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/notes",
+    "status": 201,
+    "ms": 4.69,
+    "bytes": 175
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/files",
+    "status": 200,
+    "ms": 6.3,
+    "bytes": 170
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/workspace-command",
+    "status": 200,
+    "ms": 9.01,
+    "bytes": 102
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/phase-overview",
+    "status": 200,
+    "ms": 8.51,
+    "bytes": 2774
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/53/submit",
+    "status": 201,
+    "ms": 7.52,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.04,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.8,
+    "bytes": 82313
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.83,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.41,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.38,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.52,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/11/reject",
+    "status": 200,
+    "ms": 6.27,
+    "bytes": 194
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.87,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.22,
+    "bytes": 101370
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.23,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.84,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.42,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.24,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/53/submit",
+    "status": 201,
+    "ms": 6.24,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.71,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.5,
+    "bytes": 82306
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.39,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.45,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.53,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.18,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/12/approve",
+    "status": 200,
+    "ms": 7.92,
+    "bytes": 196
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.39,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.8,
+    "bytes": 101655
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.38,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.74,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.41,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.23,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/issues",
+    "status": 201,
+    "ms": 7.56,
+    "bytes": 164
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.98,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.99,
+    "bytes": 83221
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.08,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.75,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.44,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.6,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/rework-requests/:id/approve",
+    "status": 200,
+    "ms": 5.23,
+    "bytes": 173
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/notes",
+    "status": 201,
+    "ms": 2.66,
+    "bytes": 178
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/projects/intake/upload-contract",
+    "status": 200,
+    "ms": 4.44,
+    "bytes": 75
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 62.97,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.59,
+    "bytes": 102551
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 26.01,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.42,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.31,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.21,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/phase-updates",
+    "status": 201,
+    "ms": 10.49,
+    "bytes": 413
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.32,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.43,
+    "bytes": 83970
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.66,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.85,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.98,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.84,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/phase-updates/2/approve",
+    "status": 200,
+    "ms": 11.89,
+    "bytes": 196
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.73,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.82,
+    "bytes": 102731
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.31,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.22,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32.54,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.71,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/phase-overview",
+    "status": 200,
+    "ms": 36.6,
+    "bytes": 3207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.65,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 21.38,
+    "bytes": 102731
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.96,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.51,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.19,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 5.15,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/57/submit",
+    "status": 201,
+    "ms": 8.09,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 63.18,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.43,
+    "bytes": 83787
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.7,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.51,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 32,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.82,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/13/approve",
+    "status": 200,
+    "ms": 9.95,
+    "bytes": 196
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61.7,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.61,
+    "bytes": 103107
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.05,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.48,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.4,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.57,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/56/submit",
+    "status": 201,
+    "ms": 7.24,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.19,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 19.53,
+    "bytes": 84163
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 23.82,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 25.39,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 30.12,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.37,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/14/approve",
+    "status": 200,
+    "ms": 9.08,
+    "bytes": 196
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.8,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.64,
+    "bytes": 103481
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.96,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.39,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.37,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.24,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/55/submit",
+    "status": 201,
+    "ms": 7.02,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.39,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.28,
+    "bytes": 84537
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 24.51,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 26.08,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 31.18,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.64,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/15/approve",
+    "status": 200,
+    "ms": 9.92,
+    "bytes": 196
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 60.58,
+    "bytes": 1089
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 22.55,
+    "bytes": 103855
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 27.12,
+    "bytes": 4385
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 28.91,
+    "bytes": 2594
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 34.24,
+    "bytes": 7465
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.32,
+    "bytes": 701
+  },
+  {
+    "role": "spm",
+    "path": "/api/v1/projects/:id/checklist-items/54/submit",
+    "status": 201,
+    "ms": 7.41,
+    "bytes": 207
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/auth/login",
+    "status": 200,
+    "ms": 61,
+    "bytes": 1084
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace/project-data",
+    "status": 200,
+    "ms": 20.24,
+    "bytes": 84911
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/subcontractors",
+    "status": 200,
+    "ms": 25.5,
+    "bytes": 4385
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/notifications",
+    "status": 200,
+    "ms": 27.43,
+    "bytes": 9123
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/workspace",
+    "status": 200,
+    "ms": 33.15,
+    "bytes": 6056
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/accounts/:id",
+    "status": 200,
+    "ms": 4.62,
+    "bytes": 676
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id/evidence/16/approve",
+    "status": 200,
+    "ms": 14.17,
+    "bytes": 197
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/projects/:id",
+    "status": 200,
+    "ms": 6.41,
+    "bytes": 3878
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/engineer/licenses",
+    "status": 200,
+    "ms": 3.83,
+    "bytes": 483
+  },
+  {
+    "role": "opm",
+    "path": "/api/v1/auth/reset-password",
+    "status": 200,
+    "ms": 230.42,
+    "bytes": 60
+  },
+  {
+    "role": "anonymous",
+    "path": "/api/v1/projects",
+    "status": 401,
+    "ms": 0.67,
+    "bytes": 149
+  }
+]

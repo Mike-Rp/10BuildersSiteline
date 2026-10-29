@@ -1,0 +1,315 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/IntakeGuidance.tsx");const _jsxDEV = __vite__cjsImport3_react_jsxDevRuntime["jsxDEV"];import { intakeGuidance } from "/src/intake-guidance.ts";
+import { clientSubconAgreement, openClientSubconIssue, registeredCount } from "/src/workflows.ts";
+import InfoPopover from "/src/InfoPopover.tsx";
+var _jsxFileName = "C:/Users/admin/Documents/New folder/10BuildersSiteline/src/IntakeGuidance.tsx";
+import __vite__cjsImport3_react_jsxDevRuntime from "/.audit-20261021/vite-cache/deps/react_jsx-dev-runtime.js?v=76f8d8d6";
+export function IntakeTabs({ value, counts, onChange, allLabel = "All intake" }) {
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "intake-tabs",
+		role: "group",
+		"aria-label": "Intake responsibility",
+		children: [[
+			["all", allLabel],
+			["action", "Needs your action"],
+			["waiting", "Waiting for others"]
+		].map(([key, label]) => /* @__PURE__ */ _jsxDEV("button", {
+			type: "button",
+			"aria-pressed": value === key,
+			onClick: () => onChange(key),
+			children: [
+				label,
+				" ",
+				/* @__PURE__ */ _jsxDEV("span", { children: [
+					"(",
+					counts[key],
+					")"
+				] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 10,
+					columnNumber: 226
+				}, this)
+			]
+		}, key, true, {
+			fileName: _jsxFileName,
+			lineNumber: 10,
+			columnNumber: 127
+		}, this)), /* @__PURE__ */ _jsxDEV(InfoPopover, {
+			title: "Who needs to act?",
+			children: "Needs your action shows steps available to your account. Waiting for others means a prerequisite or another role’s response is needed; viewing details does not approve on their behalf."
+		}, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 11,
+			columnNumber: 5
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 9,
+		columnNumber: 10
+	}, this);
+}
+_c = IntakeTabs;
+function stageLabel(guidance, project) {
+	if (guidance.stage === "Required documents") return `Documents incomplete (${registeredCount(project)}/6)`;
+	if (guidance.stage === "Client subcontractor review") {
+		if (openClientSubconIssue(project)) return "Client agreement issue open";
+		if (!clientSubconAgreement(project)) return "Client agreement missing";
+	}
+	return {
+		"Office PM acceptance": "Office PM acceptance pending",
+		"Lead Site PM acceptance": "Lead Site PM acceptance pending",
+		"Site PM confirmations": "Site PM confirmations pending",
+		"Phase reassignment": "Phase reassignment required",
+		"Client account prerequisite": "Client account unavailable",
+		"Signed agreement": "Signed agreement required"
+	}[guidance.stage] || guidance.stage;
+}
+function NextStepHelp({ guidance, project, details = false }) {
+	return /* @__PURE__ */ _jsxDEV(InfoPopover, {
+		title: "What happens next?",
+		label: `Help: next step for ${project.name}`,
+		children: [guidance.next, details && /* @__PURE__ */ _jsxDEV("small", {
+			className: "intake-help-meta",
+			children: [
+				project.opmAccepted ? "Office PM accepted" : "Office PM pending",
+				" · ",
+				project.team.filter((row) => row.status === "confirmed").length,
+				"/",
+				project.team.length,
+				" Site PM phases confirmed"
+			]
+		}, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 29,
+			columnNumber: 17
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 27,
+		columnNumber: 10
+	}, this);
+}
+_c2 = NextStepHelp;
+export default function IntakeGuidance({ state, project, actor, details = false }) {
+	const guidance = intakeGuidance(state, project, actor);
+	if (!guidance) return null;
+	return /* @__PURE__ */ _jsxDEV("div", {
+		className: "intake-next",
+		"aria-label": `${project.name} intake next step`,
+		children: [
+			/* @__PURE__ */ _jsxDEV("span", {
+				className: `intake-stage ${guidance.kind}`,
+				children: stageLabel(guidance, project)
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 37,
+				columnNumber: 5
+			}, this),
+			/* @__PURE__ */ _jsxDEV("span", {
+				className: `intake-responsibility ${guidance.kind}`,
+				children: guidance.kind === "action" ? "Needs your action" : "Waiting / prerequisites"
+			}, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 38,
+				columnNumber: 5
+			}, this),
+			/* @__PURE__ */ _jsxDEV("span", {
+				className: "intake-owner",
+				children: [/* @__PURE__ */ _jsxDEV("span", { children: ["Responsible: ", guidance.who] }, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 39,
+					columnNumber: 36
+				}, this), /* @__PURE__ */ _jsxDEV(NextStepHelp, {
+					guidance,
+					project,
+					details
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 39,
+					columnNumber: 76
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 39,
+				columnNumber: 5
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 36,
+		columnNumber: 10
+	}, this);
+}
+_c3 = IntakeGuidance;
+export function AdminIntakeTable({ state, projects, actor, onOpen }) {
+	return /* @__PURE__ */ _jsxDEV("table", {
+		className: "intake-guidance-table",
+		children: [/* @__PURE__ */ _jsxDEV("thead", { children: /* @__PURE__ */ _jsxDEV("tr", { children: [
+			/* @__PURE__ */ _jsxDEV("th", { children: "Project" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 44,
+				columnNumber: 62
+			}, this),
+			/* @__PURE__ */ _jsxDEV("th", { children: "Current stage" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 44,
+				columnNumber: 78
+			}, this),
+			/* @__PURE__ */ _jsxDEV("th", { children: "Responsible person" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 44,
+				columnNumber: 100
+			}, this),
+			/* @__PURE__ */ _jsxDEV("th", { children: "Action" }, void 0, false, {
+				fileName: _jsxFileName,
+				lineNumber: 44,
+				columnNumber: 127
+			}, this)
+		] }, void 0, true, {
+			fileName: _jsxFileName,
+			lineNumber: 44,
+			columnNumber: 58
+		}, this) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 44,
+			columnNumber: 51
+		}, this), /* @__PURE__ */ _jsxDEV("tbody", { children: projects.map((project) => {
+			const guidance = intakeGuidance(state, project, actor);
+			if (!guidance) return null;
+			const office = !project.opmId ? "Unassigned" : state.accounts.find((a) => a.id === project.opmId)?.name || "Assigned Office PM";
+			return /* @__PURE__ */ _jsxDEV("tr", { children: [
+				/* @__PURE__ */ _jsxDEV("td", {
+					"data-label": "Project",
+					children: [/* @__PURE__ */ _jsxDEV("button", {
+						type: "button",
+						className: "intake-project-link",
+						onClick: () => onOpen(project, false),
+						children: project.name
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 50,
+						columnNumber: 34
+					}, this), /* @__PURE__ */ _jsxDEV("small", { children: [
+						project.type,
+						" · Office PM: ",
+						office
+					] }, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 50,
+						columnNumber: 150
+					}, this)]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 50,
+					columnNumber: 9
+				}, this),
+				/* @__PURE__ */ _jsxDEV("td", {
+					"data-label": "Current stage",
+					children: /* @__PURE__ */ _jsxDEV("span", {
+						className: `intake-stage ${guidance.kind}`,
+						children: stageLabel(guidance, project)
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 51,
+						columnNumber: 40
+					}, this)
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 51,
+					columnNumber: 9
+				}, this),
+				/* @__PURE__ */ _jsxDEV("td", {
+					"data-label": "Responsible person",
+					children: [/* @__PURE__ */ _jsxDEV("div", {
+						className: "intake-owner",
+						children: [/* @__PURE__ */ _jsxDEV("span", { children: guidance.who }, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 52,
+							columnNumber: 75
+						}, this), /* @__PURE__ */ _jsxDEV(NextStepHelp, {
+							guidance,
+							project
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 52,
+							columnNumber: 102
+						}, this)]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 52,
+						columnNumber: 45
+					}, this), /* @__PURE__ */ _jsxDEV("small", {
+						className: `intake-responsibility ${guidance.kind}`,
+						children: guidance.kind === "action" ? "Needs your action" : "Waiting / prerequisites"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 52,
+						columnNumber: 162
+					}, this)]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 52,
+					columnNumber: 9
+				}, this),
+				/* @__PURE__ */ _jsxDEV("td", {
+					"data-label": "Action",
+					children: /* @__PURE__ */ _jsxDEV("button", {
+						type: "button",
+						className: "button",
+						onClick: () => onOpen(project, guidance.action === "edit"),
+						children: guidance.label
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 53,
+						columnNumber: 33
+					}, this)
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 53,
+					columnNumber: 9
+				}, this)
+			] }, project.id, true, {
+				fileName: _jsxFileName,
+				lineNumber: 49,
+				columnNumber: 14
+			}, this);
+		}) }, void 0, false, {
+			fileName: _jsxFileName,
+			lineNumber: 45,
+			columnNumber: 5
+		}, this)]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 44,
+		columnNumber: 10
+	}, this);
+}
+_c4 = AdminIntakeTable;
+var _c, _c2, _c3, _c4;
+$RefreshReg$(_c, "IntakeTabs");
+$RefreshReg$(_c2, "NextStepHelp");
+$RefreshReg$(_c3, "IntakeGuidance");
+$RefreshReg$(_c4, "AdminIntakeTable");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/src/IntakeGuidance.tsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/admin/Documents/New folder/10BuildersSiteline/src/IntakeGuidance.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/admin/Documents/New folder/10BuildersSiteline/src/IntakeGuidance.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "C:/Users/admin/Documents/New folder/10BuildersSiteline/src/IntakeGuidance.tsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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Ozs7OztBQUN0QiIsIm5hbWVzIjpbXSwic291cmNlcyI6WyJJbnRha2VHdWlkYW5jZS50c3giXSwidmVyc2lvbiI6Mywic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHR5cGUgeyBBY2NvdW50LCBQcm9qZWN0LCBTdGF0ZSB9IGZyb20gXCIuL21vZGVsXCJcclxuaW1wb3J0IHsgaW50YWtlR3VpZGFuY2UsIHR5cGUgSW50YWtlR3VpZGFuY2UgYXMgR3VpZGFuY2UsIHR5cGUgSW50YWtlVmlldyB9IGZyb20gXCIuL2ludGFrZS1ndWlkYW5jZVwiXHJcbmltcG9ydCB7IGNsaWVudFN1YmNvbkFncmVlbWVudCwgb3BlbkNsaWVudFN1YmNvbklzc3VlLCByZWdpc3RlcmVkQ291bnQgfSBmcm9tIFwiLi93b3JrZmxvd3NcIlxyXG5pbXBvcnQgSW5mb1BvcG92ZXIgZnJvbSBcIi4vSW5mb1BvcG92ZXJcIlxyXG5cclxuZXhwb3J0IGZ1bmN0aW9uIEludGFrZVRhYnMoeyB2YWx1ZSwgY291bnRzLCBvbkNoYW5nZSwgYWxsTGFiZWwgPSBcIkFsbCBpbnRha2VcIiB9OiB7XHJcbiAgdmFsdWU6IEludGFrZVZpZXc7IGNvdW50czogUmVjb3JkPEludGFrZVZpZXcsIG51bWJlcj47IG9uQ2hhbmdlOiAodmFsdWU6IEludGFrZVZpZXcpID0+IHZvaWQ7IGFsbExhYmVsPzogc3RyaW5nXHJcbn0pIHtcclxuICByZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJpbnRha2UtdGFic1wiIHJvbGU9XCJncm91cFwiIGFyaWEtbGFiZWw9XCJJbnRha2UgcmVzcG9uc2liaWxpdHlcIj5cclxuICAgIHsoW1tcImFsbFwiLCBhbGxMYWJlbF0sIFtcImFjdGlvblwiLCBcIk5lZWRzIHlvdXIgYWN0aW9uXCJdLCBbXCJ3YWl0aW5nXCIsIFwiV2FpdGluZyBmb3Igb3RoZXJzXCJdXSBhcyBjb25zdCkubWFwKChba2V5LCBsYWJlbF0pID0+IDxidXR0b24gdHlwZT1cImJ1dHRvblwiIGtleT17a2V5fSBhcmlhLXByZXNzZWQ9e3ZhbHVlID09PSBrZXl9IG9uQ2xpY2s9eygpID0+IG9uQ2hhbmdlKGtleSl9PntsYWJlbH0gPHNwYW4+KHtjb3VudHNba2V5XX0pPC9zcGFuPjwvYnV0dG9uPil9XHJcbiAgICA8SW5mb1BvcG92ZXIgdGl0bGU9XCJXaG8gbmVlZHMgdG8gYWN0P1wiPk5lZWRzIHlvdXIgYWN0aW9uIHNob3dzIHN0ZXBzIGF2YWlsYWJsZSB0byB5b3VyIGFjY291bnQuIFdhaXRpbmcgZm9yIG90aGVycyBtZWFucyBhIHByZXJlcXVpc2l0ZSBvciBhbm90aGVyIHJvbGXigJlzIHJlc3BvbnNlIGlzIG5lZWRlZDsgdmlld2luZyBkZXRhaWxzIGRvZXMgbm90IGFwcHJvdmUgb24gdGhlaXIgYmVoYWxmLjwvSW5mb1BvcG92ZXI+XHJcbiAgPC9kaXY+XHJcbn1cclxuXHJcbmZ1bmN0aW9uIHN0YWdlTGFiZWwoZ3VpZGFuY2U6IEd1aWRhbmNlLCBwcm9qZWN0OiBQcm9qZWN0KSB7XHJcbiAgaWYgKGd1aWRhbmNlLnN0YWdlID09PSBcIlJlcXVpcmVkIGRvY3VtZW50c1wiKSByZXR1cm4gYERvY3VtZW50cyBpbmNvbXBsZXRlICgke3JlZ2lzdGVyZWRDb3VudChwcm9qZWN0KX0vNilgXHJcbiAgaWYgKGd1aWRhbmNlLnN0YWdlID09PSBcIkNsaWVudCBzdWJjb250cmFjdG9yIHJldmlld1wiKSB7XHJcbiAgICBpZiAob3BlbkNsaWVudFN1YmNvbklzc3VlKHByb2plY3QpKSByZXR1cm4gXCJDbGllbnQgYWdyZWVtZW50IGlzc3VlIG9wZW5cIlxyXG4gICAgaWYgKCFjbGllbnRTdWJjb25BZ3JlZW1lbnQocHJvamVjdCkpIHJldHVybiBcIkNsaWVudCBhZ3JlZW1lbnQgbWlzc2luZ1wiXHJcbiAgfVxyXG4gIHJldHVybiAoeyBcIk9mZmljZSBQTSBhY2NlcHRhbmNlXCI6IFwiT2ZmaWNlIFBNIGFjY2VwdGFuY2UgcGVuZGluZ1wiLCBcIkxlYWQgU2l0ZSBQTSBhY2NlcHRhbmNlXCI6IFwiTGVhZCBTaXRlIFBNIGFjY2VwdGFuY2UgcGVuZGluZ1wiLFxyXG4gICAgXCJTaXRlIFBNIGNvbmZpcm1hdGlvbnNcIjogXCJTaXRlIFBNIGNvbmZpcm1hdGlvbnMgcGVuZGluZ1wiLCBcIlBoYXNlIHJlYXNzaWdubWVudFwiOiBcIlBoYXNlIHJlYXNzaWdubWVudCByZXF1aXJlZFwiLFxyXG4gICAgXCJDbGllbnQgYWNjb3VudCBwcmVyZXF1aXNpdGVcIjogXCJDbGllbnQgYWNjb3VudCB1bmF2YWlsYWJsZVwiLCBcIlNpZ25lZCBhZ3JlZW1lbnRcIjogXCJTaWduZWQgYWdyZWVtZW50IHJlcXVpcmVkXCIgfSBhcyBSZWNvcmQ8c3RyaW5nLCBzdHJpbmc+KVtndWlkYW5jZS5zdGFnZV0gfHwgZ3VpZGFuY2Uuc3RhZ2VcclxufVxyXG5cclxuZnVuY3Rpb24gTmV4dFN0ZXBIZWxwKHsgZ3VpZGFuY2UsIHByb2plY3QsIGRldGFpbHMgPSBmYWxzZSB9OiB7IGd1aWRhbmNlOiBHdWlkYW5jZTsgcHJvamVjdDogUHJvamVjdDsgZGV0YWlscz86IGJvb2xlYW4gfSkge1xyXG4gIHJldHVybiA8SW5mb1BvcG92ZXIgdGl0bGU9XCJXaGF0IGhhcHBlbnMgbmV4dD9cIiBsYWJlbD17YEhlbHA6IG5leHQgc3RlcCBmb3IgJHtwcm9qZWN0Lm5hbWV9YH0+XHJcbiAgICB7Z3VpZGFuY2UubmV4dH1cclxuICAgIHtkZXRhaWxzICYmIDxzbWFsbCBjbGFzc05hbWU9XCJpbnRha2UtaGVscC1tZXRhXCI+e3Byb2plY3Qub3BtQWNjZXB0ZWQgPyBcIk9mZmljZSBQTSBhY2NlcHRlZFwiIDogXCJPZmZpY2UgUE0gcGVuZGluZ1wifSDCtyB7cHJvamVjdC50ZWFtLmZpbHRlcihyb3cgPT4gcm93LnN0YXR1cyA9PT0gXCJjb25maXJtZWRcIikubGVuZ3RofS97cHJvamVjdC50ZWFtLmxlbmd0aH0gU2l0ZSBQTSBwaGFzZXMgY29uZmlybWVkPC9zbWFsbD59XHJcbiAgPC9JbmZvUG9wb3Zlcj5cclxufVxyXG5cclxuZXhwb3J0IGRlZmF1bHQgZnVuY3Rpb24gSW50YWtlR3VpZGFuY2UoeyBzdGF0ZSwgcHJvamVjdCwgYWN0b3IsIGRldGFpbHMgPSBmYWxzZSB9OiB7IHN0YXRlOiBTdGF0ZTsgcHJvamVjdDogUHJvamVjdDsgYWN0b3I6IEFjY291bnQ7IGRldGFpbHM/OiBib29sZWFuIH0pIHtcclxuICBjb25zdCBndWlkYW5jZSA9IGludGFrZUd1aWRhbmNlKHN0YXRlLCBwcm9qZWN0LCBhY3RvcilcclxuICBpZiAoIWd1aWRhbmNlKSByZXR1cm4gbnVsbFxyXG4gIHJldHVybiA8ZGl2IGNsYXNzTmFtZT1cImludGFrZS1uZXh0XCIgYXJpYS1sYWJlbD17YCR7cHJvamVjdC5uYW1lfSBpbnRha2UgbmV4dCBzdGVwYH0+XHJcbiAgICA8c3BhbiBjbGFzc05hbWU9e2BpbnRha2Utc3RhZ2UgJHtndWlkYW5jZS5raW5kfWB9PntzdGFnZUxhYmVsKGd1aWRhbmNlLCBwcm9qZWN0KX08L3NwYW4+XHJcbiAgICA8c3BhbiBjbGFzc05hbWU9e2BpbnRha2UtcmVzcG9uc2liaWxpdHkgJHtndWlkYW5jZS5raW5kfWB9PntndWlkYW5jZS5raW5kID09PSBcImFjdGlvblwiID8gXCJOZWVkcyB5b3VyIGFjdGlvblwiIDogXCJXYWl0aW5nIC8gcHJlcmVxdWlzaXRlc1wifTwvc3Bhbj5cclxuICAgIDxzcGFuIGNsYXNzTmFtZT1cImludGFrZS1vd25lclwiPjxzcGFuPlJlc3BvbnNpYmxlOiB7Z3VpZGFuY2Uud2hvfTwvc3Bhbj48TmV4dFN0ZXBIZWxwIGd1aWRhbmNlPXtndWlkYW5jZX0gcHJvamVjdD17cHJvamVjdH0gZGV0YWlscz17ZGV0YWlsc30gLz48L3NwYW4+XHJcbiAgPC9kaXY+XHJcbn1cclxuXHJcbmV4cG9ydCBmdW5jdGlvbiBBZG1pbkludGFrZVRhYmxlKHsgc3RhdGUsIHByb2plY3RzLCBhY3Rvciwgb25PcGVuIH06IHsgc3RhdGU6IFN0YXRlOyBwcm9qZWN0czogUHJvamVjdFtdOyBhY3RvcjogQWNjb3VudDsgb25PcGVuOiAocHJvamVjdDogUHJvamVjdCwgZWRpdDogYm9vbGVhbikgPT4gdm9pZCB9KSB7XHJcbiAgcmV0dXJuIDx0YWJsZSBjbGFzc05hbWU9XCJpbnRha2UtZ3VpZGFuY2UtdGFibGVcIj48dGhlYWQ+PHRyPjx0aD5Qcm9qZWN0PC90aD48dGg+Q3VycmVudCBzdGFnZTwvdGg+PHRoPlJlc3BvbnNpYmxlIHBlcnNvbjwvdGg+PHRoPkFjdGlvbjwvdGg+PC90cj48L3RoZWFkPlxyXG4gICAgPHRib2R5Pntwcm9qZWN0cy5tYXAocHJvamVjdCA9PiB7XHJcbiAgICAgIGNvbnN0IGd1aWRhbmNlID0gaW50YWtlR3VpZGFuY2Uoc3RhdGUsIHByb2plY3QsIGFjdG9yKVxyXG4gICAgICBpZiAoIWd1aWRhbmNlKSByZXR1cm4gbnVsbFxyXG4gICAgICBjb25zdCBvZmZpY2UgPSAhcHJvamVjdC5vcG1JZCA/IFwiVW5hc3NpZ25lZFwiIDogc3RhdGUuYWNjb3VudHMuZmluZChhID0+IGEuaWQgPT09IHByb2plY3Qub3BtSWQpPy5uYW1lIHx8IFwiQXNzaWduZWQgT2ZmaWNlIFBNXCJcclxuICAgICAgcmV0dXJuIDx0ciBrZXk9e3Byb2plY3QuaWR9PlxyXG4gICAgICAgIDx0ZCBkYXRhLWxhYmVsPVwiUHJvamVjdFwiPjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzTmFtZT1cImludGFrZS1wcm9qZWN0LWxpbmtcIiBvbkNsaWNrPXsoKSA9PiBvbk9wZW4ocHJvamVjdCwgZmFsc2UpfT57cHJvamVjdC5uYW1lfTwvYnV0dG9uPjxzbWFsbD57cHJvamVjdC50eXBlfSDCtyBPZmZpY2UgUE06IHtvZmZpY2V9PC9zbWFsbD48L3RkPlxyXG4gICAgICAgIDx0ZCBkYXRhLWxhYmVsPVwiQ3VycmVudCBzdGFnZVwiPjxzcGFuIGNsYXNzTmFtZT17YGludGFrZS1zdGFnZSAke2d1aWRhbmNlLmtpbmR9YH0+e3N0YWdlTGFiZWwoZ3VpZGFuY2UsIHByb2plY3QpfTwvc3Bhbj48L3RkPlxyXG4gICAgICAgIDx0ZCBkYXRhLWxhYmVsPVwiUmVzcG9uc2libGUgcGVyc29uXCI+PGRpdiBjbGFzc05hbWU9XCJpbnRha2Utb3duZXJcIj48c3Bhbj57Z3VpZGFuY2Uud2hvfTwvc3Bhbj48TmV4dFN0ZXBIZWxwIGd1aWRhbmNlPXtndWlkYW5jZX0gcHJvamVjdD17cHJvamVjdH0gLz48L2Rpdj48c21hbGwgY2xhc3NOYW1lPXtgaW50YWtlLXJlc3BvbnNpYmlsaXR5ICR7Z3VpZGFuY2Uua2luZH1gfT57Z3VpZGFuY2Uua2luZCA9PT0gXCJhY3Rpb25cIiA/IFwiTmVlZHMgeW91ciBhY3Rpb25cIiA6IFwiV2FpdGluZyAvIHByZXJlcXVpc2l0ZXNcIn08L3NtYWxsPjwvdGQ+XHJcbiAgICAgICAgPHRkIGRhdGEtbGFiZWw9XCJBY3Rpb25cIj48YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzc05hbWU9XCJidXR0b25cIiBvbkNsaWNrPXsoKSA9PiBvbk9wZW4ocHJvamVjdCwgZ3VpZGFuY2UuYWN0aW9uID09PSBcImVkaXRcIil9PntndWlkYW5jZS5sYWJlbH08L2J1dHRvbj48L3RkPlxyXG4gICAgICA8L3RyPlxyXG4gICAgfSl9PC90Ym9keT48L3RhYmxlPlxyXG59XHJcbiJdfQ==

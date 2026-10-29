@@ -22,6 +22,9 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     const method = init?.method || "GET"
     calls.push({ path, method })
     if (path === "/auth/me") return Response.json(user)
+    if (path === "/auth/login" || path === "/auth/admin/login") {
+      return Response.json({user,token:`test.${Buffer.from(JSON.stringify({sub:user.id,details:{id:user.id,role:user.role}})).toString("base64url")}.test`})
+    }
     if (path === "/auth/logout") return Response.json({ ok: true })
     if (path === "/accounts") return Response.json([user])
     if (path === `/accounts/${user.id}`) return Response.json(user)
@@ -52,6 +55,37 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         for (let n = 0; n < 100 && !document.querySelector('.sidebar [aria-label="Sign out"]'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
         assert.ok(!!document.querySelector('.sidebar [aria-label="Sign out"]'), `Missing exit for ${role}, mobile=${mobile}`)
         assert.equal(w.location.pathname.startsWith('/admin'), role === 'admin', 'restored sessions use the portal for the verified account role')
+        assert.equal(w.location.pathname, `/${role}`)
+        // A fresh login adds the role workspace after SITELINE's landing page.
+        // Exercise real browser traversal against the mounted application.
+        w.history.replaceState(null, "", role === "admin" ? "/admin/login" : "/")
+        w.history.pushState(null, "", `/${role}`)
+        const traverse = direction => act(async () => {
+          const moved = new Promise(resolve => w.addEventListener("popstate", resolve, {once:true}))
+          w.history[direction]()
+          await moved
+        })
+        await traverse("back")
+        assert.ok(document.querySelector("form.login-form"), "Back must display SITELINE's landing page")
+        assert.equal(client.getToken(), token, "Back is navigation, not sign out")
+        const type = async (input, value) => act(() => {
+          Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(input, value)
+          input.dispatchEvent(new w.Event("input", {bubbles:true}))
+        })
+        await type(document.querySelector('input[type="email"], input[name="email"], input[autocomplete="username"]'), user.email)
+        await type(document.querySelector('input[type="password"]'), "test-password")
+        await act(async () => {
+          document.querySelector('form.login-form').dispatchEvent(new w.Event("submit", {bubbles:true,cancelable:true}))
+          await new Promise(resolve => setTimeout(resolve, 30))
+        })
+        for (let n = 0; n < 100 && document.querySelector('form.login-form'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
+        assert.equal(w.location.pathname, `/${role}`, "successful credentials push the role route")
+        assert.ok(!document.querySelector('form.login-form'))
+        await traverse("back")
+        assert.ok(document.querySelector('form.login-form'), "fresh login preserves the landing entry")
+        await traverse("forward")
+        assert.ok(document.querySelector('.sidebar [aria-label="Sign out"]'), "Forward restores the authorized workspace")
+        assert.equal(w.location.pathname, `/${role}`)
         const baseline = logoutCalls()
         async function requestSignOut() {
           const toggle = document.querySelector(".sidebar-toggle, .mobile-menu")
@@ -84,9 +118,13 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(logoutCalls(), baseline)
         await requestSignOut()
         const confirm = confirmButton()
+        w.localStorage.setItem(`siteline-recent-projects:${user.id}`, '["project-id"]')
+        w.sessionStorage.setItem(`siteline-dashboard-session-greeting:${user.id}`, user.full_name)
         await act(async () => { confirm.click(); confirm.click(); await new Promise(resolve => setTimeout(resolve, 10)) })
         assert.equal(logoutCalls(), baseline + 1, "confirm sends exactly one logout request")
         assert.equal(client.getToken(), "")
+        assert.equal(w.localStorage.getItem(`siteline-recent-projects:${user.id}`), null)
+        assert.equal(w.sessionStorage.getItem(`siteline-dashboard-session-greeting:${user.id}`), null)
         assert.ok(!!document.querySelector("form.login-form"), `Confirmed ${role} logout must return to login`)
         assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : '/login')
         assert.equal(!!document.querySelector('.admin-access-badge'), role === 'admin')

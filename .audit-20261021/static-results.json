@@ -1,0 +1,424 @@
+{
+  "environmentFiles": [
+    {
+      "path": ".env",
+      "exists": false
+    },
+    {
+      "path": ".env.local",
+      "exists": false
+    },
+    {
+      "path": ".env.example",
+      "tracked": true,
+      "entries": []
+    },
+    {
+      "path": "Thesis-Backend/.env",
+      "tracked": false,
+      "entries": [
+        {
+          "name": "DB_SERVER",
+          "line": 1,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_PORT",
+          "line": 2,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_NAME",
+          "line": 3,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_USER",
+          "line": 4,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_PASSWORD",
+          "line": 5,
+          "configured": true,
+          "secret": true
+        },
+        {
+          "name": "PGSSLMODE",
+          "line": 6,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "JWT_SECRET",
+          "line": 7,
+          "configured": true,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "path": "Thesis-Backend/.env.example",
+      "tracked": true,
+      "entries": [
+        {
+          "name": "DB_SERVER",
+          "line": 1,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_PORT",
+          "line": 2,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_NAME",
+          "line": 3,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_USER",
+          "line": 4,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "DB_PASSWORD",
+          "line": 5,
+          "configured": true,
+          "secret": true
+        },
+        {
+          "name": "PGSSLMODE",
+          "line": 6,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "JWT_SECRET",
+          "line": 7,
+          "configured": true,
+          "secret": true
+        },
+        {
+          "name": "API_URL",
+          "line": 8,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "PORT",
+          "line": 9,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "HOST",
+          "line": 10,
+          "configured": true,
+          "secret": false
+        },
+        {
+          "name": "ARCHIVE_MAINTENANCE_ENABLED",
+          "line": 11,
+          "configured": true,
+          "secret": false
+        }
+      ]
+    }
+  ],
+  "environmentReferences": {
+    "DB_SERVER": [
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:5",
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:9",
+      "Thesis-Backend/scripts/normalize-project-types.js:19",
+      "Thesis-Backend/scripts/test-phase-database.js:10",
+      "Thesis-Backend/src/common/pool-manager.js:8"
+    ],
+    "DB_NAME": [
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:5",
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:9",
+      "Thesis-Backend/scripts/normalize-project-types.js:19",
+      "Thesis-Backend/scripts/test-phase-database.js:10",
+      "Thesis-Backend/src/common/pool-manager.js:9"
+    ],
+    "DB_USER": [
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:5",
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:9",
+      "Thesis-Backend/scripts/test-phase-database.js:10",
+      "Thesis-Backend/src/common/pool-manager.js:9"
+    ],
+    "DB_PASSWORD": [
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:10",
+      "Thesis-Backend/scripts/test-phase-database.js:11",
+      "Thesis-Backend/src/common/pool-manager.js:9"
+    ],
+    "DB_PORT": [
+      "Thesis-Backend/scripts/migrate-phase-checklists.js:10",
+      "Thesis-Backend/scripts/test-phase-database.js:11",
+      "Thesis-Backend/src/common/pool-manager.js:8"
+    ],
+    "CONFIRM_BACKUP": [
+      "Thesis-Backend/scripts/normalize-project-types.js:13"
+    ],
+    "API_URL": [
+      "Thesis-Backend/src/app.js:25"
+    ],
+    "PGSSLMODE": [
+      "Thesis-Backend/src/common/pool-manager.js:6"
+    ],
+    "DB_POOL_MAX": [
+      "Thesis-Backend/src/common/pool-manager.js:11"
+    ],
+    "VERCEL": [
+      "Thesis-Backend/src/common/pool-manager.js:11",
+      "Thesis-Backend/src/common/pool-manager.js:12"
+    ],
+    "JWT_SECRET": [
+      "Thesis-Backend/src/common/utilities/access.utility.js:69",
+      "Thesis-Backend/src/services/auth/controller.js:38",
+      "Thesis-Backend/src/services/auth/controller.js:82",
+      "Thesis-Backend/tests/accounts.test.js:12",
+      "Thesis-Backend/tests/accounts.test.js:13",
+      "Thesis-Backend/tests/accounts.test.js:14",
+      "Thesis-Backend/tests/accounts.test.js:14"
+    ],
+    "PORT": [
+      "Thesis-Backend/src/index.js:5",
+      "vite.config.ts:35",
+      "vite.config.ts:45"
+    ],
+    "HOST": [
+      "Thesis-Backend/src/index.js:6"
+    ],
+    "ARCHIVE_MAINTENANCE_ENABLED": [
+      "Thesis-Backend/src/index.js:8",
+      "Thesis-Backend/src/services/archive/scheduler.js:6"
+    ],
+    "API_PORT": [
+      "scripts/dev.mjs:12",
+      "scripts/dev.mjs:12"
+    ],
+    "VITE_API_URL": [
+      "src/api/client.ts:4",
+      "tests/database-only-ui.test.mjs:80",
+      "tests/database-only-ui.test.mjs:81",
+      "tests/database-only-ui.test.mjs:114",
+      "tests/database-only-ui.test.mjs:115"
+    ],
+    "PROD": [
+      "src/api/client.ts:4"
+    ],
+    "TZ": [
+      "tests/project-progress.test.mjs:21",
+      "tests/project-progress.test.mjs:24",
+      "tests/project-progress.test.mjs:28",
+      "tests/project-progress.test.mjs:28"
+    ],
+    "FIGMA_PUBLIC_URL": [
+      "vite.config.ts:15",
+      "vite.config.ts:15"
+    ],
+    "FIGMA_DEV_SERVER_HOST": [
+      "vite.config.ts:34",
+      "vite.config.ts:44"
+    ]
+  },
+  "largeFiles": [
+    {
+      "path": "src/RoleWorkspace.tsx",
+      "lines": 4211,
+      "bytes": 145827
+    },
+    {
+      "path": "src/App.tsx",
+      "lines": 3341,
+      "bytes": 115831
+    },
+    {
+      "path": "src/panels.tsx",
+      "lines": 2092,
+      "bytes": 68901
+    },
+    {
+      "path": "src/workflows.ts",
+      "lines": 1959,
+      "bytes": 65429
+    },
+    {
+      "path": "src/index.css",
+      "lines": 1346,
+      "bytes": 115286
+    },
+    {
+      "path": "src/LeadSubcontractorPanel.tsx",
+      "lines": 1089,
+      "bytes": 42442
+    },
+    {
+      "path": "src/ClientPortal.tsx",
+      "lines": 907,
+      "bytes": 30911
+    },
+    {
+      "path": "src/model.ts",
+      "lines": 791,
+      "bytes": 22579
+    },
+    {
+      "path": "Thesis-Backend/src/services/subcontractors/controller.js",
+      "lines": 740,
+      "bytes": 36533
+    }
+  ],
+  "criticalAny": [
+    {
+      "path": "src/App.tsx",
+      "line": 1975,
+      "kind": "cast"
+    },
+    {
+      "path": "src/RoleWorkspace.tsx",
+      "line": 908,
+      "kind": "any"
+    },
+    {
+      "path": "src/RoleWorkspace.tsx",
+      "line": 1582,
+      "kind": "any"
+    },
+    {
+      "path": "src/api/adapter.ts",
+      "line": 23,
+      "kind": "any"
+    },
+    {
+      "path": "src/api/client.ts",
+      "line": 96,
+      "kind": "cast"
+    },
+    {
+      "path": "src/api/client.ts",
+      "line": 121,
+      "kind": "any"
+    },
+    {
+      "path": "src/api/load.ts",
+      "line": 56,
+      "kind": "cast"
+    },
+    {
+      "path": "src/api/load.ts",
+      "line": 59,
+      "kind": "cast"
+    },
+    {
+      "path": "src/api/load.ts",
+      "line": 62,
+      "kind": "cast"
+    }
+  ],
+  "ignoredErrors": [
+    {
+      "path": "src/useAccountsPage.ts",
+      "line": 70
+    }
+  ],
+  "secretLocations": [
+    {
+      "path": "Thesis-Backend/.env",
+      "line": 5,
+      "value": "[MASKED]",
+      "tracked": false
+    },
+    {
+      "path": "Thesis-Backend/.env",
+      "line": 7,
+      "value": "[MASKED]",
+      "tracked": false
+    },
+    {
+      "path": "Thesis-Backend/.env.example",
+      "line": 5,
+      "value": "[MASKED]",
+      "tracked": true
+    },
+    {
+      "path": "Thesis-Backend/.env.example",
+      "line": 7,
+      "value": "[MASKED]",
+      "tracked": true
+    }
+  ],
+  "supabaseBrowserReferences": [],
+  "legacyReferences": [
+    {
+      "path": "src/client-access.ts",
+      "line": 3
+    },
+    {
+      "path": "src/client-access.ts",
+      "line": 258
+    },
+    {
+      "path": "src/model.ts",
+      "line": 1
+    },
+    {
+      "path": "src/model.ts",
+      "line": 10
+    },
+    {
+      "path": "src/model.ts",
+      "line": 597
+    },
+    {
+      "path": "src/model.ts",
+      "line": 624
+    },
+    {
+      "path": "src/model.ts",
+      "line": 744
+    },
+    {
+      "path": "src/panels.tsx",
+      "line": 18
+    },
+    {
+      "path": "src/panels.tsx",
+      "line": 739
+    },
+    {
+      "path": "src/panels.tsx",
+      "line": 1486
+    },
+    {
+      "path": "src/panels.tsx",
+      "line": 1490
+    },
+    {
+      "path": "src/workflows.ts",
+      "line": 3
+    },
+    {
+      "path": "src/workflows.ts",
+      "line": 84
+    },
+    {
+      "path": "src/workflows.ts",
+      "line": 85
+    }
+  ],
+  "sourceHashesUnchanged": true,
+  "envHistory": [],
+  "tools": {
+    "node": "v24.14.0"
+  }
+}
