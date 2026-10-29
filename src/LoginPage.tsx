@@ -98,7 +98,10 @@ export default function LoginPage({
     <main className={`login-page login-redesign${internal ? " admin-login" : " client-login"}`}>
       {internal && <LoginBanner background />}
       <nav className="login-portal-nav" aria-label="Sign-in portals">
-        {internal && <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : "STAFF"} PORTAL</span>}
+        {internal ? <span className="login-portal-label">10 BUILDERS · {admin ? "ADMINISTRATOR" : "STAFF"} PORTAL</span> : <div className="login-brand">
+          <span className="brand-mark company-logo-mark"><img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="36" height="54" /></span>
+          <span><strong>BuildAxis</strong><small>10 Builders and Development Corporation</small></span>
+        </div>}
         <div className="login-portal-links">
           <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
             <Icon name={internal ? "home" : "shield"} size={17} />

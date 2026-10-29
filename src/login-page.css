@@ -250,3 +250,18 @@
 
 /* Compact desktop client sign-in. */
 @media(min-width:761px){#root .client-login{padding:76px 28px 24px}#root .client-login .login-card{max-width:1100px;min-height:0;padding:8px;border-radius:20px}#root .client-login .login-panel{padding:24px 36px}#root .client-login .company-logo-mark,#root .client-login .company-logo-mark img{width:36px;height:54px}#root .client-login .login-brand strong{font-size:22px}#root .client-login .login-brand small{font-size:12px}#root .client-login .login-content{margin-top:16px}#root .client-login .login-heading{margin:10px 0 18px}#root .client-login .login-heading h1{font-size:26px}#root .client-login .login-heading p{font-size:14px;line-height:1.5;margin-top:8px}#root .client-login .login-form{gap:14px}#root .client-login .login-form input{min-height:44px;font-size:16px;padding-block:10px}#root .client-login .login-submit{min-height:44px;padding-block:10px}#root .client-login .client-login-note{margin-top:14px;padding-top:12px}#root .client-login .login-info{min-height:0;padding:26px}#root .client-login .login-photo-caption{padding-top:180px}#root .client-login .login-info h2{font-size:26px}#root .client-login .login-banner [aria-roledescription=slide]{min-height:105px}#root .client-login .login-banner-description{font-size:14px;min-height:44px;margin-top:10px}#root .client-login .login-banner-footer{margin-top:16px;padding-top:8px}#root .client-login .login-banner-indicators{padding:12px 4px}}
+
+/* Client identity is shown once in the page header. */
+#root .client-login .login-portal-nav .login-brand { flex: 1; min-width: 0; }
+#root .client-login .login-portal-nav .login-portal-links { flex: none; width: auto; }
+#root .client-login .login-panel { justify-content: center; }
+#root .client-login .login-content { margin-top: 0; }
+@media(max-width:760px) {
+  #root .client-login { padding-top: 104px; }
+  #root .client-login .login-portal-nav { inset: 16px 16px auto; gap: 12px; }
+  #root .client-login .login-portal-nav .company-logo-mark,
+  #root .client-login .login-portal-nav .company-logo-mark img { width: 28px; height: 44px; }
+  #root .client-login .login-portal-nav .login-brand { gap: 9px; }
+  #root .client-login .login-portal-nav .login-brand strong { font-size: 20px; }
+  #root .client-login .login-portal-nav .login-brand small { max-width: 180px; font-size: 11px; line-height: 1.4; }
+}
