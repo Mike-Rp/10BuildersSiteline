@@ -30,7 +30,7 @@ test("login asks which device to use and replaces a session only after confirmat
         approveReplacement = true
         return Response.json({ message: "Cannot reach the server. Try again." }, { status: 503 })
       }
-      return Response.json({ message: "Your account is already logged in on another device.", error: { code: "ACCOUNT_ALREADY_SIGNED_IN" } }, { status: 409 })
+      return Response.json({ message: "An existing session was active recently. Last activity: 4 minutes ago.", error: { code: "ACCOUNT_ALREADY_SIGNED_IN" } }, { status: 409 })
     }
     await act(() => root.render(React.createElement(App)))
     const setValue = async (input, value) => act(() => {
@@ -43,12 +43,12 @@ test("login asks which device to use and replaces a session only after confirmat
     await setValue(email, "office@example.test")
     await setValue(password, "Password@123")
     await submit()
-    assert.match(document.querySelector('[aria-label="Account already signed in"]').textContent, /already logged in on another device/)
+    assert.match(document.querySelector('[aria-label="Account already signed in"]').textContent, /existing session was active recently.*4 minutes ago/)
     assert.equal(approveReplacement, false)
     assert.equal(email.getAttribute("aria-invalid"), "false")
-    await act(() => button("Keep current device signed in").click())
+    await act(() => button("Cancel sign-in").click())
     assert.equal(document.querySelector('[aria-label="Account already signed in"]'), null)
-    assert.match(document.querySelector('[role="status"]').textContent, /current device will stay signed in/)
+    assert.match(document.querySelector('[role="status"]').textContent, /previous session was not changed/)
     assert.equal(requests.length, 1, "keeping the current device makes no takeover request")
     await setValue(password, "Password@123")
     await submit()

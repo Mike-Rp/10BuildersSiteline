@@ -1,0 +1,10 @@
+import React, {useState} from 'react'
+import {createRoot} from 'react-dom/client'
+import '../src/index.css'
+import {OverrideDialog, LicenseBanner, LicenseProfileBlock} from '../src/LicenseWorkflow'
+import {licensePolicyDay as localDay} from '../Thesis-Backend/src/domain/license-access.js'
+const addDays=(day,days)=>new Date(Date.parse(day+'T00:00:00Z')+days*86400000).toISOString().slice(0,10)
+const today=localDay()
+const options={project:{id:'sample',name:'Sample Residential Project'},role:'spm',stage:'Foundation',isLead:false,available:true,current:{id:'outgoing',name:'Outgoing Site PM',expiry:addDays(today,33)},pending:null,previous:[],summary:{required:8,approved:4,pct:50},candidates:[{id:'incoming',name:'Sample Incoming Engineer',phone:'09171234567',email:'engineer@example.com',workload:1,matchPercent:100,best:true,licenseExpiry:addDays(today,400)}]}
+window.fetch=async (_url, init)=>init?.method==='POST'?Response.json({data:{status:'accepted'}}):Response.json({data:options})
+function Preview(){const [view,setView]=useState('replacement');return <main style={{padding:24,maxWidth:1100,margin:'auto'}}><h1>10BuildLine · Engineer license workflow</h1><p>Implementation preview using sample data. No live assignments are changed.</p><nav style={{display:'flex',gap:12,margin:'20px 0',flexWrap:'wrap'}}>{['replacement','profile','viewing-only'].map(key=><button key={key} onClick={()=>setView(key)}>{key}</button>)}</nav>{view==='replacement'?<OverrideDialog target={{projectId:'sample',stageId:1}} onClose={()=>setView('profile')} onDone={()=>setView('profile')}/>:view==='profile'?<LicenseProfileBlock item={{...options.current,role:'spm',daysToExpiry:33,assignments:[{projectId:'sample',projectName:options.project.name,stageId:1,stage:'Foundation'}],needsCover:true}} reviewing={false} onOverride={()=>setView('replacement')} onReview={()=>{}}/>:<LicenseBanner license={{status:'expiring_soon',expiry:addDays(today,30)}}/>}</main>};createRoot(document.getElementById('root')!).render(<Preview/>);

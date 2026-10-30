@@ -132,7 +132,8 @@ export default function useSwipeNavigation(options: Options) {
       if(!current.enabled || current.blocked || hasDialog() || from!==current.page || identity!==current.identity)return
       if(suppress && target.closest('button,[role="button"]'))rememberClick(target)
       let destination: Destination | undefined
-      if(dx>0)destination={identity,from,...(current.page!==dashboard?{page:dashboard}:{})}
+      const mobile=window.matchMedia?.('(max-width: 1000px)').matches ?? window.innerWidth<=1000
+      if(dx>0 || mobile)destination={identity,from,...(current.page!==dashboard?{page:dashboard}:{})}
       else if(current.page===dashboard && previous.current?.identity===identity && current.allowedPages.includes(previous.current.page))destination={identity,from,page:previous.current.page}
       if(!destination)return
       for(const el of dirty.current.keys())if(!el.isConnected || !surface.contains(el) || valueOf(el as HTMLInputElement)===dirty.current.get(el))dirty.current.delete(el)
@@ -223,6 +224,7 @@ export default function useSwipeNavigation(options: Options) {
     surface.addEventListener('input',change)
     surface.addEventListener('change',change)
     window.addEventListener('blur',cancel)
+    window.addEventListener('resize',cancel)
     document.addEventListener('visibilitychange',cancel)
     return ()=>{
       cancel()
@@ -233,6 +235,7 @@ export default function useSwipeNavigation(options: Options) {
       surface.removeEventListener('touchstart',start);surface.removeEventListener('touchmove',move);surface.removeEventListener('touchend',end);surface.removeEventListener('touchcancel',cancel)
       surface.removeEventListener('focusin',focus);surface.removeEventListener('input',change);surface.removeEventListener('change',change)
       window.removeEventListener('blur',cancel);document.removeEventListener('visibilitychange',cancel)
+      window.removeEventListener('resize',cancel)
     }
   },[surface,options.enabled,options.blocked])
   return {ref:setSurface,dialog:pending ? <Modal title="Leave this module?" onClose={()=>setPending(undefined)}>

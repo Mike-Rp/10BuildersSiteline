@@ -72,7 +72,7 @@ async function request<T>(
         const error = await response.clone().json().catch(() => undefined)
         signal.throwIfAborted()
         setToken("")
-        if (error?.error?.code === "SESSION_REPLACED" && typeof window !== "undefined") {
+        if (["SESSION_REPLACED", "SESSION_INACTIVE"].includes(error?.error?.code) && typeof window !== "undefined") {
           window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
         }
       }

@@ -69,7 +69,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(w.location.pathname, `/${role}`)
         const beforeSwipeLogout=logoutCalls()
         await click([...document.querySelectorAll('.sidebar .nav-item')].find(el=>el.textContent.trim().startsWith('Active sites')))
-        await swipe('right')
+        await swipe(mobile?'left':'right')
         assert.match(document.querySelector('.sidebar .nav-item.active').textContent,role==='client'?/Overview/:/Dashboard/)
         assert.equal(confirmation(),null)
         await swipe('right')
@@ -78,8 +78,14 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(logoutCalls(),beforeSwipeLogout,'swipe cancellation keeps the session')
         assert.equal(client.getToken(),token)
         await swipe('left')
-        assert.match(document.querySelector('.sidebar .nav-item.active').textContent,/Active sites/)
-        await swipe('right')
+        if(mobile){
+          assert.ok(confirmation(),role+' left swipe on mobile Dashboard also asks for confirmation')
+          await click([...confirmation().querySelectorAll('button')].find(el=>el.textContent.trim()==='Cancel'))
+          assert.equal(client.getToken(),token)
+        } else {
+          assert.match(document.querySelector('.sidebar .nav-item.active').textContent,/Active sites/)
+          await swipe('right')
+        }
         // A fresh login adds the role workspace after 10BuildLine's landing page.
         // Exercise real browser traversal against the mounted application.
         w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")

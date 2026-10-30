@@ -1,3 +1,4 @@
+import { sessionStatus } from "../auth/controller.js";
 import { linkProjectFile } from "./project-upload-budget.utility.js";
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
 import { workspaceReferences } from "./reference-cache.utility.js";
@@ -163,6 +164,8 @@ router.post("/auth/login", login);
 router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);
 router.post("/auth/logout", logout);
+router.get("/auth/session", sessionStatus);
+router.post("/auth/activity", sessionStatus);
 router.post("/auth/reset-password", requireLogin, reset);
 router.get("/auth/me", endpoint(null, async (db, user) => (await db.query("select u.id,u.full_name,u.email,r.code as role,u.status,u.temp_password_issued from users u join roles r on r.id=u.role_id where u.id=$1", [user.id])).rows[0]));
 router.get("/subcontractors", getSubcontractors);

@@ -7,6 +7,14 @@ Module navigation uses the existing role-scoped page handlers, not React Router.
 - Left swipe on Dashboard: reopen the most recently visited module only if it is still permitted for the same account/session. Left swipes elsewhere do nothing.
 - Navigation buttons remain available. A swipe never accepts a form, confirms an appointment, or confirms sign-out.
 
+In the mobile layout (up to 1000px, matching the compact navigation breakpoint),
+either left or right from a module returns to Dashboard. A separate completed
+swipe in either direction on Dashboard opens the existing sign-out confirmation.
+The direction combination does not matter, and there is no automatic sign-out
+or double-swipe timer. Left-to-previous-module remains desktop-only. Resizing
+cancels a gesture in progress. Dialog and unsaved-change protections apply in
+both layouts.
+
 Gestures start within workspace content, outside inputs, links, forms, horizontal scrolling areas, carousels, sliders, side navigation and open dialogs. Browser-edge gestures (within 24px of either edge) remain browser-owned, so custom navigation cannot fire twice alongside native back/forward. No browser history trapping is used.
 
 A deliberate touchscreen swipe travels at least 64px horizontally, exceeds vertical travel by 1.5 times, stays within 70px vertical travel, and finishes within 30–1500ms. Mouse drags use the same distance checks with up to 2500ms for the drag. Vertical-first movement, multiple fingers, cancellation, window blur or a changed module/account cancels recognition. Each touch or mouse sequence can trigger at most one action. Swipes may start on card buttons; a recognized drag suppresses the resulting click, while ordinary taps and clicks keep their original behavior.

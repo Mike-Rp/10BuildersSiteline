@@ -15,7 +15,7 @@ import test from "node:test"
 import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
-import { login, setApiBase, setToken, api, apiEnvelope, downloadApiFile } from "../src/api/client.ts"
+import { login, setApiBase, setToken, getToken, api, apiEnvelope, downloadApiFile } from "../src/api/client.ts"
 import { saveApiAccount, saveApiProject, createCompany, uploadFile, sendApiWorkflow, persistAdminChanges } from "../src/api/actions.ts"
 import { randomUUID } from "node:crypto"
 import XLSX from "xlsx"
@@ -1472,6 +1472,33 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     session=await asUser(lead.email)
     await api(`/projects/${project.id}/workspace-command`,{method:'POST',json:{type:'acknowledge_client_subcon'}})
     assert.ok((await loadState(session.user)).projects.find(p=>p.id===project.id).clientSubconReview.acknowledgedAt)
+  })
+
+  await t.test("inactivity expires old sessions, background reads do not renew them, and takeover remains explicit", async () => {
+    const {user}=await asUser("patricia.domingo@10builders.com")
+    const token=getToken()
+    const first=await api('/auth/session')
+    await api('/auth/me');await api('/auth/session')
+    const unchanged=await api('/auth/session')
+    assert.equal(unchanged.lastActivityAt,first.lastActivityAt)
+    await assert.rejects(login(user.email,'wrong',true,'admin'),/Invalid credentials/)
+    await assert.rejects(login(user.email,'Password@123',false,'admin'),/existing session was active recently/i)
+    setToken(token) // Continue checking the original device after the simulated second-device login.
+    const active=await api('/auth/activity',{method:'POST'})
+    assert.ok(active.lastActivityAt>=first.lastActivityAt)
+    const stale=async()=>db.query("update workspace_account_metadata set metadata=jsonb_set(metadata,'{sessionActivity,lastActivityAt}',to_jsonb((now()-interval '5 hours')::text)) where user_id=$1",[user.id])
+    await stale()
+    await assert.rejects(api('/auth/activity',{method:'POST'}),/inactivity/)
+    setToken(token)
+    await assert.rejects(api('/projects'),/inactivity/)
+    setToken('')
+    await login(user.email,'Password@123',false,'admin')
+    const fresh=getToken();assert.notEqual(fresh,token)
+    await assert.rejects(login(user.email,'Password@123',false,'admin'),/existing session/i)
+    await login(user.email,'Password@123',true,'admin')
+    const replacement=getToken();setToken(fresh)
+    await assert.rejects(api('/auth/me'),/another device|elsewhere/)
+    setToken(replacement);await api('/auth/me')
   })
 
   await t.test("the API refuses requests without a session", async () => {

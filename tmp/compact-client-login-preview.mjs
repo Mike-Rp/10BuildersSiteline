@@ -1,0 +1,12 @@
+import React from 'react'
+import {renderToString} from 'react-dom/server'
+import {createServer} from 'vite'
+import {readdir,writeFile} from 'node:fs/promises'
+const server=await createServer({server:{middlewareMode:true,hmr:false,watch:null},appType:'custom',logLevel:'silent',optimizeDeps:{noDiscovery:true,include:[]}})
+try{
+const {default:Login}=await server.ssrLoadModule('/src/LoginPage.tsx')
+const css=(await readdir('dist/assets')).find(n=>/^index-.*\.css$/.test(n))
+const styles=`body{margin:0}@media(min-width:761px){#root .client-login{padding:76px 28px 24px}#root .client-login .login-card{max-width:1100px;min-height:0;padding:8px;border-radius:20px}#root .client-login .login-panel{padding:24px 36px}#root .client-login .company-logo-mark,#root .client-login .company-logo-mark img{width:36px;height:54px}#root .client-login .login-brand strong{font-size:22px}#root .client-login .login-brand small{font-size:12px}#root .client-login .login-content{margin-top:16px}#root .client-login .login-heading{margin:10px 0 18px}#root .client-login .login-heading h1{font-size:26px}#root .client-login .login-heading p{font-size:14px;line-height:1.5;margin-top:8px}#root .client-login .login-form{gap:14px}#root .client-login .login-form input{min-height:44px;font-size:16px;padding-block:10px}#root .client-login .login-submit{min-height:44px;padding-block:10px}#root .client-login .client-login-note{margin-top:14px;padding-top:12px}#root .client-login .login-info{min-height:0;padding:26px}#root .client-login .login-photo-caption{padding-top:180px}#root .client-login .login-info h2{font-size:26px}#root .client-login .login-banner [aria-roledescription=slide]{min-height:105px}#root .client-login .login-banner-description{font-size:14px;min-height:44px;margin-top:10px}#root .client-login .login-banner-footer{margin-top:16px;padding-top:8px}#root .client-login .login-banner-indicators{padding:12px 4px}}
+`
+await writeFile('__compact-client-login-preview.html',`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Compact client login · Design preview</title><link rel="stylesheet" href="/dist/assets/${css}"><style>${styles}</style></head><body><div id="root">${renderToString(React.createElement(Login,{portal:'client',onSignIn:async()=>{}}))}</div><script>document.querySelector('form').addEventListener('submit',e=>e.preventDefault())</script></body></html>`)
+}finally{await server.close()}

@@ -38,6 +38,7 @@ export default function LoginPage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [deviceChoice, setDeviceChoice] = useState(false)
+  const [existingSessionMessage,setExistingSessionMessage]=useState("")
   const [deviceNotice, setDeviceNotice] = useState("")
   const [touched, setTouched] = useState({ email: false, password: false })
   const [submitted, setSubmitted] = useState(false)
@@ -71,6 +72,7 @@ export default function LoginPage({
       setDeviceChoice(false)
     } catch (reason) {
       if (reason instanceof ApiError && reason.code === "ACCOUNT_ALREADY_SIGNED_IN") {
+        setExistingSessionMessage(reason.message)
         setDeviceChoice(true)
         return
       }
@@ -92,7 +94,7 @@ export default function LoginPage({
     setPassword("")
     setSubmitted(false)
     setTouched(current => ({ ...current, password: false }))
-    setDeviceNotice("Your current device will stay signed in.")
+    setDeviceNotice("Sign-in cancelled. The previous session was not changed.")
   }
   return (
     <main className={`login-page login-redesign${internal ? " admin-login" : " client-login"}`}>
@@ -110,11 +112,11 @@ export default function LoginPage({
         </div>
       </nav>
       {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
-        <p>Your account is already logged in on another device.</p>
-        <p className="subsection">Choose where you want to continue. Logging in on this device will sign out the other device.</p>
+        <p>{existingSessionMessage || "An existing session was active recently."}</p>
+        <p className="subsection">Continue here to end the previous session, or cancel to leave it unchanged.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="modal-actions">
-          <Button disabled={loading} onClick={keepCurrentDevice}>Keep current device signed in</Button>
+          <Button disabled={loading} onClick={keepCurrentDevice}>Cancel sign-in</Button>
           <Button variant="primary" disabled={loading} onClick={() => { void attemptSignIn(true) }}>{loading ? "Signing in…" : "Log in on this device"}</Button>
         </div>
       </Modal>}

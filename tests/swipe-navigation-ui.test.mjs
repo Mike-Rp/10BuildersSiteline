@@ -154,6 +154,22 @@ test('workspace swipes validate intent, protect edits and never change browser h
       await render({allowed:['Dashboard']},false);await swipe('left');assert.equal(page(),'Dashboard')
       await render({identity:'different-admin'},false);await swipe('left');assert.equal(page(),'Dashboard')
     })
+    await t.test('mobile either-direction swipes go to Dashboard then request sign-out, with desktop restored on resize',async()=>{
+      Object.defineProperty(w,'innerWidth',{value:390,configurable:true})
+      const before=exits
+      for(const first of ['left','right'])for(const second of ['left','right']){
+        await render();await swipe(first);assert.equal(page(),'Dashboard');assert.equal(document.querySelector('[role=dialog]'),null)
+        await swipe(second);assert.match(document.querySelector('[role=dialog]').textContent,/Sign out of 10BuildLine/)
+        await swipe('left');assert.equal(exits,before,'swiping inside confirmation cannot sign out')
+        await click('Cancel');assert.equal(page(),'Dashboard');assert.equal(exits,before)
+      }
+      await render({overlay:true});await swipe('left');assert.equal(page(),'Documents')
+      await render();await swipe('left');assert.equal(page(),'Dashboard')
+      Object.defineProperty(w,'innerWidth',{value:1366,configurable:true})
+      await act(()=>w.dispatchEvent(new w.Event('resize')))
+      await swipe('left');assert.equal(page(),'Documents','desktop left swipe still restores the previous module')
+      await swipe('left');assert.equal(page(),'Documents','desktop left swipe inside a module still does nothing')
+    })
   }finally{
     await act(()=>root.unmount());await server.close();dom.window.close()
     for(const [key,descriptor] of previous){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key]}

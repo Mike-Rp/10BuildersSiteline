@@ -1,3 +1,4 @@
+import { readSessionTiming, recordSessionActivity } from "../../common/utilities/session-activity.utility.js";
 import { licenseAccessPolicy, LICENSE_ACCESS_DISABLED_MESSAGE } from "../../domain/license-access.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -44,21 +45,26 @@ async function signIn(req,res,permittedRoles) {
       }
       const existing=await client.query("SELECT token FROM users_token WHERE user_id=$1",[u.id]);
       let liveSession = false;
+      let lastActivityAt;
       try {
         const stored = jwt.verify(existing.rows[0]?.token, process.env.JWT_SECRET);
-        liveSession = stored.details?.id === u.id && typeof stored.exp === "number";
+        const timing=await readSessionTiming(client,stored);
+        lastActivityAt=timing.lastActivityAt;
+        liveSession = stored.details?.id === u.id && typeof stored.exp === "number" && !timing.expired;
       } catch { /* Expired or invalid sessions do not require a device choice. */ }
       if (liveSession && req.body.replace_session !== true) {
-        throw new HttpError(409, "Your account is already logged in on another device.", "ACCOUNT_ALREADY_SIGNED_IN");
+        throw new HttpError(409, `An existing session was active recently. Last activity: ${Math.max(0,Math.floor((Date.now()-lastActivityAt)/60000))} minute(s) ago. Continue here to end that session.`, "ACCOUNT_ALREADY_SIGNED_IN");
       }
       await client.query(
         "UPDATE users SET status='active',last_login_at=now(),updated_by=$1,updated_at=now() WHERE id=$1",[u.id]);
       const safe={id:u.id,full_name:u.full_name,email:u.email,role_id:u.role_id,role:u.role,status:"active",
         temp_password_issued:u.temp_password_issued};
+      const sessionId=randomUUID();
       const token=jwt.sign({details:{...safe,user:Buffer.from(JSON.stringify(safe),"utf8").toString("base64")},
-        login:{timestamp:Date.now(),expiresIn:1000*60*60*8}},process.env.JWT_SECRET,{expiresIn:"8h", jwtid:randomUUID()});
+        login:{timestamp:Date.now(),expiresIn:1000*60*60*8}},process.env.JWT_SECRET,{expiresIn:"8h", jwtid:sessionId});
       if(existing.rowCount) await client.query("UPDATE users_token SET token=$2 WHERE user_id=$1",[u.id,token]);
       else await client.query("INSERT INTO users_token (user_id,token) VALUES ($1,$2)",[u.id,token]);
+      await recordSessionActivity(client,u.id,sessionId);
       return {token,user:safe};
     });
     return sendOk(res,"Login successful.",1,data);
@@ -94,6 +100,8 @@ export const refresh = async (req, res) => {
     const previousSession = jwt.verify(previousToken, process.env.JWT_SECRET);
 
     const token = jwt.sign({
+      iat: previousSession.iat,
+      exp: previousSession.exp,
       details: {
         id: user.id,
         full_name: user.full_name,
@@ -107,7 +115,7 @@ export const refresh = async (req, res) => {
         timestamp: new Date().getTime(),
         expiresIn: 1000 * 60 * 60 * 8
       }
-    }, process.env.JWT_SECRET, { expiresIn: '8h', jwtid: previousSession.jti || randomUUID() });
+    }, process.env.JWT_SECRET, { jwtid: previousSession.jti || randomUUID() });
 
     const renewed = await execute(
       "UPDATE users_token SET token=$2 WHERE user_id=$1 AND token=$3 RETURNING user_id",
@@ -172,4 +180,23 @@ export const logout = async (req, res) => {
     errorlog(error);
     return handleError(res, error);
   }
+};
+
+export const sessionStatus = async (req,res) => {
+  try {
+    const user=await requireUser(req,res); if(!user)return;
+    const token=req.headers.authorization.replace(/^Bearer\s+/i,'').trim();
+    const payload=jwt.verify(token,process.env.JWT_SECRET);
+    const timing=await withTransaction(async db=>{
+      await db.query('select id from users where id=$1 for update',[user.id]);
+      const current=(await db.query('select token from users_token where user_id=$1',[user.id])).rows[0];
+      if(current?.token!==token)throw new HttpError(401,'This session has ended. Please sign in again.','SESSION_REPLACED');
+      const before=await readSessionTiming(db,payload);
+      if(before.expired)throw new HttpError(401,'Your session expired due to inactivity. Please sign in again.','SESSION_INACTIVE');
+      if(req.method==='POST')await recordSessionActivity(db,user.id,payload.jti);
+      return readSessionTiming(db,payload);
+    });
+    res.set('Cache-Control','no-store');
+    return sendOk(res,'Session status.',1,{...timing,serverNow:Date.now()});
+  }catch(error){return handleError(res,error);}
 };
