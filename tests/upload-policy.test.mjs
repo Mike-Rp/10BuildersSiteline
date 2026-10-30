@@ -72,6 +72,6 @@ test("each PDF permits up to 10 MB, rejects one byte over, and retains the separ
   }
   assert.equal(validateFile({ name: "crew.xlsx", size: 15 * mb }, true), "")
   assert.match(validateFile({ name: "crew.xlsx", size: 15 * mb + 1 }, true), /15 MB or smaller/)
-  assert.match(uploadRequirements(), /Maximum 10 MB per file/)
+  assert.match(uploadRequirements(), /Project files share a 10 MB total limit/)
   assert.match(uploadRequirements(true), /Maximum 15 MB per file/)
 })

@@ -1896,7 +1896,7 @@ export default function RoleWorkspace({
                 <div>
                   <strong>General photo / report</strong>
                   <p>
-                    Optional supporting evidence · PDF, JPG or PNG · 10 MB
+                    Optional supporting evidence · PDF, JPG or PNG · 10 MB total across this project
                     maximum
                   </p>
                   {evidence && (

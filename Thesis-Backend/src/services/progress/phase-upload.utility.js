@@ -1,3 +1,4 @@
+import { assertProjectUploadBudget } from "../workspace/project-upload-budget.utility.js";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import { HttpError, handleError } from "../../common/utilities/access.utility.js";
@@ -34,6 +35,7 @@ export const optionalPhaseUpload = (req, res, next) => {
 };
 export async function insertFile(client, project, file, userId) {
   const contentType = fileType(file);
+  await assertProjectUploadBudget(client, project.id, file.buffer.length);
   const id = uuidv4();
   const originalName = file.originalname.replace(/[\r\n\\/]/g, "_").slice(0, 200);
   await client.query(

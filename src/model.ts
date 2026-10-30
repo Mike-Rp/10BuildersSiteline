@@ -613,7 +613,7 @@ export const MANPOWER_UPLOAD_LIMIT_MB = 15
 export function uploadRequirements(spreadsheet = false) {
   return spreadsheet
     ? `XLSX or XLS · Maximum ${MANPOWER_UPLOAD_LIMIT_MB} MB per file`
-    : `PDF, JPG, JPEG or PNG · Maximum ${DOCUMENT_UPLOAD_LIMIT_MB} MB per file`
+    : `PDF, JPG, JPEG or PNG · Project files share a ${DOCUMENT_UPLOAD_LIMIT_MB} MB total limit. Other documents: maximum ${DOCUMENT_UPLOAD_LIMIT_MB} MB each.`
 }
 export function validateFile(file: File, spreadsheet = false) {
   const extensions = spreadsheet

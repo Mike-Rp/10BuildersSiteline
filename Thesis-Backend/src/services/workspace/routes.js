@@ -1,3 +1,4 @@
+import { linkProjectFile } from "./project-upload-budget.utility.js";
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
 import { workspaceReferences } from "./reference-cache.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
@@ -84,7 +85,7 @@ async function linkDocument(db, user, p, code, fileId) {
     const type = (await db.query("select id from document_types where code=$1", [code])).rows[0];
     if (!type)
         throw new HttpError(422, "Document type is not configured.");
-    await db.query("update stored_files set project_id=$2,purpose='document' where id=$1", [bytes.id, p.id]);
+    await linkProjectFile(db, p.id, bytes.id);
     return (await db.query(`insert into project_documents(project_id,document_type_id,status,file_ref,uploaded_by,uploaded_at)
  values($1,$2,'uploaded',$3,$4,now()) on conflict(project_id,document_type_id) do update
  set status='uploaded',file_ref=excluded.file_ref,uploaded_by=excluded.uploaded_by,uploaded_at=now() returning id`, [p.id, type.id, "db://" + bytes.id, user.id])).rows[0];
@@ -452,7 +453,7 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
     for (const d of [...(b.docs || []), ...(clientSubconCompany?.documents || [])])
         if (d.uploaded && !(await db.query("select 1 from project_documents where project_id=$1 and id=$2", [p.id, d.id])).rowCount) {
             await file(db, user, d.id);
-            await db.query("update stored_files set project_id=$2,purpose='document' where id=$1", [d.id, p.id]);
+            await linkProjectFile(db, p.id, d.id);
         }
     await db.query("update projects set target_end_date=$2,location=$3 where id=$1", [p.id, b.end || null, b.location || ""]);
     await db.query(`insert into workspace_project_metadata(project_id,metadata) values($1,$2)
@@ -617,7 +618,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             const f = await file(db, user, c.doc?.id);
             if (!/image\/(png|jpeg)/.test(f.content_type))
                 throw new HttpError(400, "Choose a JPG or PNG.");
-            await db.query("update stored_files set project_id=$2,purpose='photo' where id=$1", [f.id, p.id]);
+            await linkProjectFile(db, p.id, f.id, "photo");
             await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5)", [p.id, "db://" + f.id, c.note || "", user.id, false]); // internal until the Office PM or Administrator releases it
             break;
         }
