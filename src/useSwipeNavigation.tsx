@@ -15,6 +15,14 @@ type Destination = { page?: string; identity: string; from: string }
 type Gesture = { id: number; x: number; y: number; started: number; page: string; identity: string; direction: number; target: Element }
 const excluded = "input,textarea,select,a,form,[contenteditable]:not([contenteditable=false]),[role=slider],[role=tablist],[aria-roledescription=carousel],[data-no-swipe],nav,aside,.notification-container"
 const hasDialog = () => !!document.querySelector('[role="dialog"],dialog[open],[aria-modal="true"]')
+const horizontalScroller = (target: EventTarget | null) => {
+  let el=target as HTMLElement | null
+  while(el && el!==document.body && el!==document.documentElement) {
+    if(el.scrollWidth>el.clientWidth+2 && ["auto","scroll","hidden"].includes(window.getComputedStyle(el).overflowX))return true
+    el=el.parentElement
+  }
+  return false
+}
 const valueOf = (element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) =>
   element instanceof element.ownerDocument.defaultView!.HTMLInputElement && ["checkbox", "radio"].includes(element.type) ? String(element.checked) : element.value
 
@@ -27,6 +35,43 @@ export default function useSwipeNavigation(options: Options) {
   const previous = useRef<{identity:string;page:string} | undefined>(undefined)
   const dirty = useRef(new Map<Element,string>())
   const origin = useRef({identity:options.identity,page:options.page})
+
+  useEffect(()=>{
+    if(!options.enabled)return
+    // Dialogs are outside main-shell. Contain browser overscroll at the page
+    // root too, without adding history entries or interfering with Back buttons.
+    const roots=[document.documentElement,document.body]
+    const prior=roots.map(el=>el.style.overscrollBehaviorX)
+    roots.forEach(el=>{el.style.overscrollBehaviorX="none"})
+    let origin: {x:number;y:number;id:number} | undefined
+    const start=(event:TouchEvent)=>{
+      origin=hasDialog() && event.touches.length===1
+        ? {x:event.touches[0].clientX,y:event.touches[0].clientY,id:event.touches[0].identifier}:undefined
+    }
+    const move=(event:TouchEvent)=>{
+      if(!origin || !hasDialog() || event.touches.length!==1)return
+      const touch=event.touches[0]
+      if(touch.identifier!==origin.id)return
+      const dx=Math.abs(touch.clientX-origin.x),dy=Math.abs(touch.clientY-origin.y)
+      if(dy>20 && dy>dx){origin=undefined;return}
+      if(dx>=18 && dx>dy*1.5 && !horizontalScroller(event.target) && event.cancelable)event.preventDefault()
+    }
+    const end=()=>{origin=undefined}
+    const wheel=(event:WheelEvent)=>{
+      if(hasDialog() && !event.ctrlKey && Math.abs(event.deltaX)>Math.abs(event.deltaY)*1.5 && !horizontalScroller(event.target) && event.cancelable)event.preventDefault()
+    }
+    document.addEventListener('touchstart',start,{capture:true,passive:true})
+    document.addEventListener('touchmove',move,{capture:true,passive:false})
+    document.addEventListener('touchend',end,true)
+    document.addEventListener('touchcancel',end,true)
+    document.addEventListener('wheel',wheel,{capture:true,passive:false})
+    return ()=>{
+      roots.forEach((el,index)=>{el.style.overscrollBehaviorX=prior[index]})
+      document.removeEventListener('touchstart',start,true);document.removeEventListener('touchmove',move,true)
+      document.removeEventListener('touchend',end,true);document.removeEventListener('touchcancel',end,true)
+      document.removeEventListener('wheel',wheel,true)
+    }
+  },[options.enabled])
 
   useEffect(()=>{
     if(origin.current.identity !== options.identity || !options.enabled) previous.current=undefined
@@ -55,6 +100,10 @@ export default function useSwipeNavigation(options: Options) {
     const priorOverscroll=surface.style.overscrollBehaviorX
     surface.style.overscrollBehaviorX="contain"
     const cancel=()=>{gesture=undefined;mouse=undefined;wheel=undefined;if(wheelTimer)clearTimeout(wheelTimer)}
+    const observer=new window.MutationObserver(records=>{
+      if(hasDialog() || records.some(record=>Array.from(record.addedNodes).some(node=>node instanceof Element && (node.matches('[role="dialog"],dialog,[aria-modal="true"]') || node.querySelector('[role="dialog"],dialog,[aria-modal="true"]')))))cancel()
+    })
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['role','open','aria-modal']})
     const editable=(target: EventTarget | null) => {
       const el=target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
       if(!el?.matches?.("input,textarea,select") || el.closest('[role="dialog"],dialog,[role="search"],.filter-bar,.list-toolbar') || el.matches('input[type="search"],[role="searchbox"],[readonly],[disabled]')) return null
@@ -177,6 +226,7 @@ export default function useSwipeNavigation(options: Options) {
     document.addEventListener('visibilitychange',cancel)
     return ()=>{
       cancel()
+      observer.disconnect()
       surface.style.overscrollBehaviorX=priorOverscroll
       surface.removeEventListener('pointerdown',pointerStart);window.removeEventListener('pointermove',pointerMove);window.removeEventListener('pointerup',pointerEnd);window.removeEventListener('pointercancel',pointerCancel)
       surface.removeEventListener('wheel',wheelMove);surface.removeEventListener('click',click,true)

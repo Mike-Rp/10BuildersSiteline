@@ -16,3 +16,22 @@ Changed form fields, inline notes and file inputs receive a conservative leave-p
 QA covers all four accounts at desktop/mobile layouts, existing sign-out cancellation/confirmation, left/right navigation, repeated ends, rapid separate gestures, excluded controls, horizontal scroll containers, unsaved edits, revoked destinations and unchanged browser history. Automated tests dispatch touch, pointer and wheel sequences; physical-device browser edge behavior is deliberately left native.
 
 Horizontal touchpad/wheel input is accumulated as one stream, including momentum, and evaluated after 220ms of quiet. It needs at least 100px of horizontal movement and must dominate vertical scrolling. Pinch gestures, vertical scrolling and horizontal scroll containers are excluded. The content-movement direction is used, matching natural trackpad scrolling.
+
+## Dialog and browser navigation protection
+
+While a workspace is active, horizontal overscroll is disabled on the document
+root and body, including the modal/backdrop outside main-shell. While a dialog
+is open, cancelable horizontal touch and wheel gestures outside horizontal
+scroll containers are consumed without performing any application action.
+Vertical scrolling, pinch gestures and horizontal lists remain available.
+Opening a dialog cancels any in-progress gesture or queued wheel navigation;
+closing it does not resume that gesture. Styles and listeners are restored
+when the workspace is disabled or unmounted.
+
+The prior handler ignored dialog input but only contained overscroll on the
+workspace surface. Regression tests reproduce the unhandled horizontal dialog
+and backdrop events before the fix. Browser Back can reveal a login route
+without clearing a session; the sign-out callback still requires explicit
+confirmation. No history entries, popstate traps or Back-button interception
+were added. Browser/OS gestures that are not cancelable remain browser-controlled;
+automated DOM tests do not prove physical-device edge-gesture behavior.

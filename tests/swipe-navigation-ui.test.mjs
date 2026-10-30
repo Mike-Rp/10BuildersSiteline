@@ -84,6 +84,43 @@ test('workspace swipes validate intent, protect edits and never change browser h
       await click('Stay here');assert.equal(page(),'Documents');await swipe();await click('Leave page');assert.equal(page(),'Dashboard')
     })
 
+    await t.test('dialog and backdrop horizontal wheel gestures cannot escape to browser history',async()=>{
+      await render({overlay:true})
+      const dialog=document.querySelector('[role=dialog]')
+      const event=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:5,deltaX:-180})
+      await act(()=>dialog.dispatchEvent(event))
+      assert.equal(event.defaultPrevented,true,'dialog outside the workspace surface must stop horizontal browser navigation')
+      const backdrop=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:5,deltaX:-180})
+      await act(()=>document.body.dispatchEvent(backdrop))
+      assert.equal(backdrop.defaultPrevented,true)
+      assert.equal(page(),'Documents');assert.equal(exits,1)
+      const vertical=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:180})
+      await act(()=>dialog.dispatchEvent(vertical));assert.equal(vertical.defaultPrevented,false)
+      assert.equal(document.documentElement.style.overscrollBehaviorX,'none')
+      const {move}=await swipe('right',{target:dialog,start:5})
+      assert.equal(move.defaultPrevented,true,'horizontal touch inside the profile is contained, including near the edge')
+      const scroller=document.createElement('div');scroller.style.overflowX='auto'
+      Object.defineProperties(scroller,{scrollWidth:{value:500},clientWidth:{value:100}});dialog.appendChild(scroller)
+      const horizontal=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:180})
+      await act(()=>scroller.dispatchEvent(horizontal));assert.equal(horizontal.defaultPrevented,false,'dialog horizontal list keeps its own scrolling')
+      await render();await swipe();assert.equal(page(),'Dashboard')
+      await swipe();assert.match(document.querySelector('[role=dialog]').textContent,/Sign out of 10BuildLine/)
+      await click('Cancel');assert.equal(page(),'Dashboard')
+    })
+
+    await t.test('a dialog opening mid-gesture cancels touch and queued trackpad navigation',async()=>{
+      await render()
+      await act(()=>emit(canvas(),'touchstart',[touch(100)],[],clock))
+      await render({overlay:true},false)
+      await render({},false)
+      await act(()=>emit(canvas(),'touchend',[],[touch(280)],clock+150))
+      assert.equal(page(),'Documents','closing the intervening dialog must not revive the old gesture')
+      await act(()=>canvas().dispatchEvent(new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:200,deltaX:-180})))
+      await render({overlay:true},false);await render({},false)
+      await act(()=>new Promise(resolve=>setTimeout(resolve,260)))
+      assert.equal(page(),'Documents')
+    })
+
     await t.test('mouse drags work, taps remain normal, and dragging a card never also clicks it',async()=>{
       await render()
       const target=[...document.querySelectorAll('button')].find(b=>b.textContent==='Open Team')

@@ -159,7 +159,7 @@ export default function LoginPage({
           </div>}
 
           <div className="login-content">
-            <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{internal ? "Staff access" : "Client access"}</div>
+            <div className={internal ? "admin-access-badge" : "client-access-badge"}><Icon name={internal ? "shield" : "home"} size={16} />{admin ? "Administrator access" : staff ? "Staff access" : "Client access"}</div>
             <div className="login-heading">
               <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to 10BuildLine"}</h1>
               <p>{admin ? "Use your administrator account to manage the 10BuildLine workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
