@@ -50,15 +50,6 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
       </div>
     </PageTitlePanel>
-    <ExecutiveSummary
-      description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${followUpTotal} follow-up ${followUpTotal === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
-      metrics={[
-        { label: "Active projects", value: overview.activeProjects, hint: "Open Active sites", icon: "building", onOpen: () => onNavigate("Active sites") },
-        { label: "Projects in intake", value: overview.intakeProjects, hint: "Open Project intake", onOpen: () => onNavigate("Project intake") },
-        { label: "Completed projects", value: overview.completedProjects ?? 0, hint: "View completed project records", icon: "check", onOpen: onCompletedProjects || (() => onNavigate("Archive")) },
-        { label: "Team accounts", value: overview.teamAccounts, hint: "Active and invited accounts", icon: "users", onOpen: () => onNavigate("Team") },
-      ]}
-    />
     <div className="dashboard-attention-switch" role="tablist" aria-label="Dashboard attention views" onKeyDown={event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return
       event.preventDefault()
@@ -79,6 +70,15 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
     <div id="password-requests-panel" role="tabpanel" aria-labelledby="password-requests-tab" hidden={attentionView!=='password'}>
       {attentionView==='password' && <PasswordResetRequestPanel requests={resetRequests} onOpen={onOpenReset}/>}
     </div>
+    <ExecutiveSummary
+      description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${followUpTotal} follow-up ${followUpTotal === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
+      metrics={[
+        { label: "Active projects", value: overview.activeProjects, hint: "Open Active sites", icon: "building", onOpen: () => onNavigate("Active sites") },
+        { label: "Projects in intake", value: overview.intakeProjects, hint: "Open Project intake", onOpen: () => onNavigate("Project intake") },
+        { label: "Completed projects", value: overview.completedProjects ?? 0, hint: "View completed project records", icon: "check", onOpen: onCompletedProjects || (() => onNavigate("Archive")) },
+        { label: "Team accounts", value: overview.teamAccounts, hint: "Active and invited accounts", icon: "users", onOpen: () => onNavigate("Team") },
+      ]}
+    />
     <div className="ao-content">
       <section className="ao-panel" aria-labelledby="ao-attention-title">
         <header className="ao-panel-header"><div><h2 id="ao-attention-title" >All follow-up items</h2><p>Urgent and routine work across your workspace.</p></div><span className="ao-count" aria-label={`${overview.items.length + Number(delayedCount > 0)} follow-up items`}>{overview.items.length + Number(delayedCount > 0)}</span></header>
