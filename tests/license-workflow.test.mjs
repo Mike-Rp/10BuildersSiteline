@@ -160,10 +160,10 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   const required = await q('select discipline_id from project_stage_discipline_links where project_stage_id=$1 and project_type_id=$2',[mobilization,brook.project_type_id])
   for (const {discipline_id} of required) await q('insert into user_discipline_scopes(user_id,discipline_id) values($1,$2) on conflict do nothing',[idOf('karlo'),discipline_id])
 
-  await t.test('33-day preparation threshold exposes contact details and profile assignments', async () => {
-    await setExpiry('diego',34)
+  await t.test('30-day preparation threshold exposes contact details and profile assignments', async () => {
+    await setExpiry('diego',31)
     assert.equal((await options()).data.available,false)
-    await setExpiry('diego',33)
+    await setExpiry('diego',30)
     const data=(await options()).data
     assert.equal(data.available,true)
     const candidate=data.candidates.find(c=>c.id===idOf('karlo'))
@@ -175,7 +175,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     assert.ok(overview.assignments.some(a=>a.projectId===brook.id))
   })
 
-  await t.test('33-day notices reach Admin and outgoing engineer once, including pending renewals', async () => {
+  await t.test('30-day notices reach Admin and outgoing engineer once, including pending renewals', async () => {
     await sweepLicenses(db)
     const first=await notices(idOf('admin'),'Prepare engineer replacement')
     assert.ok(first.some(n=>n.detail.includes('Diego')))
@@ -224,35 +224,25 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     assert.equal((await call('admin','POST','/licenses/overrides',approval())).status,409,'stale holder cannot be replaced twice')
   })
 
-  await t.test('day 30 through day 24 allows viewing only, blocking every project mutation', async () => {
-    for(const days of [30,24]) {
-      await setExpiry('rafael',days)
-      assert.equal((await call('rafael','GET','/workspace')).status,200)
-      const self=await call('rafael','GET','/licenses/me')
-      assert.equal(self.data.access.mode,'view_only')
-      assert.equal(self.data.access.viewingDaysLeft,days-23)
-      for(const [path,body] of [[`/progress/projects/${brook.id}/notes`,{note_text:'blocked'}],[`/projects/${brook.id}/workspace-command`,{type:'add_photo'}],[`/confirmations/projects/${brook.id}/phase-team/${designStage}/decline`,{}]]) {
-        const result=await call('rafael','POST',path,body)
-        assert.equal(result.code,'LICENSE_VIEW_ONLY',result.text)
-      }
+  await t.test('once expired, access is viewing-only: mutations blocked, reading and renewal submission allowed', async () => {
+    await setExpiry('rafael',-1)
+    assert.equal((await call('rafael','GET','/workspace')).status,200)
+    const self=await call('rafael','GET','/licenses/me')
+    assert.equal(self.data.access.mode,'view_only')
+    for(const [path,body] of [[`/progress/projects/${brook.id}/notes`,{note_text:'blocked'}],[`/projects/${brook.id}/workspace-command`,{type:'add_photo'}],[`/confirmations/projects/${brook.id}/phase-team/${designStage}/decline`,{}]]) {
+      const result=await call('rafael','POST',path,body)
+      assert.equal(result.code,'LICENSE_VIEW_ONLY',result.text)
     }
-  })
-
-  await t.test('day 23 disables existing sessions and fresh sign-in with clear Admin instructions', async () => {
-    await setExpiry('rafael',23)
-    const r=await call('rafael','GET','/workspace')
-    assert.equal(r.code,'LICENSE_ACCESS_DISABLED',r.text)
-    assert.match(r.message,/Contact.*Administrator/)
-    const fresh=await fetch(base+'/auth/staff/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:EMAIL.rafael,password:'Password@123',replace_session:true})})
-    assert.equal(fresh.status,403)
-    assert.equal((await fresh.json()).error.code,'LICENSE_ACCESS_DISABLED')
+    const own=await call('rafael','POST','/licenses/renewals',undefined,renewalForm(400))
+    assert.equal(own.status,201,own.text)
     assert.equal((await q('select status from users where id=$1',[idOf('rafael')]))[0].status,'active','restriction does not delete or suspend HR account')
+    await q("update license_renewal_requests set status='rejected',reviewed_by=$2,reviewed_at=now(),review_note='test cleanup' where user_id=$1 and status='under_review'",[idOf('rafael'),idOf('admin')])
   })
 
   await t.test('renewal under review does not lift restriction; only verified renewal restores access', async () => {
     const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'rafael'))
     assert.equal(submitted.status,201,submitted.text)
-    assert.equal((await call('rafael','GET','/workspace')).code,'LICENSE_ACCESS_DISABLED')
+    assert.equal((await call('rafael','GET','/licenses/me')).data.access.mode,'view_only')
     const verified=await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{})
     assert.equal(verified.status,200,verified.text)
     assert.equal((await call('rafael','GET','/workspace')).status,200)
@@ -268,7 +258,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
 
   await t.test('Office PM replacements use the same Admin confirmation flow', async () => {
     const original=(await q('select suggested_opm_id from projects where id=$1',[brook.id]))[0].suggested_opm_id
-    await q('update user_licenses set license_expiry=$2 where user_id=$1 and superseded_at is null',[original,addDays(today(),33)])
+    await q('update user_licenses set license_expiry=$2 where user_id=$1 and superseded_at is null',[original,addDays(today(),30)])
     const o=await call('admin','GET',`/licenses/override-options?project_id=${brook.id}`)
     assert.equal(o.status,200,o.text)
     const candidate=o.data.candidates[0]

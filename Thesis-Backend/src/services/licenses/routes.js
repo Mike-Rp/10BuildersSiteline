@@ -13,7 +13,7 @@ router.get("/requests", myRequests);
 router.post("/requests/:id/accept", acceptRequest);
 router.post("/requests/:id/decline", declineRequest);
 // Administrator
-router.post("/renewals", requireRoles("admin"), uploadLicenseFile, submitRenewal);
+router.post("/renewals", requireRoles("admin", "opm", "spm"), uploadLicenseFile, submitRenewal);
 router.get("/renewals", listRenewals);
 router.post("/renewals/:id/verify", verifyRenewal);
 router.post("/renewals/:id/reject", rejectRenewal);

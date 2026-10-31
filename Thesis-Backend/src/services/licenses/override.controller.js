@@ -1,5 +1,5 @@
 import { needsLicenseReplacement } from "../../common/utilities/license-status.utility.js";
-// Admin-managed replacement from 33 days before expiry. Office signing and Admin approval finalize the switch.
+// Admin-managed replacement from 30 days before expiry. Office signing and Admin approval finalize the switch.
 import execute from "../../common/utilities/query.utility.js";
 import { HttpError, handleError, hasProjectAccess, isUuid, isSmallintId, paging, requireUser, sendError, sendOk } from "../../common/utilities/access.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -194,7 +194,7 @@ export const createOverride = async (req, res) => {
     const holder = await holderOf(db,project,stage == null ? null : Number(stage));
     if (holder.user_id !== expectedHolder) throw new HttpError(409,"The assignment changed. Refresh before approving a replacement.");
     const state = await loadLicenseState(holder.user_id,{db});
-    if (!needsLicenseReplacement(state)) throw new HttpError(409,"Replacement preparation opens 33 days before license expiry.");
+    if (!needsLicenseReplacement(state)) throw new HttpError(409,"Replacement preparation opens 30 days before license expiry.");
     const role = stage == null ? "opm" : "spm";
     await requireEligible(db,toId,role);
     const candidates = await candidateRows(db,project,stage == null ? null : Number(stage),holder.user_id);

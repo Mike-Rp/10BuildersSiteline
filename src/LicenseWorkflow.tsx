@@ -52,15 +52,12 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
   let title = ""
   let detail: ReactNode = null
   const policy = licenseAccessPolicy(license.expiry)
-  if (policy.mode === "view_only") {
-    title = "Viewing-only access · " + plural(policy.viewingDaysLeft || 0, "day") + " remaining"
-    detail = "Under company policy, submissions and approvals are disabled. Workspace access ends on " + dateLabel(policy.disabledOn || "") + ". Your past work stays on record."
-  } else if (policy.mode === "disabled") {
-    title = "Workspace access restricted"
-    detail = "Contact Admin to verify your renewed license and restore eligible access."
+  if (policy.mode === "view_only" && license.status !== "renewal_under_review") {
+    title = "License expired · viewing-only access"
+    detail = "Submissions, approvals and project changes are disabled until your renewed license is verified. You can still view your records and submit your renewal. Your past work stays on record."
   } else if (policy.prepareReplacement) {
     title = "Replacement preparation notice"
-    detail = "Admin is preparing a replacement. Viewing-only access begins on " + dateLabel(policy.noticeOn || "") + "; workspace access ends on " + dateLabel(policy.disabledOn || "") + " unless renewal is verified."
+    detail = "New assignments are blocked and the Admin is preparing a replacement. Submit your renewed license for verification before " + expiry + " to stay eligible."
   } else if (license.status === "renewal_under_review") {
     title = "Renewal under review"
     detail = "An Administrator is verifying your renewed license."
@@ -76,7 +73,7 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
       <div>
         <strong>{title}</strong>
         <p>{detail}</p>
-        <p>Visit your Administrator with your renewed license. Only an Administrator can upload or update it.</p>
+        {license.status !== "renewal_under_review" && <RenewalSubmit />}
         {rejected && renewal && (
           <p className="license-reason">
             <strong>Your last renewal was not accepted:</strong> {renewal.reviewNote}
@@ -84,6 +81,37 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
         )}
       </div>
     </section>
+  )
+}
+
+/** The engineer submits their renewed license; an Administrator still verifies it. */
+function RenewalSubmit() {
+  const [open, setOpen] = useState(false)
+  const [number, setNumber] = useState("")
+  const [expiry, setExpiry] = useState("")
+  const [file, setFile] = useState<File>()
+  const [error, setError] = useState("")
+  const [busy, setBusy] = useState(false)
+  async function send() {
+    if (!file) return setError("Choose the renewed license file (PDF, JPG or PNG).")
+    setBusy(true)
+    try {
+      await licenses.submitOwnRenewal({ licenseNumber: number, licenseExpiry: expiry, file })
+      window.location.reload()
+    } catch (err) {
+      setError(messageOf(err))
+      setBusy(false)
+    }
+  }
+  if (!open) return <Button onClick={() => setOpen(true)}>Submit renewed license</Button>
+  return (
+    <div className="license-renewal-form">
+      <Field label="License number"><input value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
+      <Field label="New expiry date"><input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
+      <Field label="Renewed license file"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} /></Field>
+      {error && <p className="error" role="alert">{error}</p>}
+      <Button onClick={send} disabled={busy}>{busy ? "Submitting…" : "Send for verification"}</Button>
+    </div>
   )
 }
 
@@ -265,7 +293,7 @@ export function OverrideDialog({
             <div className="notice neutral">
               <Icon name="clock" />
               <p>
-                Replacement becomes available when the license has 33 days or fewer remaining.
+                Replacement becomes available when the license has 30 days or fewer remaining.
               </p>
             </div>
           ) : (
@@ -503,14 +531,14 @@ export function PhaseLicenseFlag({
         License expiry {expired} ·{" "}
         {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? "Replacement overdue; new assignments disabled" : "Prepare replacement before the 30-day notice"}
       </span>
-      {item.daysToExpiry !== null && item.daysToExpiry <= 33 ? (
+      {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? (
         assignment.pendingOverrideId ? (
           <Badge tone="amber">Waiting for replacement</Badge>
         ) : (
           <Button onClick={() => onOverride({ projectId: assignment.projectId, stageId: assignment.stageId })}>Prepare replacement</Button>
         )
       ) : (
-        <small>Replacement preparation opens 33 days before license expiry.</small>
+        <small>Replacement preparation opens 30 days before license expiry.</small>
       )}
     </div>
   )
@@ -531,15 +559,15 @@ export function LicenseProfileBlock({
   if (!item) return null
   return (
     <div className="license-profile">
-      {item.daysToExpiry !== null && item.daysToExpiry <= 33 && (
+      {item.daysToExpiry !== null && item.daysToExpiry <= 30 && (
         <p className="license-warning">
           <Icon name="alert" size={16} />
           <span>
-            {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? "New assignments disabled. Replace this engineer or verify their renewed license." : "Prepare and contact a replacement before the 30-day notice."}
+            {item.daysToExpiry !== null && item.daysToExpiry < 0 ? "License expired. Replace this engineer or verify their renewed license." : "New assignments are blocked. Contact a replacement, confirm office signing, or verify the renewed license."}
           </span>
         </p>
       )}
-      {item.expiry && <p className="license-note">License expiry: {dateLabel(item.expiry)} · Viewing-only starts: {dateLabel(licenseAccessPolicy(item.expiry).noticeOn || "")} · Workspace access ends: {dateLabel(licenseAccessPolicy(item.expiry).disabledOn || "")}</p>}
+      {item.expiry && <p className="license-note">License expiry: {dateLabel(item.expiry)} · New assignments blocked from: {dateLabel(licenseAccessPolicy(item.expiry).noticeOn || "")} · Viewing-only from: {dateLabel(licenseAccessPolicy(item.expiry).restrictedOn || "")}</p>}
       {reviewing && (
         <p className="license-warning">
           <Icon name="shield" size={16} />
@@ -557,7 +585,7 @@ export function LicenseProfileBlock({
               {a.pendingOverrideId ? (
                 <Badge tone="amber">Waiting for replacement</Badge>
               ) : (
-                item.daysToExpiry !== null && item.daysToExpiry <= 33 && (
+                item.daysToExpiry !== null && item.daysToExpiry <= 30 && (
                   <Button onClick={() => onOverride({ projectId: a.projectId, stageId: a.stageId })}>Replace engineer</Button>
                 )
               )}

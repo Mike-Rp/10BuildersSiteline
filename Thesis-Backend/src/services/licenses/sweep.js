@@ -54,17 +54,19 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
           (select 1 from project_phase_team t where t.project_id=p.id and t.spm_user_id=$1 and t.status in ('pending','confirmed')))`, [engineer.id])).rows;
       for (const project of projects) {
         const first = await db.query("insert into license_reminders_sent(user_id,license_expiry,reminder_key) values($1,$2,$3) on conflict do nothing returning id",
-          [engineer.id, engineer.license_expiry, (state.daysToExpiry <= 30 ? 'replacement-overdue:' : 'replacement-prepare:') + project.id]);
-        if (first.rowCount) await notify(db, { title: state.daysToExpiry <= 30 ? "Engineer replacement overdue" : "Prepare engineer replacement", recipientIds: admins, projectId: project.id,
-          detail: engineer.full_name + ' · ' + project.name + ' · license ' + when(state) + '. Arrange office signing and confirm the replacement before the 30-day notice, or verify the renewed license.' });
+          [engineer.id, engineer.license_expiry, (state.daysToExpiry < 0 ? 'replacement-overdue:' : 'replacement-prepare:') + project.id]);
+        if (first.rowCount) await notify(db, { title: state.daysToExpiry < 0 ? "Engineer replacement overdue" : "Prepare engineer replacement", recipientIds: admins, projectId: project.id,
+          detail: engineer.full_name + ' · ' + project.name + ' · license ' + when(state) + '. Arrange office signing and confirm the replacement, or verify the renewed license.' });
       }
     }
     const policy = licenseAccessPolicy(state.expiry, today);
     if (policy.prepareReplacement) {
-      const stage = policy.mode === "disabled" ? "access-disabled" : policy.mode === "view_only" ? "view-only-started" : "preparation-notice";
+      const stage = policy.mode === "view_only" ? "view-only-started" : "preparation-notice";
       const fresh = await db.query("insert into license_reminders_sent(user_id,license_expiry,reminder_key) values($1,$2,$3) on conflict do nothing returning id",[engineer.id,engineer.license_expiry,stage]);
-      if(fresh.rowCount) await notify(db,{title: policy.mode === "disabled" ? "Workspace access disabled" : policy.mode === "view_only" ? "Seven-day viewing period started" : "License replacement preparation notice",recipientIds:[engineer.id,...admins],
-        detail: engineer.full_name + ' · Company policy: viewing-only access starts ' + policy.noticeOn + '; workspace access ends ' + policy.disabledOn + ' unless renewal is verified. Contact Admin to arrange verification.'});
+      if(fresh.rowCount) await notify(db,{title: policy.mode === "view_only" ? "License expired: viewing-only access" : "License replacement preparation notice",recipientIds:[engineer.id,...admins],
+        detail: engineer.full_name + (policy.mode === "view_only"
+          ? ' · License ' + when(state) + '. Submissions and approvals are blocked until the renewal is verified. Submit the renewed license for verification.'
+          : ' · Company policy: new assignments are blocked from ' + policy.noticeOn + ' and the Admin starts the replacement. Submit the renewed license for verification, or the Admin will confirm a replacement.')});
     }
     if (underReview.has(engineer.id)) continue;
     const key = reminderKeyFor(state, rules.reminderDays);
@@ -78,14 +80,14 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
       await notify(db, { title: "Engineer license expired: assignment needs cover", recipientIds: others,
         detail: `${engineer.full_name} · license ${when(state)} · not renewed after the grace period` });
       await notify(db, { title: "Your license was not renewed", recipientIds: [engineer.id],
-        detail: "Workspace access is restricted under company policy. Contact your Administrator to submit and verify your renewed license." });
+        detail: "Submissions and approvals are blocked under company policy. Submit your renewed license for Administrator verification." });
       result.graceEnded++;
     } else {
       const left = state.graceDaysLeft;
       await notify(db, { title: "License renewal reminder", recipientIds: [engineer.id],
         detail: state.restricted
-          ? `Your PRC license ${when(state)}. Workspace access is restricted under company policy. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.`
-          : `Your PRC license ${when(state)}. Visit your Administrator with your renewed license. Only an Administrator can upload or update it.` });
+          ? `Your PRC license ${when(state)}. Submissions and approvals are blocked under company policy. Submit your renewed license for Administrator verification.`
+          : `Your PRC license ${when(state)}. Submit your renewed license for Administrator verification.` });
       await notify(db, { title: "Engineer license reminder", recipientIds: others, detail: `${engineer.full_name} · license ${when(state)}` });
       result.reminders++;
     }

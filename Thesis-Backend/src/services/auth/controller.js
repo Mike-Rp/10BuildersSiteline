@@ -1,5 +1,4 @@
 import { readSessionTiming, recordSessionActivity } from "../../common/utilities/session-activity.utility.js";
-import { licenseAccessPolicy, LICENSE_ACCESS_DISABLED_MESSAGE } from "../../domain/license-access.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
 import execute from "../../common/utilities/query.utility.js";
@@ -38,10 +37,6 @@ async function signIn(req,res,permittedRoles) {
           `SELECT 1 FROM user_client_project_links l JOIN projects p ON p.id=l.project_id
            WHERE l.user_id=$1 AND p.lifecycle_status IN ('active','archived') AND COALESCE(p.is_deleted,false)=false LIMIT 1`,[u.id]);
         if(!ready.rowCount) throw new HttpError(403,"Client login is awaiting project approvals.");
-      }
-      if (["opm", "spm"].includes(u.role)) {
-        const license = (await client.query("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by created_at desc,id desc limit 1", [u.id])).rows[0];
-        if (licenseAccessPolicy(license?.expiry).mode === "disabled") throw new HttpError(403, LICENSE_ACCESS_DISABLED_MESSAGE, "LICENSE_ACCESS_DISABLED");
       }
       const existing=await client.query("SELECT token FROM users_token WHERE user_id=$1",[u.id]);
       let liveSession = false;

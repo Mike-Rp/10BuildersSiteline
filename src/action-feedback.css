@@ -1,0 +1,10 @@
+.action-feedback > .modal-backdrop { z-index: 100000; }
+.action-feedback .modal { max-width: 480px; }
+.action-result, .action-upload-status { display: grid; justify-items: center; gap: 16px; text-align: center; font-size: 14px; }
+.action-result > svg { color: #167347; }
+.action-result-error > svg { color: #b42318; }
+.action-result p, .action-upload-status p { margin: 0; overflow-wrap: anywhere; }
+.action-result button { min-width: 120px; min-height: 48px; }
+.action-upload-progress { position: fixed; z-index: 100000; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); box-sizing: border-box; display: grid; gap: 12px; padding: 20px; border: 1px solid #cbd8e8; border-radius: 12px; background: #fff; color: #183355; box-shadow: 0 8px 32px #102c4c26; font-size: 14px; }
+.action-upload-progress progress { display: block; width: 100%; height: 10px; accent-color: #2563a5; border: 0; border-radius: 8px; overflow: hidden; }
+.action-upload-progress span { color: #53657b; }

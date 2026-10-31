@@ -1,4 +1,4 @@
-import { LICENSE_ACCESS_DISABLED_MESSAGE, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
+import { LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 // Expired engineer license workflow: pure rules (status calculation, reminders, the pause gate, the assignment
 // warning and the local pre-check). Dates are fixed, so these never depend on when the tests run.
 import assert from "node:assert/strict"
@@ -177,14 +177,14 @@ test("expired engineers cannot mutate or view workspace records after the compan
       assert.ok(LICENSE_COMMANDS.has(type), `${type} is a license command`)
       assert.throws(
         () => applyWorkflow(expired(account), account.id, { type, projectId: "p1" }),
-        { message: LICENSE_ACCESS_DISABLED_MESSAGE },
+        { message: LICENSE_VIEW_ONLY_MESSAGE },
         `${account.id} ${type}`,
       )
     }
   }
-  const viewOnly = {...state, accounts: state.accounts.map(a => a.id === spm.id ? {...a,expiry:inDays(28)} : a)}
-  assert.throws(() => applyWorkflow(viewOnly,spm.id,{type:"add_note",projectId:"p1"}),{message:LICENSE_VIEW_ONLY_MESSAGE})
-
+  const expiring = {...state, accounts: state.accounts.map(a => a.id === spm.id ? {...a,expiry:inDays(28)} : a)}
+  try { applyWorkflow(expiring,spm.id,{type:"add_note",projectId:"p1"}) } catch (error) { assert.notEqual(error.message, LICENSE_VIEW_ONLY_MESSAGE, "28 days before expiry is not viewing-only") }
+  try { applyWorkflow(expired(spm),spm.id,{type:"view_document",projectId:"p1",label:"Notice to Proceed"}) } catch (error) { assert.notEqual(error.message, LICENSE_VIEW_ONLY_MESSAGE, "viewing stays allowed once expired") }
 })
 
 test("every command the backend pauses is also paused by the screen", () => {

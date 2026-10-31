@@ -21,10 +21,10 @@ test("engineer license notices direct updates to an admin without exposing uploa
     ]) {
       const dom = new JSDOM(renderToStaticMarkup(React.createElement(LicenseBanner, { license: { expiry: day, ...state } })))
       const document = dom.window.document
-      assert.match(document.body.textContent, /Visit your Administrator with your renewed license/)
-      assert.match(document.body.textContent, /Only an Administrator can upload or update it/)
-      assert.equal(document.querySelectorAll('button, input[type="file"], form').length, 0)
-      assert.doesNotMatch(document.body.textContent, /license you uploaded|Upload renewed license/)
+      const reviewing = state.status === "renewal_under_review"
+      assert.equal(document.querySelectorAll('button').length, reviewing ? 0 : 1)
+      if (!reviewing) assert.match(document.body.textContent, /Submit renewed license/)
+      assert.doesNotMatch(document.body.textContent, /Only an Administrator can upload or update it/)
       if (state.renewal) assert.match(document.body.textContent, /Photo is unreadable/)
       dom.window.close()
     }

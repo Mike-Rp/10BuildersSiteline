@@ -127,8 +127,22 @@ export function projectDocumentIndex(
   ] satisfies Omit<ProjectDocumentCategory, "fileCount">[]
 
   const category = (id: string) => categories.find((item) => item.id === id)!
-  const folder = (categoryId: string, folderId: string) =>
-    category(categoryId).folders.find((item) => item.id === folderId)!
+  // A phase can have files without a current assignment (for example after a Site PM was removed),
+  // so a missing phase folder is created from the phase name instead of failing.
+  const folder = (categoryId: string, folderId: string, name = folderId) => {
+    const folders = category(categoryId).folders
+    let found = folders.find((item) => item.id === folderId)
+    if (!found) {
+      found = {
+        id: folderId,
+        name,
+        description: "Original evidence retained for this phase.",
+        files: [] as ProjectDocumentFile[],
+      }
+      folders.push(found)
+    }
+    return found
+  }
   const isManpower = (doc: Doc) =>
     /manpower|labor|labour|attendance|crew report/i.test(
       `${doc.label} ${doc.name}`,
@@ -143,14 +157,14 @@ export function projectDocumentIndex(
     if (!doc?.uploaded || seen.has(doc.id)) return
     seen.add(doc.id)
     if (isManpower(doc)) {
-      const phaseFolder =
-        category("manpower").folders.find(
-          (item) => item.id === slug(phase || project.phase),
-        ) || category("manpower").folders[0]
-      phaseFolder?.files.push({ doc, source })
+      const phaseName = phase || project.phase || "General"
+      folder("manpower", slug(phaseName) || "general", phaseName).files.push({
+        doc,
+        source,
+      })
       return
     }
-    folder(categoryId, folderId).files.push({ doc, source })
+    folder(categoryId, folderId, phase).files.push({ doc, source })
   }
 
   for (const [phase, items] of Object.entries(workflow.checklist))

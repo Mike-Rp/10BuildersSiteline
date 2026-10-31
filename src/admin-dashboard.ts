@@ -25,7 +25,7 @@ export function adminDashboardOverview(state: State, now = Date.now()) {
     ["pending_reviews", "current_assignment", "next_assignment", "next_scope"].includes(p.handoffReadiness.reasonCode || "") && p.handoffReadiness.reason)
     .sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   const blockedIds = new Set(blockers.map(p => p.id))
-  // Company policy: prepare replacements at day 33; renewals wait for verification.
+  // Company policy: prepare replacements at day 30; renewals wait for verification.
   const cover = (state.license?.overview || []).filter(i => i.needsCover)
   const coverIds = new Set(cover.map(i => i.id))
   const renewals = state.license?.renewals || []
@@ -44,9 +44,9 @@ export function adminDashboardOverview(state: State, now = Date.now()) {
     })),
     ...cover.map(i => ({
       key: `license-cover:${i.id}`, id: i.id, kind: "account" as const, category: "licenses" as const,
-      title: i.daysToExpiry !== null && i.daysToExpiry <= 30 ? "Engineer replacement overdue" : "Prepare engineer replacement",
+      title: i.daysToExpiry !== null && i.daysToExpiry < 0 ? "Engineer replacement overdue" : "Prepare engineer replacement",
       detail: `${i.name} · license expires ${i.expiry ? dateLabel(i.expiry) : ""} · Replace on: ${i.assignments.map(a => a.projectName).filter((name, index, all) => all.indexOf(name) === index).join(", ")}`,
-      label: "Prepare replacement", icon: "alert", urgency: i.daysToExpiry !== null && i.daysToExpiry <= 30 ? "blocked" as const : "soon" as const,
+      label: "Prepare replacement", icon: "alert", urgency: i.daysToExpiry !== null && i.daysToExpiry < 0 ? "blocked" as const : "soon" as const,
     })),
     ...renewals.map(r => ({
       key: `license-renewal:${r.id}`, id: r.user_id, kind: "account" as const, category: "licenses" as const,

@@ -1,3 +1,4 @@
+import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
@@ -462,11 +463,7 @@ function AppInner() {
       document.removeEventListener("visibilitychange", check)
     }
   }, [signedOut])
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(""), 5000)
-    return () => clearTimeout(t)
-  }, [toast])
+  useActionMessage(toast, () => setToast(""))
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -3402,24 +3399,11 @@ function AppInner() {
             else navigate(action.page)
           }
         }} />}
-      {toast && (
-        <div className="toast" role="status">
-          <span>
-            <Icon name="check" size={18} />
-          </span>
-          {toast}
-          <Button
-            variant="icon-button"
-            icon="close"
-            aria-label="Dismiss notification"
-            onClick={() => setToast("")}
-          />
-        </div>
-      )}
+
     </div>
   )
 }
 
 export default function App() {
-  return <AppInner />
+  return <><AppInner /><ActionFeedback /></>
 }

@@ -100,4 +100,4 @@ export async function loadLicenseStates(userIds, { db, today = localDay() } = {}
   return states;
 }
 
-export const needsLicenseReplacement = state => Number.isFinite(state.daysToExpiry) && state.daysToExpiry <= 33;
+export const needsLicenseReplacement = state => Number.isFinite(state.daysToExpiry) && state.daysToExpiry <= 30;

@@ -1,4 +1,4 @@
-// Administrators submit and review renewals on behalf of engineers. Documents are personal data and are
+// Engineers submit their own renewals (or an Administrator on their behalf); only Administrators verify them. Documents are personal data and are
 // readable only by the license holder and by Administrators.
 import fs from "node:fs";
 import path from "node:path";
@@ -33,10 +33,9 @@ export const myLicense = async (req, res) => {
   } catch (error) { return handleError(res, error); }
 };
 
-/** An Administrator records a renewal for an engineer. Used by POST /licenses/renewals. */
+/** An engineer submits their own renewal, or an Administrator records one for them. Used by POST /licenses/renewals. */
 export async function createRenewalRequest(db, user, body, file) {
-  if (user.role !== "admin") throw new HttpError(403, "Only an Administrator can upload or update licenses.");
-  const userId = body.user_id ?? body.userId;
+  const userId = user.role === "admin" ? (body.user_id ?? body.userId) : user.id;
   if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
   const number = String(body.license_number ?? body.licenseNumber ?? "").trim();
   const expiry = body.license_expiry ?? body.licenseExpiry;
@@ -55,7 +54,7 @@ export async function createRenewalRequest(db, user, body, file) {
       [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id]);
     await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,
       subjectType: "license_renewal", subjectId: String(inserted.rows[0].id), link: "/licenses/renewals",
-      detail: `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` });
+      detail: user.role === "admin" ? `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` : `${engineer.full_name} submitted a renewed license (expires ${expiry}).` });
     return inserted.rows[0];
   } catch (error) {
     if (error.code === "23505") throw new HttpError(409, "A renewal is already under review.");
@@ -65,7 +64,7 @@ export async function createRenewalRequest(db, user, body, file) {
 
 export const submitRenewal = async (req, res) => {
   try {
-    const user = await requireUser(req, res, ["admin"]);
+    const user = await requireUser(req, res, ["admin", "opm", "spm"]);
     if (!user) {
       if (req.file) fs.unlink(req.file.path, () => {});
       return;

@@ -1,5 +1,6 @@
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
+import { beginFileUpload, showActionResult } from "./action-feedback"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
 import EstimatedCompletionDate from "./EstimatedCompletionDate"
@@ -109,6 +110,16 @@ export async function downloadDoc(doc: Doc) {
     file ? doc.name : `${doc.label} — record.txt`,
   )
 }
+export function AttachmentRow({ name, size, onRemove, disabled = false }: {
+  name: string; size?: number; onRemove: () => void; disabled?: boolean
+}) {
+  const amount = size === undefined ? "" : size < 1024 * 1024 ? `${Math.ceil(size / 1024)} KB` : `${(size / 1024 / 1024).toFixed(2)} MB`
+  return <div className="attachment-row">
+    <span>{name}{amount ? ` (${amount})` : ""}</span>
+    <Button variant="icon-button" icon="close" disabled={disabled} aria-label={`Remove attachment ${name}`} onClick={onRemove} />
+  </div>
+}
+
 export function Upload({
   label,
   onSave,
@@ -132,36 +143,11 @@ export function Upload({
   const hintId = useId()
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File>()
-  const [preview, setPreview] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  // Browsers that ignore "#toolbar=0" (Firefox, Safari, mobile) get page 1 as an image.
-  const isPdf =
-    !!file && (file.type === "application/pdf" || /\.pdf$/i.test(file.name))
-  const needsFallback = isPdf && !canHideNativePdfToolbar(navigator)
-  const [pageImage, setPageImage] = useState("")
-  const [pageFailed, setPageFailed] = useState(false)
-  useEffect(() => {
-    setPageImage("")
-    setPageFailed(false)
-    if (!needsFallback || !preview) return
-    let cancelled = false
-    renderPdfFirstPage(preview)
-      .then((src) => {
-        if (!cancelled) setPageImage(src)
-      })
-      .catch(() => {
-        if (!cancelled) setPageFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [needsFallback, preview])
   function clear() {
-    if (preview) URL.revokeObjectURL(preview)
     setFile(undefined)
-    setPreview("")
     setError("")
     if (input.current) input.current.value = ""
   }
@@ -172,6 +158,7 @@ export function Upload({
     savingRef.current = true
     setSaving(true)
     setError("")
+    const finishUpload = beginFileUpload()
     try {
       const id = uid()
       const uploaded = await saveFile(id, file, spreadsheet)
@@ -179,10 +166,13 @@ export function Upload({
       if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
       const saved=await onSave(doc)
       if(saved===false)throw new Error("We couldn’t save your upload. Your file is still selected—please try again.")
+      showActionResult(`${label} uploaded and saved successfully.`)
       clear()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed. Your file is still selected; try again.")
+      showActionResult(e instanceof Error ? e.message : "Your upload could not be completed. Please try again.", true)
     } finally {
+      finishUpload()
       savingRef.current = false
       setSaving(false)
     }
@@ -206,94 +196,23 @@ export function Upload({
           setError(message)
           if (!message) {
             setFile(selected)
-            setPreview(URL.createObjectURL(selected))
           }
         }}
       />
-      <span className="upload-control">
-        <Button
-          icon="upload"
-          disabled={disabled || saving}
-          aria-label={ariaLabel}
-          aria-describedby={hintId}
-          onClick={() => input.current?.click()}
-        >
-          {buttonLabel}
-        </Button>
+      <div className="upload-control attachment-control">
+        {file && <AttachmentRow name={file.name} size={file.size} disabled={disabled || saving} onRemove={clear} />}
+        <div className="attachment-actions">
+          <Button icon="plus" className="attachment-add" disabled={disabled || saving}
+            aria-label={ariaLabel || buttonLabel} aria-describedby={hintId} onClick={() => input.current?.click()}>
+            Add attachments
+          </Button>
+          {file && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
+            {saving ? "Uploading?" : "Confirm upload"}
+          </Button>}
+        </div>
         <span className="upload-limit" id={hintId}>{uploadRequirements(spreadsheet)}</span>
-      </span>
-      {error && !file && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {file && (
-        <Modal title="Confirm document upload" subtitle={label} onClose={() => { if (!savingRef.current) clear() }}>
-          <p className="upload-limit">{uploadRequirements(spreadsheet)}</p>
-          {error && <p className="error" role="alert">{error}</p>}
-          <div className="upload-file">
-            <Icon name="doc" />
-            <div>
-              <strong>{file.name}</strong>
-              <p>
-                {(file.size / 1024 / 1024).toFixed(2)} MB · Ready to upload
-              </p>
-            </div>
-          </div>
-          {spreadsheet ? <p>Excel manpower list · Confirm to upload this workbook.</p> : file.type.startsWith("image/") ? (
-            <img
-              className="file-preview"
-              src={preview}
-              alt="Selected document"
-            />
-          ) : needsFallback ? (
-            <div
-              className="pdf-preview"
-              style={{ overflow: "auto" }}
-              role="group"
-              aria-label="Document preview"
-            >
-              {pageImage ? (
-                <img
-                  src={pageImage}
-                  alt="First page of the selected document"
-                  style={{ width: "100%", display: "block" }}
-                />
-              ) : (
-                <p>
-                  {pageFailed
-                    ? "Preview unavailable. You can still confirm this file."
-                    : "Loading preview…"}
-                </p>
-              )}
-            </div>
-          ) : (
-            <object
-              className="pdf-preview"
-              data={`${preview}#toolbar=0&navpanes=0&scrollbar=1`}
-              type="application/pdf"
-              aria-label="Document preview"
-            >
-              <p>Preview unavailable. You can still confirm this file.</p>
-            </object>
-          )}
-          <div className="modal-actions">
-            <Button disabled={saving} onClick={clear}>Back</Button>
-            <Button
-              disabled={saving}
-              onClick={() => {
-                clear()
-                setTimeout(() => input.current?.click(), 0)
-              }}
-            >
-              Retry upload
-            </Button>
-            <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
-              {saving ? "Saving…" : "Confirm upload"}
-            </Button>
-          </div>
-        </Modal>
-      )}
+        {error && <p className="error" role="alert">{error}</p>}
+      </div>
     </>
   )
 }
@@ -1670,7 +1589,7 @@ export function IntakeForm({
                           </option>
                         ))}
                       </select>
-                      <small>
+                      <small className={`discipline-match ${current && current.matched === current.total ? "discipline-match-valid" : "discipline-match-invalid"}`}>
                         {current
                           ? `${current.matched} of ${current.total} required discipline tags matched`
                           : candidates.length

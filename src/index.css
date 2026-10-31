@@ -1499,3 +1499,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .override-candidates small { overflow-wrap: anywhere; }
 .override-form .override-candidates input[type="radio"], .override-form .appointment-confirmation input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin-top: 3px; padding: 0; }
 .override-candidates label > span { min-width: 0; }
+
+/* Keep the numeric match text as well as color for accessibility. */
+#root small.discipline-match-invalid { color: #b42318; }
+#root small.discipline-match-valid { color: #167347; }

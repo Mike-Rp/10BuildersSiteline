@@ -1,5 +1,5 @@
 import { readSessionTiming } from "./session-activity.utility.js";
-import { licenseAccessPolicy, LICENSE_ACCESS_DISABLED_MESSAGE, LICENSE_VIEW_ONLY_MESSAGE } from "../../domain/license-access.js";
+import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../../domain/license-access.js";
 import jwt from "jsonwebtoken";
 import execute from "./query.utility.js";
 import { errorlog } from "./logger.utility.js";
@@ -102,12 +102,12 @@ export const getCurrentUser = async (req) => {
     if (["opm", "spm"].includes(user.role)) {
       const current = (await execute("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by created_at desc,id desc limit 1", [user.id])).rows[0];
       const policy = licenseAccessPolicy(current?.expiry);
-      if (policy.mode === "disabled") throw new HttpError(403, LICENSE_ACCESS_DISABLED_MESSAGE, "LICENSE_ACCESS_DISABLED");
       const url = (req.originalUrl || req.url || "").split("?")[0];
       const readCommand = url.endsWith("/workspace-command") && req.body?.type === "view_document";
       const accountAction = /\/auth\/(logout|reset-password|refresh|activity|session)$/.test(url);
+      const renewalAction = req.method === "POST" && /\/licenses\/renewals$/.test(url);
       const readAction = /\/(monthly-report|monthly-summary)\/export$/.test(url) || /\/notifications\/(read|preferences)$/.test(url);
-      if (policy.mode === "view_only" && req.method && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !readCommand && !accountAction && !readAction)
+      if (policy.mode === "view_only" && req.method && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !readCommand && !accountAction && !readAction && !renewalAction)
         throw new HttpError(403, LICENSE_VIEW_ONLY_MESSAGE, "LICENSE_VIEW_ONLY");
     }
     return user;

@@ -15,6 +15,13 @@ export const fetchRequests = () => api<ReassignRequest[]>("/licenses/requests")
 export const fetchOverview = () => apiList<OverviewItem>("/licenses/overview")
 export const fetchRenewals = (status = "under_review") => api<RenewalQueueItem[]>("/licenses/renewals?status=" + status)
 
+export const submitOwnRenewal = (input: { licenseNumber: string; licenseExpiry: string; file: File }) => {
+  const body = new FormData()
+  body.set("license_number", input.licenseNumber)
+  body.set("license_expiry", input.licenseExpiry)
+  body.set("file", input.file)
+  return api("/licenses/renewals", { method: "POST", body })
+}
 export const verifyRenewal = (id: number, corrections: { license_number?: string; license_expiry?: string } = {}) =>
   api("/licenses/renewals/" + id + "/verify", { method: "POST", json: corrections })
 export const rejectRenewal = (id: number, note: string) =>

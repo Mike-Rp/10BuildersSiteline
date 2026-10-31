@@ -22,7 +22,7 @@ test('replacement form requires office signing and shows contacts; banner explai
     globalThis.fetch=async (url,init={}) => {
       if(init.method==='POST') { writes.push(JSON.parse(init.body)); return Response.json({data:{status:'accepted'}}) }
       return Response.json({data:{project:{id:'project',name:'Sample project'},role:'spm',stage:'Foundation',isLead:false,
-        available:true,current:{id:'outgoing',name:'Outgoing engineer',expiry:addDays(localDay(),33)},pending:null,previous:[],summary:{required:2,approved:1,pct:50},
+        available:true,current:{id:'outgoing',name:'Outgoing engineer',expiry:addDays(localDay(),30)},pending:null,previous:[],summary:{required:2,approved:1,pct:50},
         candidates:[{id:'incoming',name:'Incoming engineer',phone:'09171234567',email:'incoming@example.com',workload:1,matchPercent:100,best:true,licenseExpiry:addDays(localDay(),400)}]}})
     }
     const {OverrideDialog,LicenseBanner}=await server.ssrLoadModule('/src/LicenseWorkflow.tsx')
@@ -45,9 +45,12 @@ test('replacement form requires office signing and shows contacts; banner explai
     assert.equal(writes[0].from_user_id,'outgoing')
     assert.equal(finished,1)
     await act(()=>root.render(React.createElement(LicenseBanner,{license:{status:'expiring_soon',expiry:addDays(localDay(),30)}})))
-    assert.match(document.body.textContent,/Viewing-only access · 7 days remaining/)
-    assert.match(document.body.textContent,/submissions and approvals are disabled/i)
-    await act(()=>root.render(React.createElement(LicenseBanner,{license:{status:'renewal_under_review',expiry:addDays(localDay(),33)}})))
+    assert.match(document.body.textContent,/Replacement preparation notice/)
+    assert.match(document.body.textContent,/new assignments are blocked/i)
+    await act(()=>root.render(React.createElement(LicenseBanner,{license:{status:'expired',expiry:addDays(localDay(),-1)}})))
+    assert.match(document.body.textContent,/License expired · viewing-only access/)
+    assert.match(document.body.textContent,/submissions, approvals and project changes are disabled/i)
+    await act(()=>root.render(React.createElement(LicenseBanner,{license:{status:'renewal_under_review',expiry:addDays(localDay(),30)}})))
     assert.match(document.body.textContent,/Replacement preparation notice/)
   } finally {
     await act(()=>root.unmount()); globalThis.fetch=originalFetch

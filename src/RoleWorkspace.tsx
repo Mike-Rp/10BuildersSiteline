@@ -1,3 +1,4 @@
+import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 import ProjectScopeSummary from "./ProjectScopeSummary"
@@ -53,7 +54,7 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
 import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
-import { CompanyForm, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import { AttachmentRow, CompanyForm, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
   ListPager,
@@ -376,11 +377,8 @@ export default function RoleWorkspace({
     setEvidence(undefined)
     setDiary("")
   }, [pickedId, picked?.phase])
-  useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(() => setMessage(""), 5000)
-    return () => clearTimeout(timer)
-  }, [message])
+  useActionMessage(message, () => setMessage(""))
+  useActionMessage(error, () => setError(""), true)
   useEffect(() => {
     const close = (event: PointerEvent) => {
       if (!(event.target as HTMLElement).closest(".notification-container"))
@@ -4049,18 +4047,7 @@ export default function RoleWorkspace({
           </div>
         </Modal>
       )}
-      {(saving || error || message) && (
-        <div className={`toast workflow-feedback${saving ? " workflow-feedback-saving" : error ? " workflow-feedback-error" : ""}`} role={error ? "alert" : "status"} aria-atomic="true">
-          <Icon name={saving ? "clock" : error ? "alert" : "check"} size={18} />
-          <span>{saving ? "Saving changes…" : error || message}</span>
-          {!saving && <Button
-            icon="close"
-            variant="icon-button"
-            aria-label={error ? "Dismiss error" : "Dismiss notification"}
-            onClick={() => { setMessage(""); setError("") }}
-          />}
-        </div>
-      )}
+
       {swipe.dialog}
       {signOut.dialog}
       {idleWarning && !paused && (

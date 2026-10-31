@@ -2,3 +2,12 @@
 #root .upload-control > .button { max-width: 100%; white-space: normal; }
 #root .upload-limit { display: block; font-size: 14px; line-height: 1.5; color: var(--color-muted); overflow-wrap: anywhere; }
 #root .modal-body > .upload-limit { margin-bottom: 14px; }
+
+#root .attachment-control { display: flex; width: 100%; gap: 6px; }
+#root .attachment-row { display: flex; align-items: center; justify-content: space-between; width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #269df1; border-radius: 22px; padding: 0 8px 0 16px; background: transparent; color: #10243d; font-size: 14px; }
+#root .attachment-row > span { overflow-wrap: anywhere; min-width: 0; padding: 8px 0; }
+#root .attachment-row > button { flex-shrink: 0; width: 40px; min-width: 40px; min-height: 40px; color: #737e8a; }
+#root .attachment-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#root .attachment-add { border-radius: 24px; background: #0086ae; color: white; border: 1px solid #0086ae; padding: 7px 16px; font-weight: 700; min-height: 40px; }
+#root .attachment-add:hover { background: #006f94; }
+@media (pointer: coarse) { #root .attachment-row > button, #root .attachment-add { min-height: 48px; min-width: 48px; } }

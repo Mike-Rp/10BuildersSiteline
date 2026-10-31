@@ -1,6 +1,7 @@
 import { resolveApiBase } from "./base.ts"
 import { currentLoginPortal, type LoginPortal } from "../login-portal.ts"
 import { RequestTimeoutError, withRequestDeadline } from "./request-deadline.ts"
+import { beginFileUpload, dismissActionResult, isInteractiveWrite, showActionResult } from "../action-feedback.ts"
 
 // The backend is required. Missing configuration never enables demo data.
 let base = resolveApiBase(import.meta.env?.VITE_API_URL, Boolean(import.meta.env?.PROD))
@@ -23,6 +24,7 @@ export function getToken(): string {
   }
 }
 export function setToken(token: string) {
+  if (!token || token !== getToken()) dismissActionResult()
   memoryToken = token
   try {
     if (token) sessionStorage.setItem(TOKEN_KEY, token)
@@ -64,6 +66,8 @@ async function request<T>(
     !headers.has("Content-Type")
   )
     headers.set("Content-Type", "application/json")
+  const interactive = isInteractiveWrite(path, init.method)
+  const finishUpload = init.body instanceof FormData ? beginFileUpload() : undefined
   try {
     return await withRequestDeadline(async signal => {
       const response = await fetch(base + path, { ...init, headers, signal, cache: "no-store" })
@@ -83,9 +87,12 @@ async function request<T>(
           if (typeof window !== "undefined") window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: failure.error.message }))
         }
       }
-      return consume(response)
+      const result = await consume(response)
+      if (interactive && response.ok && token === getToken()) showActionResult(init.body instanceof FormData ? "Your file was received by the server." : "Your request was completed successfully.")
+      return result
     }, { signal: init.signal, timeoutMs: init.body instanceof FormData ? 120_000 : 30_000 })
   } catch (error) {
+    if (interactive && !init.signal?.aborted && token === getToken()) showActionResult(error instanceof Error ? error.message : "The request could not be completed. Please try again.", true)
     if (error instanceof ApiError) throw error
     if (error instanceof RequestTimeoutError) throw new ApiError(error.message, 0, "REQUEST_TIMEOUT")
     if (init.signal?.aborted) throw error
@@ -93,6 +100,8 @@ async function request<T>(
       "Cannot reach the server. Check that the backend is running.",
       0,
     )
+  } finally {
+    finishUpload?.()
   }
 }
 

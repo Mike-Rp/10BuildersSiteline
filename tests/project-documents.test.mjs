@@ -110,3 +110,18 @@ test("project document index groups source records into the four repository cate
       .some((file) => file.doc === photo),
   )
 })
+
+test("project documents still open when a phase has files but no current assignment", () => {
+  const project = initialState().projects.find((item) => item.id === "p1")
+  const workflow = workflowFor(project)
+  project.workflow = workflow
+  project.team = []
+  workflow.checklist["Orphaned Phase"] = [
+    { id: "orphan-check", label: "Inspection", status: "approved", version: 1, doc: uploaded("orphan-evidence", "Inspection") },
+  ]
+  workflow.photos = [uploaded("manpower-report", "Daily manpower report")]
+  const index = projectDocumentIndex(project)
+  const phaseFolder = index.find((c) => c.id === "phases").folders.find((f) => f.name === "Orphaned Phase")
+  assert.equal(phaseFolder.files.length, 1)
+  assert.equal(index.find((c) => c.id === "manpower").folders.flatMap((f) => f.files).length, 1)
+})

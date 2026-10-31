@@ -1,3 +1,4 @@
+import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { LoadingRoleProvider } from "./LoadingSkeleton"
 import ExtensionWorkflow from "./ExtensionWorkflow"
@@ -159,11 +160,7 @@ export default function ClientPortal({
       /* Revoked access removes the preview immediately. */
     }
   }
-  useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(() => setMessage(""), 5000)
-    return () => clearTimeout(timer)
-  }, [message])
+  useActionMessage(message, () => setMessage(""))
   useEffect(() => {
     const outside = (event: PointerEvent) => {
       if (!(event.target as HTMLElement).closest(".notification-container"))
@@ -806,18 +803,7 @@ export default function ClientPortal({
           onClose={() => setViewer(undefined)}
         />
       )}
-      {message && (
-        <div className="toast" role="status">
-          <Icon name="check" size={18} />
-          {message}
-          <Button
-            variant="icon-button"
-            icon="close"
-            aria-label="Dismiss Client notification"
-            onClick={() => setMessage("")}
-          />
-        </div>
-      )}
+
       {swipe.dialog}
       {signOut.dialog}
       {idleWarning && !paused && (
