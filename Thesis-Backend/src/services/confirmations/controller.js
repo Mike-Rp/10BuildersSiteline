@@ -5,6 +5,7 @@ import { assertLicenseActive } from '../../common/utilities/license-gate.utility
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { loadPhaseCoverage } from "../projects/phase-coverage.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isUuid, isBigintId, isSmallintId, paging,
@@ -314,7 +315,8 @@ const respondToPhase = (newStatus) => async (req, res) => {
           `SELECT 1 FROM project_phase_team WHERE project_id = $1 AND status <> 'confirmed' LIMIT 1`,
           [id]
         );
-        if (open.rowCount === 0) {
+        // The last confirmation activates only when the authoritative workflow is fully covered.
+        if (open.rowCount === 0 && (await loadPhaseCoverage(client, id)).ok) {
           await client.query(
             `UPDATE projects
                 SET lifecycle_status = 'active',

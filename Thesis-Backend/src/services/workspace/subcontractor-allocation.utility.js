@@ -1,5 +1,6 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js"
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
+import { loadPhaseCoverage } from "../projects/phase-coverage.utility.js"
 import { locationError, normalizeLocation, normalizeServiceAreas, serviceAreasError } from "../../domain/operating-location.js"
 import { COMPANY_TRADES, companyTradePhases, normalizeCompanyTrades } from "../../domain/company-trades.js"
 import {
@@ -85,21 +86,9 @@ async function intakeReady(db, p) {
       ],
     ],
   )
-  const team = await db.query(
-    "select status from project_phase_team where project_id=$1",
-    [p.id],
-  )
-  const missing = await db.query(
-    `select 1 from (${projectWorkflowSql}) pts left join project_phase_team t on t.project_id=$1 and t.project_stage_id=pts.project_stage_id
-      where pts.project_id=$1 and (t.spm_user_id is null or t.status<>'confirmed') limit 1`,
-    [p.id],
-  )
-  if (
-    required.rows[0].n !== 6 ||
-    missing.rowCount ||
-    !team.rowCount ||
-    team.rows.some((t) => t.status !== "confirmed")
-  )
+  // Same shared coverage rule as activation: one confirmed, eligible Site PM per required phase.
+  const coverage = await loadPhaseCoverage(db, p.id)
+  if (required.rows[0].n !== 6 || !coverage.ok)
     fail(
       "All six registered documents and team confirmations are required before allocation.",
     )
