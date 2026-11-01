@@ -2,6 +2,7 @@ import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controlle
 import { monthlyReport, exportMonthlyReport } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
+import { assertPhaseCoverage } from "../projects/phase-coverage.utility.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -398,6 +399,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             leader();
             if (p.lifecycle_status !== "spm_review")
                 throw new HttpError(409, "Only an intake under Site PM review can be activated.");
+            // Required phases come from the project-type workflow, never from the saved team rows.
+            await assertPhaseCoverage(db, p.id);
             if (c.type === "upload_agreement")
                 await linkDocument(db, user, p, "subcontractor_agreement", c.doc?.id);
             else if (!meta.clientSubcon)

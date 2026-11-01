@@ -4,6 +4,7 @@ import {
   DOC_LABELS,
   PHASES,
   PROJECT_PHASE_DEFINITIONS,
+  phaseDefinitions,
   licenseExpired,
   licenseState,
   projectPhaseNames,
@@ -166,6 +167,36 @@ export function leadConfirmed(p: Project) {
     !!leadId(p) &&
     p.team.find((t) => t.phase === "Mobilization")?.status === "confirmed"
   )
+}
+// Coverage is measured against the project type's workflow, never the saved team rows alone.
+export function teamCoverage(p: Pick<Project, "type" | "team">) {
+  const required = phaseDefinitions(p.type).map((d) => d.name)
+  const rows = (phase: string) => p.team.filter((t) => t.phase === phase)
+  const single = (phase: string) => rows(phase).length === 1 ? rows(phase)[0] : null
+  return {
+    missing: required.filter((phase) => !rows(phase).length),
+    duplicate: required.filter((phase) => rows(phase).length > 1),
+    unassigned: required.filter((phase) => single(phase) && !single(phase)!.accountId),
+    unconfirmed: required.filter(
+      (phase) => !!single(phase)?.accountId && single(phase)!.status !== "confirmed",
+    ),
+    extra: [...new Set(p.team.map((t) => t.phase))].filter(
+      (phase) => !required.includes(phase),
+    ),
+  }
+}
+export function teamCoverageGaps(p: Pick<Project, "type" | "team">) {
+  const c = teamCoverage(p)
+  const groups: [string, string[]][] = [
+    ["Missing", c.missing],
+    ["Unassigned", c.unassigned],
+    ["Awaiting confirmation", c.unconfirmed],
+    ["Duplicate", c.duplicate],
+    ["Not in workflow", c.extra],
+  ]
+  return groups
+    .filter(([, list]) => list.length)
+    .map(([label, list]) => `${label}: ${list.join(", ")}`)
 }
 export function teamConfirmed(p: Project) {
   return (

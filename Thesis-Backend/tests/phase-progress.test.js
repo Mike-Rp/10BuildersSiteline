@@ -375,9 +375,11 @@ test("crew approval with zero available workers does not create an assignment", 
 });
 
 const confirmations = await import("../src/services/confirmations/controller.js");
-test("confirming a phase locks the project before checking final activation", async () => {
-  const queries = [];
-  client = { async query(sql, params) {
+const COMMERCIAL = ["Mobilization", "Design", "Foundation", "Structure", "Envelope / Curtain Wall", "MEP Rough-In",
+  "Fire & Life Safety", "Fit-Out / Finishes", "Closeout"].map((code, i) => ({ project_stage_id: i + 1, code, sort_order: i + 1 }));
+const confirmedRow = phase => ({ project_stage_id: phase.project_stage_id, stage_code: phase.code, spm_user_id: spm.id, status: "confirmed", engineer_valid: true });
+function confirmationClient(queries, teamRows) {
+  return { async query(sql, params) {
     sql = sql.replace(/\s+/g, " ").trim();
     queries.push({ sql, params });
     const result = rows => ({ rows, rowCount: rows.length });
@@ -385,10 +387,26 @@ test("confirming a phase locks the project before checking final activation", as
     if (sql.startsWith("SELECT id, status, response_deadline_at")) return result([{ id: "1", status: "pending", response_deadline_at: null }]);
     if (sql.startsWith("UPDATE project_phase_team")) return result([{ stage_id: 4, status: "confirmed" }]);
     if (sql.startsWith("SELECT 1 FROM project_phase_team")) return result([]);
+    if (sql.startsWith("SELECT w.project_stage_id,s.code")) return result(COMMERCIAL);
+    if (sql.startsWith("SELECT t.project_stage_id,s.code AS stage_code")) return result(teamRows);
     if (sql.startsWith("UPDATE projects")) return result([{}]);
     if (/^select license_expiry::text/i.test(sql)) return result([]);
     throw new Error("Unexpected confirmation query: " + sql);
   } };
+}
+test("the last confirmation does not activate a project whose rows cover only four of nine phases", async () => {
+  const queries = [];
+  const four = COMMERCIAL.filter(p => ["Mobilization", "Design", "Fit-Out / Finishes", "Closeout"].includes(p.code)).map(confirmedRow);
+  client = confirmationClient(queries, four);
+  const res = response();
+  await confirmations.acceptPhase(request(spm, {}, { stageId: "4" }), res);
+  assert.equal(res.statusCode, 200, "the confirmation itself is recorded");
+  assert.equal(queries.some(q => /SET lifecycle_status = 'active'/.test(q.sql)), false);
+  assert.match(queries.find(q => q.sql.startsWith("SELECT t.project_stage_id")).sql, /FOR UPDATE OF t/);
+});
+test("confirming a phase locks the project before checking final activation", async () => {
+  const queries = [];
+  client = confirmationClient(queries, COMMERCIAL.map(confirmedRow));
   const res = response();
   await confirmations.acceptPhase(request(spm, {}, { stageId: "4" }), res);
   assert.equal(res.statusCode, 200);

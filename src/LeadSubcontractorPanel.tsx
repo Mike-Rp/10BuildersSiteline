@@ -26,6 +26,7 @@ import {
   projectSubcontractor,
   subcontractorRecommendation,
   subcontractorRecommendations,
+  teamCoverageGaps,
   workflowFor,
   type WorkflowCommand,
 } from "./workflows"
@@ -188,7 +189,14 @@ export default function LeadSubcontractorPanel({
       .filter((selection) => selection.status === "declined")
       .map((selection) => selection.companyId),
   )
-  const checks = activationChecks(state, project)
+  // The team check must cover every phase of the type workflow, not just the saved rows.
+  const coverageGaps =
+    project.status === "active" ? [] : teamCoverageGaps(project)
+  const checks = activationChecks(state, project).map((check) =>
+    check.id === "team" && coverageGaps.length
+      ? { ...check, passed: false, detail: coverageGaps.join(". ") }
+      : { ...check, detail: "" },
+  )
   const clientOwned = !!project.clientSubcon
   const review = clientSubconReview(project)
   const openIssue = openClientSubconIssue(project)
@@ -886,7 +894,12 @@ export default function LeadSubcontractorPanel({
           {checks.map((check) => (
             <div key={check.id} className={check.passed ? "passed" : "blocked"}>
               <Icon name={check.passed ? "check" : "clock"} size={17} />
-              <span>{check.label}</span>
+              <span>
+                {check.label}
+                {check.detail && (
+                  <small className="role-muted"> · {check.detail}</small>
+                )}
+              </span>
               <strong>{check.passed ? "Passed" : "Pending"}</strong>
             </div>
           ))}
@@ -906,6 +919,15 @@ export default function LeadSubcontractorPanel({
                   ? "Agreement upload unlocks after you acknowledge the Admin-assigned subcontractor and any reported issue is resolved."
                   : "Agreement upload unlocks only after all selected companies are approved and have accepted. Declined or replaced companies do not count as committed partners."}
         </p>
+        {coverageGaps.length > 0 && (
+          <div className="role-error">
+            <Icon name="alert" />
+            <span>
+              Activation is blocked until every required phase has one
+              confirmed Site PM. {coverageGaps.join(". ")}.
+            </span>
+          </div>
+        )}
         {!clientReady && (
           <div className="role-error">
             <Icon name="alert" />
@@ -967,7 +989,7 @@ export default function LeadSubcontractorPanel({
               <Upload
                 label={DOC_LABELS[6]}
                 owner={actor.name}
-                disabled={!responsesComplete}
+                disabled={!responsesComplete || coverageGaps.length > 0}
                 buttonLabel="Upload signed subcontractor agreement"
                 onSave={async (doc) => {
                   if (

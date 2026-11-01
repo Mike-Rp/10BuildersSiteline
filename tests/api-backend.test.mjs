@@ -257,6 +257,17 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   let newProjectId
+  // Everything a successful activation writes; a rejected activation must leave all of it unchanged.
+  const activationSnapshot=async projectId=>({
+    project:(await db.query("select lifecycle_status,current_stage_id,crew_assigned from projects where id=$1",[projectId])).rows[0],
+    agreement:(await db.query("select count(*)::int n from project_documents d join document_types t on t.id=d.document_type_id where d.project_id=$1 and t.code='subcontractor_agreement'",[projectId])).rows[0].n,
+    assignments:(await db.query("select count(*)::int n from project_subcontractor_assignments where project_id=$1",[projectId])).rows[0].n,
+    workers:(await db.query("select count(*)::int n from subcontractor_workers where current_project_id=$1",[projectId])).rows[0].n,
+    checklists:(await db.query("select count(*)::int n from project_phase_checklist_items where project_id=$1",[projectId])).rows[0].n,
+    activation:(await db.query("select metadata->'activation' a from workspace_project_metadata where project_id=$1",[projectId])).rows[0]?.a ?? null,
+    phaseChecklists:(await db.query("select count(*)::int n from project_phase_checklists where project_id=$1",[projectId])).rows[0].n,
+    events:(await db.query("select count(*)::int n from activity_log")).rows[0].n,
+  })
   await t.test("project intake, confirmations, registered documents and allocation persist", async () => {
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const draft=state.projects.find(p=>p.name.startsWith("Alden Heights"))
@@ -342,6 +353,23 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await sendApiWorkflow(session.state,actor,{type:"respond_company",projectId:p.id,companyId:company.id,accepted:true})
     const id=randomUUID()
     await uploadFile(id,new File(["%PDF-1.4\nSigned agreement"],"signed.pdf",{type:"application/pdf"}))
+    // Regression: required phases come from the type workflow. A missing phase blocks activation even when every
+    // remaining row is confirmed and an extra row pads the count; a rejected attempt writes nothing.
+    const required=(await db.query("select w.project_stage_id from projects p join project_type_stages w on w.project_type_id=p.project_type_id where p.id=$1 order by w.sort_order",[p.id])).rows
+    const removed=(await db.query("delete from project_phase_team where project_id=$1 and project_stage_id=$2 returning *",[p.id,required[2].project_stage_id])).rows[0]
+    const extra=(await db.query("insert into project_stages(id,code,sort_order) select max(id)+1,'Out-of-workflow test stage',200 from project_stages returning id")).rows[0]
+    await db.query("insert into project_phase_team(project_id,project_stage_id,spm_user_id,status,is_lead) values($1,$2,$3,'confirmed',false)",[p.id,extra.id,removed.spm_user_id])
+    assert.equal((await db.query("select 1 from project_phase_team where project_id=$1 and status<>'confirmed'",[p.id])).rowCount,0)
+    assert.equal((await db.query("select 1 from project_phase_team where project_id=$1",[p.id])).rowCount,required.length)
+    const before=await activationSnapshot(p.id)
+    await assert.rejects(sendApiWorkflow(session.state,actor,{type:"upload_agreement",projectId:p.id,doc:{id,name:"signed.pdf"}}),/Missing assignments/)
+    assert.deepEqual(await activationSnapshot(p.id),before)
+    // Restoring the phase as unconfirmed still blocks, and still writes nothing.
+    await db.query("delete from project_phase_team where project_id=$1 and project_stage_id=$2",[p.id,extra.id])
+    await db.query("insert into project_phase_team(project_id,project_stage_id,spm_user_id,status,is_lead) values($1,$2,$3,'pending',false)",[p.id,removed.project_stage_id,removed.spm_user_id])
+    await assert.rejects(sendApiWorkflow(session.state,actor,{type:"upload_agreement",projectId:p.id,doc:{id,name:"signed.pdf"}}),/Awaiting confirmation/)
+    assert.deepEqual(await activationSnapshot(p.id),before)
+    await db.query("update project_phase_team set status='confirmed',responded_at=now() where project_id=$1 and project_stage_id=$2",[p.id,removed.project_stage_id])
     await sendApiWorkflow(session.state,actor,{type:"upload_agreement",projectId:p.id,doc:{id,name:"signed.pdf"}})
     const active=await api("/projects/"+p.id)
     assert.equal(active.lifecycle_status,"active")
@@ -370,6 +398,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await api("/projects/"+project.id+"/workspace-command",{method:"POST",json:{type:"resolve_client_subcon_issue",issueId:issue.id,note:"Scope clarified with the client"}})
     session=await asUser(lead.email);actor=session.state.accounts.find(a=>a.id===session.user.id)
     await sendApiWorkflow(session.state,actor,{type:"acknowledge_client_subcon",projectId:project.id})
+    // The client-provided path enforces the same phase coverage: an unassigned engineer blocks activation.
+    const phaseRow=(await db.query("select t.* from project_phase_team t join projects p on p.id=t.project_id join project_type_stages w on w.project_type_id=p.project_type_id and w.project_stage_id=t.project_stage_id where t.project_id=$1 and not t.is_lead and t.spm_user_id<>$2 order by w.sort_order desc limit 1",[project.id,actor.id])).rows[0]
+    await db.query("update users set status='suspended' where id=$1",[phaseRow.spm_user_id])
+    const before=await activationSnapshot(project.id)
+    await assert.rejects(sendApiWorkflow(session.state,actor,{type:"activate_project",projectId:project.id}),/Unassigned or ineligible engineer/)
+    assert.deepEqual(await activationSnapshot(project.id),before)
+    await db.query("update users set status='active' where id=$1",[phaseRow.spm_user_id])
     await sendApiWorkflow(session.state,actor,{type:"activate_project",projectId:project.id})
     assert.equal((await api("/projects/"+project.id)).lifecycle_status,"active")
     assert.equal((await loadState(session.user)).projects.find(p=>p.id===project.id).clientSubconReview.issues[0].status,"resolved")
