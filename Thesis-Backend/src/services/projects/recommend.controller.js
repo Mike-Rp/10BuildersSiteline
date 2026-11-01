@@ -122,7 +122,7 @@ export const updatePhaseTeam = async (req, res) => {
       }
       await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
       for (const stage of phase_team) await assertEligibleManager(client, stage.user_id, 'spm');
-      if (locked.rows[0].phase_scope) await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team);
+      await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team);
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
@@ -240,7 +240,7 @@ const getSpm = async (project_type) => {
             ${experienceForProjectSql("$2")} AS experience_years,
             array_agg(pt.id) FILTER (WHERE uds.discipline_id IS NOT NULL) AS disciplines,
             CASE WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
-          FROM user_discipline_scopes uds
+          FROM engineer_qualified_scopes uds
           LEFT JOIN disciplines pt ON pt.id = uds.discipline_id
           JOIN users u ON u.id = uds.user_id AND u.status = 'active' AND COALESCE(u.is_deleted, false) = false
           JOIN roles r ON r.id = u.role_id AND lower(r.code) = 'spm'

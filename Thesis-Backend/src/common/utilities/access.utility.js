@@ -100,7 +100,7 @@ export const getCurrentUser = async (req) => {
     const timing = await readSessionTiming({query:execute}, payload);
     if (timing.expired) throw new HttpError(401, "Your session expired due to inactivity. Please sign in again.", "SESSION_INACTIVE");
     if (["opm", "spm"].includes(user.role)) {
-      const current = (await execute("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by created_at desc,id desc limit 1", [user.id])).rows[0];
+      const current = (await execute("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc,id desc limit 1", [user.id])).rows[0];
       const policy = licenseAccessPolicy(current?.expiry);
       const url = (req.originalUrl || req.url || "").split("?")[0];
       const readCommand = url.endsWith("/workspace-command") && req.body?.type === "view_document";

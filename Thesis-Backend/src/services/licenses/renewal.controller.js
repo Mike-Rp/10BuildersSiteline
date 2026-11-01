@@ -1,3 +1,4 @@
+import { PROFESSIONS, licenseNumberError, isoDateValid } from "../../domain/engineer-credentials.js";
 // Engineers submit their own renewals (or an Administrator on their behalf); only Administrators verify them. Documents are personal data and are
 // readable only by the license holder and by Administrators.
 import fs from "node:fs";
@@ -10,8 +11,7 @@ import { adminIds, notify } from "../../common/utilities/notify.utility.js";
 import { resolveNotifications } from "../notifications/notification.utility.js";
 
 const UPLOAD_ROOT = path.resolve("uploads");
-const isIsoDate = (value) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value || "") && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+const isIsoDate = isoDateValid;
 
 export const publicState = (s) => ({
   access: s.access,
@@ -37,21 +37,32 @@ export const myLicense = async (req, res) => {
 export async function createRenewalRequest(db, user, body, file) {
   const userId = user.role === "admin" ? (body.user_id ?? body.userId) : user.id;
   if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
-  const number = String(body.license_number ?? body.licenseNumber ?? "").trim();
+  const number = body.license_number ?? body.licenseNumber;
+  const profession = body.profession;
+  if (!PROFESSIONS.includes(profession)) throw new HttpError(400, "Select the licensed profession. Do not infer it from tags.");
+  const numberError = licenseNumberError(number);
+  if (numberError) throw new HttpError(400, numberError);
   const expiry = body.license_expiry ?? body.licenseExpiry;
   if (!file) throw new HttpError(400, "Upload the renewed license (PDF, JPG or PNG).");
-  if (!number || number.length > 120) throw new HttpError(400, "Enter the engineer's license number.");
+
   if (!isIsoDate(expiry)) throw new HttpError(400, "Enter the new expiry date (YYYY-MM-DD).");
   if (expiry <= localDay()) throw new HttpError(400, "The new expiry date must be in the future.");
   const engineer = (await db.query(
     `select u.full_name from users u join roles r on r.id=u.role_id
       where u.id=$1 and r.code in ('opm','spm') and not coalesce(u.is_deleted,false)`, [userId])).rows[0];
   if (!engineer) throw new HttpError(404, "Engineer not found.");
+  await db.query("select id from users where id=$1 for update", [userId]);
+  const replaces=body.replaces_license_id||null;
+  if(replaces) {
+    if(!isUuid(replaces)) throw new HttpError(400,"Invalid previous credential.");
+    const old=(await db.query("select profession from user_licenses where id=$1 and user_id=$2 and superseded_at is null",[replaces,userId])).rows[0];
+    if(!old||(old.profession&&old.profession!==profession))throw new HttpError(422,"The previous credential must belong to this engineer and profession.");
+  }
   try {
     const inserted = await db.query(
-      `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by)
-       values($1,$2,$3,$4,$5) returning id,status,submitted_at`,
-      [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id]);
+      `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by,profession,replaces_license_id)
+       values($1,$2,$3,$4,$5,$6,$7) returning id,status,submitted_at`,
+      [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id, profession, replaces]);
     await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,
       subjectType: "license_renewal", subjectId: String(inserted.rows[0].id), link: "/licenses/renewals",
       detail: user.role === "admin" ? `An Administrator submitted ${engineer.full_name}'s renewed license (expires ${expiry}).` : `${engineer.full_name} submitted a renewed license (expires ${expiry}).` });
@@ -85,8 +96,8 @@ export const listRenewals = async (req, res) => {
     const status = ["under_review", "verified", "rejected"].includes(req.query.status) ? req.query.status : null;
     const rows = (await execute(
       `select q.id, q.user_id, u.full_name, r.code as role, q.license_number, q.license_expiry::text as license_expiry,
-              q.status, q.submitted_at, q.reviewed_at, q.review_note
-         from license_renewal_requests q join users u on u.id=q.user_id join roles r on r.id=u.role_id
+              q.status, q.profession, q.submitted_at, q.reviewed_at, q.review_note, reviewer.full_name as reviewed_by_name
+         from license_renewal_requests q join users u on u.id=q.user_id join roles r on r.id=u.role_id left join users reviewer on reviewer.id=q.reviewed_by
         where ($1::text is null or q.status=$1) order by q.submitted_at desc limit 200`, [status])).rows;
     return sendOk(res, "Renewals retrieved.", rows.length, rows);
   } catch (error) { return handleError(res, error); }
@@ -100,6 +111,11 @@ export const renewalFile = async (req, res) => {
     if (!/^\d+$/.test(req.params.id)) return sendError(res, "Document not found.", 404);
     const row = (await execute("select user_id, file_ref from license_renewal_requests where id=$1", [req.params.id])).rows[0];
     if (!row || (user.role !== "admin" && user.id !== row.user_id)) return sendError(res, "Document not found.", 404);
+    if (row.file_ref.startsWith("db:")) {
+      const id = row.file_ref.replace(/^db:(\/\/)?/, "");
+      if (!isUuid(id)) return sendError(res,"Document not found.",404);
+      return res.redirect(307, `/api/v1/files/${id}/content`);
+    }
     const absolute = path.resolve(row.file_ref);
     if (!absolute.startsWith(UPLOAD_ROOT + path.sep) || !fs.existsSync(absolute)) return sendError(res, "Document not found.", 404);
     return res.download(absolute, `License_renewal${path.extname(absolute)}`);
@@ -113,29 +129,42 @@ async function review(req, res, decision) {
     if (!/^\d+$/.test(req.params.id)) return sendError(res, "Invalid renewal id.", 400);
     const note = String(req.body?.note ?? req.body?.review_note ?? "").trim();
     if (decision === "rejected" && !note) return sendError(res, "A reason is required to reject a renewal.", 400);
+    if (note.length > 2000) return sendError(res,"Review note must be at most 2000 characters.",400);
     const data = await withTransaction(async (db) => {
+      const owner=(await db.query("select user_id from license_renewal_requests where id=$1",[req.params.id])).rows[0];
+      if(!owner)throw new HttpError(404,"Renewal not found.");
+      await db.query("select id from users where id=$1 for update",[owner.user_id]);
       const found = await db.query("select *, license_expiry::text as expiry_text from license_renewal_requests where id=$1 for update", [req.params.id]);
       const request = found.rows[0];
       if (!request) throw new HttpError(404, "Renewal not found.");
       if (request.status !== "under_review") throw new HttpError(409, `This renewal was already ${request.status}.`);
       let licenseId = null;
       if (decision === "verified") {
-        const number = String(req.body?.license_number ?? request.license_number).trim();
+        const number = req.body?.license_number ?? request.license_number;
+        const profession = req.body?.profession ?? request.profession;
+        if (!PROFESSIONS.includes(profession)) throw new HttpError(400, "Select the licensed profession before verifying this legacy submission.");
+        if (licenseNumberError(number)) throw new HttpError(400, licenseNumberError(number));
+        await db.query("select id from users where id=$1 for update", [request.user_id]);
         const expiry = req.body?.license_expiry ?? request.expiry_text;
-        if (!number) throw new HttpError(400, "A license number is required.");
-        if (!isIsoDate(expiry)) throw new HttpError(400, "A valid expiry date (YYYY-MM-DD) is required.");
+        if (!note) throw new HttpError(400, "Record the manual verification result in a review note.");
+        if (!isIsoDate(expiry) || expiry <= localDay()) throw new HttpError(400, "A future expiry date (YYYY-MM-DD) is required.");
+        if(request.replaces_license_id) {
+          const old=(await db.query("select profession from user_licenses where id=$1 and user_id=$2",[request.replaces_license_id,request.user_id])).rows[0];
+          if(!old||(old.profession&&old.profession!==profession))throw new HttpError(422,"Replacement evidence does not match the verified profession.");
+        }
         await db.query("select set_config('app.current_user_id',$1,true)", [user.id]);
-        await db.query("update user_licenses set superseded_at=now(), updated_by=$2, updated_at=now() where user_id=$1 and superseded_at is null", [request.user_id, user.id]);
+        await db.query("update user_licenses set superseded_at=now(), updated_by=$2, updated_at=now() where user_id=$1 and profession=$3 and superseded_at is null", [request.user_id, user.id, profession]);
         licenseId = (await db.query(
-          `insert into user_licenses(user_id,license_number,license_expiry,upload_file_ref,upload_status,created_by,updated_by)
-           values($1,$2,$3,$4,'uploaded',$5,$5) returning id`, [request.user_id, number, expiry, request.file_ref, user.id])).rows[0].id;
+          `insert into user_licenses(user_id,license_number,license_expiry,upload_file_ref,upload_status,created_by,updated_by,profession,verification_status,verified_by,verified_at,verification_note)
+           values($1,$2,$3,$4,'uploaded',$5,$5,$6,'verified',$5,now(),$7) returning id`, [request.user_id, number, expiry, request.file_ref, user.id, profession, note])).rows[0].id;
       }
+      if(decision==='verified'&&request.replaces_license_id)await db.query("update user_licenses set superseded_at=now(),updated_by=$3 where id=$1 and user_id=$2 and superseded_at is null",[request.replaces_license_id,request.user_id,user.id]);
       await db.query(
         `update license_renewal_requests set status=$2, reviewed_by=$3, reviewed_at=now(), review_note=$4, resulting_license_id=$5 where id=$1`,
         [request.id, decision, user.id, note || null, licenseId]);
       await notify(db, {
         title: decision === "verified" ? "License verified" : "License renewal rejected",
-        detail: decision === "verified" ? "Your license renewal was verified. Your work is no longer paused." : `Reason: ${note}`,
+        detail: decision === "verified" ? "Your credential was verified. Assignment eligibility depends on the required profession, expiry, availability and holds." : `Reason: ${note}`,
         recipientIds: [request.user_id], actorId: user.id,
       });
       await resolveNotifications(db, { subjectType: "license_renewal", subjectId: String(request.id), reason: `Renewal ${decision}.` });

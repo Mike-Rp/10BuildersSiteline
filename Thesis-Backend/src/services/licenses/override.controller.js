@@ -66,7 +66,7 @@ async function candidateRows(db, project, stageId, excludeId) {
       "select discipline_id from project_stage_discipline_links where project_stage_id=$1 and project_type_id=$2", [stageId, project.project_type_id])).rows.map((r) => r.discipline_id);
     const rows = (await db.query(
       `select u.id, u.full_name, u.email, u.phone,
-              (select count(*) from user_discipline_scopes s where s.user_id=u.id and s.discipline_id = any($1::int[]))::int as matching,
+              (select count(*) from engineer_qualified_scopes s where s.user_id=u.id and s.discipline_id = any($1::int[]))::int as matching,
               (select count(distinct p.id) from project_phase_team t join projects p on p.id=t.project_id
                 where t.spm_user_id=u.id and p.id<>$3 and t.status in ('pending','confirmed') and p.lifecycle_status<>'archived' and not coalesce(p.is_deleted,false))::int as workload,
               (select l.license_expiry::text from user_licenses l where l.user_id=u.id and l.superseded_at is null order by l.created_at desc, l.id desc limit 1) as license_expiry

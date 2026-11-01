@@ -1,3 +1,4 @@
+import { validateScopedQualifications } from "../projects/type-phases.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { HttpError,requireUser,handleError,sendOk,sendError,isUuid,isBigintId,isProjectOpmOrAdmin } from "../../common/utilities/access.utility.js";
@@ -109,6 +110,8 @@ export const reassignPhase = async (req,res) => {
       const old=found.rows[0];
       if(old.spm_user_id && !["declined","auto_expired"].includes(old.status)) throw new HttpError(409,"Only declined or expired assignments can be reassigned.");
       await assertEligibleManager(db,req.body.new_user_id,"spm");
+      const scope=(await db.query("select p.project_type_id,s.code from projects p join project_stages s on s.id=$2 where p.id=$1",[p.id,old.project_stage_id])).rows[0];
+      await validateScopedQualifications(db,scope.project_type_id,[{stage:scope.code,user_id:req.body.new_user_id}]);
       const clock=await db.query("SELECT now() AS now");
       const deadline=businessDeadline(clock.rows[0].now);
       await db.query(

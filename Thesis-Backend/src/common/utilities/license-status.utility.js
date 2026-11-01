@@ -66,7 +66,7 @@ export async function loadLicenseState(userId, { db, today = localDay() } = {}) 
   const rules = await readLicenseRules(db);
   const license = (await run(
     `select id, license_number, license_expiry::text as license_expiry, upload_status
-       from user_licenses where user_id = $1 and superseded_at is null order by created_at desc, id desc limit 1`, [userId])).rows[0];
+       from user_licenses where user_id = $1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc limit 1`, [userId])).rows[0];
   const renewal = (await run(
     `select id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note
        from license_renewal_requests where user_id = $1 order by id desc limit 1`, [userId])).rows[0] || null;
@@ -85,7 +85,7 @@ export async function loadLicenseStates(userIds, { db, today = localDay() } = {}
   const rules = await readLicenseRules(db);
   const licenses = new Map((await run(
     `select distinct on (user_id) user_id, id, license_number, license_expiry::text as license_expiry
-       from user_licenses where user_id = any($1::uuid[]) and superseded_at is null order by user_id, created_at desc, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
+       from user_licenses where user_id = any($1::uuid[]) and superseded_at is null order by user_id, (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
   const renewals = new Map((await run(
     `select distinct on (user_id) user_id, id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note
        from license_renewal_requests where user_id = any($1::uuid[]) order by user_id, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));

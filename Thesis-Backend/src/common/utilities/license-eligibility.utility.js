@@ -4,6 +4,13 @@ export const LICENSE_ELIGIBILITY_SQL = `NOT EXISTS (SELECT 1 FROM workspace_acco
   SELECT 1 FROM public.user_licenses valid_license
   WHERE valid_license.user_id = u.id
     AND valid_license.superseded_at IS NULL
+    AND to_jsonb(valid_license)->>'verification_status' = 'verified'
+    AND to_jsonb(valid_license)->>'verified_by' IS NOT NULL
+    AND to_jsonb(valid_license)->>'verified_at' IS NOT NULL
+    AND to_jsonb(valid_license)->>'profession' IN ('Civil Engineer','Mechanical Engineer','Electrical Engineer','Sanitary Engineer','Electronics Engineer','Geodetic Engineer')
+    AND length(valid_license.license_number) BETWEEN 1 AND 120
+    AND valid_license.license_number=btrim(valid_license.license_number)
+    AND valid_license.license_number !~ '[[:cntrl:]]'
     AND valid_license.upload_status = 'uploaded'
     AND valid_license.upload_file_ref IS NOT NULL
     AND valid_license.license_expiry > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30
@@ -27,27 +34,6 @@ export async function assertEligibleManager(client, userId, role) {
 
 
 export async function getLicenseEligibility(userId, db = execute) {
-  const result = await db(`
-    SELECT u.id,
-      CASE WHEN l.id IS NULL THEN 'missing'
-           WHEN l.upload_status <> 'uploaded' OR l.upload_file_ref IS NULL THEN 'pending_document'
-           WHEN l.license_expiry < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date THEN 'expired'
-           WHEN l.license_expiry <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30 THEN 'expiring_soon'
-           ELSE 'valid' END AS license_status,
-      l.license_expiry,
-      CASE WHEN l.id IS NOT NULL
-             AND l.upload_status = 'uploaded'
-             AND l.upload_file_ref IS NOT NULL
-             AND l.license_expiry > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date + 30
-           THEN true ELSE false END AS eligible_for_new_assignment
-    FROM public.users u
-    LEFT JOIN LATERAL (
-      SELECT id, license_expiry, upload_status, upload_file_ref
-      FROM public.user_licenses
-      WHERE user_id = u.id AND superseded_at IS NULL
-      ORDER BY created_at DESC, id DESC LIMIT 1
-    ) l ON true
-    WHERE u.id = $1
-  `, [userId]);
-  return result.rows[0] ?? null;
+ const result=await db(`SELECT u.id,u.status as account_status, (u.status='active' AND NOT coalesce(u.is_deleted,false) AND ${LICENSE_ELIGIBILITY_SQL}) as eligible_for_new_assignment FROM users u WHERE u.id=$1`,[userId]);
+ return result.rows[0]??null;
 }

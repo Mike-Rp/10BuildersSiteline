@@ -1,3 +1,4 @@
+import { getCredentials,putSpecializations,submitLegacyCredential } from "./credentials.controller.js";
 import { Router } from "express";
 import { requireRoles } from "../../common/utilities/access.utility.js";
 import { uploadLicenseFile } from "../accounts/manage.controller.js";
@@ -7,6 +8,9 @@ import {
 } from "./override.controller.js";
 
 const router = Router();
+router.get('/credentials/:userId',getCredentials);
+router.put('/credentials/:userId/specializations',putSpecializations);
+router.post('/credentials/:id/submit-for-review',submitLegacyCredential);
 // Engineer
 router.get("/me", myLicense);
 router.get("/requests", myRequests);

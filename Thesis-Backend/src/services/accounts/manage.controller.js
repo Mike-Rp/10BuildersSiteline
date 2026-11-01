@@ -1,3 +1,6 @@
+import { saveSpecializations,credentialSummary } from "../licenses/credentials.controller.js";
+import { ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
+import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
 import crypto from "crypto";
@@ -9,7 +12,6 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
-import { sweepLicenses } from "./license-sweep.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser, isUuid,
 } from "../../common/utilities/access.utility.js";
@@ -85,7 +87,9 @@ const lookupIds = async (client, table, values) => {
 // Replaces the user's whole scope of one kind.
 const writeScope = async (client, userId, { kind, values }, actorId) => {
   if (kind === "disciplines") {
-    const ids = await lookupIds(client, "disciplines", values);
+    if(values.some(value=>!ENGINEER_SPECIALIZATIONS.includes(value))) throw new HttpError(422,"Select engineer specializations from the independent engineer catalog. Legacy company trades require review.");
+    await saveSpecializations(client,userId,values,actorId);
+    const ids = (await client.query("select id from disciplines where code=any($1::text[])",[values])).rows.map(row=>row.id);
     await client.query(`DELETE FROM user_discipline_scopes WHERE user_id = $1`, [userId]);
     for (const id of ids) {
       await client.query(
@@ -224,9 +228,9 @@ export const getAccount = async (req, res) => {
                 WHERE s.user_id = $1 ORDER BY pt.code`, [id]),
       execute(`SELECT p.id, p.name FROM user_client_project_links l JOIN projects p ON p.id = l.project_id
                 WHERE l.user_id = $1 ORDER BY p.name`, [id]),
-      execute(`SELECT id, license_number, license_expiry::text AS license_expiry, upload_status,upload_file_ref
+      execute(`SELECT id, license_number, license_expiry::text AS license_expiry, upload_status,upload_file_ref,profession,verification_status,verified_by,verified_at
                  FROM user_licenses WHERE user_id = $1 AND superseded_at IS NULL
-                ORDER BY created_at DESC LIMIT 1`, [id]),
+                ORDER BY (verification_status='verified') DESC,license_expiry DESC,created_at DESC LIMIT 1`, [id]),
       execute(`SELECT ct.code FROM user_certifications uc JOIN certification_types ct ON ct.id = uc.certification_type_id
                 WHERE uc.user_id = $1 ORDER BY ct.code`, [id]),
     ]);
@@ -238,6 +242,7 @@ export const getAccount = async (req, res) => {
         project_types: projectTypes.rows.map((r) => r.code),
         projects: projects.rows,
       },
+      ...(["opm","spm"].includes(base.rows[0].role) ? await (async()=>{const summary=await credentialSummary({query:execute},id);return {specializations:summary.specializations.map(s=>s.specialization),qualifiedRequirements:summary.qualifiedRequirements,credentialEligibility:summary.eligibleForNewAssignment}})() : {}),
       license: license.rows[0] ?? null,
       certifications: certs.rows.map((r) => r.code),
     });
@@ -408,33 +413,8 @@ export const addLicense = async (req, res) => {
     if (!user) return cleanup();
     if (!isUuid(id)) { cleanup(); return sendError(res, "Invalid account id.", 400); }
 
-    const b = req.body || {};
-    const licenseNumber = pick(b, "license_number", "licenseNumber");
-    const licenseExpiry = pick(b, "license_expiry", "licenseExpiry");
-    if (!licenseNumber || !String(licenseNumber).trim()) { cleanup(); return sendError(res, "license_number is required.", 400); }
-    if (!licenseExpiry || !/^\d{4}-\d{2}-\d{2}$/.test(licenseExpiry) || Number.isNaN(Date.parse(licenseExpiry))) {
-      cleanup(); return sendError(res, "license_expiry is required (YYYY-MM-DD).", 400);
-    }
-
-    const data = await withTransaction(async (client) => {
-      const target = await client.query(
-        `SELECT 1 FROM users WHERE id = $1 AND COALESCE(is_deleted,false) = false`, [id]);
-      if (target.rowCount === 0) throw new HttpError(404, "Account not found.");
-
-      // Retire the current license only; older history keeps its original superseded_at.
-      await client.query(
-        `UPDATE user_licenses SET superseded_at = now(), updated_by = $2, updated_at = now()
-          WHERE user_id = $1 AND superseded_at IS NULL`, [id, user.id]);
-
-      const inserted = await client.query(
-        `INSERT INTO user_licenses (user_id, license_number, license_expiry, upload_file_ref, upload_status, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $6)
-         RETURNING id, user_id, license_number, license_expiry::text AS license_expiry, upload_status`,
-        [id, String(licenseNumber).trim(), licenseExpiry, req.file ? req.file.path.replace(/\\/g, "/") : null, req.file ? "uploaded" : "pending", user.id]);
-      await sweepLicenses(client, { userId: id });
-      return inserted.rows[0];
-    });
-    return sendOk(res, "License saved.", 1, data, 201);
+    const data = await withTransaction(db => createRenewalRequest(db,user,{...req.body,user_id:id},req.file));
+    return sendOk(res,"Credential submitted for verification.",1,data,201);
   } catch (error) {
     cleanup();
     return fail(res, error);

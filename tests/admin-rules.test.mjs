@@ -97,7 +97,7 @@ test("account email uniqueness is case-insensitive and scope limits are enforced
     /one to three/,
   )
   assert.equal(
-    accountError({ ...sample, email: "unique@example.com" }, state),
+    accountError({ ...sample, email: "unique@example.com", scope:["Civil","Structural"] }, state),
     "",
   )
 })

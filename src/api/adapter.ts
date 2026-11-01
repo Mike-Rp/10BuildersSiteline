@@ -91,7 +91,8 @@ export function mapAccount(
     role,
     email: a.email ?? "",
     phone: a.phone ?? "",
-    scope,
+    scope: detail?.specializations ?? scope,
+    qualifiedRequirements: detail?.qualifiedRequirements,
     projectTypes: types,
     experienceByType: detail?.experience_by_type ?? a.experience_by_type,
     status: accountStatus(a.status),
@@ -99,7 +100,7 @@ export function mapAccount(
     license: license?.license_number ?? "",
     expiry: day(license?.license_expiry),
     docs: [],
-    eligibleForNewAssignment:["opm","spm"].includes(role)?Boolean(license?.upload_status==="uploaded"&&license?.upload_file_ref&&day(license.license_expiry)>=new Date().toISOString().slice(0,10)):undefined,
+    eligibleForNewAssignment:["opm","spm"].includes(role)?Boolean(detail?.credentialEligibility):undefined,
   }
   if(detail?.license?.upload_file_ref?.startsWith("db:")){const fileId=detail.license.upload_file_ref.replace(/^db:(\/\/)?/,"");account.docs.push({id:fileId,label:"PRC License",name:"PRC License.pdf",uploaded:true,owner:account.name,date:account.added,clientVisible:false})}
   if (detail?.certifications?.length)

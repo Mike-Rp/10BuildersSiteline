@@ -1,3 +1,4 @@
+import {installCredentialFixture} from "./helpers/credential-fixture.mjs"
 import assert from "node:assert/strict"
 import test from "node:test"
 import fs from "node:fs"
@@ -163,6 +164,7 @@ test(
       "update subcontractor_workers set availability_status='available',current_project_id=null where subcontractor_id=any($1::uuid[])",
       [companyIds],
     )
+    await installCredentialFixture(db)
     const dbPort = await port(),
       apiPort = await port()
     socket = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })

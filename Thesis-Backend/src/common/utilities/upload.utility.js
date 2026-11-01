@@ -12,7 +12,6 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 const DOC_TYPE_PATTERN = /^[a-z0-9_-]{1,40}$/;
 
-const LICENSE_NUMBER_MAX = 120;
 const CONTRACT_TEXT_MAX = 150;
 const CONTRACT_TYPES = new Set(['client_contract', 'client_subcon_agreement']);
 
@@ -54,16 +53,6 @@ const optionalText = (value, label, max) => {
   return value;
 };
 
-const optionalIsoDate = (value, label) => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)
-    || Number.isNaN(Date.parse(`${value}T00:00:00Z`))
-    || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) {
-    throw new HttpError(400, `${label} must be a valid date (YYYY-MM-DD).`);
-  }
-  return value;
-};
-
 const requireUuid = (value, label) => {
   if (!isUuid(value)) throw new HttpError(400, `${label} must be a valid id.`);
   return value;
@@ -101,100 +90,12 @@ export const uploadAttachment = async (
   created_by
 ) => {
   if (type === 'license') {
-    return await uploadLicense(file, data, method, created_by);
+    throw new HttpError(409, 'Submit professional credentials through the license verification workflow.');
   }
   else if (type === 'contracts') {
     return await uploadContract(file, data, method, created_by);
   }
 }
-
-const uploadLicense = async (
-  file,
-  data,
-  method,
-  created_by
-) => {
-  const actor = requireActor(created_by);
-
-  if (method === 'create') {
-    const userId = requireUuid(data.user_id, 'user_id');
-    const licenseNumber = optionalText(data.license_number, 'license_number', LICENSE_NUMBER_MAX) ?? null;
-    const licenseExpiry = optionalIsoDate(data.license_expiry, 'license_expiry') ?? null;
-
-    await execute(
-      `
-          UPDATE user_licenses SET superseded_at = NOW(), updated_by = $2, updated_at = NOW() WHERE user_id = $1
-        `,
-      [
-        userId,
-        actor
-      ]
-    );
-    const result = await execute(
-      `
-        INSERT INTO user_licenses (
-          user_id,
-          license_number,
-          license_expiry,
-          upload_file_ref,
-          upload_status,
-          superseded_at,
-          created_by,
-          created_at,
-          updated_by,
-          updated_at
-        ) VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          NULL,
-          $6,
-          NOW(),
-          $7,
-          NOW()
-        ) RETURNING id
-      `,
-      [
-        userId,
-        licenseNumber,
-        licenseExpiry,
-        file ? file.path : null,
-        file ? 'uploaded' : 'pending',
-        actor,
-        actor
-      ]
-    );
-
-    return result.rows[0].id;
-  }
-  else if (method === 'update') {
-    const id = requireUuid(data.id, 'License id');
-    const licenseNumber = optionalText(data.license_number, 'license_number', LICENSE_NUMBER_MAX);
-    const licenseExpiry = optionalIsoDate(data.license_expiry, 'license_expiry');
-
-    const update = assignments();
-    if (licenseNumber !== undefined) update.set('license_number', licenseNumber);
-    if (licenseExpiry !== undefined) update.set('license_expiry', licenseExpiry);
-    if (file) {
-      update.set('upload_file_ref', file.path);
-      update.set('upload_status', 'uploaded');
-    }
-    update.set('updated_by', actor);
-    update.raw('updated_at = NOW()');
-
-    const { setClause, params, idPlaceholder } = update.finish(id);
-    const result = await execute(
-      `UPDATE user_licenses SET ${setClause} WHERE id = ${idPlaceholder} RETURNING id`,
-      params
-    );
-    if (result.rowCount === 0) throw new HttpError(404, 'License not found.');
-
-    return id;
-  }
-}
-
 
 const uploadContract = async (
   file,

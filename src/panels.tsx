@@ -1,3 +1,4 @@
+import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
@@ -592,7 +593,7 @@ export function AccountForm({
     }
     if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
-    if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
+
     const err = clientOnly
       ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())
         ? "A client name and valid email are required."
@@ -726,9 +727,11 @@ export function AccountForm({
       {!clientOnly && draft.role === "spm" && (
         <section className="form-section">
           <h3>
-            Discipline scope <span>Choose 1–3</span>
+            Engineer specializations <span>Choose 1–3</span>
           </h3>
-          {chips(state.referenceDisciplines || DISCIPLINES, draft.scope, "scope", 3)}
+          {chips(ENGINEER_SPECIALIZATIONS, draft.scope, "scope", 3)}
+          {draft.scope.filter(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag)).map(tag=><p key={tag}>Legacy tag requiring review: {tag} <Button onClick={()=>patch({scope:draft.scope.filter(t=>t!==tag)})}>Remove legacy tag</Button></p>)}
+          <p>Specializations do not replace a verified professional credential. Fire Protection, Facade and Acoustic mappings require company validation before granting eligibility.</p>
         </section>
       )}
       {draft.role === "opm" && (
@@ -783,16 +786,7 @@ export function AccountForm({
           ))}
         </section>
       )}
-      {!account && !clientOnly && ["spm", "opm"].includes(draft.role) && <section className="form-section">
-        <h3>Professional license</h3>
-        <div className="form-grid">
-          <Field label="PRC license number *"><input required value={draft.license} onChange={e => patch({ license: e.target.value })} /></Field>
-          <Field label="Expiry date *"><input required type="date" value={draft.expiry} onChange={e => patch({ expiry: e.target.value })} /></Field>
-        </div>
-        {draft.docs.some(d => d.label === "PRC License" && d.uploaded)
-          ? <div className="uploaded-inline"><Icon name="check" />{draft.docs.find(d => d.label === "PRC License")?.name}<Button onClick={() => patch({ docs: draft.docs.filter(d => d.label !== "PRC License") })}>Replace</Button></div>
-          : <Upload label="PRC License" onSave={doc => patch({ docs: [...draft.docs, doc] })} />}
-      </section>}
+      {!account && !clientOnly && ["spm", "opm"].includes(draft.role) && <p className="notice">After creating this account, open Professional credentials to submit each licensed profession for Admin verification. Account creation does not grant assignment eligibility.</p>}
       {!account && !clientOnly && (
         <section className="form-section">
           <h3>Temporary credentials</h3>

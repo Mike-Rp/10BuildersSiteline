@@ -45,6 +45,8 @@ export type OverviewItem = {
   needsCover: boolean
 }
 export type RenewalQueueItem = {
+  profession?: string
+  reviewed_by_name?: string
   id: number
   user_id: string
   full_name: string

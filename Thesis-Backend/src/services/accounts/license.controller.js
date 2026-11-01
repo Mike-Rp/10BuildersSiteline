@@ -1,13 +1,10 @@
+import { submitRenewal } from "../licenses/renewal.controller.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
 import execute from "../../common/utilities/query.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-import { authenticate } from "../../common/utilities/auth.utility.js";
 import { mapMultiple, mapSingle } from "../../common/utilities/dao.utility.js";
-import { uploadAttachment } from "../../common/utilities/upload.utility.js";
-import { handleError, isUuid } from "../../common/utilities/access.utility.js";
+import { isUuid } from "../../common/utilities/access.utility.js";
 
 export const getLicenses = async (req, res) => {
   try {
@@ -71,11 +68,13 @@ export const getLicenses = async (req, res) => {
         l.id AS "MAIN.id",
         l.user_id AS "MAIN.user_id",
         l.license_number AS "MAIN.license_number",
+        l.profession AS "MAIN.profession",l.verification_status AS "MAIN.verification_status",
         l.license_expiry AS "MAIN.license_expiry",
         CASE 
           WHEN license_expiry < NOW() - INTERVAL '1 days' THEN 'Expired'
           WHEN superseded_at IS NOT NULL THEN 'Superseded'
-          ELSE 'Active'
+          WHEN l.verification_status <> 'verified' OR l.profession IS NULL THEN 'Needs review'
+          ELSE 'Verified'
         END AS "MAIN.status",
         l.upload_file_ref AS "MAIN.upload_file_ref",
         l.upload_status AS "MAIN.upload_status",
@@ -134,61 +133,11 @@ export const getLicenseById = async (req, res) => {
   }
 };
 
-export const createLicense = async (req, res) => {
-  try {
-    const created_by = await authenticate(req, res);
-    if (!created_by) return responseError(res, 'Missing or invalid token.', 401);
-
-    const { license_number, license_expiry, user_id } = req.body || {};
-
-    const id = await uploadAttachment(
-      req.file,
-      'license',
-      {
-        license_number,
-        license_expiry,
-        user_id
-      },
-      'create',
-      created_by
-    );
-
-    const details = await getLicense(id);
-
-    responseOk(res, 'Resource created successfully', 1, details);
-  } catch (error) {
-    return handleError(res, error);
-  }
-};
-
-export const updateLicense = async (req, res) => {
-  try {
-    const created_by = await authenticate(req, res);
-    if (!created_by) return responseError(res, 'Missing or invalid token.', 401);
-    const { id } = req.params;
-
-    const { license_number, license_expiry, user_id } = req.body || {};
-
-    const document_id = await uploadAttachment(
-      req.file,
-      'license',
-      {
-        license_number,
-        license_expiry,
-        user_id,
-        id
-      },
-      'update',
-      created_by
-    );
-
-    const details = await getLicense(document_id);
-
-    responseOk(res, 'Resource updated successfully', 1, details);
-  }
-  catch (error) {
-    return handleError(res, error);
-  }
+export const createLicense = submitRenewal;
+// Existing credential records are immutable evidence. Submit a renewal instead.
+export const updateLicense = async (req,res) => {
+  if(req.file) (await import('node:fs')).unlink(req.file.path,()=>{});
+  return responseError(res,"License records cannot be overwritten. Submit a credential for verification through /licenses/renewals.",409);
 };
 
 export const getLicense = async (userId) => {
@@ -197,10 +146,12 @@ export const getLicense = async (userId) => {
       l.id AS "MAIN.id",
       l.user_id AS "MAIN.user_id",
       l.license_number AS "MAIN.license_number",
+        l.profession AS "MAIN.profession",l.verification_status AS "MAIN.verification_status",
       l.license_expiry AS "MAIN.license_expiry",
       CASE 
         WHEN license_expiry < NOW() - INTERVAL '1 days' THEN 'Expired'
-        ELSE 'Active'
+        WHEN l.verification_status <> 'verified' OR l.profession IS NULL THEN 'Needs review'
+          ELSE 'Verified'
       END AS "MAIN.status",
       l.upload_file_ref AS "MAIN.upload_file_ref",
       l.upload_status AS "MAIN.upload_status",

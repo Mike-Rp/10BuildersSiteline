@@ -1,3 +1,4 @@
+import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import type { LicenseData } from "./licenseTypes.ts"
 import { experienceYears, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
 export const PHASES = [
@@ -203,6 +204,7 @@ export type Account = {
   renewalUnderReview?: boolean
   cooldown?: number
   suspendedAt?: string
+  qualifiedRequirements?: string[]
   eligibleForNewAssignment?: boolean
   assignmentHold?: boolean
   resignation?: ResignationRecord
@@ -784,7 +786,7 @@ export function spmCandidates(
     )
     .map((a) => ({
       account: a,
-      matched: tags.filter((t) => a.scope.includes(t)).length,
+      matched: tags.filter((t) => (a.qualifiedRequirements ?? a.scope).includes(t)).length,
       total: tags.length,
     }))
     .filter((candidate) => !tags.length || candidate.matched > 0)
@@ -853,7 +855,7 @@ export function accountError(
     a.role === "spm" &&
     (!a.scope.length ||
       a.scope.length > 3 ||
-      a.scope.some((t) => !(state.referenceDisciplines || DISCIPLINES).includes(t)))
+      a.scope.some((t) => !ENGINEER_SPECIALIZATIONS.includes(t)))
   )
     return "Choose one to three valid discipline tags."
   if (

@@ -1,3 +1,4 @@
+import { PROFESSIONS, licenseNumberError } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 // Expired-license workflow screens. All rules (who is paused, when an override opens, who may be suggested) are
 // enforced by the backend; these components only show the state and send the requests.
@@ -88,15 +89,17 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
 function RenewalSubmit() {
   const [open, setOpen] = useState(false)
   const [number, setNumber] = useState("")
+  const [profession,setProfession] = useState("")
   const [expiry, setExpiry] = useState("")
   const [file, setFile] = useState<File>()
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   async function send() {
     if (!file) return setError("Choose the renewed license file (PDF, JPG or PNG).")
+    if(licenseNumberError(number)) return setError(licenseNumberError(number))
     setBusy(true)
     try {
-      await licenses.submitOwnRenewal({ licenseNumber: number, licenseExpiry: expiry, file })
+      await licenses.submitOwnRenewal({ licenseNumber: number, licenseExpiry: expiry, file, profession })
       window.location.reload()
     } catch (err) {
       setError(messageOf(err))
@@ -106,7 +109,8 @@ function RenewalSubmit() {
   if (!open) return <Button onClick={() => setOpen(true)}>Submit renewed license</Button>
   return (
     <div className="license-renewal-form">
-      <Field label="License number"><input value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
+      <Field label="Licensed profession"><select value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
+      <Field label="License number"><input maxLength={120} value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
       <Field label="New expiry date"><input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
       <Field label="Renewed license file"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} /></Field>
       {error && <p className="error" role="alert">{error}</p>}
@@ -124,6 +128,9 @@ export function RenewalQueue({
   onChanged: () => void
 }) {
   const [rejecting, setRejecting] = useState<RenewalQueueItem>()
+  const [verifying,setVerifying] = useState<RenewalQueueItem>()
+  const [profession,setProfession] = useState("")
+  const [verificationNote,setVerificationNote] = useState("")
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -166,7 +173,7 @@ export function RenewalQueue({
             >
               View document
             </Button>
-            <Button variant="primary" disabled={busy} onClick={() => run(() => licenses.verifyRenewal(r.id))}>
+            <Button variant="primary" disabled={busy} onClick={() => {setVerifying(r);setProfession(r.profession||"");setVerificationNote("")}}>
               Verify renewal
             </Button>
             <Button variant="danger-ghost" disabled={busy} onClick={() => setRejecting(r)}>
@@ -175,10 +182,20 @@ export function RenewalQueue({
           </div>
         </div>
       ))}
+      {verifying && <Modal title="Verify credential" subtitle="Manual review; no automatic PRC integration." onClose={()=>setVerifying(undefined)}>
+        <form onSubmit={async e=>{e.preventDefault();await run(async()=>{await licenses.verifyRenewal(verifying.id,{profession,note:verificationNote});setVerifying(undefined)})}}>
+          <p><a href="https://verification.prc.gov.ph/" target="_blank" rel="noreferrer">Open official PRC verification website</a></p>
+          <Field label="Licensed profession"><select required value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
+          <Field label="Manual verification result"><textarea required maxLength={2000} value={verificationNote} onChange={e=>setVerificationNote(e.target.value)} /></Field>
+          <p>The system saves your identity and the review time. A format match alone does not establish authenticity.</p>
+          {error&&<p role="alert" className="error">{error}</p>}
+          <Button disabled={busy} type="submit" variant="primary">Verify submitted credential</Button>
+        </form>
+      </Modal>}
       {rejecting && (
         <Modal
           title="Reject renewal"
-          subtitle={`${rejecting.full_name} must visit the admin office with a corrected license for an Administrator to upload.`}
+          subtitle={`${rejecting.full_name} can submit corrected evidence through their account.`}
           onClose={() => setRejecting(undefined)}
         >
           <form

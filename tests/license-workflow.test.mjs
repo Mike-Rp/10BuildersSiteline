@@ -1,3 +1,4 @@
+import {installCredentialFixture} from "./helpers/credential-fixture.mjs"
 // End to end: the expired engineer license workflow through the real backend (Express) and an in-process Postgres
 // loaded with the demo data. Every write stays in this throwaway test database.
 import assert from "node:assert/strict"
@@ -68,6 +69,8 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   await db.exec(read("../Thesis-Backend/migrations/008-monthly-report-history.sql"))
   await db.exec(read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql")) // backfills the seeded holders
   await db.exec("update user_licenses set license_expiry=current_date+400 where superseded_at is null")
+  await installCredentialFixture(db)
+
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
@@ -134,6 +137,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   const renewalForm = (expiryOffset = 400, who = "rafael") => {
     const f = new FormData()
     f.append("user_id", idOf(who))
+    f.append("profession", "Civil Engineer")
     f.append("license_number", "PRC-RENEWED-1")
     f.append("license_expiry", addDays(today(), expiryOffset))
     f.append("file", PDF(), "renewal.pdf")
@@ -160,6 +164,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   const required = await q('select discipline_id from project_stage_discipline_links where project_stage_id=$1 and project_type_id=$2',[mobilization,brook.project_type_id])
   for (const {discipline_id} of required) await q('insert into user_discipline_scopes(user_id,discipline_id) values($1,$2) on conflict do nothing',[idOf('karlo'),discipline_id])
 
+  await installCredentialFixture(db)
   await t.test('30-day preparation threshold exposes contact details and profile assignments', async () => {
     await setExpiry('diego',31)
     assert.equal((await options()).data.available,false)
@@ -200,8 +205,10 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     await setExpiry('karlo',400)
     const saved=await q('select discipline_id from user_discipline_scopes where user_id=$1',[idOf('karlo')])
     await q('delete from user_discipline_scopes where user_id=$1',[idOf('karlo')])
+    await q('delete from engineer_specializations where user_id=$1',[idOf('karlo')])
     assert.equal((await call('admin','POST','/licenses/overrides',approval())).status,422)
     for(const row of saved) await q('insert into user_discipline_scopes(user_id,discipline_id) values($1,$2)',[idOf('karlo'),row.discipline_id])
+    await installCredentialFixture(db)
   })
 
   await t.test('Admin approval immediately transfers a signed appointment before day 30, preserving history and lead', async () => {
@@ -243,7 +250,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'rafael'))
     assert.equal(submitted.status,201,submitted.text)
     assert.equal((await call('rafael','GET','/licenses/me')).data.access.mode,'view_only')
-    const verified=await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{})
+    const verified=await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{note:"Fixture credential manually checked."})
     assert.equal(verified.status,200,verified.text)
     assert.equal((await call('rafael','GET','/workspace')).status,200)
     assert.equal((await call('rafael','GET','/licenses/me')).data.access.mode,'normal')
@@ -252,7 +259,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   await t.test('late renewal never takes transferred projects back from the replacement', async () => {
     const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'diego'))
     assert.equal(submitted.status,201,submitted.text)
-    assert.equal((await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{})).status,200)
+    assert.equal((await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{note:"Fixture credential manually checked."})).status,200)
     assert.equal((await holder()).spm_user_id,idOf('karlo'))
   })
 

@@ -1,3 +1,4 @@
+import {installCredentialFixture} from "./helpers/credential-fixture.mjs"
 // Security regression tests for the license, certification, intake-upload, refresh,
 // health, cron and sign-in routes. Runs the real Thesis-Backend against an in-process
 // throwaway Postgres (PGlite); nothing here can reach a hosted database.
@@ -55,6 +56,9 @@ test("license, certification and intake routes enforce login, roles and safe SQL
   }
   await db.exec(fs.readFileSync(dummy, "utf8"))
 
+  await installCredentialFixture(db)
+
+
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
@@ -81,7 +85,7 @@ test("license, certification and intake routes enforce login, roles and safe SQL
 
   let failedSignIns = 0
   const signIn = async (email, password = PASSWORD, replaceSession = true) => {
-    const response = await fetch(`${base}/auth`, {
+    const response = await fetch(`${base}${email===ADMIN?"/auth/admin/login":"/auth/staff/login"}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, replace_session: replaceSession }),
     })
     if ([401, 403].includes(response.status)) failedSignIns++
@@ -174,40 +178,25 @@ test("license, certification and intake routes enforce login, roles and safe SQL
     }
   })
 
-  await t.test("injection text in the license number is stored as plain text and cannot reach other columns", async () => {
-    const before = await snapshot()
-    const payloads = [
-      "x', license_expiry = '1999-01-01",
-      "'; DROP TABLE user_licenses; --",
-      "x', upload_file_ref = 'http://evil.example/steal",
-    ]
-    for (const payload of payloads) {
-      const response = await call("PUT", `/engineer/licenses/${license.id}`, { token: admin, body: form({ license_number: payload }) })
-      assert.equal(response.status, 200, `payload accepted as text: ${payload}`)
-      const after = await snapshot()
-      assert.equal(after.license_number, payload)
-      assert.equal(after.license_expiry, before.license_expiry, "expiry was not altered by the text")
+  await t.test("legacy credential mutation cannot overwrite verified evidence", async () => {
+    const before=await snapshot()
+    for(const payload of ["x', license_expiry = '1999-01-01","'; DROP TABLE user_licenses; --","x', upload_file_ref = 'http://evil.example/steal"]){
+      assert.equal((await call("PUT",`/engineer/licenses/${license.id}`,{token:admin,body:form({license_number:payload})})).status,409)
+      assert.deepEqual(await snapshot(),before)
     }
-    const stored = (await db.query("select upload_file_ref from user_licenses where id=$1", [license.id])).rows[0]
-    assert.ok(!String(stored.upload_file_ref ?? "").includes("evil.example"))
-    assert.ok((await db.query("select count(*)::int as n from user_licenses")).rows[0].n > 0, "table still exists")
   })
-
-  await t.test("license input is validated", async () => {
-    const put = (id, fields) => call("PUT", `/engineer/licenses/${id}`, { token: admin, body: form(fields) })
-    assert.equal((await put(license.id, { license_expiry: "2026-13-45" })).status, 400)
-    assert.equal((await put(license.id, { license_expiry: "2026-02-30" })).status, 400)
-    assert.equal((await put(license.id, { license_expiry: "tomorrow" })).status, 400)
-    assert.equal((await put(license.id, { license_number: "N".repeat(121) })).status, 400)
-    assert.equal((await put("not-a-uuid", { license_number: "OK" })).status, 400)
-    assert.equal((await put("00000000-0000-4000-8000-000000000000", { license_number: "OK" })).status, 404)
-    assert.equal((await put(license.id, { license_number: "N".repeat(120), license_expiry: "2031-06-30" })).status, 200)
-    assert.equal((await snapshot()).license_expiry, "2031-06-30")
-    const created = await call("POST", "/engineer/licenses/", { token: admin, body: form({ user_id: "nope", license_number: "A" }) })
-    assert.equal(created.status, 400)
-    const ok = await call("POST", "/engineer/licenses/", { token: admin, body: form({ user_id: knownUser, license_number: "PRC-1234", license_expiry: "2032-01-31" }) })
-    assert.equal(ok.status, 200)
-    assert.equal((await db.query("select count(*)::int as n from user_licenses where user_id=$1 and superseded_at is null", [knownUser])).rows[0].n, 1)
+  await t.test("credential input is validated and legacy creation enters pending review", async()=>{
+    const post=fields=>call("POST","/engineer/licenses/",{token:admin,body:form(fields,{name:"credential.pdf"})})
+    const fields={user_id:knownUser,profession:"Geodetic Engineer",license_number:"0000123",license_expiry:"2032-01-31"}
+    for(const patch of [{license_expiry:"2026-13-45"},{license_expiry:"2026-02-30"},{license_expiry:"tomorrow"},{license_number:"N".repeat(121)},{user_id:"nope"},{profession:"Unknown"}])assert.equal((await post({...fields,...patch})).status,400)
+    const before=await snapshot()
+    const response=await post(fields);assert.equal(response.status,201)
+    const row=(await response.json()).data
+    const pending=(await db.query("select * from license_renewal_requests where id=$1",[row.id])).rows[0]
+    assert.equal(pending.status,'under_review');assert.equal(pending.license_number,'0000123')
+    assert.deepEqual(await snapshot(),before)
+    const exact=here('../Thesis-Backend/'+pending.file_ref)
+    if(exact.startsWith(here('../Thesis-Backend/uploads/')))t.after(()=>fs.rmSync(exact,{force:true}))
   })
 
   await t.test("sort order text is never executed", async () => {
@@ -298,31 +287,16 @@ test("license, certification and intake routes enforce login, roles and safe SQL
     assert.ok(list.some((n) => n.title === "PRC license expiring soon" && n.detail.includes(person.full_name)), "admin sees the reminder without the cron")
   })
 
-  await t.test("a new account whose license expires in 2 days notifies that Site PM and the admins", async () => {
+  await t.test("account metadata cannot grant verified credential eligibility",async()=>{
     await freshAdmin()
-    const discipline = (await db.query("select code from disciplines order by code limit 1")).rows[0].code
-    const email = "new.spm@10builders.com"
-    const created = await call("POST", "/accounts", { token: admin, headers: json, body: JSON.stringify({
-      full_name: "Newly Created SPM", email, phone: "", role: "spm", scope: { disciplines: [discipline] }, password: "Temp@12345678" }) })
-    assert.ok([200, 201].includes(created.status), `account created (${created.status})`)
-    const id = (await created.json()).data.id
-    assert.equal((await db.query("select status from users where id=$1", [id])).rows[0].status, "invited")
-
-    const expiry = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)
-    const saved = await call("PUT", `/accounts/${id}/workspace`, { token: admin, headers: json, body: JSON.stringify({
-      docs: [], license: "PRC-NEW-1", expiry }) })
-    assert.equal(saved.status, 200)
-
-    const forAdmin = await notices(admin)
-    assert.ok(forAdmin.some((n) => n.title === "PRC license expiring soon" && n.detail.includes("Newly Created SPM") && n.detail.includes(expiry)))
-    const spm = await signIn(email, "Temp@12345678")
-    assert.ok(spm.token, "the invited account can sign in")
-    const forSpm = await notices(spm.token)
-    assert.ok(forSpm.some((n) => n.title === "PRC license expiring soon" && n.detail.includes(expiry)), "the Site PM sees their own reminder")
-
-    await call("PUT", `/accounts/${id}/workspace`, { token: admin, headers: json, body: JSON.stringify({ docs: [], license: "PRC-NEW-1", expiry }) })
-    const again = (await db.query("select count(*)::int as n from activity_log where anchor_reference like $1", [`license:${id}:expiring_soon:%`])).rows[0].n
-    assert.equal(again, 1, "saving the same license again does not repeat the reminder")
+    const response=await call("POST","/accounts",{token:admin,headers:json,body:JSON.stringify({full_name:"Newly Created SPM",email:"new.spm@10builders.com",role:"spm",scope:{disciplines:["Civil"]},password:"Temp@12345678"})})
+    assert.equal(response.status,201);const id=(await response.json()).data.id
+    const saved=await call("PUT",`/accounts/${id}/workspace`,{token:admin,headers:json,body:JSON.stringify({docs:[],license:"PRC-NEW-1",expiry:"2030-01-01"})})
+    assert.equal(saved.status,200)
+    assert.equal((await db.query("select count(*)::int as n from user_licenses where user_id=$1",[id])).rows[0].n,0)
+    const own=await signIn("new.spm@10builders.com","Temp@12345678");assert.ok(own.token)
+    const summary=await call("GET",`/licenses/credentials/${id}`,{token:own.token});assert.equal(summary.status,200)
+    assert.equal((await summary.json()).data.eligibleForNewAssignment,false)
   })
 
   await t.test("repeated failed sign-ins are rate limited", async () => {

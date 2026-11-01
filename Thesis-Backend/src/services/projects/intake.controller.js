@@ -97,7 +97,7 @@ export const createIntake = async (req, res) => {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
         await assertEligibleManager(client, phase.user_id, 'spm');
       }
-      if (phaseScope) await validateScopedQualifications(client,projectType.rows[0].id,phase_team);
+      await validateScopedQualifications(client,projectType.rows[0].id,phase_team);
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,

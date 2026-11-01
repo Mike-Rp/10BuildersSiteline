@@ -1,3 +1,4 @@
+import EngineerCredentials from "./EngineerCredentials";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
@@ -95,7 +96,6 @@ import {
   downloadBlob,
   downloadDoc,
   IntakeForm,
-  LicenseForm,
   Preview,
   SettingsForm,
   Upload,
@@ -1556,7 +1556,7 @@ function AppInner() {
                       }
                     >
                       <span className="avatar large">{initials(a.name)}</span>
-                      <Status status={licenseState(a, state.rules.grace)} />
+                      <Badge tone={a.eligibleForNewAssignment ? "green" : "amber"}>{a.eligibleForNewAssignment ? "Credential requirements met" : "View credential eligibility"}</Badge>
                       <h3>{a.name}</h3>
                       <p>{ROLE_NAMES[a.role]}</p>
                       <div>
@@ -1612,7 +1612,7 @@ function AppInner() {
                           {workload(state, a.id)} / {state.rules.cap} active
                           projects
                         </span>
-                        <Status status={licenseState(a, state.rules.grace)} />
+                        <Badge tone={a.eligibleForNewAssignment ? "green" : "amber"}>{a.eligibleForNewAssignment ? "Credential requirements met" : "View credential eligibility"}</Badge>
                       </div>
                     </button>
                   ))}
@@ -2556,49 +2556,7 @@ function AppInner() {
         )}
         {a.role !== "client" && (
           <>
-            <section className="detail-section">
-              <div className="section-title">
-                <h3>Professional credentials</h3>
-                <Status status={licenseState(a, state.rules.grace)} />
-              </div>
-              <div className="credential-record">
-                <span className="credential-icon">
-                  <Icon name="shield" size={30} />
-                </span>
-                <div>
-                  <strong>{a.license || "No license on file"}</strong>
-                  <p>
-                    {a.expiry
-                      ? `Expiry: ${dateLabel(a.expiry)} · Grace period: ${state.rules.grace} days`
-                      : "Add a license record and supporting document when applicable."}
-                  </p>
-                </div>
-                <Button
-                  disabled={a.status === "deactivated"}
-                  icon="upload"
-                  onClick={() => setDialog({ kind: "license", id: a.id })}
-                >
-                  {a.license ? "Renew license" : "Add license"}
-                </Button>
-              </div>
-              <LicenseProfileBlock
-                item={state.license?.overview?.find((i) => i.id === a.id)}
-                reviewing={Boolean(a.renewalUnderReview)}
-                onOverride={setOverrideTarget}
-                onReview={() => setRenewalsOpen(true)}
-              />
-              {a.certifications && (
-                <div className="tag-list subsection">
-                  {a.certifications.map((cert) => (
-                    <span key={cert}>{cert}</span>
-                  ))}
-                </div>
-              )}
-              <p className="muted">
-                Renewal reminders are sent automatically when a license is
-                missing, expiring or expired.
-              </p>
-            </section>
+            {["opm","spm"].includes(a.role) && <EngineerCredentials key={a.id} userId={a.id} admin onChanged={()=>{void reloadWorkspace()}} />}
             <WorkRecord userId={a.id} />
             <section className="detail-section">
               <h3>Engineer documents</h3>
@@ -3156,13 +3114,7 @@ function AppInner() {
           subtitle={selectedAccount.name}
           onClose={() => setDialog(undefined)}
         >
-          <LicenseForm
-            account={selectedAccount}
-            onClose={() =>
-              setDialog({ kind: "account", id: selectedAccount.id })
-            }
-            onSave={updateAccount}
-          />
+          <EngineerCredentials key={selectedAccount.id} userId={selectedAccount.id} admin onChanged={()=>{void reloadWorkspace()}} />
         </Modal>
       )}
       {dialog?.kind === "company" && selectedCompany && (

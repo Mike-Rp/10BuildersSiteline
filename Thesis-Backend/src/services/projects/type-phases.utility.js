@@ -11,7 +11,7 @@ export async function validatePhaseTeam(db,typeId,team,{projectId,phaseNames}={}
 
 export async function validateScopedQualifications(db,typeId,team) {
  for (const phase of team) {
-  const matched=await db.query(`SELECT 1 FROM user_discipline_scopes u
+  const matched=await db.query(`SELECT 1 FROM engineer_qualified_scopes u
    JOIN project_stage_discipline_links l ON l.discipline_id=u.discipline_id AND l.project_type_id=$1
    JOIN project_stages s ON s.id=l.project_stage_id
    WHERE u.user_id=$2 AND s.code=$3 LIMIT 1`,[typeId,phase.user_id,phase.stage]);

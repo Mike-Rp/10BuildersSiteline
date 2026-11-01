@@ -13,6 +13,11 @@ test('backend blocks new OPM/SPM assignments through day 30 and allows day 31', 
       insert into roles values(1,'opm'),(2,'spm');
       insert into users values(1,1,'active',false),(2,2,'active',false);
       insert into user_licenses values(1,1,null,'uploaded','license.pdf',current_date+400,now()),(2,2,null,'uploaded','license.pdf',current_date+400,now());`)
+    await db.exec(`alter table user_licenses add column profession text default 'Civil Engineer';
+      alter table user_licenses add column verification_status text default 'verified';
+      alter table user_licenses add column verified_by text default 'fixture-admin';
+      alter table user_licenses add column verified_at timestamp default now();
+      alter table user_licenses add column license_number text default '0000123';`)
     for (const [id, role] of [[1,'opm'],[2,'spm']]) {
       for (const days of [-1,0,1,29,30,31,60]) {
         await db.query(`update user_licenses set license_expiry=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date+$1::int where user_id=$2`,[days,id])

@@ -1,3 +1,4 @@
+import {installCredentialFixture} from "./helpers/credential-fixture.mjs"
 import assert from "node:assert/strict"
 import test from "node:test"
 import fs from "node:fs"
@@ -57,6 +58,7 @@ test("saved scopes drive checklists, options, sequential handoff and historical 
   await db.exec(read("../supabase/migrations/20261017000002_thesis_backend_schema.sql").replace(/^create extension if not exists pgcrypto.*$/m,""))
   await db.exec(read("../supabase/seed/dummy-data.sql"))
   for(const migration of ["003-react-integration.sql","004-project-type-workflows.sql","004-verified-activity-progress.sql","005-targeted-rework.sql","009-engineer-license-workflow.sql"])await db.exec(read("../Thesis-Backend/migrations/"+migration))
+  await installCredentialFixture(db)
   const original=(await db.query(`SELECT id,current_stage_id,current_pct,lifecycle_status FROM projects ORDER BY id`)).rows
   const originalWorkflows=(await db.query(projectWorkflowSql)).rows
   const preview=await migrateMixedUseScope(db)
@@ -73,6 +75,8 @@ test("saved scopes drive checklists, options, sequential handoff and historical 
   await db.query("INSERT INTO user_discipline_scopes(user_id,discipline_id) SELECT $1,id FROM disciplines WHERE code='Civil'",[reviewer])
   await assert.rejects(validateScopedQualifications(db,type,[{stage:"Office Fit-Out",user_id:reviewer}]),/matching discipline/)
   await db.query("INSERT INTO user_discipline_scopes(user_id,discipline_id) SELECT $1,id FROM disciplines WHERE code='Electrical'",[reviewer])
+  await db.query("insert into engineer_specializations(user_id,specialization,recorded_by) values($1,'Electrical',$1) on conflict do nothing",[reviewer])
+  await db.query("insert into user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,profession,verification_status,verified_by,verified_at) values($1,'0012345',current_date+400,'uploaded','fixture.pdf','Electrical Engineer','verified',$1,now())",[reviewer])
   await validateScopedQualifications(db,type,[{stage:"Office Fit-Out",user_id:reviewer}])
   const saved=normalizeMixedUseScope({...scope(),uses:["office","retail"],features:{podium:false,tower:false,curtainWall:false,landscaping:false}})
   const id=randomUUID()

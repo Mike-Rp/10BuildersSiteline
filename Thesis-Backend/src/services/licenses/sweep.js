@@ -40,7 +40,7 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
     `select u.id, u.full_name, r.code as role, l.license_expiry::text as license_expiry
        from users u join roles r on r.id=u.role_id
        join lateral (select license_expiry from user_licenses where user_id=u.id and superseded_at is null
-                      order by created_at desc, id desc limit 1) l on true
+                      order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc limit 1) l on true
       where r.code in ('opm','spm') and u.status='active' and not coalesce(u.is_deleted,false) and l.license_expiry is not null`)).rows;
   const underReview = new Set((await db.query("select user_id from license_renewal_requests where status='under_review'")).rows.map((r) => r.user_id));
   const result = { reminders: 0, graceEnded: 0, overridesExpired: 0 };

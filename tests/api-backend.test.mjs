@@ -1,3 +1,4 @@
+import {installCredentialFixture} from "./helpers/credential-fixture.mjs"
 import { overallChecklistProgress } from "../src/project-progress.ts"
 import { projectPhaseNames } from "../src/model.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
@@ -69,6 +70,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-photo-release.sql"),"utf8"))
 
+  await installCredentialFixture(db)
+
+
   const dbPort = await freePort()
   const apiPort = await freePort()
   const pg = new PGLiteSocketServer({ db, port: dbPort, host: "127.0.0.1" })
@@ -125,7 +129,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(rosaria.workflow.pendingUpdate,undefined,"Retired manual-percentage requests must not appear in the new review queue")
     assert.equal(rosaria.workflow.checklist.Structure.filter((i) => i.status === "approved").length, 3)
     const karlo = state.accounts.find((a) => a.name === "Karlo M. Espiritu")
-    assert.deepEqual(karlo.scope.sort(), ["Civil", "Structural", "Waterproofing"])
+    assert.ok(karlo.scope.includes("Civil")); assert.ok(!karlo.scope.includes("Waterproofing"))
     assert.match(karlo.license, /PRC Registered Engineer/)
     const maria = state.accounts.find((a) => a.name === "Maria L. Santos")
     assert.equal(maria.scope.length, 3, "a client is linked to their projects")
@@ -429,7 +433,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       const account=state.accounts.find(a=>a.id===id)
       const fileId=randomUUID()
       await uploadFile(fileId,new File(["%PDF-1.4\nVerified license"],"license.pdf",{type:"application/pdf"}))
-      await saveApiAccount({...account,phone:"09171234567",expiry:"2028-12-31",docs:[{id:fileId,label:"PRC License",name:"license.pdf",uploaded:true,owner:account.name,date:"2026-10-18",clientVisible:false}]},true)
+      await saveApiAccount({...account,scope:account.scope.slice(0,3),phone:"09171234567",expiry:"2028-12-31",docs:[{id:fileId,label:"PRC License",name:"license.pdf",uploaded:true,owner:account.name,date:"2026-10-18",clientVisible:false}]},true)
+    }
+    await installCredentialFixture(db)
+    // New assignments require a real qualification match, even when a legacy source team was mismatched.
+    for(const row of project.team) {
+      const match=await db.query(`select q.user_id from engineer_qualified_scopes q join users u on u.id=q.user_id join project_stage_discipline_links l on l.discipline_id=q.discipline_id join project_stages s on s.id=l.project_stage_id join project_types pt on pt.id=l.project_type_id where s.code=$1 and pt.code=$2 and u.status='active' order by (q.user_id=$3) desc,q.user_id limit 1`,[row.phase,project.type,row.accountId]);
+      assert.ok(match.rowCount, 'Qualified fixture for '+row.phase); row.accountId=match.rows[0].user_id;
     }
     newProjectId=await saveApiProject(project,false)
     state=await loadState(user)
@@ -1405,6 +1415,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
         SELECT $1,'EXPERIENCE-TEST',current_date+400,'uploaded',upload_file_ref,$2 FROM user_licenses WHERE upload_file_ref IS NOT NULL LIMIT 1`, [account.id, user.id])
       assert.equal((await api(`/accounts/${account.id}`)).experience_by_type.Residential, years)
     }
+    await installCredentialFixture(db)
     const loaded = await loadState(user)
     assert.equal(loaded.accounts.find(a => a.id === created.spm7).experienceByType.Residential, 7)
     await api(`/accounts/${created.spm5}`, { method: "PATCH", json: { experience_by_type: { Residential: 6 } } })
@@ -1435,6 +1446,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       await db.query(`INSERT INTO user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,created_by)
         SELECT $1,'SCOPE-TEST',current_date+400,'uploaded',upload_file_ref,$2 FROM user_licenses WHERE upload_file_ref IS NOT NULL LIMIT 1`,[manager.id,session.user.id])
     }
+    await installCredentialFixture(db)
     const scope=normalizeMixedUseScope({...defaultMixedUseScope(),uses:["office","hotel"],features:{podium:false,tower:false,curtainWall:false,landscaping:false},basis:"Reviewed client brief: office and hotel building without residential or retail units, with general structure, enclosure and site works.",confirmed:true})
     const id=randomUUID()
     const client=session.state.accounts.find(account=>account.role==="client")

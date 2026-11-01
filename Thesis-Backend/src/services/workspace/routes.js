@@ -1,3 +1,5 @@
+import { credentialEligible,qualifyingSpecializations,REQUIREMENT_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
+import { localDay } from "../../common/utilities/license-status.utility.js";
 import { sessionStatus } from "../auth/controller.js";
 import { linkProjectFile } from "./project-upload-budget.utility.js";
 import { getProjectData, reconcilePhaseHandoffs } from "./project-data.controller.js";
@@ -27,7 +29,7 @@ import phases from "../progress/phase.routes.js";
 import progress from "../progress/routes.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { sweepLicensesThrottled } from "../licenses/sweep.js";
-import { sweepLicenses, sweepLicensesIfDue } from "../accounts/license-sweep.utility.js";
+import { sweepLicensesIfDue } from "../accounts/license-sweep.utility.js";
 const router = Router();
 router.get("/projects/:id/monthly-report", monthlyReport);
 router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
@@ -197,10 +199,23 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     const selections = user.role === "client" ? [] : (await db.query("select * from project_subcontractor_selections where project_id=any($1::uuid[])", [allowed])).rows;
     const map = rows => Object.fromEntries(rows.map(r => [r.id, r.metadata]));
     const { backendPhases, referenceDisciplines } = await workspaceReferences.get(db);
-    const accountDetails = user.role === "admin" ? (await db.query(`select u.id,
+    const accountDetails = user.role === "admin" ? (await db.query(`select u.id,u.status,r.code as role,
  (select to_jsonb(l) from user_licenses l where l.user_id=u.id and l.superseded_at is null order by l.created_at desc limit 1) as license,
  array(select c.code from user_certifications x join certification_types c on c.id=x.certification_type_id where x.user_id=u.id) as certifications
- from users u where not coalesce(u.is_deleted,false)`)).rows : [];
+ from users u join roles r on r.id=u.role_id where not coalesce(u.is_deleted,false)`)).rows : [];
+    if(accountDetails.length) {
+      const credentials=(await db.query("select *,license_expiry::text as license_expiry from user_licenses where user_id=any($1::uuid[]) and superseded_at is null",[accountDetails.map(a=>a.id)])).rows;
+      const recorded=(await db.query("select user_id,specialization from engineer_specializations where user_id=any($1::uuid[])",[accountDetails.map(a=>a.id)])).rows;
+      for(const detail of accountDetails) if(['opm','spm'].includes(detail.role)) {
+        const own=credentials.filter(c=>c.user_id===detail.id);
+        const tags=recorded.filter(e=>e.user_id===detail.id).map(e=>e.specialization);
+        const qualified=qualifyingSpecializations(own,tags,localDay());
+        detail.specializations=tags;
+        detail.qualifiedRequirements=Object.keys(REQUIREMENT_SPECIALIZATIONS).filter(r=>REQUIREMENT_SPECIALIZATIONS[r].some(t=>qualified.includes(t)));
+        detail.credentialEligibility=detail.status==='active'&&!accountMeta.find(a=>a.id===detail.id)?.metadata?.assignmentHold&&own.some(c=>credentialEligible(c,localDay()))&&(detail.role!=='spm'||qualified.length>0);
+        detail.license=own.sort((a,b)=>Number(credentialEligible(b,localDay()))-Number(credentialEligible(a,localDay()))||b.license_expiry.localeCompare(a.license_expiry))[0]||null;
+      }
+    }
     const tradeAllocationAvailable = (await db.query("select exists(select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='subcontractor_allocation_version') as ready")).rows[0].ready;
     return { backendPhases, referenceDisciplines, tradeAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
         rules: (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules,
@@ -362,16 +377,9 @@ router.put("/accounts/:id/workspace", endpoint(["admin"], async (db, user, req) 
         for (const type of types)
             await db.query("insert into user_certifications(user_id,certification_type_id) values($1,$2)", [req.params.id, type.id]);
     }
-    if (b.license && b.expiry) {
-        const doc = b.docs.find(d => d.label === "PRC License" && d.uploaded);
-        const previous = (await db.query("select license_number,license_expiry::text,upload_file_ref from user_licenses where user_id=$1 and superseded_at is null order by created_at desc limit 1", [req.params.id])).rows[0];
-        if (previous?.license_number === b.license && previous.license_expiry === b.expiry && (!doc || previous.upload_file_ref?.replace(/^db:(\/\/)?/, "") === doc.id))
-            return {};
-        await db.query("update user_licenses set superseded_at=now() where user_id=$1 and superseded_at is null", [req.params.id]);
-        await db.query(`insert into user_licenses(user_id,license_number,license_expiry,upload_file_ref,upload_status,created_by)
- values($1,$2,$3,$4,$5,$6)`, [req.params.id, b.license, b.expiry, doc ? "db://" + doc.id : null, doc ? "uploaded" : "pending", user.id]);
-        await sweepLicenses(db, { userId: req.params.id });
-    }
+    // Credential fields from legacy clients are not evidence of verification.
+    // Account metadata saves never create, supersede or verify professional credentials.
+
     return {};
 }));
 router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user, req) => {

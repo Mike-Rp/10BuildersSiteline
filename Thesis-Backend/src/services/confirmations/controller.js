@@ -1,3 +1,4 @@
+import { validateScopedQualifications } from "../projects/type-phases.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { archiveNote,businessDeadline,recordArchiveEvent } from "../archive/audit.utility.js";
 import { assertEligibleManager } from '../../common/utilities/license-eligibility.utility.js';
@@ -199,6 +200,13 @@ export const reassignConfirmation = async (req, res) => {
       }
 
      await assertEligibleManager(client, new_user_id, old.role_context);
+     if(old.role_context==='spm') {
+       const affected=await client.query(`select s.code as stage,p.project_type_id from project_phase_team t join project_stages s on s.id=t.project_stage_id join projects p on p.id=t.project_id where t.project_id=$1 and t.spm_user_id=$2`,[old.project_id,old.target_user_id]);
+       for(const row of affected.rows) await validateScopedQualifications(client,row.project_type_id,[{stage:row.stage,user_id:new_user_id}]);
+     } else {
+       const match=await client.query(`select 1 from projects p join user_project_type_specializations s on s.project_type_id=p.project_type_id where p.id=$1 and s.user_id=$2`,[old.project_id,new_user_id]);
+       if(!match.rowCount) throw new HttpError(422,'Select an Office PM with the matching project type.');
+     }
 
       const target = await client.query(
         `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id

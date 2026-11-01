@@ -1,3 +1,4 @@
+import EngineerCredentials from "./EngineerCredentials";
 import { useState } from "react"
 import { dateLabel, initials, licenseState, ROLE_NAMES, type Account, type Doc, type Project } from "./model"
 import { DocumentList, Preview } from "./panels"
@@ -24,12 +25,7 @@ export default function MyProfile({ actor, projects, onClose }: {
       <div><small>DISCIPLINE / SPECIALIZATION</small><strong>{[...actor.scope, ...actor.projectTypes].join(", ") || "Not on file"}</strong></div>
       <div><small>WORKLOAD</small><strong>{assigned.filter(p => p.status === "active").length} active projects</strong></div>
     </div>
-    <section className="detail-section">
-      <h3>Professional credentials</h3>
-      <p>License: {actor.license || "Not on file"}</p>
-      <p>Expiry: {actor.expiry ? dateLabel(actor.expiry) : "Not on file"} · {licenseState(actor)}</p>
-      <p>Certifications: {actor.certifications?.join(", ") || "Not on file"}</p>
-    </section>
+    {["opm","spm"].includes(actor.role) && <EngineerCredentials key={actor.id} userId={actor.id} />}
     <section className="detail-section">
       <h3>My documents</h3>
       {actor.docs.length ? <DocumentList docs={actor.docs} onPreview={setPreview} /> : <p>No documents on file.</p>}
