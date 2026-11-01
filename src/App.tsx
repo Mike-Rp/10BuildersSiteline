@@ -1,3 +1,4 @@
+import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
@@ -10,7 +11,6 @@ import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import { delayedProjects } from "./domain/schedule-status"
 import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
-import OverallProjectProgress from "./OverallProjectProgress"
 import AdminDashboard from "./AdminDashboard"
 import PageTitlePanel from "./PageTitlePanel"
 import DashboardWelcome from "./DashboardWelcome"
@@ -2146,13 +2146,12 @@ function AppInner() {
     return null
   }
   function projectDetails(p: Project, docsOnly = false) {
-    const phases = projectPhaseNames(p)
-    const currentPhaseIndex = phases.indexOf(p.phase)
     const staff = [...new Set([p.opmId, ...p.team.map((t) => t.accountId)])]
       .map((id) => state.accounts.find((a) => a.id === id))
       .filter(Boolean) as Account[]
     return (
       <>
+        {docsOnly && <>
         <div className="detail-hero">
           <span className="project-symbol">
             <Icon name="building" size={28} />
@@ -2166,58 +2165,14 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
+        </>}
+        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} />}
         {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
             <ProjectScheduleDetails project={p} today={scheduleToday} />
-            <div className="detail-stats">
-              <div>
-                <small>OVERALL PROGRESS</small>
-                <strong>{p.progress}%</strong>
-              </div>
-              <div>
-                <small>CURRENT PHASE</small>
-                <strong>{p.phase}</strong>
-              </div>
-              <div>
-                <small>FLOOR AREA</small>
-                <strong>{p.area} sqm</strong>
-              </div>
-              <div>
-                <small>TARGET START</small>
-                <strong>{dateLabel(p.start)}</strong>
-              </div>
-              <div>
-                <small>TARGET END</small>
-                <strong>{p.end ? dateLabel(p.end) : "Not set"}</strong>
-              </div>
-            </div>
-            <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
             {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
-            <div className="phase-timeline">
-              {phases.map((phase, i) => (
-                <div
-                  className={
-                    i < currentPhaseIndex
-                      ? "done"
-                      : p.phase === phase
-                        ? "current"
-                        : ""
-                  }
-                  key={phase}
-                >
-                  <span>
-                    {i < currentPhaseIndex ? (
-                      <Icon name="check" size={15} />
-                    ) : (
-                      i + 1
-                    )}
-                  </span>
-                  <strong>{phase}</strong>
-                </div>
-              ))}
-            </div>
             {p.status !== "active" && p.status !== "completed" && (
               <div className="notice">
                 <Icon name="clock" />
@@ -2911,9 +2866,7 @@ function AppInner() {
           </span>
         </div>
         <div className="brand">
-          <span className="brand-mark">
-            10
-          </span>
+          <span className="brand-mark"><img src="/images/10-builders-logo.png" alt="10 Builders" width="30" height="48" /></span>
           <div>
             10BuildLine<small>10 BUILDERS</small>
           </div>

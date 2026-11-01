@@ -6,6 +6,7 @@ import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import InfoPopover from "./InfoPopover"
 import { Badge, Button, Icon } from "./ui"
 import PageTitlePanel from "./PageTitlePanel"
+import "./project-monitoring.css"
 import "./client-overview.css"
 
 export default function ClientOverview({ project, latest, photos, onNavigate, onDetails }: {
@@ -45,7 +46,22 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       </div>
       {project.status === "completed" && <p className="co-completed"><Icon name="check" size={16} /> {project.completedAt ? `Completion recorded ${dateLabel(project.completedAt)}` : "Completed project record"}</p>}
     </section>
-    <div className="co-preview-grid">
+    <div className="co-preview-grid co-monitor-grid">
+      <section className="co-photos" aria-label="Latest site photos">
+        <div className="co-heading"><h2>Latest site photos</h2></div>
+        {photos}
+        <Button variant="text-button co-preview-link" onClick={() => onNavigate("Site Photographs")}>View gallery <Icon name="arrow" size={16} /></Button>
+      </section>
+      <section className="monitor-card" aria-label="Shared project details">
+        <h3><Icon name="building" size={20}/>Project details</h3>
+        <dl className="monitor-facts">
+          <div><dt>Project type</dt><dd>{project.type}</dd></div>
+          <div><dt>Floor area</dt><dd>{project.area} sqm</dd></div>
+          <div><dt>Floors</dt><dd>{project.floors}</dd></div>
+          <div><dt>Target start</dt><dd>{dateLabel(project.start)}</dd></div>
+        </dl>
+        <p className="monitor-note">Only project records shared with your account are shown here.</p>
+      </section>
       <div className="co-update-stack">
       <section className="co-update" aria-label="Latest project update">
         <div className="co-heading"><h2>Latest project update</h2></div>
@@ -56,12 +72,11 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
         </div> : <p className="co-empty">No shared updates yet.</p>}
         <Button variant="text-button co-preview-link" onClick={() => onNavigate("Progress History")}>View progress history <Icon name="arrow" size={16} /></Button>
       </section>
-      </div>
-      <section className="co-photos" aria-label="Latest site photos">
-        <div className="co-heading"><h2>Latest site photos</h2></div>
-        {photos}
-        <Button variant="text-button co-preview-link" onClick={() => onNavigate("Site Photographs")}>View gallery <Icon name="arrow" size={16} /></Button>
+      <section className="monitor-card" aria-label="Project contacts">
+        <h3><Icon name="users" size={20}/>Project contacts</h3>
+        {project.contacts.map((contact,index)=><div className="monitor-person" key={`${contact.role}-${index}`}><div><strong>{contact.name}</strong><small>{contact.role}</small></div></div>)}
       </section>
+      </div>
     </div>
   </div>
 }

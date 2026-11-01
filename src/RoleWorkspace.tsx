@@ -1,3 +1,4 @@
+import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
@@ -5,7 +6,6 @@ import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import useSidebarNavigation from "./useSidebarNavigation"
-import OverallProjectProgress from "./OverallProjectProgress"
 import ProjectProgress from "./ProjectProgress"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
@@ -48,7 +48,6 @@ import {
 import LeadSubcontractorPanel, {
   SubcontractorAllocationReadOnly,
 } from "./LeadSubcontractorPanel"
-import PhaseTimeline from "./PhaseTimeline"
 import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
@@ -3135,53 +3134,14 @@ export default function RoleWorkspace({
     return (
       <>
         <ExtensionWorkflow actor={actor} projectId={p.id} />
-        <div className="detail-hero">
-          <span className="project-symbol">
-            <Icon name="building" size={28} />
-          </span>
-          <div>
-            <span className="eyebrow">{p.type}</span>
-            <h3>{p.name}</h3>
-            <p>
-              {p.area} sqm · {p.floors} floors · {dateLabel(p.start)} –{" "}
-              {p.end ? dateLabel(p.end) : "end not set"}
-            </p>
-          </div>
-          <Status value={p.status} />
-        </div>
+        <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} />
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
-        <div className="detail-stats">
-          <div>
-            <small>RECORDED PROGRESS</small>
-            <strong>{p.progress}%</strong>
-          </div>
-          <div>
-            <small>CURRENT PHASE</small>
-            <strong>{p.phase}</strong>
-          </div>
-          <div>
-            <small>OFFICE PM</small>
-            <strong>{actorName(p.opmId)}</strong>
-          </div>
-          <div>
-            <small>CURRENT OWNER</small>
-            <strong>{actorName(phaseOwner(p))}</strong>
-          </div>
-        </div>
-        <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />
-        <div className="schedule-timeline">
-          <PlannedTimeline project={p} />
-        </div>
-        <PhaseTimeline
-          phase={p.phase}
-          phases={projectPhaseNames(p)}
-          completed={p.status === "completed"}
-        />
+        <div className="schedule-timeline"><PlannedTimeline project={p} /></div>
         {p.status === "pending" && timeline(p)}
         <section className="detail-section">
           <h3>Personnel by phase</h3>
@@ -3622,9 +3582,7 @@ export default function RoleWorkspace({
           </span>
         </div>
         <div className="brand">
-          <span className="brand-mark">
-            10
-          </span>
+          <span className="brand-mark"><img src="/images/10-builders-logo.png" alt="10 Builders" width="30" height="48" /></span>
           <div>
             10BuildLine<small>10 BUILDERS</small>
           </div>

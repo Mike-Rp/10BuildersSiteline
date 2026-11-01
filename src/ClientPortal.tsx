@@ -610,9 +610,7 @@ export default function ClientPortal({
     <LoadingRoleProvider role="client"><div className={`app-shell client-portal ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
       <aside id="client-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Client sidebar" aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="brand">
-          <span className="brand-mark">
-            10
-          </span>
+          <span className="brand-mark"><img src="/images/10-builders-logo.png" alt="10 Builders" width="30" height="48" /></span>
           <div>
             10BuildLine<small>10 BUILDERS</small>
           </div>

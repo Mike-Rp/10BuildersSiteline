@@ -101,7 +101,7 @@ export default function useSwipeNavigation(options: Options) {
     surface.style.overscrollBehaviorX="contain"
     const cancel=()=>{gesture=undefined;mouse=undefined;wheel=undefined;if(wheelTimer)clearTimeout(wheelTimer)}
     const observer=new window.MutationObserver(records=>{
-      if(hasDialog() || records.some(record=>Array.from(record.addedNodes).some(node=>node instanceof Element && (node.matches('[role="dialog"],dialog,[aria-modal="true"]') || node.querySelector('[role="dialog"],dialog,[aria-modal="true"]')))))cancel()
+      if(hasDialog() || records.some(record=>Array.from(record.addedNodes).some(node=>node instanceof window.Element && (node.matches('[role="dialog"],dialog,[aria-modal="true"]') || node.querySelector('[role="dialog"],dialog,[aria-modal="true"]')))))cancel()
     })
     observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['role','open','aria-modal']})
     const editable=(target: EventTarget | null) => {

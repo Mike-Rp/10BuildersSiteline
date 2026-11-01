@@ -4,6 +4,7 @@ import App from "./App"
 import SessionInactivity from "./SessionInactivity"
 import "./index.css"
 import "./construction-daylight.css"
+import "./workspace-theme.css"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

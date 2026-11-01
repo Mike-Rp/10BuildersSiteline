@@ -1,0 +1,49 @@
+#root .modal:has(.project-monitoring) { max-width: 1500px; width: calc(100vw - 48px); border-radius: 20px; }
+#root .modal:has(.project-monitoring) .modal-body { background: #eff5fa; }
+#root .project-monitoring { color: #182d50; min-width: 0; margin-bottom: 22px; }
+#root .monitor-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+#root .monitor-heading > div { min-width: 0; }
+#root .monitor-heading h2 { font-size: clamp(25px,2.5vw,34px); letter-spacing: -.9px; overflow-wrap: anywhere; margin-bottom: 12px; }
+#root .monitor-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#root .monitor-badges .badge { border-radius: 999px; }
+#root .monitor-totals { display: grid; grid-template-columns: minmax(200px,1fr) auto; gap: 18px; align-items: center; flex: 1 1 420px; max-width: 560px; }
+#root .monitor-totals .overall-project-progress { background: none; padding: 0; border: 0; margin: 0; }
+#root .monitor-target { display: grid; gap: 6px; padding-left: 18px; border-left: 1px solid #d5a459; }
+#root .monitor-target small { color: #5d718f; font-size: 12px; }
+#root .monitor-target strong { font-size: 18px; }
+#root .monitor-grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr); gap: 16px; align-items: start; }
+#root .monitor-card { min-width: 0; background: #fff; border: 1px solid #e1eaf2; border-radius: 18px; padding: 18px; }
+#root .monitor-card h3 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin-bottom: 16px; }
+#root .monitor-side { display: grid; gap: 16px; min-width: 0; }
+#root .monitor-photo { width: 100%; display: block; background: #f5f9fc; border: 1px solid #e1eaf2; border-radius: 12px; overflow: hidden; text-align: left; padding: 0; color: #182d50; }
+#root .monitor-photo img { width: 100%; aspect-ratio: 16/10; display: block; object-fit: cover; }
+#root .monitor-photo > span:last-child { display: grid; padding: 10px; gap: 4px; overflow-wrap: anywhere; }
+#root .monitor-photo small { font-size: 12px; color: #5d718f; }
+#root .monitor-photo-empty { display: grid; gap: 12px; place-content: center; min-height: 180px; padding: 20px; text-align: center; background: #edf5fc; border-radius: 12px; color: #5d718f; }
+#root .monitor-photo-empty svg { margin-inline: auto; }
+#root .monitor-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+#root .monitor-facts dt { color: #5d718f; font-size: 12px; }
+#root .monitor-facts dd { margin: 5px 0 0; font-size: 14px; font-weight: 600; }
+#root .monitor-updates { list-style: none; margin: 0; padding: 0; }
+#root .monitor-updates li { padding: 12px 0; border-bottom: 1px solid #e1eaf2; }
+#root .monitor-updates li:last-child { border: 0; padding-bottom: 0; }
+#root .monitor-updates p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+#root .monitor-updates small,#root .monitor-muted { color: #5d718f; font-size: 13px; }
+#root .monitor-person { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+#root .monitor-person > div { min-width: 0; display: grid; gap: 5px; }
+#root .monitor-person strong { font-size: 14px; overflow-wrap: anywhere; }
+#root .monitor-person small { font-size: 12px; color: #5d718f; }
+#root .monitor-person .avatar { flex-shrink: 0; border-radius: 50%; }
+#root .monitor-note { border-radius: 12px; background: #edf5fc; padding: 12px; font-size: 12px; line-height: 1.6; color: #315a85; margin-top: 14px; }
+#root .monitor-review { border-color: #ead6b5; }
+#root .monitor-phases .construction-phase-timeline { display: grid; grid-template-columns: 1fr; gap: 0; overflow: visible; padding: 0; border: 0; background: transparent; }
+#root .monitor-phases .construction-phase-timeline li { display: flex; flex-direction: row; gap: 12px; align-items: start; padding: 0 0 18px; min-width: 0; text-align: left; }
+#root .monitor-phases .construction-phase-timeline li > span { flex-shrink: 0; margin: 0; width: 30px; height: 30px; border-radius: 50%; }
+#root .monitor-phases .construction-phase-timeline li { min-height: 58px; }
+#root .monitor-phases .construction-phase-timeline li::after { left: 15px; top: 33px; bottom: 3px; right: auto; height: auto; width: 1px; }
+#root .monitor-phases .construction-phase-timeline li small { max-width: none; padding-inline: 0; margin-top: 4px; }
+#root .monitor-phases .construction-phase-timeline li > div { min-width: 0; padding-top: 3px; }
+#root .monitor-phases .construction-phase-timeline li strong { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+#root .monitor-phases .construction-phase-timeline li small { font-size: 11px; display: block; line-height: 1.5; }
+@media(max-width:1100px) { #root .monitor-grid { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); } #root .monitor-side { grid-column: 1/-1; grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { #root .modal:has(.project-monitoring) { width: calc(100vw - 16px); } #root .monitor-grid,#root .monitor-side { display: grid; grid-template-columns: minmax(0,1fr); } #root .monitor-totals { grid-template-columns: minmax(0,1fr); } #root .monitor-target { padding: 10px 0 0; border-left: 0; border-top: 1px solid #e1eaf2; } #root .monitor-card { padding: 16px; } }
