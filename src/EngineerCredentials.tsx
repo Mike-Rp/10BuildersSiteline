@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { api } from "./api/client"
 import {
   submitOwnRenewal,
@@ -72,6 +72,7 @@ export default function EngineerCredentials({
     [note, setNote] = useState(""),
     [reviewProfession, setReviewProfession] = useState("")
   const [reviewId, setReviewId] = useState<number>()
+  const running = useRef(false)
   async function refresh() {
     const next = await api<Summary>("/licenses/credentials/" + userId)
     setData(next)
@@ -94,6 +95,8 @@ export default function EngineerCredentials({
     }
   }, [userId])
   async function run(task: () => Promise<unknown>) {
+    if (running.current) return
+    running.current = true
     setBusy(true)
     setError("")
     try {
@@ -103,6 +106,7 @@ export default function EngineerCredentials({
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      running.current = false
       setBusy(false)
     }
   }
@@ -182,7 +186,7 @@ export default function EngineerCredentials({
                       )
                     }
                   >
-                    Submit legacy evidence for selected profession
+                    Save legacy credential as verified
                   </Button>
                 )}
               </div>
@@ -191,10 +195,9 @@ export default function EngineerCredentials({
           {!data.credentials.length && (
             <p>No verified professional credentials on file.</p>
           )}
-          <h4>Submit a credential or renewal</h4>
+          <h4>{admin ? "Save a credential or renewal" : "Submit a credential or renewal"}</h4>
           <p>
-            Each profession is submitted and verified separately. Submission
-            does not restore eligibility.
+            {admin ? "Saving records the credential as verified with your administrator identity and the save time." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
           </p>
           <form
             className="form-grid"
@@ -257,7 +260,7 @@ export default function EngineerCredentials({
               authenticity.
             </p>
             <Button disabled={busy} type="submit" variant="primary">
-              Send for verification
+              {busy ? "Saving…" : admin ? "Save credential" : "Send for verification"}
             </Button>
           </form>
           <h4>Submission & review history</h4>
@@ -269,7 +272,7 @@ export default function EngineerCredentials({
                   {q.status === "under_review"
                     ? "Pending verification"
                     : q.status === "rejected"
-                      ? "Correction required"
+                      ? q.review_note === "Replaced by a credential saved directly by an Administrator." ? "Replaced by Admin update" : "Correction required"
                       : "Verified"}
                 </strong>
                 <p>

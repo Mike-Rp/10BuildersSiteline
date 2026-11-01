@@ -408,6 +408,47 @@ test(
     const list = await call("admin", "GET", "/licenses/renewals")
     assert.equal(list.status, 200, JSON.stringify(list))
     assert.ok(list.data.some((q) => q.reviewed_by_name))
+    // Administrator uploads save and verify in one transaction, including updates
+    // while the engineer has an older submission pending for that profession.
+    const pendingCivil = await submit("Civil Engineer")
+    const remindersBefore=(await db.query("select count(*)::int as n from activity_log where title='License renewal to review'")).rows[0].n
+    const electricalBefore=(await db.query("select id from user_licenses where user_id=$1 and profession='Electrical Engineer' and superseded_at is null",[ids.engineer])).rows[0].id
+    const adminForm=form("Civil Engineer","0000456")
+    adminForm.set("user_id",ids.engineer)
+    const direct=await call("admin","POST","/licenses/renewals",adminForm)
+    assert.equal(direct.status,201,JSON.stringify(direct))
+    assert.equal(direct.data.status,"verified")
+    const directRequest=(await db.query("select * from license_renewal_requests where id=$1",[direct.data.id])).rows[0]
+    submitted.push(directRequest.file_ref)
+    assert.equal(directRequest.reviewed_by,ids.admin)
+    assert.ok(directRequest.reviewed_at)
+    const directLicense=(await db.query("select * from user_licenses where id=$1",[directRequest.resulting_license_id])).rows[0]
+    assert.equal(directLicense.license_number,"0000456")
+    assert.equal(directLicense.verification_status,"verified")
+    assert.equal(directLicense.verified_by,ids.admin)
+    assert.ok(directLicense.verified_at)
+    assert.equal((await db.query("select status from license_renewal_requests where id=$1",[pendingCivil.id])).rows[0].status,"rejected")
+    assert.equal((await db.query("select count(*)::int as n from license_renewal_requests where user_id=$1 and profession='Civil Engineer' and status='under_review'",[ids.engineer])).rows[0].n,0)
+    assert.equal((await db.query("select count(*)::int as n from activity_log where title='License renewal to review'")).rows[0].n,remindersBefore)
+    assert.equal((await db.query("select id from user_licenses where user_id=$1 and profession='Electrical Engineer' and superseded_at is null",[ids.engineer])).rows[0].id,electricalBefore)
+    const updateForm=form("Civil Engineer","0000789")
+    updateForm.set("user_id",ids.engineer)
+    const updated=await call("admin","POST","/licenses/renewals",updateForm)
+    assert.equal(updated.status,201,JSON.stringify(updated))
+    assert.equal(updated.data.status,"verified")
+    submitted.push((await db.query("select file_ref from license_renewal_requests where id=$1",[updated.data.id])).rows[0].file_ref)
+    assert.ok((await db.query("select superseded_at from user_licenses where id=$1",[directLicense.id])).rows[0].superseded_at)
+    assert.equal((await db.query("select count(*)::int as n from user_licenses where user_id=$1 and profession='Civil Engineer' and superseded_at is null",[ids.engineer])).rows[0].n,1)
+    const forgedForm=form("Civil Engineer")
+    forgedForm.set("user_id",ids.other)
+    forgedForm.set("verification_status","verified")
+    forgedForm.set("auto_verify","true")
+    const forged=await call("engineer","POST","/licenses/renewals",forgedForm)
+    assert.equal(forged.status,201,JSON.stringify(forged))
+    const forgedRequest=(await db.query("select * from license_renewal_requests where id=$1",[forged.data.id])).rows[0]
+    submitted.push(forgedRequest.file_ref)
+    assert.equal(forgedRequest.user_id,ids.engineer)
+    assert.equal(forgedRequest.status,"under_review","engineers cannot enable immediate verification")
     assert.equal(
       (
         await call(

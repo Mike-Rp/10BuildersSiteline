@@ -60,6 +60,11 @@ test("credential profile separates account access, verification, expiry and revi
     ],
     submissions: [
       {
+        id: 2, profession: "Civil Engineer", license_number: "0001000", license_expiry: "2030-01-01",
+        status: "rejected", submitted_at: "2026-01-01T10:00:00Z",
+        review_note: "Replaced by a credential saved directly by an Administrator.",
+      },
+      {
         id: 1,
         profession: "Civil Engineer",
         license_number: "0001234",
@@ -88,6 +93,10 @@ test("credential profile separates account access, verification, expiry and revi
     assert.match(document.body.textContent, /Expired/)
     assert.match(document.body.textContent, /Pending verification/)
     assert.match(document.body.textContent, /0001234/)
+    assert.ok([...document.querySelectorAll("button")].some(b => b.textContent === "Save credential"))
+    assert.equal([...document.querySelectorAll("button")].some(b => b.textContent === "Send for verification"), false)
+    assert.match(document.body.textContent, /Saving records the credential as verified/)
+    assert.match(document.body.textContent, /Replaced by Admin update/)
     const review = [...document.querySelectorAll("button")].find(
       (b) => b.textContent === "Review submission",
     )

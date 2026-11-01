@@ -185,7 +185,7 @@ test("license, certification and intake routes enforce login, roles and safe SQL
       assert.deepEqual(await snapshot(),before)
     }
   })
-  await t.test("credential input is validated and legacy creation enters pending review", async()=>{
+  await t.test("credential input is validated and Admin legacy creation saves as verified", async()=>{
     const post=fields=>call("POST","/engineer/licenses/",{token:admin,body:form(fields,{name:"credential.pdf"})})
     const fields={user_id:knownUser,profession:"Geodetic Engineer",license_number:"0000123",license_expiry:"2032-01-31"}
     for(const patch of [{license_expiry:"2026-13-45"},{license_expiry:"2026-02-30"},{license_expiry:"tomorrow"},{license_number:"N".repeat(121)},{user_id:"nope"},{profession:"Unknown"}])assert.equal((await post({...fields,...patch})).status,400)
@@ -193,7 +193,8 @@ test("license, certification and intake routes enforce login, roles and safe SQL
     const response=await post(fields);assert.equal(response.status,201)
     const row=(await response.json()).data
     const pending=(await db.query("select * from license_renewal_requests where id=$1",[row.id])).rows[0]
-    assert.equal(pending.status,'under_review');assert.equal(pending.license_number,'0000123')
+    assert.equal(pending.status,'verified');assert.equal(pending.license_number,'0000123')
+    assert.ok(pending.reviewed_by);assert.ok(pending.reviewed_at);assert.ok(pending.resulting_license_id)
     assert.deepEqual(await snapshot(),before)
     const exact=here('../Thesis-Backend/'+pending.file_ref)
     if(exact.startsWith(here('../Thesis-Backend/uploads/')))t.after(()=>fs.rmSync(exact,{force:true}))

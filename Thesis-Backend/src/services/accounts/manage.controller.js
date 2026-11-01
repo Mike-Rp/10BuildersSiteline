@@ -1,4 +1,6 @@
 import { saveSpecializations,credentialSummary } from "../licenses/credentials.controller.js";
+import { workEmailFromAssignedId, assertWorkEmailAvailable } from "./work-email.utility.js";
+import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
 import { ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
 import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
@@ -139,8 +141,48 @@ export const listAccounts = async (req,res) => {
 
 // POST /accounts   body: { full_name, email, phone?, role, scope? }
 export async function createAccountRecord(client, actor, body) {
+  if (body.request_id === undefined) return insertAccountRecord(client, actor, body);
+  if (!isUuid(body.request_id)) throw new HttpError(400, "Invalid account creation request ID.");
+  // Keep retries safe even when the original response or a later workspace save was lost.
+  const canonical = value => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  const { password, ...details } = body;
+  const fingerprint = crypto.createHash("sha256").update(JSON.stringify(canonical(details))).digest("hex");
+  await client.query("select pg_advisory_xact_lock(hashtext($1))", [`account-create:${actor.id}:${body.request_id}`]);
+  const previous = (await client.query(
+    `select u.id,to_jsonb(u)->>'id_number' as id_number,u.full_name,u.email,u.phone,u.status,u.date_added::text as date_added,u.password_hash,r.code as role,
+      m.metadata->'accountCreation'->>'fingerprint' as fingerprint
+      from users u join roles r on r.id=u.role_id join workspace_account_metadata m on m.user_id=u.id
+      where u.created_by=$2 and m.metadata->'accountCreation'->>'requestId'=$1 limit 1`,
+    [body.request_id, actor.id],
+  )).rows[0];
+  if (previous) {
+    if (previous.fingerprint !== fingerprint || (password !== undefined && (typeof password !== "string" || !await bcrypt.compare(password, previous.password_hash)))) {
+      throw new HttpError(409, "This account creation request was already used with different details. Reopen the form to create another account.");
+    }
+    const { password_hash, fingerprint: storedFingerprint, ...saved } = previous;
+    void password_hash; void storedFingerprint;
+    return { ...saved, ...(password !== undefined ? { temp_password: password } : {}) };
+  }
+  const saved = await insertAccountRecord(client, actor, body);
+  await client.query(
+    `insert into workspace_account_metadata(user_id,metadata) values($1,$2::jsonb)
+      on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata`,
+    [saved.id, JSON.stringify({ accountCreation: { requestId: body.request_id, fingerprint } })],
+  );
+  return saved;
+}
+
+async function insertAccountRecord(client, actor, body) {
   const fullName = body.full_name ?? body.fullName ?? body.contact_person;
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
+  const userId = uuidv4();
+  const automaticEmail = body.auto_work_email === true;
+  // Insert once so the database assigns its own id_number. This private address
+  // is replaced in the same transaction and is never returned or committed.
+  const email = body.auto_work_email === true
+    ? `pending.${userId}@10builders.com`
+    : typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
+  if (automaticEmail) workEmailFromAssignedId(body.last_name, "10B00001"); // Validate the surname before inserting.
   const phone = body.phone ?? body.contact_number ?? null;
   const role = body.role;
   if (role === "client" && clientEmailError(email)) throw new HttpError(400, clientEmailError(email));
@@ -150,6 +192,7 @@ export async function createAccountRecord(client, actor, body) {
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
   const scope = normalizeScope(role,body.scope);
   const experience = validateEngineerExperience(body.experience_by_type, role);
+  await assertWorkEmailAvailable(client, email, null, body.auto_work_email === true ? undefined : body.employee_id);
   const password = body.password ?? makeTempPassword();
   if (typeof password!=="string" || password.length<8 || Buffer.byteLength(password,"utf8")>72) throw new HttpError(400,"Temporary password must be at least 8 characters and at most 72 UTF-8 bytes.");
   const roleRow = await client.query("SELECT id FROM roles WHERE code=$1",[role]);
@@ -159,9 +202,15 @@ export async function createAccountRecord(client, actor, body) {
   const inserted = await client.query(
     `INSERT INTO users (id,full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by)
      VALUES ($1,$2,$3,$4,$5,true,$6,'invited',$7,$7)
-     RETURNING id,full_name,email,phone,status,date_added::text AS date_added`,
-    [uuidv4(),fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
+     RETURNING id,to_jsonb(users)->>'id_number' as id_number,full_name,email,phone,status,date_added::text AS date_added`,
+    [userId,fullName.trim(),email,phone?.trim() || null,hash,roleRow.rows[0].id,actor.id])
     .catch((error) => { throw error.code === "23505" ? new HttpError(409,"This email is already assigned to another account.") : error; });
+  if (automaticEmail) {
+    const workEmail = workEmailFromAssignedId(body.last_name, inserted.rows[0].id_number);
+    await assertWorkEmailAvailable(client, workEmail, userId);
+    await client.query("update users set email=$2 where id=$1", [userId, workEmail]);
+    inserted.rows[0].email = workEmail;
+  }
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
   await saveEngineerExperience(client, inserted.rows[0].id, experience);
   return { ...inserted.rows[0],role,temp_password:password };
@@ -270,9 +319,12 @@ export const updateAccount = async (req, res) => {
 
     const data = await withTransaction(async (client) => {
       const found = await client.query(
-        `SELECT u.id, r.code AS role FROM users u JOIN roles r ON r.id = u.role_id
+        `SELECT u.id, u.email, r.code AS role FROM users u JOIN roles r ON r.id = u.role_id
           WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false FOR UPDATE OF u`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Account not found.");
+      const assignedId = employeeIdFromWorkEmail(found.rows[0].email);
+      if (assignedId && b.email !== undefined && employeeIdFromWorkEmail(b.email) !== assignedId) throw new HttpError(422, "The system-assigned employee ID cannot be changed.");
+      if (b.email !== undefined) await assertWorkEmailAvailable(client, b.email, id, b.employee_id);
       const scope = normalizeScope(found.rows[0].role, b.scope);
       const experience = validateEngineerExperience(b.experience_by_type, found.rows[0].role);
 
@@ -414,7 +466,7 @@ export const addLicense = async (req, res) => {
     if (!isUuid(id)) { cleanup(); return sendError(res, "Invalid account id.", 400); }
 
     const data = await withTransaction(db => createRenewalRequest(db,user,{...req.body,user_id:id},req.file));
-    return sendOk(res,"Credential submitted for verification.",1,data,201);
+    return sendOk(res,"Credential saved and verified.",1,data,201);
   } catch (error) {
     cleanup();
     return fail(res, error);

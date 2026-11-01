@@ -312,6 +312,7 @@ function AppInner() {
   const [notifications, setNotifications] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<Event>()
   const [credentials, setCredentials] = useState<{
+    email: string
     name: string
     password: string
   }>()
@@ -739,7 +740,7 @@ function AppInner() {
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
       await reloadWorkspace();setDialog(undefined)
-      if(!exists&&saved.password)setCredentials({name:account.name,password:saved.password})
+      if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password})
       setToast(exists?"Account updated":"Account created")
     }catch(error){setToast((error as Error).message);throw error}
   }
@@ -3254,6 +3255,7 @@ function AppInner() {
               <Icon name="check" size={28} />
             </span>
             <h3>{credentials.name}</h3>
+            <p>Work email: <strong>{credentials.email}</strong></p>
           </div>
           <div className="password-display">
             <code>{credentials.password}</code>

@@ -1,4 +1,5 @@
 import { api, apiList, downloadApiFile, registerFileUrl } from "./client.ts";
+import { employeeIdFromWorkEmail } from "../../Thesis-Backend/src/domain/work-email.js";
 import { headcount, projectPhaseDisciplines, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
 import type { WorkflowCommand } from "../workflows.ts";
 import { DOC_CODES, type Dto } from "./adapter.ts";
@@ -159,6 +160,7 @@ function accountPayload(account: Account) {
     const scope = account.role === "spm" ? { disciplines: account.scope } : account.role === "opm" ?
         { project_types: account.projectTypes } : account.role === "client" ? { projects: account.scope } : undefined;
     return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope,
+      ...(employeeIdFromWorkEmail(account.email) ? { employee_id: employeeIdFromWorkEmail(account.email) } : {}),
       ...(account.experienceByType !== undefined && ["opm", "spm"].includes(account.role) ? { experience_by_type: account.experienceByType } : {}) };
 }
 export async function saveApiAccount(account: Account, existing: boolean, password?: string) {
@@ -167,15 +169,18 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
     if (existing)
         delete (payload as Partial<typeof payload>).role;
     const saved = await api<Dto>(existing ? "/accounts/" + account.id : "/accounts", {
-        method: existing ? "PATCH" : "POST", json: { ...payload, ...(!existing && password ? { password } : {}) },
+        method: existing ? "PATCH" : "POST", json: { ...payload,
+          ...(!existing ? { request_id: account.id } : {}),
+          ...(!existing && account.lastName && !account.email ? { email: undefined, auto_work_email: true, last_name: account.lastName } : {}),
+          ...(!existing && password ? { password } : {}) },
     });
     const id = saved.id || account.id;
     if (existing && account.status !== previous?.status && ["active", "suspended", "invited"].includes(account.status))
         await api("/accounts/" + id + "/status", { method: "PATCH", json: { status: account.status } });
     await api("/accounts/" + id + "/workspace", {
-        method: "PUT", json: account,
+        method: "PUT", json: { ...account, email: saved.email || account.email },
     });
-    return { id, password: saved.temp_password || password };
+    return { id, email: saved.email || account.email, password: saved.temp_password || password };
 }
 export async function createCompany(company: Company) {
     return await post("/subcontractors/registrations", company);

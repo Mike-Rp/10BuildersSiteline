@@ -156,7 +156,7 @@ export const putSpecializations = async (req, res) => {
     return handleError(res, e)
   }
 }
-// Legacy evidence is never relabeled as verified. Explicitly submit it to the same review queue.
+// An explicit Administrator save verifies the selected legacy evidence and records attribution.
 export const submitLegacyCredential = async (req, res) => {
   try {
     const user = await requireUser(req, res, ["admin"])
@@ -190,7 +190,7 @@ export const submitLegacyCredential = async (req, res) => {
         { path: old.upload_file_ref },
       )
     })
-    return sendOk(res, "Legacy evidence submitted for review.", 1, result, 201)
+    return sendOk(res, "Legacy credential saved and verified.", 1, result, 201)
   } catch (e) {
     return handleError(res, e)
   }

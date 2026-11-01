@@ -55,7 +55,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
-  for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql"]) {
+  for(const migration of ["001-phase-checklists.sql","002-phase-update-confirmation.sql","003-react-integration.sql","004-verified-activity-progress.sql","016-user-id-numbers.sql"]) {
     await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/"+migration),"utf8"))
   }
   // Re-running the recovery migration is safe on the original strict status CHECK.
@@ -212,6 +212,19 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
     assert.ok(created.id)
     assert.equal((await api("/accounts/"+created.id)).email,"integration.admin@example.test")
+    const automaticDraft={...self,id:randomUUID(),name:"Juan Cruz",lastName:"Cruz",email:"",phone:"09171234567",docs:[]}
+    const attempts=await Promise.all(Array.from({length:4},()=>saveApiAccount(automaticDraft,false,"Password@123")))
+    const automatic=attempts[0]
+    assert.equal(new Set(attempts.map(a=>a.id)).size,1,"four simultaneous submissions must create one account")
+    const retried=await saveApiAccount(automaticDraft,false,"Password@123")
+    assert.equal(retried.id,automatic.id,"a later retry returns the original account")
+    await assert.rejects(saveApiAccount({...automaticDraft,name:"Different person"},false,"Password@123"),error=>error.status===409)
+    assert.match(automatic.email,/^cruz\.10b\d{5}@10builders\.com$/)
+    const databaseId=(await db.query("select id_number from users where id=$1",[automatic.id])).rows[0].id_number
+    assert.equal(automatic.email,`cruz.${databaseId.replace('-','').toLowerCase()}@10builders.com`,"the email must embed this account's actual database id_number")
+    const afterAutomatic=await loadState(user)
+    assert.equal(afterAutomatic.accounts.find(a=>a.id===automatic.id).email,automatic.email,"metadata must retain the server-generated address")
+    await assert.rejects(api("/accounts/"+automatic.id,{method:"PATCH",json:{email:"cruz.10b99999@10builders.com"}}),/cannot be changed/)
     await assert.rejects(createCompany({...state.companies[0],id:randomUUID(),name:"Admin cannot register",email:"admin.register@gmail.com",phone:"09171234567",documents:[],manpowerDocuments:[]}),error=>error.status===403)
     await asUser("karlo.espiritu@10builders.com")
     const fileId=randomUUID()

@@ -247,7 +247,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   })
 
   await t.test('renewal under review does not lift restriction; only verified renewal restores access', async () => {
-    const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'rafael'))
+    const submitted=await call('rafael','POST','/licenses/renewals',undefined,renewalForm(400,'rafael'))
     assert.equal(submitted.status,201,submitted.text)
     assert.equal((await call('rafael','GET','/licenses/me')).data.access.mode,'view_only')
     const verified=await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{note:"Fixture credential manually checked."})
@@ -259,7 +259,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   await t.test('late renewal never takes transferred projects back from the replacement', async () => {
     const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'diego'))
     assert.equal(submitted.status,201,submitted.text)
-    assert.equal((await call('admin','POST',`/licenses/renewals/${submitted.data.id}/verify`,{note:"Fixture credential manually checked."})).status,200)
+    assert.equal(submitted.data.status,'verified')
     assert.equal((await holder()).spm_user_id,idOf('karlo'))
   })
 

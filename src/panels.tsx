@@ -64,7 +64,6 @@ import {
   type Rules,
   type Role,
   type State,
-  suggestWorkEmail,
 } from "./model"
 import "./upload-control.css"
 
@@ -560,22 +559,19 @@ export function AccountForm({
   )
   const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
   const generatedIdentity = !account && !clientOnly
-  // Once the administrator edits the email, name changes stop overwriting it.
-  const [emailEdited, setEmailEdited] = useState(false)
-  const suggestion = suggestWorkEmail(nameParts, state.accounts)
-  const plainEmail = suggestWorkEmail({ ...nameParts, middle: "" }, [])
   function updateName(part: "first" | "middle" | "last", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
     setDraft(current => ({ ...current,
       lastName: next.last.trim(),
       name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
-      ...(emailEdited ? {} : { email: suggestWorkEmail(next, state.accounts) }),
     }))
     setError("")
   }
   const [pass, setPass] = useState(password())
   const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
   const [emailError, setEmailError] = useState("")
   const requiresClientEmail = !account && draft.role === "client"
@@ -584,14 +580,15 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const invalidClientEmail = requiresClientEmail ? clientEmailError(draft.email) : ""
+    if (savingRef.current) return
+    const invalidClientEmail = requiresClientEmail && !generatedIdentity ? clientEmailError(draft.email) : ""
     setEmailError(invalidClientEmail)
     if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
       try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { setError((reason as Error).message); return }
       if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter years of experience for at least one project type. Use 0 for a new engineer."); return }
     }
-    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
+    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim())) { setError("Enter a first and last name."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
 
     const err = clientOnly
@@ -604,9 +601,11 @@ export function AccountForm({
             )
           ? "This email is already in use. Select the existing client instead."
           : ""
-      : accountError(requiresClientEmail ? { ...draft, email: draft.email.trim() } : draft, state)
+      : accountError(requiresClientEmail ? { ...draft, email: draft.email.trim() } : draft, state, generatedIdentity)
     setError(err)
     if (!err) try {
+      savingRef.current = true
+      setSaving(true)
       await onSave(
         {
           ...draft,
@@ -617,6 +616,7 @@ export function AccountForm({
         account ? undefined : pass,
       )
     } catch(reason) { setError((reason as Error).message) }
+    finally { savingRef.current = false; setSaving(false) }
   }
   function chips(
     values: string[],
@@ -651,7 +651,8 @@ export function AccountForm({
     )
   }
   return (
-    <form onSubmit={submit} noValidate={requiresClientEmail}>
+    <form onSubmit={submit} noValidate={requiresClientEmail} aria-busy={saving}>
+      <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         {!clientOnly && (
           <Field label="Account role" wide>
@@ -687,7 +688,7 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        <Field label="Email address *" wide={generatedIdentity} error={requiresClientEmail ? emailError : undefined} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
+        {!generatedIdentity && <Field label="Email address *" error={requiresClientEmail ? emailError : undefined} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
           <input
             required
             type="email"
@@ -695,17 +696,13 @@ export function AccountForm({
             pattern={requiresClientEmail ? CLIENT_EMAIL_PATTERN : undefined}
             value={draft.email}
             onChange={(e) => {
-              if (generatedIdentity) setEmailEdited(true)
               patch({ email: e.target.value })
               if (emailError) setEmailError(requiresClientEmail ? clientEmailError(e.target.value) : "")
               setError("")
             }}
-            placeholder={requiresClientEmail || generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder={requiresClientEmail ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
-        </Field>
-        {generatedIdentity && <div className="field wide">
-          {emailEdited && <Button onClick={() => { setEmailEdited(false); setDraft(current => ({ ...current, email: suggestion })); setError("") }}>Use suggested email{suggestion ? ` (${suggestion})` : ""}</Button>}
-        </div>}
+        </Field>}
         <Field label="Contact number">
           <input
             value={draft.phone}
@@ -831,15 +828,16 @@ export function AccountForm({
         </div>
       )}
       <div className="modal-actions">
-        <Button onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="primary">
-          {account
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Saving account…" : account
             ? "Save changes"
             : clientOnly
               ? "Save client for project"
               : "Create account"}
         </Button>
       </div>
+      </fieldset>
     </form>
   )
 }
