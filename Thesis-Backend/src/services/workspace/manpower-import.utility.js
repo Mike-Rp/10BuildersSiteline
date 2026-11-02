@@ -1,3 +1,4 @@
+import { saveCapabilityReview } from "./subcontractor-allocation.utility.js";
 import XLSX from "xlsx";
 import { locationError, normalizeLocation } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, manpowerRows, normalizeCompanyForemen } from "../../domain/company-registration.js";
@@ -24,14 +25,14 @@ export function readManpowerFile(file) {
 
 /** Values are read from stored file bytes; form-supplied headcounts are never used. */
 export async function registerCompany(db, user, company, loadFile, projectId = "") {
-    if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can submit subcontractor companies for Administrator approval.");
+    if (user.role !== "admin") throw new HttpError(403, "Only Administrators can register subcontractor companies.");
     if (company?.operatingLocation !== undefined && locationError(company.operatingLocation)) throw new HttpError(400, locationError(company.operatingLocation));
     const errors = companyRegistrationErrors(company);
     if (Object.keys(errors).length) throw new HttpError(400, Object.values(errors)[0]);
     const foremen = normalizeCompanyForemen(company);
     let proposedDisciplines;
     if (company.proposedDisciplines !== undefined) {
-        if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can propose company trades.");
+
         const catalog = COMPANY_TRADES;
         if (!Array.isArray(company.proposedDisciplines) || new Set(company.proposedDisciplines).size !== company.proposedDisciplines.length || company.proposedDisciplines.some(value => typeof value !== "string" || !catalog.includes(value === "Façade" ? "Facade" : value)))
             throw new HttpError(400, "Choose proposed trades from the configured discipline catalog.");
@@ -60,9 +61,11 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
     const companyId = company.id || crypto.randomUUID();
     if ((await db.query("select id from subcontractors where id=$1", [companyId])).rowCount)
         throw new HttpError(409, "This company request has already been submitted. Refresh the directory to view it.");
-    const trade = (await db.query("select id from trades where code='Structural / Rebar'", [])).rows[0];
+    const trade = (await db.query("select id from trades where code=$1", [company.primaryTrade])).rows[0];
     if (!trade) throw new HttpError(422, "The company trade is not configured. Contact your Administrator.");
-    const status = "pending";
+    if (!["pending", "verified"].includes(company.verificationDecision)) throw new HttpError(400, "Choose pending verification or verified.");
+    if (company.verificationDecision === "verified" && company.evidenceReviewed !== true) throw new HttpError(400, "Confirm the company evidence review.");
+    const status = company.verificationDecision === "verified" ? "approved" : "pending";
     const inserted = await db.query(`insert into subcontractors(id,company_name,trade_id,contact_email,source,directory_status,created_by,updated_by)
         values($1,$2,$3,$4,'directory',$5,$6,$6) on conflict(id) do nothing returning id`, [companyId, company.name.trim(), trade.id, company.email.trim().toLowerCase(), status, user.id]);
     if (!inserted.rowCount) throw new HttpError(409, "This company request has already been submitted. Refresh the directory to view it.");
@@ -78,6 +81,10 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
         ...(proposedDisciplines === undefined ? {} : { proposedDisciplines }),
     })]);
     for (const doc of [...documents, ...manpowerDocuments]) await db.query("update stored_files set purpose='company' where id=$1", [doc.id]);
+    if (company.verificationDecision === "verified") await saveCapabilityReview(db, user, companyId, {
+        disciplines: proposedDisciplines || [], documentIds: documents.map(d => d.id), note: company.verificationNote,
+        unavailable: false,
+    });
     return { id: companyId, status, manpowerCount: workers.length };
 }
 

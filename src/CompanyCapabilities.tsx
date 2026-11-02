@@ -29,7 +29,7 @@ export default function CompanyCapabilities({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("")
   const locked = useRef(false)
-  const editable = role === "spm" && !!onSave
+  const editable = role === "admin" && !!onSave
   const supportingRecords = company.documents.filter(document => document.uploaded)
   const linkedDocuments = documents.filter(id => supportingRecords.some(document => document.id === id))
   const differentSet = (a: string[], b: string[]) => JSON.stringify([...a].sort()) !== JSON.stringify([...b].sort())
@@ -63,7 +63,7 @@ export default function CompanyCapabilities({
   if (!editable) return (
     <section className="detail-section trade-allocation">
       <h3>Company capabilities</h3>
-      <p>View only. Capability reviews are managed in the Site PM workspace.</p>
+      <p>View only. Capabilities are verified by Admin in the Subcontractor directory.</p>
       <p>Directory classification: <strong>{company.primaryTrade || "Not recorded"}</strong></p>
       {review ? <>
         <div className="tag-list">{review.disciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div>
@@ -72,13 +72,13 @@ export default function CompanyCapabilities({
         <p>{review.note}</p>
         <p>{review.unavailable ? "Unavailable for new commitments" : "Available for capacity checks"}</p>
         <p>Supporting records: {company.documents.filter(document => (review.documentIds || []).includes(document.id)).map(document => document.name).join(", ") || "No linked records available"}</p>
-      </> : <><p>Site PM capability review required.</p>{!!company.proposedDisciplines?.length && <><p>Proposed trades · Not verified</p><div className="tag-list">{company.proposedDisciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div></>}</>}
+      </> : <><p>Admin capability verification required.</p>{!!company.proposedDisciplines?.length && <><p>Proposed trades · Not verified</p><div className="tag-list">{company.proposedDisciplines.map(discipline => <span key={discipline}>{discipline}</span>)}</div></>}</>}
       <CompanyTradeMatches trades={review?.disciplines || company.proposedDisciplines || []} verified={!!review?.reviewedAt} />
     </section>
   )
   return (
     <section className="detail-section trade-allocation company-capability-review">
-      <h3>Site PM capability review</h3>
+      <h3>Admin capability verification</h3>
       <p>Select company trades supported by the records. Verification is applied when you save this review.</p>
       <div className="capability-summary">
         <div><span>Directory classification</span><strong>{company.primaryTrade || "Not recorded"}</strong></div>
@@ -110,7 +110,7 @@ export default function CompanyCapabilities({
             {onPreview && <Button disabled={busy} onClick={() => onPreview(document)}>Preview {document.name}</Button>}
           </div>)}
           {!supportingRecords.length && <p>No supporting records on file. Add company records to verify the selected trades.</p>}
-          {onUpload && <Upload label="Company Supporting Document" owner="Site PM" disabled={busy} buttonLabel="Add document" onSave={async document => {
+          {onUpload && <Upload label="Company Supporting Document" owner="Administrator" disabled={busy} buttonLabel="Add document" onSave={async document => {
             await onUpload(document)
             setDocuments(current => [...new Set([...current, document.id])])
           }} />}
@@ -123,7 +123,7 @@ export default function CompanyCapabilities({
       {error && <p role="alert">{error}</p>}
       <div className="capability-review-footer">
         <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>
-        <div className="capability-footer-actions">{onCancel && <Button disabled={busy} onClick={onCancel}>Cancel</Button>}<Button variant="primary" disabled={busy || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>
+        <div className="capability-footer-actions">{onCancel && <Button disabled={busy} onClick={onCancel}>Cancel</Button>}<Button variant="primary" disabled={busy || !selected.length || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>
       </div>
       <p className="capability-help">Company approval and project acceptance are separate.</p>
     </section>

@@ -202,14 +202,21 @@ test(
       const role = (await db.query("select r.code from users u join roles r on r.id=u.role_id where lower(u.email::text)=lower($1)", [email])).rows[0]?.code
       return login(email, "Password@123", true, role === "admin" ? "admin" : role === "client" ? "client" : "staff")
     }
+    async function directoryApi(path, options) {
+      if (!path.endsWith("/capabilities")) return api(path, options)
+      const previousEmail = user.email
+      try { await as("patricia.domingo@10builders.com"); return await api(path, options) }
+      finally { await as(previousEmail) }
+    }
     let user = await as("patricia.domingo@10builders.com")
     const historicalLocation = { region: "Old recorded region", province: "Old recorded province", city: "Old recorded city" }
     await db.query("insert into workspace_project_metadata(project_id,metadata) values($1,$2) on conflict(project_id) do update set metadata=workspace_project_metadata.metadata||excluded.metadata", [projectId, JSON.stringify({ siteLocation: historicalLocation })])
     await api(`/projects/${projectId}/workspace`, { method: "PUT", json: { siteLocation: historicalLocation, location: "Existing site address", note: "An unrelated record correction", docs: [] } })
     assert.deepEqual((await db.query("select metadata->'siteLocation' as location from workspace_project_metadata where project_id=$1", [projectId])).rows[0].location, historicalLocation)
     await assert.rejects(api(`/projects/${projectId}/workspace`, { method: "PUT", json: { siteLocation: { ...historicalLocation, city: "A different invented city" }, docs: [] } }), /location catalog/)
+    const adminStateId = user.id
     const reviewPath = `/subcontractors/${companyIds[0]}/capabilities`
-    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Admin cannot edit capability reviews")
+    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 400, "Admin must supply review evidence")
     await assert.rejects(
       api(`/projects/${projectId}/workspace-command`, { method: "POST", json: { type: "auto_allocate_company", allocationRevision: 0 } }),
       /Lead Site PM/,
@@ -221,11 +228,13 @@ test(
     user = await as(initialClient)
     await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "Clients cannot edit capability reviews")
     user = await as(source.lead_email)
+    await assert.rejects(api(reviewPath, { method: "PUT", json: {} }), error => error.status === 403, "SPM cannot verify capabilities")
+    user = await as("patricia.domingo@10builders.com")
     const disciplines = [...COMPANY_TRADES]
     const engineerCatalog = (await db.query("select code from disciplines order by code")).rows
     const suggestedId = randomUUID(), proposedDisciplines = ["Civil", "Facade", "Waterproofing"]
     const foremen = [{ name: "Juan Dela Cruz", phone: "09171234567" }, { name: "Maria Santos", phone: "09181234567" }]
-    const suggestion = { id: suggestedId, name: "Company with proposed trades", email: "proposedtrades@gmail.com", contact: "Untrusted legacy alias", phone: "09999999999", foremen, proposedDisciplines, documents: [], manpowerDocuments: [] }
+    const suggestion = { primaryTrade: "Mechanical / Plumbing", verificationDecision: "pending", id: suggestedId, name: "Company with proposed trades", email: "proposedtrades@gmail.com", contact: "Untrusted legacy alias", phone: "09999999999", foremen, proposedDisciplines, documents: [], manpowerDocuments: [] }
     const invalidLocationId = randomUUID()
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidLocationId, operatingLocation: { ...codedCebu, psgcCode: "1380600000" } } }), /location catalog/)
     assert.equal((await db.query("select 1 from subcontractors where id=$1", [invalidLocationId])).rowCount, 0, "invalid geographic combinations do not create a partial company")
@@ -251,19 +260,38 @@ test(
     proposalState = await loadState(user); suggested = proposalState.companies.find(company => company.id === suggestedId)
     assert.equal(suggested.documents.length, 1, "a retried proof upload does not duplicate company records")
     assert.equal(suggested.documents[0].name, "trade-proof.png", "stored file metadata is authoritative")
-    await assert.rejects(api(`/subcontractors/${companyIds[0]}/supporting-documents`, { method: "POST", json: { doc: { id: proofId } } }), /already linked/)
-    await api(`/subcontractors/${suggestedId}/capabilities`, { method: "PUT", json: { disciplines: proposedDisciplines, unavailable: false, documentIds: [proofId], note: "Site PM reviewed the company records for these trades." } })
+    await assert.rejects(directoryApi(`/subcontractors/${companyIds[0]}/supporting-documents`, { method: "POST", json: { doc: { id: proofId } } }), /already linked/)
+    await directoryApi(`/subcontractors/${suggestedId}/capabilities`, { method: "PUT", json: { disciplines: proposedDisciplines, unavailable: false, documentIds: [proofId], note: "Site PM reviewed the company records for these trades." } })
     suggested = (await loadState(user)).companies.find(company => company.id === suggestedId)
     assert.deepEqual(suggested.capabilityReview.disciplines, proposedDisciplines)
     assert.deepEqual((await db.query("select code from disciplines order by code")).rows, engineerCatalog, "company trade registration and verification must not change the engineer catalog")
-    assert.equal(suggested.status, "pending", "capability verification must not approve the company")
+    assert.equal(suggested.status, "approved", "Admin verification activates the company for allocation checks")
     user = await as("patricia.domingo@10builders.com")
     const pendingCompany = (await loadState(user)).companies.find(company => company.id === suggestedId)
-    await api(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...pendingCompany, foremen: undefined, contact: "Attempted legacy alias change", phone: "09999999999", note: "Company registration reviewed" } })
+    await directoryApi(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...pendingCompany, foremen: undefined, contact: "Attempted legacy alias change", phone: "09999999999", note: "Company registration reviewed" } })
     const preservedCompany = (await loadState(user)).companies.find(company => company.id === suggestedId)
     assert.deepEqual(preservedCompany.foremen, foremen, "general company updates must preserve both stored foremen")
     assert.equal(preservedCompany.phone, foremen[0].phone)
-    await assert.rejects(api(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...preservedCompany, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
+    await assert.rejects(directoryApi(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...preservedCompany, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
+    // A complete Admin registration verifies in one transaction; invalid evidence leaves no company.
+    const registeredProof = randomUUID()
+    await uploadFile(registeredProof, new File([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6L8AAAAASUVORK5CYII=", "base64")], "registration-proof.png", {type:"image/png"}))
+    const verifiedId = randomUUID()
+    const verifiedBody = {...suggestion,id:verifiedId,name:"Admin verified registration",verificationDecision:"verified",evidenceReviewed:true,verificationNote:"Admin reviewed company evidence.",documents:[{id:registeredProof,uploaded:true}]}
+    await assert.rejects(api("/subcontractors/registrations",{method:"POST",json:{...verifiedBody,evidenceReviewed:false}}),/Confirm.*review/)
+    assert.equal((await db.query("select id from subcontractors where id=$1",[verifiedId])).rowCount,0)
+    await assert.rejects(api("/subcontractors/registrations",{method:"POST",json:{...verifiedBody,documents:[]}}),/supporting records/)
+    assert.equal((await db.query("select id from subcontractors where id=$1",[verifiedId])).rowCount,0)
+    await api("/subcontractors/registrations",{method:"POST",json:verifiedBody})
+    const verifiedCompany=(await loadState(user)).companies.find(c=>c.id===verifiedId)
+    assert.equal(verifiedCompany.status,"approved")
+    assert.equal(verifiedCompany.primaryTrade,"Mechanical / Plumbing")
+    assert.equal(verifiedCompany.capabilityReview.reviewedById,user.id)
+    assert.equal(verifiedCompany.capabilityReview.note,verifiedBody.verificationNote)
+    assert.deepEqual(verifiedCompany.activeProjectIds,[])
+    // Keep registration fixtures out of the deterministic allocation scenario below.
+    await db.query("update workspace_company_metadata set metadata=jsonb_set(metadata,'{capabilityReview,unavailable}','true') where subcontractor_id=any($1::uuid[])",[[suggestedId,verifiedId]])
+    user = await as(source.lead_email)
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: randomUUID() } }), error => error.status === 403)
     await assert.rejects(api(proofPath, { method: "POST", json: { doc: { id: proofId } } }), error => error.status === 403)
     user = await as(opmEmail)
@@ -301,7 +329,7 @@ test(
       await db.query("update stored_files set purpose='company' where id=$1", [fileId])
       user = await as(source.lead_email)
       assert.ok(await downloadApiFile(fileId), "Site PM can preview an approved company's supporting record uploaded by Admin")
-      await api(`/subcontractors/${id}/capabilities`, {
+      await directoryApi(`/subcontractors/${id}/capabilities`, {
         method: "PUT",
         json: {
           disciplines,
@@ -316,12 +344,12 @@ test(
           [id],
         )
       ).rows[0].review
-      assert.equal(saved.reviewedById, user.id)
+      assert.equal(saved.reviewedById, adminStateId)
       assert.notEqual(saved.reviewedAt, "")
     }
     user = await as("patricia.domingo@10builders.com")
     const adminState = await loadState(user), reviewedCompany = adminState.companies.find(c => c.id === companyIds[0])
-    await api(`/subcontractors/${companyIds[0]}/workspace`, { method: "PUT", json: { ...reviewedCompany, capabilityReview: { ...reviewedCompany.capabilityReview, note: "Attempted Admin overwrite", disciplines: [] } } })
+    await directoryApi(`/subcontractors/${companyIds[0]}/workspace`, { method: "PUT", json: { ...reviewedCompany, capabilityReview: { ...reviewedCompany.capabilityReview, note: "Attempted Admin overwrite", disciplines: [] } } })
     assert.equal((await db.query("select metadata->'capabilityReview'->>'note' as note from workspace_company_metadata where subcontractor_id=$1", [companyIds[0]])).rows[0].note, "Reviewed the supporting company capability records in this test.", "Admin's general company update cannot bypass capability permissions")
     user = await as(initialClient)
     assert.equal(await downloadApiFile(supportingFileIds[0]), undefined, "Company capability documents remain unavailable to clients")
@@ -329,7 +357,7 @@ test(
     assert.ok(await downloadApiFile(supportingFileIds[0]), "Office PM can view an approved company record without permission to edit its review")
     user = await as(source.lead_email)
     await assert.rejects(
-      api(`/subcontractors/${companyIds[0]}/capabilities`, {
+      directoryApi(`/subcontractors/${companyIds[0]}/capabilities`, {
         method: "PUT",
         json: {},
       }),
@@ -343,7 +371,7 @@ test(
     await command({ type: "set_allocation_location", allocationRevision: 0, siteLocation: cebu })
     const outsideId = companyIds[1]
     const localReview = (await db.query("select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1", [outsideId])).rows[0].review
-    await api(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: manila } })
+    await directoryApi(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: manila } })
     await command({ type: "auto_allocate_company", allocationRevision: 0 })
     let state = await loadState(user),
       project = state.projects.find((p) => p.id === projectId),
@@ -352,7 +380,7 @@ test(
     assert.deepEqual(plan.requirements.find(phase => phase.name === "Mobilization").disciplines, ["Civil", "Electrical", "Plumbing"])
     assert.deepEqual(project.siteLocation, cebu)
     assert.equal(allocationCandidates(state, project).find(company => company.id === outsideId).locationIssue, undefined, "A different historical operating area does not exclude a company")
-    await api(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: cebu } })
+    await directoryApi(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: cebu } })
     assert.equal(plan.companyIds.length, 2)
     assert.equal(project.subcontractorAllocationVersion, 1)
     assert.equal(
@@ -380,7 +408,7 @@ test(
     })
     await assert.rejects(command({ type: "set_allocation_location", allocationRevision: 2, siteLocation: manila }), /locked/)
     const acceptedReview = (await db.query("select metadata->'capabilityReview' as review from workspace_company_metadata where subcontractor_id=$1", [acceptedId])).rows[0].review
-    await api(`/subcontractors/${acceptedId}/capabilities`, { method: "PUT", json: { ...acceptedReview, operatingLocation: manila } })
+    await directoryApi(`/subcontractors/${acceptedId}/capabilities`, { method: "PUT", json: { ...acceptedReview, operatingLocation: manila } })
     const concurrent = await Promise.allSettled(
       [1, 2].map(() =>
         command({
@@ -649,8 +677,8 @@ test(
     const mandaue = locationForCity(LOCATION_CITIES.find(city => city.name.includes("Mandaue")).code)
     const preciseBase = { ...mandaue, coordinates: { latitude: 10.3158, longitude: 123.8855 } }
     const reviewedCoverage = [{ scope: "city", location: codedCebu }]
-    await assert.rejects(api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [{ scope: "province", location: mandaue }] } }), /Independent cities/)
-    await api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: reviewedCoverage } })
+    await assert.rejects(directoryApi(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [{ scope: "province", location: mandaue }] } }), /Independent cities/)
+    await directoryApi(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: reviewedCoverage } })
     await commercialCommand({
       type: "auto_allocate_company",
       allocationRevision: 0,
@@ -686,7 +714,7 @@ test(
     user = await as("patricia.domingo@10builders.com")
     await assert.rejects(api(`/projects/${commercialId}/workspace`, { method: "PUT", json: { siteLocation: { ...preciseSite, coordinates: { latitude: 10.33, longitude: 123.89 } }, docs: [] } }), /locked/, "Admin cannot bypass the contacted-site lock by moving coordinates within the same city")
     user = await as(source.lead_email)
-    await api(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [] } })
+    await directoryApi(`/subcontractors/${nearbyCompanyId}/capabilities`, { method: "PUT", json: { ...nearbyReview, operatingLocation: preciseBase, serviceAreas: [] } })
     const afterContact = (await loadState(user)).projects.find(project => project.id === commercialId)
     assert.deepEqual(afterContact.subcontractorAllocation.companyIds, commercial.subcontractorAllocation.companyIds, "Location checks do not replace contacted or accepted companies")
     const commercialDoc = randomUUID()

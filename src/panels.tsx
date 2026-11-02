@@ -1827,6 +1827,7 @@ export function CompanyForm({
     documents: [],
     note: "",
     version: 1,
+    verificationDecision: "pending",
   })
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
@@ -1857,6 +1858,12 @@ export function CompanyForm({
         const errors = companyRegistrationErrors(draft)
         setFieldErrors(errors)
         if (Object.keys(errors).length) return
+        if (role === "admin") {
+          if (!draft.primaryTrade || !draft.proposedDisciplines?.length) { setError("Choose a primary category and at least one offered trade."); return }
+          if (draft.verificationDecision === "verified" && (!draft.evidenceReviewed || !draft.verificationNote?.trim() || !draft.documents.length)) {
+            setError("Attach supporting records, confirm the evidence review and record a verification note."); return
+          }
+        }
         submittingRef.current = true
         setSubmitting(true)
         setError("")
@@ -1874,9 +1881,9 @@ export function CompanyForm({
       }}
     >
       <CompanyRegistrationFields draft={draft} patch={patch} fieldErrors={fieldErrors} busy={busy} />
-      {role === "spm" && <section className="form-section trade-allocation capability-proposal">
-        <CompanyTradePicker selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Proposed company trades" />
-        <p>Choose the trades this company offers. These remain proposals until a Site PM reviews supporting records and saves verified capabilities in company details. Company approval remains with Admin.</p>
+      {role === "admin" && <section className="form-section trade-allocation capability-proposal">
+        <CompanyTradePicker selected={draft.proposedDisciplines || []} onChange={proposedDisciplines => patch({ proposedDisciplines })} disabled={busy} label="Offered company trades" />
+        <p>Select the trades supported by company records. Pending companies cannot be allocated to projects.</p>
       </section>}
       <div className="form-grid">
         <Field label="Company availability" hint="Not assigned to a project. Company approval does not assign a project.">
@@ -1890,6 +1897,23 @@ export function CompanyForm({
           />
         </Field>
       </div>
+      {role === "admin" && <section className="form-section">
+        <h3>Admin verification</h3>
+        <Field label="Primary company category *"><select value={draft.primaryTrade || ""} disabled={busy} onChange={e => patch({ primaryTrade: e.target.value })}>
+          <option value="">Select category</option>{["Structural / Rebar", "Electrical", "Mechanical / Plumbing", "Facade", "Waterproofing", "Fire & Life Safety"].map(category => <option key={category}>{category}</option>)}
+        </select></Field>
+        <h4>Supporting company documents</h4>
+        <DocumentList docs={draft.documents} onPreview={downloadDoc} />
+        <Upload label="Company supporting document" owner={owner} disabled={busy} onSave={doc => patch({ documents: [...draft.documents, doc] })} />
+        <Field label="Verification decision"><select value={draft.verificationDecision || "pending"} disabled={busy} onChange={e => patch({ verificationDecision: e.target.value as "pending" | "verified" })}>
+          <option value="pending">Pending verification</option><option value="verified">Verify company and trade capabilities</option>
+        </select></Field>
+        {draft.verificationDecision === "verified" && <>
+          <label className="check-row"><input type="checkbox" disabled={busy} checked={!!draft.evidenceReviewed} onChange={e => patch({ evidenceReviewed: e.target.checked })} />I reviewed the company records and selected trade capabilities</label>
+          <Field label="Verification note *"><textarea maxLength={2000} disabled={busy} value={draft.verificationNote || ""} onChange={e => patch({ verificationNote: e.target.value })} /></Field>
+        </>}
+        <p className="notice">{draft.verificationDecision === "verified" ? "Admin verification is recorded when saved. Project allocation still requires matching trades, availability, capacity and existing acceptance steps." : "Saved as pending verification. Project allocation is blocked until Admin verifies the company and its capabilities."}</p>
+      </section>}
       {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
       {error && (
         <p className="error" role="alert">
@@ -1899,7 +1923,7 @@ export function CompanyForm({
       <div className="modal-actions">
         <Button disabled={busy} onClick={onClose}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={busy}>
-          {busy ? "Submitting…" : status === "approved" ? "Add company" : "Submit for Admin approval"}
+          {busy ? "Saving…" : role === "admin" ? draft.verificationDecision === "verified" ? "Register & verify company" : "Save pending verification" : "Submit for Admin approval"}
         </Button>
       </div>
     </form>

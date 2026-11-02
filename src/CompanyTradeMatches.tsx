@@ -12,7 +12,7 @@ export default function CompanyTradeMatches({ trades, verified = false }: { trad
   })).filter(group => group.phases.length)
   return <details className="company-trade-matches">
     <summary>How these trades connect</summary>
-    <p>{verified ? "Verified trades" : "Selected trades · Site PM verification required"}</p>
+    <p>{verified ? "Verified trades" : "Selected trades · Admin verification required"}</p>
     {!matches.length ? <p>No phase matches in the current company trade catalog.</p> : <>
       <p>Each match shows the work this company can cover within a phase. Other companies can cover the remaining trades.</p>
       <div className="company-trade-match-grid">{matches.map(group => <section key={group.type} aria-label={`${group.type} trade matches`}>

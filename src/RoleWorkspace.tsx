@@ -53,7 +53,7 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
 import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
-import { AttachmentRow, CompanyForm, DocumentList, downloadDoc, Preview, Upload } from "./panels"
+import { AttachmentRow, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
   ListPager,
@@ -1709,7 +1709,7 @@ export default function RoleWorkspace({
         onCrew={(companyId) =>
           setDialog({ kind: "company", projectId: p.id, companyId })
         }
-        onNewCompany={() => setDialog({ kind: "new-company", projectId: p.id })}
+        onNewCompany={() => {}}
         onPreview={(doc) => showDoc(p, doc)}
         onOpenActive={() => {
           setPickedId(p.id)
@@ -2801,14 +2801,7 @@ export default function RoleWorkspace({
       <>
         {header(
           "Subcontractor directory",
-          !isOpm ? <Button
-            icon="plus"
-            variant="primary"
-            disabled={saving}
-            onClick={() => setDialog({ kind: "new-company" })}
-          >
-            Suggest Company
-          </Button> : undefined,
+          undefined,
         )}
         <ListSection
           list={directoryList}
@@ -3378,13 +3371,7 @@ export default function RoleWorkspace({
           </div>
         </div>
         <CompanyForemen company={c} />
-        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={setPreview} onCancel={() => setDialog(undefined)} onUpload={actor.role === "spm" ? async document => {
-          await api("/subcontractors/" + c.id + "/supporting-documents", { method: "POST", json: { doc: document } })
-          await onReload()
-        } : undefined} onSave={actor.role === "spm" ? async review => {
-          await api("/subcontractors/" + c.id + "/capabilities", { method: "PUT", json: review })
-          await onReload()
-        } : undefined} />
+        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={setPreview} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">
@@ -3860,32 +3847,6 @@ export default function RoleWorkspace({
           onClose={() => setDialog(undefined)}
         >
           {companyDetail(company)}
-        </Modal>
-      )}
-      {actor.role === "spm" && dialog?.kind === "new-company" && (
-        <Modal
-          title="Suggest a subcontractor company"
-          subtitle="Company approval is separate from project acceptance."
-          wide
-          onClose={() => setDialog(undefined)}
-        >
-          <CompanyForm
-            owner={actor.name}
-            actorId={actor.id}
-            role={actor.role}
-            status="pending"
-            saving={saving}
-            project={projects.find(p => p.id === dialog.projectId)}
-            onClose={() => setDialog(undefined)}
-            onSave={async c => {
-              const saved = await act(
-                { type: "request_company", projectId: c.projectId || undefined, company: c },
-                "Company suggestion sent for Administrator verification.",
-              )
-              if (saved) setDialog(undefined)
-              return saved
-            }}
-          />
         </Modal>
       )}
       {dialog?.kind === "activated" && detail && (

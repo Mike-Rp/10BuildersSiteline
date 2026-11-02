@@ -245,7 +245,7 @@ export const createSubcontractor = async (req, res) => {
   try {
     const user = await requireUser(req, res, WRITE_ROLES);
     if (!user) return;
-    return sendError(res, "Site PMs must submit company suggestions through the directory form for Administrator approval.", 403);
+    return sendError(res, "Use the Administrator company registration form in the Subcontractor directory.", 403);
   } catch (error) { return handleError(res, error); }
 };
 

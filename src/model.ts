@@ -315,6 +315,9 @@ export type PhaseProgress = {
   locked?: boolean
 }
 export type Company = {
+  verificationDecision?: "pending" | "verified"
+  evidenceReviewed?: boolean
+  verificationNote?: string
   operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation
   foremen?: { name: string; phone: string }[]
   proposedDisciplines?: string[]

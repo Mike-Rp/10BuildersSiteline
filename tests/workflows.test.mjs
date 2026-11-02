@@ -389,66 +389,11 @@ test("document reads use canonical stored records and cannot spoof Site PM visib
   assert.equal(viewed.events[0].type, "view")
   assert.match(viewed.events[0].title, /watermarked/)
 })
-test("company suggestions retain manpower documents, require approval, and do not mutate command inputs", () => {
-  const state = teamReady()
-  const company = {
-    id: "new-company",
-    name: "Field Request Co",
-    contact: "Field Foreman",
-    phone: "09170000000",
-    email: "field.request@gmail.com",
-    status: "pending",
-    submittedBy: "",
-    projectId: "p4",
-    availability: "available",
-    manpowerCount: 999,
-    activeProjectIds: [],
-    manpowerDocuments: [
-      {
-        ...doc("manpower-list.xlsx"),
-        manpowerCount: 14,
-        mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      },
-    ],
-    documents: [],
-    note: "",
-    version: 1,
-  }
-  const requested = run(state, "a4", { type: "request_company", company })
-  assert.equal(company.activeProjectIds.length, 0)
-  const stored = requested.companies.find((c) => c.id === company.id)
-  assert.equal(stored.status, "pending")
-  assert.equal(stored.submittedById, "a4")
-  assert.equal(stored.manpowerCount, 14)
-  assert.equal(stored.manpowerDocuments[0].name, "manpower-list.xlsx")
-  assert.throws(
-    () =>
-      run(state, "a5", {
-        type: "request_company",
-        company: { ...company, id: "non-lead-suggestion" },
-      }),
-    /Lead Site PM/,
-  )
-  assert.throws(
-    () =>
-      run(requested, "a4", { type: "contact_company", companyId: company.id }),
-    /approved subcontractor/,
-  )
-  const archived = run(requested, "a4", {
-    type: "archive_company_request",
-    companyId: company.id,
-  })
-  const retained = archived.companies.find((c) => c.id === company.id)
-  const selection = workflowFor(project(archived)).selections.find(
-    (item) => item.companyId === company.id,
-  )
-  assert.equal(retained.status, "archived")
-  assert.equal(retained.manpowerCount, 14)
-  assert.equal(retained.manpowerDocuments[0].name, "manpower-list.xlsx")
-  assert.ok(retained.archivedAt)
-  assert.equal(selection.status, "archived")
-  assert.equal(selection.archivedBy, "a4")
+test("company registration belongs to Admin rather than the Site PM project workflow", () => {
+ const state=initialState()
+ assert.throws(()=>run(state,"a4",{type:"request_company",company:{id:"new-company"}}),/Only Admin/)
 })
+
 test("legacy rework cannot apply stage-floor rollback or bypass targeted review", () => {
   let state = run(initialState(), "a6", {
     type: "submit_progress",

@@ -35,7 +35,7 @@ import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
-import { persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
+import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import MonthlyReport from "./MonthlyReport"
@@ -92,6 +92,7 @@ import {
 import {
   AccountDeactivationForm,
   AccountForm,
+  CompanyForm,
   DocumentList,
   downloadBlob,
   downloadDoc,
@@ -777,6 +778,9 @@ function AppInner() {
     )
   }
   function approval(c: Company, status: "approved" | "rejected") {
+    if (status === "approved" && !c.capabilityReview?.reviewedAt) {
+      setDialog({kind:"company",id:c.id}); setToast("Complete Admin capability verification to approve this company."); return
+    }
     setConfirmation({
       title:
         status === "approved"
@@ -1320,7 +1324,7 @@ function AppInner() {
             <Panel
               key={c.id}
               title={c.name}
-              actions={<Status status={c.status} />}
+              actions={<Badge tone={c.status === "pending" ? "amber" : c.status === "approved" ? "green" : "gray"}>{c.status === "pending" ? "Pending Admin verification" : c.status}</Badge>}
             >
               <div className="approval-content">
                 <div className="detail-grid">
@@ -1626,10 +1630,11 @@ function AppInner() {
       )
     const subcontractorsTab = () => (
         <>
+          <div className="modal-actions"><Button variant="primary" icon="plus" onClick={() => setDialog({kind:"add-company"})}>Add company</Button></div>
           <div className="tabs standalone">
             {[
               ["registered", "Registered companies"],
-              ["pending", `Pending requests (${pending.length})`],
+              ["pending", `Pending verification (${pending.length})`],
               ["rejected", "Rejected"],
               ["archived", "Archived"],
             ].map(([v, l]) => (
@@ -2638,7 +2643,7 @@ function AppInner() {
             <h3>{c.name}</h3>
             <p>{c.email}</p>
           </div>
-          <Status status={c.status} />
+          <Badge tone={c.status === "pending" ? "amber" : c.status === "approved" ? "green" : "gray"}>{c.status === "pending" ? "Pending Admin verification" : c.status}</Badge>
         </div>
         <div className="detail-grid account-detail-grid">
           {!c.foremen?.length && <><div>
@@ -2656,7 +2661,9 @@ function AppInner() {
         </div>
         <CompanyForemen company={c} />
         <p className="section-description">{c.note}</p>
-        <CompanyCapabilities company={c} role={actor.role} />
+        <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={previewDoc}
+          onUpload={async doc => { await api("/subcontractors/" + c.id + "/supporting-documents", {method:"POST",json:{doc}}); await reloadWorkspace() }}
+          onSave={async review => { await api("/subcontractors/" + c.id + "/capabilities", {method:"PUT",json:review}); await reloadWorkspace() }} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
           <div className="tag-list subsection">
@@ -2692,9 +2699,7 @@ function AppInner() {
               >
                 Reject request
               </Button>
-              <Button variant="primary" onClick={() => approval(c, "approved")}>
-                Approve company
-              </Button>
+<p>Complete Admin capability verification above to approve this company for allocation.</p>
             </>
           )}
         </div>
@@ -3125,6 +3130,11 @@ function AppInner() {
           <EngineerCredentials key={selectedAccount.id} userId={selectedAccount.id} admin onChanged={()=>{void reloadWorkspace()}} />
         </Modal>
       )}
+      {dialog?.kind === "add-company" && <Modal title="Add subcontractor company" subtitle="Company details, trades and Admin verification in one form." wide onClose={() => setDialog(undefined)}>
+        <CompanyForm role="admin" owner={actor.name} actorId={actor.id} status="pending" onClose={() => setDialog(undefined)} onSave={async company => {
+          await createCompany(company); await reloadWorkspace(); setDialog(undefined); setSubconTab(company.verificationDecision === "verified" ? "registered" : "pending"); setToast(company.verificationDecision === "verified" ? "Company registered and verified" : "Company saved pending verification")
+        }} />
+      </Modal>}
       {dialog?.kind === "company" && selectedCompany && (
         <Modal
           title="Subcontractor company"

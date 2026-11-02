@@ -902,6 +902,7 @@ export function applyWorkflow(
     actor.role === "opm" || actor.role === "spm",
     "This action requires an Office PM or Site PM session.",
   )
+  assert(!["request_company"].includes(command.type), "Only Admin can register companies in the Subcontractor directory.")
   const next = structuredClone(state)
   if (!command.projectId && ["request_company", "archive_company_request"].includes(command.type)) {
     assert(actor.role === "spm", "Only Site PMs can request new companies.")

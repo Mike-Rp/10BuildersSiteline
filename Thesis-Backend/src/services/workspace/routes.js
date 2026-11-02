@@ -283,10 +283,10 @@ router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"
  values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
     return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
 }));
-router.post("/subcontractors/registrations", endpoint(["spm"], async (db, user, req) => {
+router.post("/subcontractors/registrations", endpoint(["admin"], async (db, user, req) => {
     if (user.role === "spm") await assertLicenseActive(user, db);
     const saved = await registerCompany(db, user, req.body, file);
-    await event(db, user, null, user.role === "spm" ? "Subcontractor company suggestion submitted" : "Subcontractor company added", req.body.name);
+    await event(db, user, null, "Subcontractor company registered by Admin", req.body.name);
     return saved;
 }));
 router.post("/subcontractors/:id/withdraw", endpoint(["spm"], async (db, user, req) => {
@@ -410,18 +410,18 @@ router.put("/subcontractors/:id/workspace", endpoint(["admin"], async (db, user,
         })]);
     return {};
 }));
-router.put("/subcontractors/:id/capabilities", endpoint(["spm"], async (db, user, req) => {
+router.put("/subcontractors/:id/capabilities", endpoint(["admin"], async (db, user, req) => {
     if (!isUuid(req.params.id) || !(await db.query("select 1 from subcontractors where id=$1 and not coalesce(is_deleted,false)", [req.params.id])).rowCount)
         throw new HttpError(404, "Company not found.");
     const review = await saveCapabilityReview(db, user, req.params.id, req.body);
     await event(db, user, null, "Company capabilities reviewed", req.params.id + ": " + review.disciplines.join(", "));
     return review;
 }));
-router.post("/subcontractors/:id/supporting-documents", endpoint(["spm"], async (db, user, req) => {
+router.post("/subcontractors/:id/supporting-documents", endpoint(["admin"], async (db, user, req) => {
     if (!isUuid(req.params.id)) throw new HttpError(400, "Invalid company ID.");
     const company = (await db.query("select directory_status from subcontractors where id=$1 and not coalesce(is_deleted,false) for update", [req.params.id])).rows[0];
     const metadata = (await db.query("select metadata from workspace_company_metadata where subcontractor_id=$1", [req.params.id])).rows[0]?.metadata || {};
-    if (!company || (company.directory_status !== "approved" && !(company.directory_status === "pending" && metadata.submittedById === user.id)))
+    if (!company || (company.directory_status !== "approved" && !(company.directory_status === "pending" && user.role === "admin")))
         throw new HttpError(404, "Approved company or your pending company request not found.");
     if (!isUuid(req.body.doc?.id)) throw new HttpError(400, "Upload and confirm a supporting company document first.");
     const existing = metadata.documents?.find(document => document.id === req.body.doc.id);

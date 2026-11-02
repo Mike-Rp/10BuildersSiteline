@@ -174,7 +174,7 @@ test("accepted scope has no replacement actions; other Site PMs and Office PMs s
     }
   })
 })
-test("Site PM capability review supports more than three verified disciplines and requires supporting records", async () => {
+test("Admin capability verification supports more than three verified disciplines and requires supporting records", async () => {
   await withUi(async ({ React, root, server, w, button, click }) => {
     const { default: Review } = await server.ssrLoadModule(
       "/src/CompanyCapabilities.tsx",
@@ -190,7 +190,7 @@ test("Site PM capability review supports more than three verified disciplines an
         React.createElement(Review, {
           company,
           disciplines: DISCIPLINES,
-          role: "spm",
+          role: "admin",
           onSave: async (review) => {
             saved = review
           },
@@ -219,75 +219,36 @@ test("Site PM capability review supports more than three verified disciplines an
     )
   })
 })
-test("Site PM can open capability editing from the company directory and save through the protected API", async () => {
-  await withUi(async ({ React, root, server, w, button, click }) => {
-    const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
-    const state = fixture(), actor = state.accounts.find(a => a.id === "a4"), company = state.companies[0]
-    state.referenceDisciplines = DISCIPLINES
-    actor.expiry = "2099-01-01"
-    company.capabilityReview = undefined
-    company.proposedDisciplines = ["Civil", "Structural"]
-    company.documents = [{ id: "proof", name: "Company records.pdf", label: "Company supporting document", uploaded: true, date: "2026-10-27" }]
-    let reloads = 0, requests = []
-    const originalFetch = globalThis.fetch
-    globalThis.fetch = async (url, options) => {
-      requests.push({ url: String(url), options })
-      return new Response(JSON.stringify({ data: {} }), { status: 200, headers: { "Content-Type": "application/json" } })
-    }
-    try {
-      await React.act(() => root.render(React.createElement(Workspace, { state, actor, onCommand: async () => ({ ok: true }), onRead() {}, onMute() {}, onReload() { reloads++ }, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
-      await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Subcon directory"))
-      const directoryCard = [...document.querySelectorAll(".company-card")].find(element => element.textContent.includes(company.name))
-      assert.match(directoryCard.textContent, /Proposed trades · Review required/)
-      assert.match(directoryCard.querySelector(".capability-card-tags").textContent, /Civil/)
-      await click([...document.querySelectorAll(".company-card")].find(el => el.textContent.includes(company.name)))
-      assert.match(document.querySelector('[role="dialog"]').textContent, /Site PM capability review/)
-      assert.ok(button("Preview Company records.pdf"))
-      const checks = [...document.querySelectorAll('.trade-allocation input[type="checkbox"]')]
-      await click(checks[0]); await click(checks[DISCIPLINES.length])
-      const note = document.querySelector(".trade-allocation textarea")
-      await React.act(() => { Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set.call(note, "Site PM reviewed company records."); note.dispatchEvent(new w.Event("input", { bubbles: true })) })
-      await click(button("Save verified capabilities"))
-      const saved = requests.find(request => request.url.endsWith(`/subcontractors/${company.id}/capabilities`))
-      assert.ok(saved)
-      assert.equal(saved.options.method, "PUT")
-      assert.equal(JSON.parse(saved.options.body).note, "Site PM reviewed company records.")
-      assert.equal(reloads, 1)
-    } finally { globalThis.fetch = originalFetch }
+test("Site PM directory shows Admin-managed capabilities without verification controls", async () => {
+  await withUi(async ({React,root,server,click,button}) => {
+    const {default:Workspace}=await server.ssrLoadModule("/src/RoleWorkspace.tsx")
+    const state=fixture(),actor=state.accounts.find(a=>a.id==="a4")
+    await React.act(()=>root.render(React.createElement(Workspace,{state,actor,onCommand:async()=>({ok:true}),onRead(){},onMute(){},onReload(){},paused:false,onResume(){},onPause(){},idleWarning:false,onStayActive(){}})))
+    await click([...document.querySelectorAll(".sidebar button")].find(b=>b.textContent.trim()==="Subcon directory"))
+    assert.equal(button("Suggest Company"),undefined)
+    await click(document.querySelector(".company-card"))
+    assert.match(document.querySelector('[role="dialog"]').textContent,/Capabilities are verified by Admin/)
+    assert.equal(button("Save verified capabilities"),undefined)
   })
 })
-test("Suggest Company exposes grouped proposed trades and submits them without marking them verified", async () => {
-  await withUi(async ({ React, root, server, w, button, click }) => {
-    const { CompanyForm } = await server.ssrLoadModule("/src/panels.tsx")
-    let submitted
-    const disciplines = [...DISCIPLINES, "Facade", "Waterproofing", "General Labor", "Renovation", "Fire & Life Safety"]
-    await React.act(() => root.render(React.createElement(CompanyForm, { owner: "Site reviewer", actorId: "a4", role: "spm", disciplines, status: "pending", onClose() {}, onSave: company => { submitted = company } })))
-    assert.match(document.body.textContent, /Proposed company trades/)
-    assert.equal(document.querySelectorAll(".capability-group").length, 3)
-    assert.deepEqual([...document.querySelectorAll('.capability-choice span')].map(element => element.textContent).sort(), [...DISCIPLINES].sort(), "Company trades are independent of the engineer reference catalog")
-    for (const trade of ["Civil", "Electrical", "Waterproofing"]) await click([...document.querySelectorAll(".capability-choice")].find(label => label.textContent === trade).querySelector("input"))
-    const field = text => [...document.querySelectorAll("input")].find(input => input.getAttribute("aria-label") === text) || document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
-    for (const [label, value] of [["Company name *", "Proposed trades company"], ["Company email *", "proposedtrades@gmail.com"], ["Primary foreman full name", "Juan Dela Cruz"], ["Primary foreman mobile number", "09171234567"]])
-      if (field(label).getAttribute("role") === "combobox") {
-        await React.act(() => field(label).focus())
-        await React.act(() => document.querySelector(`[role="option"][data-location-code="${value}"]`).click())
-      } else await React.act(() => { const element = field(label); Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(element, value); element.dispatchEvent(new w.Event("input", { bubbles: true })) })
-    await click(button("Submit for Admin approval"))
-    assert.deepEqual(submitted.proposedDisciplines, ["Civil", "Electrical", "Waterproofing"])
-    assert.equal(submitted.capabilityReview, undefined)
-    assert.equal(submitted.status, "pending")
-    assert.deepEqual(submitted.foremen, [{ name: "Juan Dela Cruz", phone: "09171234567" }], "a blank backup must not create a second contact")
-    await React.act(() => root.render(React.createElement(CompanyForm, { key: "admin", owner: "Admin", role: "admin", disciplines, onClose() {}, onSave() {} })))
-    assert.equal(document.querySelector(".company-trade-picker"), null, "Admin must not get the trade editor")
-  })
+
+test("Admin registration exposes the company trade catalog",async()=>{
+ await withUi(async({React,root,server})=>{
+  const {CompanyForm}=await server.ssrLoadModule("/src/panels.tsx")
+  await React.act(()=>root.render(React.createElement(CompanyForm,{owner:"Admin",role:"admin",onClose(){},onSave(){}})))
+  assert.ok(document.querySelector(".company-trade-picker"))
+  assert.match(document.body.textContent,/Offered company trades/)
+  assert.match(document.body.textContent,/Save pending verification/)
+ })
 })
+
 test("company profiles explain phase matches and update partial trade coverage without saving or verifying draft changes", async () => {
   await withUi(async ({ React, root, server, click }) => {
     const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
     const company = { ...fixture().companies[0], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
     company.capabilityReview = { ...company.capabilityReview, disciplines: ["Facade", "Waterproofing"], documentIds: ["proof"], note: "Company enclosure services verified.", reviewedBy: "Site reviewer" }
     let saves = 0
-    await React.act(() => root.render(React.createElement(Review, { company, role: "spm", onSave: async () => { saves++ } })))
+    await React.act(() => root.render(React.createElement(Review, { company, role: "admin", onSave: async () => { saves++ } })))
     const connections = document.querySelector('.company-trade-matches')
     assert.equal(connections.open, false, "Phase references remain compact until requested")
     await click(connections.querySelector('summary'))
@@ -298,7 +259,7 @@ test("company profiles explain phase matches and update partial trade coverage w
     assert.match(connections.textContent, /Verified trades/)
     await click([...document.querySelectorAll('.capability-choice')].find(label => label.textContent === "Waterproofing").querySelector('input'))
     assert.match(phase("Commercial", "Envelope / Curtain Wall").textContent, /Facade1 of 2 required trades/)
-    assert.match(connections.textContent, /Site PM verification required/)
+    assert.match(connections.textContent, /Admin verification required/)
     assert.equal(saves, 0)
     assert.deepEqual(company.capabilityReview.disciplines, ["Facade", "Waterproofing"])
   })
@@ -321,7 +282,7 @@ test("proposed trades prefill the grouped review and remain unverified until an 
     const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
     const company = { ...fixture().companies[0], capabilityReview: undefined, proposedDisciplines: ["Civil", "Structural"], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
     let saved
-    await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "spm", onSave: async review => { saved = review } })))
+    await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "admin", onSave: async review => { saved = review } })))
     assert.equal(document.querySelectorAll('.company-trade-picker input:checked').length, 2)
     assert.match(document.body.textContent, /Review required/)
     assert.match(document.body.textContent, /Proposed trades are preselected/)
@@ -330,12 +291,12 @@ test("proposed trades prefill the grouped review and remain unverified until an 
     assert.equal(company.capabilityReview, undefined)
   })
 })
-test("capability review is read-only for Admin, Office PM and clients even when a save callback is provided", async () => {
+test("capability review is read-only for Site PM, Office PM and clients even when a save callback is provided", async () => {
   await withUi(async ({ React, root, server, button }) => {
     const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
     const company = { ...fixture().companies[0], capabilityReview: { disciplines: ["Civil", "Structural"], unavailable: false, documentIds: ["proof"], note: "Previously reviewed supporting records.", reviewedBy: "Site reviewer", reviewedById: "a4", reviewedAt: "2026-10-27T08:00:00Z" }, documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
     let saves = 0
-    for (const role of ["admin", "opm", "client"]) {
+    for (const role of ["spm", "opm", "client"]) {
       await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role, onSave: async () => { saves++ } })))
       assert.equal(document.querySelectorAll("input,select,textarea").length, 0)
       assert.equal(button("Save verified capabilities"), undefined)
@@ -346,13 +307,13 @@ test("capability review is read-only for Admin, Office PM and clients even when 
     assert.equal(saves, 0)
   })
 })
-test("Site PM saves verified trades without location or service-area fields", async () => {
+test("Admin saves verified trades without location or service-area fields", async () => {
   await withUi(async ({ React, root, server, w, button, click }) => {
     const { default: Review } = await server.ssrLoadModule("/src/CompanyCapabilities.tsx")
     const company = { ...fixture().companies[0], documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }] }
     company.capabilityReview = { ...company.capabilityReview, serviceAreas: [], documentIds: ["proof"], note: "Confirmed crew base and service coverage from company records." }
     let saved
-    await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "spm", onSave: async review => { saved = review } })))
+    await React.act(() => root.render(React.createElement(Review, { company, disciplines: DISCIPLINES, role: "admin", onSave: async review => { saved = review } })))
     assert.equal(document.querySelector('.location-fields'), null)
     assert.equal(document.querySelector('[aria-label="Additional service areas"]'), null)
     assert.doesNotMatch(document.body.textContent, /Operating-base coordinates|Operating-base review|Reviewed operating base/)

@@ -196,7 +196,7 @@ export async function allocationCommand(db, p, meta, user, c) {
         proposed = c.type === "auto_allocate_company" ? recommendTeam(ctx.type, ctx.phases, ctx.companies) : c.plan
       if (!proposed)
         fail(
-          "No complete eligible team is available. Review company capabilities in the Site PM workspace or request another company.",
+          "No complete eligible team is available. Ask Admin to register or verify additional companies in the Subcontractor directory.",
         )
       // Newly selected companies are rechecked after their rows are locked.
       await lockCompanies(db, proposed.companyIds)
@@ -356,14 +356,14 @@ export async function validateAllocationActivation(db, p, meta, command) {
   return plan.companyIds
 }
 export async function saveCapabilityReview(db, user, id, review) {
-  if (user.role !== "spm") throw new HttpError(403, "Only Site PMs can edit company capability reviews.")
+  if (user.role !== "admin") throw new HttpError(403, "Only Administrators can verify company capabilities.")
   if (review?.operatingLocation !== undefined && locationError(review.operatingLocation)) throw new HttpError(400, locationError(review.operatingLocation))
   if (serviceAreasError(review?.serviceAreas)) throw new HttpError(400, serviceAreasError(review.serviceAreas))
   if (
     !review ||
-    !Array.isArray(review.disciplines) ||
+    !Array.isArray(review.disciplines) || !review.disciplines.length ||
     typeof review.unavailable !== "boolean" ||
-    !review.note?.trim() ||
+    typeof review.note !== "string" || !review.note.trim() || review.note.length > 2000 ||
     !Array.isArray(review.documentIds) ||
     !review.documentIds.length
   )
@@ -430,5 +430,6 @@ export async function saveCapabilityReview(db, user, id, review) {
     "insert into workspace_company_metadata(subcontractor_id,metadata) values($1,$2) on conflict(subcontractor_id) do update set metadata=excluded.metadata",
     [id, JSON.stringify(metadata)],
   )
+  await db.query("update subcontractors set directory_status='approved',updated_by=$2,updated_at=now() where id=$1 and directory_status='pending'", [id, user.id])
   return metadata.capabilityReview
 }

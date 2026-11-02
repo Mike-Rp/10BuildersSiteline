@@ -60,19 +60,7 @@ test("missing columns, empty rosters, incomplete rows, duplicate IDs and formula
   assert.equal(readManpowerFile(book([["Worker ID", "Laborer Name"], ["1", "Juan"], ["2", "Juan"]])).length, 2, "Two people may share a name when IDs differ")
 })
 
-test("a Site PM can suggest an unassigned company with no projects, and only its owner can withdraw it", () => {
+test("SPMs must use the Admin-managed directory instead of registering a company", () => {
   const state = initialState()
-  state.projects = []
-  const company = { ...valid, id: "standalone", contact: "", status: "approved", submittedBy: "", projectId: "forged", availability: "committed",
-    manpowerCount: 999, activeProjectIds: ["forged"], manpowerDocuments: [], documents: [], note: "", version: 1 }
-  const requested = applyWorkflow(state, "a5", { type: "request_company", company })
-  const saved = requested.companies.find(item => item.id === company.id)
-  assert.equal(saved.projectId, "")
-  assert.equal(saved.status, "pending")
-  assert.equal(saved.availability, "available")
-  assert.equal(saved.manpowerCount, 0)
-  assert.deepEqual(saved.activeProjectIds, [])
-  assert.throws(() => applyWorkflow(requested, "a4", { type: "archive_company_request", companyId: saved.id }), /Only your/)
-  assert.equal(applyWorkflow(requested, "a5", { type: "archive_company_request", companyId: saved.id }).companies.find(item => item.id === saved.id).status, "archived")
-  assert.equal(company.availability, "committed", "Do not mutate the caller's draft")
+  assert.throws(() => applyWorkflow(state, "a5", { type: "request_company", company: valid }), /Only Admin/)
 })

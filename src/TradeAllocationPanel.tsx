@@ -237,7 +237,7 @@ export default function TradeAllocationPanel({
         </Badge>
       </header>
       <p>
-        Match Site PM-reviewed capabilities to each phase’s required disciplines.
+        Match Admin-verified capabilities to each phase’s required disciplines.
         A company can cover several phases and return later; each company
         reserves one project slot after acceptance. The crew foreman handles
         workforce distribution.
@@ -296,9 +296,7 @@ export default function TradeAllocationPanel({
             >
               Choose companies manually
             </Button>
-            <Button disabled={disabled || active} onClick={onNewCompany}>
-              Request another company
-            </Button>
+            <p className="role-muted">Ask Admin to register and verify additional companies in the Subcontractor directory.</p>
           </div>
         </section>
       ) : (

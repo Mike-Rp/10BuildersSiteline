@@ -39,6 +39,6 @@ export default function LocationFields({ value, onChange, disabled = false, pref
       {coordinatesError(location.coordinates) && <p role="alert" className="error">{coordinatesError(location.coordinates)}</p>}
     </details>}
     {error && <p role="alert" className="error">{error}</p>}
-    <p className="capability-help">{prefix === "Project" ? "Select the project site. Eligible companies must have Site PM-reviewed service coverage for this location." : prefix === "Operating" ? "Select the company’s operating base. Site PM review confirms its base and additional service areas before allocation." : "Choose a catalog location within the area the company can serve."}</p>
+    <p className="capability-help">{prefix === "Project" ? "Select the project site. Eligible companies must have Admin-verified service coverage for this location." : prefix === "Operating" ? "Select the company’s operating base. Admin verification confirms its base and additional service areas before allocation." : "Choose a catalog location within the area the company can serve."}</p>
   </section>
 }

@@ -408,9 +408,7 @@ function LegacyLeadSubcontractorPanel({
                 The system ranks verified companies. Contact one; you record
                 its answer yourself. Nothing is emailed or called.
               </p>
-              <Button icon="plus" onClick={onNewCompany}>
-                Propose new company
-              </Button>
+              <p className="role-muted">Ask Admin to register and verify additional companies in the Subcontractor directory.</p>
             </div>
           )}
           {current && currentCompany && (
@@ -606,12 +604,10 @@ function LegacyLeadSubcontractorPanel({
           {!confirmed && !active && !current && !featured && (
             <section className="subcon-recommendation-section">
               <Empty title="No verified companies available">
-                No verified companies available. Propose a new company for Admin
+                No verified companies available. Ask Admin to register a company for
                 verification.
               </Empty>
-              <Button icon="plus" onClick={onNewCompany}>
-                Propose new company
-              </Button>
+              <p className="role-muted">Ask Admin to register and verify additional companies in the Subcontractor directory.</p>
             </section>
           )}
           {!confirmed && !active && !current && eligible.length > 1 && (
@@ -821,7 +817,7 @@ function LegacyLeadSubcontractorPanel({
               </div>
               {filteredCandidates.length === 0 && (
                 <Empty title="No candidates match">
-                  Change the filter, or propose a new company for Admin
+                  Change the filter, or ask Admin to register a company for
                   verification.
                 </Empty>
               )}
