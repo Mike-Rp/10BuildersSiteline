@@ -133,6 +133,15 @@ test("credential profile separates account access, verification, expiry and revi
         (b) => b.textContent === "Send for verification",
       ),
     )
+    await act(async () => {
+      root.render(React.createElement(Panel, { key: "directory", userId: "engineer", admin: true, readOnly: true }))
+      await new Promise(r => setTimeout(r, 30))
+    })
+    assert.match(document.body.textContent, /0001234/)
+    assert.match(document.body.textContent, /Pending verification/)
+    assert.equal(document.querySelectorAll("form,input,select,textarea").length, 0)
+    assert.ok([...document.querySelectorAll("button")].some(b => b.textContent === "View submitted document"))
+    assert.equal([...document.querySelectorAll("button")].some(b => /Save|Review submission|Verify credential|Request correction/.test(b.textContent)), false)
   } finally {
     await act(() => root.unmount())
     await server.close()

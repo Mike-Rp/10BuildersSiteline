@@ -2474,9 +2474,9 @@ function AppInner() {
               <Button
                 disabled={a.status === "deactivated"}
                 icon="edit"
-                onClick={() => setDialog({ kind: "edit-account", id: a.id })}
+                onClick={() => { setPage("Team"); setDialog({ kind: "edit-account", id: a.id }) }}
               >
-                Edit account
+                {page === "Team" ? "Edit account" : "Edit in Team & accounts"}
               </Button>
               {a.id !== admin.id &&
                 a.status !== "deactivated" &&
@@ -2558,7 +2558,13 @@ function AppInner() {
         )}
         {a.role !== "client" && (
           <>
-            {["opm","spm"].includes(a.role) && <EngineerCredentials key={a.id} userId={a.id} admin onChanged={()=>{void reloadWorkspace()}} />}
+            {["opm","spm"].includes(a.role) && <>
+              {page !== "Team" && <div className="notice">
+                <p>Credentials and specializations are managed in Team & accounts. This view is read-only.</p>
+                <Button onClick={() => { setPage("Team"); setDialog({ kind: "account", id: a.id }) }}>Manage in Team & accounts</Button>
+              </div>}
+              <EngineerCredentials key={a.id} userId={a.id} admin readOnly={page !== "Team"} onChanged={()=>{void reloadWorkspace()}} />
+            </>}
             <WorkRecord userId={a.id} />
             <section className="detail-section">
               <h3>Engineer documents</h3>

@@ -55,10 +55,12 @@ type Summary = {
 export default function EngineerCredentials({
   userId,
   admin = false,
+  readOnly = false,
   onChanged,
 }: {
   userId: string
   admin?: boolean
+  readOnly?: boolean
   onChanged?: () => void
 }) {
   const [data, setData] = useState<Summary>(),
@@ -135,7 +137,7 @@ export default function EngineerCredentials({
           {data.submissions.some(q => q.status === "under_review") && <div className="notice" role="status">
             <strong>Pending Admin verification</strong>
             <p>Submitted details are saved. Pending credentials do not qualify this account for new assignments.</p>
-            {admin ? <p>View the submitted document and choose Review submission below. No re-entry is needed.</p> : <p>Your credential is awaiting Admin review.</p>}
+            {readOnly ? <p>Manage credential reviews in Team & accounts.</p> : admin ? <p>View the submitted document and choose Review submission below. No re-entry is needed.</p> : <p>Your credential is awaiting Admin review.</p>}
           </div>}
           <p>
             Phase coordination matches:{" "}
@@ -177,7 +179,7 @@ export default function EngineerCredentials({
                     {c.verification_note}
                   </p>
                 )}
-                {admin && c.needsReview && !c.superseded_at && (
+                {admin && !readOnly && c.needsReview && !c.superseded_at && (
                   <Button
                     disabled={busy || !profession}
                     onClick={() =>
@@ -200,6 +202,7 @@ export default function EngineerCredentials({
           {!data.credentials.length && (
             <p>No verified professional credentials on file.</p>
           )}
+          {!readOnly && <>
           <h4>{admin ? "Save a credential or renewal" : "Submit a credential or renewal"}</h4>
           <p>
             {admin ? "Saving records the credential as verified with your administrator identity and the save time." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
@@ -268,6 +271,7 @@ export default function EngineerCredentials({
               {busy ? "Saving…" : admin ? "Save credential" : "Send for verification"}
             </Button>
           </form>
+          </>}
           <h4>Submission & review history</h4>
           {data.submissions.map((q) => (
             <article className="credential-record" key={q.id}>
@@ -297,7 +301,7 @@ export default function EngineerCredentials({
                 >
                   View submitted document
                 </Button>
-                {admin && q.status === "under_review" && (
+                {admin && !readOnly && q.status === "under_review" && (
                   <Button
                     disabled={busy}
                     onClick={() => {
@@ -312,7 +316,7 @@ export default function EngineerCredentials({
               </div>
             </article>
           ))}
-          {admin && reviewId && (
+          {admin && !readOnly && reviewId && (
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -384,7 +388,7 @@ export default function EngineerCredentials({
               {dateLabel(s.recorded_at)}
             </p>
           ))}
-          {admin && (
+          {admin && !readOnly && (
             <>
               <div className="tag-list">
                 {ENGINEER_SPECIALIZATIONS.map((tag) => (
