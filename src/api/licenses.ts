@@ -1,3 +1,4 @@
+import { LICENSE_RENEWAL_ONLY_EVENT } from "./client";
 import { api, apiList, downloadBlob } from "./client.ts"
 import type {
   HistoryRow,
@@ -15,14 +16,16 @@ export const fetchRequests = () => api<ReassignRequest[]>("/licenses/requests")
 export const fetchOverview = () => apiList<OverviewItem>("/licenses/overview")
 export const fetchRenewals = (status = "under_review") => api<RenewalQueueItem[]>("/licenses/renewals?status=" + status)
 
-export const submitOwnRenewal = (input: { licenseNumber: string; licenseExpiry: string; file: File; profession: string; userId?: string }) => {
+export const submitOwnRenewal = async (input: { licenseNumber: string; licenseExpiry: string; file: File; profession: string; userId?: string }) => {
   const body = new FormData()
   body.set("profession", input.profession)
   if(input.userId) body.set("user_id",input.userId)
   body.set("license_number", input.licenseNumber)
   body.set("license_expiry", input.licenseExpiry)
   body.set("file", input.file)
-  return api("/licenses/renewals", { method: "POST", body })
+  const saved = await api("/licenses/renewals", { method: "POST", body })
+  if (!input.userId && typeof window !== "undefined") window.dispatchEvent(new window.CustomEvent(LICENSE_RENEWAL_ONLY_EVENT))
+  return saved
 }
 export const verifyRenewal = (id: number, corrections: { license_number?: string; license_expiry?: string; profession?: string; note?: string } = {}) =>
   api("/licenses/renewals/" + id + "/verify", { method: "POST", json: corrections })

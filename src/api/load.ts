@@ -1,3 +1,4 @@
+import { requiresRenewalOnlyAccess } from "../renewal-only.ts";
 import { emptyState } from "../model.ts";
 import type { Account, Role, State } from "../model.ts"
 import type { LicenseData } from "../licenseTypes.ts"
@@ -57,10 +58,10 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   if (["opm", "spm"].includes(me.role)) {
     const status = await fetchMyLicense()
     currentLicense = status
-    if (status.renewalOnly) {
+    if (requiresRenewalOnlyAccess(status)) {
       const state = emptyState()
       const self = { ...stubAccount(me.id, me.full_name || "Engineer", me.role), email: me.email || "", expiry: status.expiry || "" }
-      state.accounts = [self]; state.license = { self: status }
+      state.accounts = [self]; state.license = { self: { ...status, renewalOnly: true } }
       return state
     }
   }

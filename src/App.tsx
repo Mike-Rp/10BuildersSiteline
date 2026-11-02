@@ -1,3 +1,4 @@
+import { requiresRenewalOnlyAccess } from "./renewal-only";
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
 import RestrictedRenewalPage from "./RestrictedRenewalPage";
@@ -2814,7 +2815,7 @@ function AppInner() {
       />
     )
   }
-  if ((actor.role === "opm" || actor.role === "spm") && state.license?.self?.renewalOnly)
+  if ((actor.role === "opm" || actor.role === "spm") && state.license?.self && requiresRenewalOnlyAccess(state.license.self))
     return <><RestrictedRenewalPage actor={actor} status={state.license.self} onReload={reloadWorkspace} onSignOut={signOut.request} />{signOut.dialog}</>
   if (actor.role === "opm" || actor.role === "spm")
     return (

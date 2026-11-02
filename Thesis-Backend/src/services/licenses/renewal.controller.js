@@ -18,7 +18,7 @@ const UPLOAD_ROOT = path.resolve("uploads");
 const isIsoDate = isoDateValid;
 
 export const publicState = (s) => ({
-  access: s.access, renewalSubmissionAllowed: licenseAccessPolicy(s.expiry).daysToExpiry === null || licenseAccessPolicy(s.expiry).daysToExpiry > 23, renewalOnly: licenseAccessPolicy(s.expiry).mode === "view_only", restrictedOn: licenseAccessPolicy(s.expiry).restrictedOn, noticeOn: licenseAccessPolicy(s.expiry).noticeOn,
+  access: s.access, renewalSubmissionAllowed: licenseAccessPolicy(s.expiry).daysToExpiry === null || licenseAccessPolicy(s.expiry).daysToExpiry > 23, renewalOnly: !!s.pendingRenewal || licenseAccessPolicy(s.expiry).mode === "view_only", restrictedOn: licenseAccessPolicy(s.expiry).restrictedOn, noticeOn: licenseAccessPolicy(s.expiry).noticeOn,
   status: s.status, base: s.base, restricted: s.restricted, expiry: s.expiry, daysToExpiry: s.daysToExpiry,
   graceEndsOn: s.graceEndsOn, graceDaysLeft: s.graceDaysLeft, graceEnded: s.graceEnded,
   graceDays: s.rules.graceDays, reminderDays: s.rules.reminderDays, licenseNumber: s.licenseNumber,

@@ -1,3 +1,4 @@
+import { PENDING_RENEWAL_SQL } from "../../services/licenses/submission-kind.utility.js";
 import { readSessionTiming } from "./session-activity.utility.js";
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../../domain/license-access.js";
 import jwt from "jsonwebtoken";
@@ -102,6 +103,8 @@ export const getCurrentUser = async (req) => {
     if (["opm", "spm"].includes(user.role)) {
       const current = (await execute("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc,id desc limit 1", [user.id])).rows[0];
       const policy = licenseAccessPolicy(current?.expiry);
+      const pendingRenewal = (await execute(PENDING_RENEWAL_SQL, [user.id])).rows[0]?.pending;
+      const renewalOnly = policy.mode === "view_only" || pendingRenewal;
       const url = (req.originalUrl || req.url || "").split("?")[0];
       const read = ["GET", "HEAD"].includes(req.method);
       const accountAction = /\/auth\/(logout|reset-password|refresh|activity|session)$/.test(url);
@@ -114,7 +117,7 @@ export const getCurrentUser = async (req) => {
       let ownStoredFile = false;
       const storedFileId = read && url.match(/\/files\/([0-9a-f-]+)\/content$/i)?.[1];
       if (storedFileId && policy.mode === "view_only") ownStoredFile = (await execute("select 1 from license_renewal_requests where user_id=$1 and file_ref in ($2,$3) limit 1", [user.id,"db:"+storedFileId,"db://"+storedFileId])).rowCount > 0;
-      if (policy.mode === "view_only" && !accountAction && !renewalAction && !ownCredentials && !licenseStatus && !renewalFile && !ownStoredFile)
+      if (renewalOnly && !accountAction && !renewalAction && !ownCredentials && !licenseStatus && !renewalFile && !ownStoredFile)
         throw new HttpError(403, LICENSE_VIEW_ONLY_MESSAGE, "LICENSE_RENEWAL_ONLY");
     }
     return user;

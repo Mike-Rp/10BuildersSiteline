@@ -1,4 +1,4 @@
-import { SUBMISSION_KIND_SQL } from "../../services/licenses/submission-kind.utility.js";
+import { SUBMISSION_KIND_SQL, PENDING_RENEWAL_SQL } from "../../services/licenses/submission-kind.utility.js";
 import { licenseAccessPolicy, licensePolicyDay } from "../../domain/license-access.js";
 // License status is always CALCULATED from the expiry date against the server's local today.
 // Nothing here is stored or typed in by a person.
@@ -75,7 +75,8 @@ export async function loadLicenseState(userId, { db, today = localDay() } = {}) 
     expiry: license?.license_expiry, today, reminderDays: rules.reminderDays, graceDays: rules.graceDays,
     renewalOpen: renewal?.status === "under_review",
   });
-  return { ...computed, licenseId: license?.id || null, licenseNumber: license?.license_number || null, renewal, rules, today };
+  const pendingRenewal = (await run(PENDING_RENEWAL_SQL, [userId])).rows[0]?.pending || false;
+  return { ...computed, pendingRenewal, licenseId: license?.id || null, licenseNumber: license?.license_number || null, renewal, rules, today };
 }
 
 /** loadLicenseState for many engineers in three queries, so a list does not cost three round trips per person. */
