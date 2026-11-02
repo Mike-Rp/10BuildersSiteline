@@ -269,7 +269,7 @@ export function Modal({
   children,
   onClose,
   wide = false,
-  closeOnBackdrop = true,
+  closeOnBackdrop = false,
 }: {
   title: string
   subtitle?: string
