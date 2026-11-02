@@ -269,12 +269,14 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  closeOnBackdrop = true,
 }: {
   title: string
   subtitle?: string
   children: ReactNode
   onClose: () => void
   wide?: boolean
+  closeOnBackdrop?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
@@ -323,7 +325,7 @@ export function Modal({
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (closeOnBackdrop && e.target === e.currentTarget) onClose()
       }}
     >
       <div

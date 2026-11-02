@@ -3074,6 +3074,7 @@ function AppInner() {
         <Modal
           title={selectedAccount ? "Edit account" : "Add team account"}
           subtitle="Admin-provisioned access. Role changes require a new account."
+          closeOnBackdrop={false}
           onClose={() => setDialog(undefined)}
         >
           <AccountForm
