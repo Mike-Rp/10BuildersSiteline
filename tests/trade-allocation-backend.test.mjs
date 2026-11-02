@@ -528,6 +528,16 @@ test(
       }),
       /allocation changed/,
     )
+    // Confirmed staff must still have verified credentials at activation.
+    const projectStaff = (await db.query("select suggested_opm_id from projects where id=$1", [projectId])).rows[0]
+    const phaseStaff = (await db.query("select spm_user_id from project_phase_team where project_id=$1 limit 1", [projectId])).rows[0]
+    for (const userId of [projectStaff.suggested_opm_id, phaseStaff.spm_user_id]) {
+      await db.query("update user_licenses set verification_status='needs_review' where user_id=$1 and superseded_at is null", [userId])
+      await assert.rejects(command({ type: "upload_agreement", allocationRevision: 8, doc: { id: docId } }), /verified|ineligible/i)
+      assert.equal((await db.query("select lifecycle_status from projects where id=$1", [projectId])).rows[0].lifecycle_status, "spm_review")
+      assert.equal((await db.query("select count(*)::int as n from project_subcontractor_assignments where project_id=$1", [projectId])).rows[0].n, 0)
+      await db.query("update user_licenses set verification_status='verified' where user_id=$1 and superseded_at is null", [userId])
+    }
     await command({
       type: "upload_agreement",
       allocationRevision: 8,

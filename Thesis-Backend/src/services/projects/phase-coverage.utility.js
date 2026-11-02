@@ -1,5 +1,6 @@
 import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
+import { LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 
 // Pure check: every required phase has exactly one row with a valid engineer that is confirmed.
 // `required` comes only from the authoritative workflow; `rows` are the saved assignment rows.
@@ -44,7 +45,8 @@ export async function loadPhaseCoverage(db, projectId) {
   const consistent = resolved.length === Number(expected) && new Set(resolved.map(p => String(p.project_stage_id))).size === resolved.length;
   const required = consistent ? resolved : [];
   const rows = (await db.query(`SELECT t.project_stage_id,s.code AS stage_code,t.spm_user_id,t.status,
-    (u.id IS NOT NULL AND r.code='spm' AND u.status='active' AND NOT COALESCE(u.is_deleted,false)) AS engineer_valid
+    (u.id IS NOT NULL AND r.code='spm' AND u.status='active' AND NOT COALESCE(u.is_deleted,false)
+      AND ${LICENSE_ELIGIBILITY_SQL}) AS engineer_valid
     FROM project_phase_team t JOIN project_stages s ON s.id=t.project_stage_id
     LEFT JOIN users u ON u.id=t.spm_user_id LEFT JOIN roles r ON r.id=u.role_id
     WHERE t.project_id=$1 FOR UPDATE OF t`, [projectId])).rows;

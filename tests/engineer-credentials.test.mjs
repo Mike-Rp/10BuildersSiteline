@@ -210,6 +210,8 @@ test(
         await db.query("update users set status='active' where id=$1", [accountId])
         const activeSummary = await call("admin", "GET", "/licenses/credentials/" + accountId)
         assert.equal(activeSummary.data.eligibleForNewAssignment, decision === "verified")
+        if (decision === "pending") await assert.rejects(assertEligibleManager(db, accountId, role), { status: 422 })
+        else await assertEligibleManager(db, accountId, role)
         if (decision === "pending") {
           const reviewed = await call("admin", "POST", "/licenses/renewals/" + summary.data.submissions[0].id + "/verify", { note: "Evidence reviewed after registration." })
           assert.equal(reviewed.status, 200, JSON.stringify(reviewed))
