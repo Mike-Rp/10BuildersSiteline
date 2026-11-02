@@ -1,3 +1,4 @@
+import { SUBMISSION_KIND_SQL } from "../../services/licenses/submission-kind.utility.js";
 import { licenseAccessPolicy, licensePolicyDay } from "../../domain/license-access.js";
 // License status is always CALCULATED from the expiry date against the server's local today.
 // Nothing here is stored or typed in by a person.
@@ -68,8 +69,8 @@ export async function loadLicenseState(userId, { db, today = localDay() } = {}) 
     `select id, license_number, license_expiry::text as license_expiry, upload_status
        from user_licenses where user_id = $1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc limit 1`, [userId])).rows[0];
   const renewal = (await run(
-    `select id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note
-       from license_renewal_requests where user_id = $1 order by id desc limit 1`, [userId])).rows[0] || null;
+    `select id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note, ${SUBMISSION_KIND_SQL} as submission_kind
+       from license_renewal_requests q where user_id = $1 order by id desc limit 1`, [userId])).rows[0] || null;
   const computed = computeLicenseStatus({
     expiry: license?.license_expiry, today, reminderDays: rules.reminderDays, graceDays: rules.graceDays,
     renewalOpen: renewal?.status === "under_review",
@@ -87,8 +88,8 @@ export async function loadLicenseStates(userIds, { db, today = localDay() } = {}
     `select distinct on (user_id) user_id, id, license_number, license_expiry::text as license_expiry
        from user_licenses where user_id = any($1::uuid[]) and superseded_at is null order by user_id, (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
   const renewals = new Map((await run(
-    `select distinct on (user_id) user_id, id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note
-       from license_renewal_requests where user_id = any($1::uuid[]) order by user_id, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
+    `select distinct on (user_id) user_id, id, status, license_number, license_expiry::text as license_expiry, submitted_at, reviewed_at, review_note, ${SUBMISSION_KIND_SQL} as submission_kind
+       from license_renewal_requests q where user_id = any($1::uuid[]) order by user_id, id desc`, [userIds])).rows.map((r) => [r.user_id, r]));
   for (const id of userIds) {
     const license = licenses.get(id), renewal = renewals.get(id) || null;
     const computed = computeLicenseStatus({

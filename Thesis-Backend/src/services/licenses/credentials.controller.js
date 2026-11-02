@@ -1,3 +1,4 @@
+import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import {
   ENGINEER_SPECIALIZATIONS,
   REQUIREMENT_SPECIALIZATIONS,
@@ -39,7 +40,7 @@ export async function credentialSummary(db, userId) {
   ).rows
   const submissions = (
     await db.query(
-      `select q.id,q.profession,q.license_number,q.license_expiry::text,q.status,q.submitted_at,q.reviewed_at,q.review_note,u.full_name as reviewed_by_name from license_renewal_requests q left join users u on u.id=q.reviewed_by where q.user_id=$1 order by q.id desc`,
+      `select q.id,q.profession,q.license_number,q.license_expiry::text,q.status,${SUBMISSION_KIND_SQL} as submission_kind,q.submitted_at,q.reviewed_at,q.review_note,u.full_name as reviewed_by_name from license_renewal_requests q left join users u on u.id=q.reviewed_by where q.user_id=$1 order by q.id desc`,
       [userId],
     )
   ).rows

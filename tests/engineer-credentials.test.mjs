@@ -193,6 +193,7 @@ test(
         assert.equal(result.status, 201, JSON.stringify(result))
         const accountId = result.data.id
         const summary = await call("admin", "GET", "/licenses/credentials/" + accountId)
+        assert.equal(summary.data.submissions[0].submission_kind, "initial")
         assert.equal(summary.data.submissions[0].status, decision === "pending" ? "under_review" : "verified")
         assert.equal(summary.data.eligibleForNewAssignment, false, "invited accounts still require first login")
         assert.equal(summary.data.credentials.length, decision === "pending" ? 0 : 1)
@@ -283,6 +284,8 @@ test(
     const civil = await submit("Civil Engineer")
     assert.equal(civil.license_number, "0000123")
     assert.equal(civil.status, "under_review")
+    const ownQueue=await call("admin","GET","/licenses/renewals")
+    assert.equal(ownQueue.data.find(q=>String(q.id)===String(civil.id)).submission_kind,"renewal")
     assert.equal(
       (
         await call(

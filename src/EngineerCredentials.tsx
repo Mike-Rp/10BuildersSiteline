@@ -29,6 +29,7 @@ type Credential = {
   verification_note?: string
 }
 type Submission = {
+  submission_kind?: "initial" | "renewal"
   id: number
   profession: string | null
   license_number: string
@@ -203,7 +204,7 @@ export default function EngineerCredentials({
             <p>No verified professional credentials on file.</p>
           )}
           {!readOnly && <>
-          <h4>{admin ? "Save a credential or renewal" : "Submit a credential or renewal"}</h4>
+          <h4>{admin ? "Save a credential or renewal" : "Submit license renewal"}</h4>
           <p>
             {admin ? "Saving records the credential as verified with your administrator identity and the save time." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
           </p>
@@ -268,7 +269,7 @@ export default function EngineerCredentials({
               authenticity.
             </p>
             <Button disabled={busy} type="submit" variant="primary">
-              {busy ? "Saving…" : admin ? "Save credential" : "Send for verification"}
+              {busy ? "Saving…" : admin ? "Save credential" : "Submit license renewal"}
             </Button>
           </form>
           </>}
@@ -279,7 +280,7 @@ export default function EngineerCredentials({
                 <strong>
                   {q.profession || "Profession needs review"} ·{" "}
                   {q.status === "under_review"
-                    ? "Pending verification"
+                    ? q.submission_kind === "initial" ? "Initial credential under review" : "License renewal under review"
                     : q.status === "rejected"
                       ? q.review_note === "Replaced by a credential saved directly by an Administrator." ? "Replaced by Admin update" : "Correction required"
                       : "Verified"}

@@ -36,6 +36,6 @@ export default function MyProfile({ actor, projects, onClose }: {
         <div><strong>{p.name}</strong><p>{p.status} · {p.opmId === actor.id ? "Office PM" : p.team.filter(t => t.accountId === actor.id).map(t => `${t.phase} (${t.status})`).join(", ")}</p></div>
       </div>) : <p>No assignments on file.</p>}
     </section>
-    <p className="notice">Contact your Administrator to update official account details, professional credentials, or assignments.</p>
+    <p className="notice">Submit license renewals in Professional credentials above. Contact your Administrator to update official account details or assignments.</p>
   </Modal>
 }

@@ -69,7 +69,7 @@ test("credential profile separates account access, verification, expiry and revi
         profession: "Civil Engineer",
         license_number: "0001234",
         license_expiry: "2030-01-01",
-        status: "under_review",
+        status: "under_review", submission_kind: "initial",
         submitted_at: "2026-01-01T10:00:00Z",
       },
     ],
@@ -91,10 +91,10 @@ test("credential profile separates account access, verification, expiry and revi
     assert.match(document.body.textContent, /Account: active/)
     assert.match(document.body.textContent, /Not eligible for new assignments/)
     assert.match(document.body.textContent, /Expired/)
-    assert.match(document.body.textContent, /Pending verification/)
+    assert.match(document.body.textContent, /Initial credential under review/)
     assert.match(document.body.textContent, /0001234/)
     assert.ok([...document.querySelectorAll("button")].some(b => b.textContent === "Save credential"))
-    assert.equal([...document.querySelectorAll("button")].some(b => b.textContent === "Send for verification"), false)
+    assert.equal([...document.querySelectorAll("button")].some(b => b.textContent === "Submit license renewal"), false)
     assert.match(document.body.textContent, /Saving records the credential as verified/)
     assert.match(document.body.textContent, /Replaced by Admin update/)
     const review = [...document.querySelectorAll("button")].find(
@@ -130,7 +130,7 @@ test("credential profile separates account access, verification, expiry and revi
     )
     assert.ok(
       [...document.querySelectorAll("button")].some(
-        (b) => b.textContent === "Send for verification",
+        (b) => b.textContent === "Submit license renewal",
       ),
     )
     await act(async () => {
@@ -138,10 +138,21 @@ test("credential profile separates account access, verification, expiry and revi
       await new Promise(r => setTimeout(r, 30))
     })
     assert.match(document.body.textContent, /0001234/)
-    assert.match(document.body.textContent, /Pending verification/)
+    assert.match(document.body.textContent, /Initial credential under review/)
     assert.equal(document.querySelectorAll("form,input,select,textarea").length, 0)
     assert.ok([...document.querySelectorAll("button")].some(b => b.textContent === "View submitted document"))
     assert.equal([...document.querySelectorAll("button")].some(b => /Save|Review submission|Verify credential|Request correction/.test(b.textContent)), false)
+    const { RenewalQueue } = await server.ssrLoadModule("/src/LicenseWorkflow.tsx")
+    await act(() => root.render(React.createElement(RenewalQueue, {
+      renewals: [
+        { id: 10, full_name: "New account", role: "opm", license_number: "0012345", license_expiry: "2030-01-01", submitted_at: "2026-01-01", status: "under_review", submission_kind: "initial" },
+        { id: 11, full_name: "Renewing engineer", role: "spm", license_number: "0012346", license_expiry: "2030-01-01", submitted_at: "2026-01-01", status: "under_review", submission_kind: "renewal" },
+      ], onChanged() {},
+    })))
+    assert.match(document.body.textContent, /Initial credential under review/)
+    assert.match(document.body.textContent, /License renewal under review/)
+    assert.ok([...document.querySelectorAll("button")].some(b => b.textContent.trim() === "Verify credential"))
+    assert.ok([...document.querySelectorAll("button")].some(b => b.textContent.trim() === "Verify renewal"))
   } finally {
     await act(() => root.unmount())
     await server.close()

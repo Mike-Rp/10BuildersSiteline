@@ -3095,7 +3095,7 @@ function AppInner() {
         />
       )}
       {renewalsOpen && (
-        <Modal title="License renewals" subtitle="Verify or reject uploaded licenses." onClose={() => setRenewalsOpen(false)} wide>
+        <Modal title="Credential verification & renewals" subtitle="Review initial credentials awaiting approval and license renewal submissions." onClose={() => setRenewalsOpen(false)} wide>
           <RenewalQueue
             renewals={state.license?.renewals || []}
             onChanged={async () => {

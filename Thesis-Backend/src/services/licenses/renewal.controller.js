@@ -1,3 +1,4 @@
+import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import { PROFESSIONS, licenseNumberError, isoDateValid } from "../../domain/engineer-credentials.js";
 // Engineer submissions need review. Administrator saves are verified in the same transaction. Documents are personal data and are
 // readable only by the license holder and by Administrators.
@@ -20,7 +21,7 @@ export const publicState = (s) => ({
   graceDays: s.rules.graceDays, reminderDays: s.rules.reminderDays, licenseNumber: s.licenseNumber,
   renewal: s.renewal && {
     id: s.renewal.id, status: s.renewal.status, submittedAt: s.renewal.submitted_at, reviewedAt: s.renewal.reviewed_at,
-    reviewNote: s.renewal.status === "rejected" ? s.renewal.review_note : null, licenseExpiry: s.renewal.license_expiry,
+    reviewNote: s.renewal.status === "rejected" ? s.renewal.review_note : null, licenseExpiry: s.renewal.license_expiry, submissionKind: s.renewal.submission_kind,
   },
 });
 
@@ -75,9 +76,10 @@ export async function createRenewalRequest(db, user, body, file, options = {}) {
       const verified = await reviewRenewalInTransaction(db, user, inserted.rows[0].id, "verified", { note: options.note || "Saved directly by Administrator." });
       return { ...inserted.rows[0], ...verified };
     }
-    await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,
+    const kind = (await db.query(`select ${SUBMISSION_KIND_SQL} as kind from license_renewal_requests q where q.id=$1`, [inserted.rows[0].id])).rows[0].kind;
+    await notify(db, { title: kind === "initial" ? "Initial credential awaiting approval" : "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,
       subjectType: "license_renewal", subjectId: String(inserted.rows[0].id), link: "/licenses/renewals",
-      detail: `${engineer.full_name} submitted a renewed license (expires ${expiry}).` });
+      detail: kind === "initial" ? `${engineer.full_name} has an initial credential awaiting Admin verification (expires ${expiry}).` : `${engineer.full_name} submitted a license renewal (expires ${expiry}).` });
     return inserted.rows[0];
   } catch (error) {
     if (error.code === "23505") throw new HttpError(409, "A renewal is already under review.");
@@ -108,7 +110,7 @@ export const listRenewals = async (req, res) => {
     const status = ["under_review", "verified", "rejected"].includes(req.query.status) ? req.query.status : null;
     const rows = (await execute(
       `select q.id, q.user_id, u.full_name, r.code as role, q.license_number, q.license_expiry::text as license_expiry,
-              q.status, q.profession, q.submitted_at, q.reviewed_at, q.review_note, reviewer.full_name as reviewed_by_name
+              q.status, q.profession, ${SUBMISSION_KIND_SQL} as submission_kind, q.submitted_at, q.reviewed_at, q.review_note, reviewer.full_name as reviewed_by_name
          from license_renewal_requests q join users u on u.id=q.user_id join roles r on r.id=u.role_id left join users reviewer on reviewer.id=q.reviewed_by
         where ($1::text is null or q.status=$1) order by q.submitted_at desc limit 200`, [status])).rows;
     return sendOk(res, "Renewals retrieved.", rows.length, rows);
@@ -130,7 +132,7 @@ export const renewalFile = async (req, res) => {
     }
     const absolute = path.resolve(row.file_ref);
     if (!absolute.startsWith(UPLOAD_ROOT + path.sep) || !fs.existsSync(absolute)) return sendError(res, "Document not found.", 404);
-    return res.download(absolute, `License_renewal${path.extname(absolute)}`);
+    return res.download(absolute, `License_document${path.extname(absolute)}`);
   } catch (error) { return handleError(res, error); }
 };
 
@@ -142,7 +144,7 @@ async function reviewRenewalInTransaction(db, user, requestId, decision, body = 
   const owner=(await db.query("select user_id from license_renewal_requests where id=$1",[requestId])).rows[0];
   if(!owner)throw new HttpError(404,"Renewal not found.");
   await db.query("select id from users where id=$1 for update",[owner.user_id]);
-  const found = await db.query("select *, license_expiry::text as expiry_text from license_renewal_requests where id=$1 for update", [requestId]);
+  const found = await db.query(`select q.*, q.license_expiry::text as expiry_text, ${SUBMISSION_KIND_SQL} as submission_kind from license_renewal_requests q where q.id=$1 for update of q`, [requestId]);
   const request = found.rows[0];
   if (!request) throw new HttpError(404, "Renewal not found.");
   if (request.status !== "under_review") throw new HttpError(409, `This renewal was already ${request.status}.`);
@@ -171,7 +173,7 @@ async function reviewRenewalInTransaction(db, user, requestId, decision, body = 
     `update license_renewal_requests set status=$2, reviewed_by=$3, reviewed_at=now(), review_note=$4, resulting_license_id=$5 where id=$1`,
     [request.id, decision, user.id, note || null, licenseId]);
   await notify(db, {
-    title: decision === "verified" ? "License verified" : "License renewal rejected",
+    title: decision === "verified" ? "License verified" : request.submission_kind === "initial" ? "Initial credential requires correction" : "License renewal rejected",
     detail: decision === "verified" ? "Your credential was verified. Assignment eligibility depends on the required profession, expiry, availability and holds." : `Reason: ${note}`,
     recipientIds: [request.user_id], actorId: user.id,
   });

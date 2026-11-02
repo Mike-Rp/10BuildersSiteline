@@ -60,8 +60,8 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
     title = "Replacement preparation notice"
     detail = "New assignments are blocked and the Admin is preparing a replacement. Submit your renewed license for verification before " + expiry + " to stay eligible."
   } else if (license.status === "renewal_under_review") {
-    title = "Renewal under review"
-    detail = "An Administrator is verifying your renewed license."
+    title = renewal?.submissionKind === "initial" ? "Initial credential under review" : "License renewal under review"
+    detail = renewal?.submissionKind === "initial" ? "Your initial credential is awaiting Admin approval. New assignments remain blocked until verification is complete." : "An Administrator is verifying your license renewal."
   } else if (license.status === "expiring_soon") {
     title = "Your license expires in " + plural(daysUntil(license.expiry), "day")
     detail = "PRC license valid until " + expiry + "."
@@ -148,7 +148,7 @@ export function RenewalQueue({
       setBusy(false)
     }
   }
-  if (!renewals.length) return <Empty title="No renewals to review">Uploaded licenses appear here for verification.</Empty>
+  if (!renewals.length) return <Empty title="No credential submissions to review">Uploaded licenses appear here for verification.</Empty>
   return (
     <div className="license-list">
       {error && (
@@ -161,11 +161,11 @@ export function RenewalQueue({
           <div>
             <strong>{r.full_name}</strong>
             <small>
-              {r.role === "opm" ? "Office PM" : "Site PM"} · license {r.license_number} · new expiry {dateLabel(r.license_expiry)}
+              {r.role === "opm" ? "Office PM" : "Site PM"} · license {r.license_number} · expiry {dateLabel(r.license_expiry)}
             </small>
             <small>Uploaded {dateLabel(r.submitted_at)}</small>
           </div>
-          <Badge tone="amber">Renewal under review</Badge>
+          <Badge tone="amber">{r.submission_kind === "initial" ? "Initial credential under review" : "License renewal under review"}</Badge>
           <div className="license-actions">
             <Button
               icon="doc"
@@ -174,7 +174,7 @@ export function RenewalQueue({
               View document
             </Button>
             <Button variant="primary" disabled={busy} onClick={() => {setVerifying(r);setProfession(r.profession||"");setVerificationNote("")}}>
-              Verify renewal
+              {r.submission_kind === "initial" ? "Verify credential" : "Verify renewal"}
             </Button>
             <Button variant="danger-ghost" disabled={busy} onClick={() => setRejecting(r)}>
               Reject…
@@ -182,19 +182,19 @@ export function RenewalQueue({
           </div>
         </div>
       ))}
-      {verifying && <Modal title="Verify credential" subtitle="Manual review; no automatic PRC integration." onClose={()=>setVerifying(undefined)}>
+      {verifying && <Modal title={verifying.submission_kind === "initial" ? "Verify initial credential" : "Verify license renewal"} subtitle="Manual review; no automatic PRC integration." onClose={()=>setVerifying(undefined)}>
         <form onSubmit={async e=>{e.preventDefault();await run(async()=>{await licenses.verifyRenewal(verifying.id,{profession,note:verificationNote});setVerifying(undefined)})}}>
           <p><a href="https://verification.prc.gov.ph/" target="_blank" rel="noreferrer">Open official PRC verification website</a></p>
           <Field label="Licensed profession"><select required value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
           <Field label="Manual verification result"><textarea required maxLength={2000} value={verificationNote} onChange={e=>setVerificationNote(e.target.value)} /></Field>
           <p>The system saves your identity and the review time. A format match alone does not establish authenticity.</p>
           {error&&<p role="alert" className="error">{error}</p>}
-          <Button disabled={busy} type="submit" variant="primary">Verify submitted credential</Button>
+          <Button disabled={busy} type="submit" variant="primary">{verifying.submission_kind === "initial" ? "Verify credential" : "Verify renewal"}</Button>
         </form>
       </Modal>}
       {rejecting && (
         <Modal
-          title="Reject renewal"
+          title={rejecting.submission_kind === "initial" ? "Request credential correction" : "Reject renewal"}
           subtitle={`${rejecting.full_name} can submit corrected evidence through their account.`}
           onClose={() => setRejecting(undefined)}
         >
@@ -217,7 +217,7 @@ export function RenewalQueue({
             <div className="modal-actions wide">
               <Button onClick={() => setRejecting(undefined)}>Cancel</Button>
               <Button type="submit" variant="primary" disabled={busy}>
-                Reject renewal
+                {rejecting.submission_kind === "initial" ? "Request correction" : "Reject renewal"}
               </Button>
             </div>
           </form>

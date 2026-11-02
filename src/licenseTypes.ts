@@ -1,5 +1,6 @@
 // Shapes returned by the license endpoints (Thesis-Backend/src/services/licenses). Dates are YYYY-MM-DD.
 export type LicenseRenewal = {
+  submissionKind?: "initial" | "renewal"
   id: number
   status: "under_review" | "verified" | "rejected"
   submittedAt: string
@@ -45,6 +46,7 @@ export type OverviewItem = {
   needsCover: boolean
 }
 export type RenewalQueueItem = {
+  submission_kind?: "initial" | "renewal"
   profession?: string
   reviewed_by_name?: string
   id: number
