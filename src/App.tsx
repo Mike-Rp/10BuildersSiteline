@@ -1,3 +1,4 @@
+import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
@@ -27,7 +28,6 @@ import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guid
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import { clearStoredAccountPreferences, clearStoredWorkspaceData } from "./browser-data"
 import { createInFlight } from "./api/in-flight"
-import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
 import { adminDashboardOverview } from "./admin-dashboard"
 import ProjectProgress from "./ProjectProgress"
@@ -2847,24 +2847,8 @@ function AppInner() {
           </div>
           <Button className="sidebar-close admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
         </div>
-        <nav aria-label="Main navigation">
-          {NAV.map((n) => (
-            <div key={n.label}>
-              {n.group && <div className="nav-group-label">{n.group}</div>}
-              <button
-                aria-label={n.label}
-                aria-description={navigationCounts[n.label]?.count ? `${navigationCounts[n.label].count} ${navigationCounts[n.label].description}` : undefined}
-                className={`nav-item ${page === n.label ? "active" : ""}`}
-                onClick={() => navigate(n.label)}
-              >
-                <Icon name={n.icon} size={19} />
-                <span>{n.label}</span>
-                <NavigationCount item={navigationCounts[n.label]} />
-                {n.label === "Dashboard" && page === n.label && <i />}
-              </button>
-            </div>
-          ))}
-        </nav>
+        <CollapsibleSidebarNav items={NAV} page={page} counts={navigationCounts} onNavigate={navigate} />
+
         <div className="sidebar-bottom">
           <button onClick={() => { navigation.closeMobile(); setDialog({ kind: "help" }) }}>
             <Icon name="doc" size={18} />
