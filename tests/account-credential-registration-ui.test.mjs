@@ -27,6 +27,11 @@ test("SPM and OPM creation submit credentials once, default pending and require 
     const saved = []
     await React.act(() => root.render(React.createElement(AccountForm, { key: role, state: emptyState(), onClose() {}, onSave: value => saved.push(value) })))
     await enter("Account role", role)
+    const headings = [...document.querySelectorAll("form h3")].map(h => h.textContent)
+    const licenseIndex = headings.indexOf("Professional license details")
+    const specializationIndex = headings.findIndex(h => h.includes(role === "spm" ? "Areas of specialization" : "Project specialization"))
+    assert.ok(licenseIndex >= 0 && licenseIndex < specializationIndex)
+    assert.ok(headings.indexOf("Admin verification") > headings.indexOf("Project experience"))
     await enter("First name *", "Juan"); await enter("Last name *", "Cruz")
     await enter("Residential experience (years)", "0")
     await click(role === "spm" ? "Civil" : "Residential")

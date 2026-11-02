@@ -25,8 +25,8 @@ const port = () =>
   })
 test("credential input preserves text and validates real dates", () => {
   assert.equal(licenseNumberError("0000123"), "")
-  assert.equal(licenseNumberError("PRC-001"), "")
-  for (const v of [123, "", " 123", "123 ", "x".repeat(121), "123\n"])
+  assert.ok(licenseNumberError("PRC-001"))
+  for (const v of [1234567, "", "123456", "12345678", "123 456", "１２３４５６７", " 1234567", "1234567 ", "x".repeat(121), "1234567\n"])
     assert.ok(licenseNumberError(v))
   assert.equal(isoDateValid("2028-02-29"), true)
   for (const d of ["2027-02-29", "2026-13-01", "no date", null])
@@ -39,7 +39,7 @@ test("credential input preserves text and validates real dates", () => {
           verification_status: "verified",
           verified_by: "admin",
           verified_at: "2026-01-01",
-          license_number: "001",
+          license_number: "0000001",
           license_expiry: "2030-01-01",
           upload_status: "uploaded",
           upload_file_ref: "x",
@@ -225,8 +225,8 @@ test(
     const reusableFile = await uploadEvidence()
     const failedMulti = { request_id: crypto.randomUUID(), full_name: "Rollback registration", email: "rollback.registration@10builders.com", role: "spm",
       initial_credentials: [
-        { profession: "Civil Engineer", license_number: "0001", license_expiry: future, file_id: reusableFile },
-        { profession: "Electrical Engineer", license_number: "0002", license_expiry: "2000-01-01", file_id: await uploadEvidence() },
+        { profession: "Civil Engineer", license_number: "0000001", license_expiry: future, file_id: reusableFile },
+        { profession: "Electrical Engineer", license_number: "0000002", license_expiry: "2000-01-01", file_id: await uploadEvidence() },
       ], credential_decision: "verified", credential_evidence_reviewed: true, credential_review_note: "Reviewed evidence." }
     assert.equal((await call("admin", "POST", "/accounts", failedMulti)).status, 400)
     assert.equal((await db.query("select count(*)::int as n from users where email=$1", [failedMulti.email])).rows[0].n, 0)
@@ -237,7 +237,7 @@ test(
     assert.equal((await call("admin", "GET", "/licenses/credentials/" + successfulMulti.data.id)).data.credentials.length, 2)
     const foreignFile = await uploadEvidence("engineer")
     const invalidBody = { full_name: "Invalid registration", email: "invalid.registration@10builders.com", role: "spm",
-      initial_credentials: [{ profession: "Civil Engineer", license_number: "001", license_expiry: future, file_id: foreignFile }], credential_decision: "pending" }
+      initial_credentials: [{ profession: "Civil Engineer", license_number: "0000001", license_expiry: future, file_id: foreignFile }], credential_decision: "pending" }
     assert.equal((await call("admin", "POST", "/accounts", invalidBody)).status, 404)
     assert.equal((await call("engineer", "POST", "/accounts", invalidBody)).status, 403)
     assert.equal((await db.query("select count(*)::int as n from users where email=$1", [invalidBody.email])).rows[0].n, 0)
@@ -468,13 +468,11 @@ test(
       ])
     ).rows[0]
     assert.ok(expiredCivil.superseded_at)
-    const invalid = await call(
-      "engineer",
-      "POST",
-      "/licenses/renewals",
-      form("Civil Engineer", "x".repeat(121)),
-    )
-    assert.equal(invalid.status, 400)
+    for (const invalidNumber of ["123456", "12345678", "12A4567", "123 456", "x".repeat(121)]) {
+      const invalid = await call("engineer", "POST", "/licenses/renewals", form("Civil Engineer", invalidNumber))
+      assert.equal(invalid.status, 400)
+      assert.match(invalid.message, /exactly 7 digits/)
+    }
     const list = await call("admin", "GET", "/licenses/renewals")
     assert.equal(list.status, 200, JSON.stringify(list))
     assert.ok(list.data.some((q) => q.reviewed_by_name))

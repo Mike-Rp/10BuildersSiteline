@@ -110,7 +110,7 @@ function RenewalSubmit() {
   return (
     <div className="license-renewal-form">
       <Field label="Licensed profession"><select value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
-      <Field label="License number"><input maxLength={120} value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
+      <Field label="License number"><input inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
       <Field label="New expiry date"><input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
       <Field label="Renewed license file"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} /></Field>
       {error && <p className="error" role="alert">{error}</p>}

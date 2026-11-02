@@ -46,7 +46,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
   }
   return <>
     <section className="form-section registration-credentials">
-      <h3>Professional credentials</h3>
+      <h3>Professional license details</h3>
       <p>Save credentials with this account. Uploading alone does not verify them.</p>
       {rows.map((row, index) => <section className="credential-record" key={index}>
         <h4>Credential {index + 1}</h4>
@@ -54,7 +54,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
           <Field label="Licensed profession *"><select required value={row.profession} onChange={e => update(index, { profession: e.target.value })}>
             <option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}
           </select></Field>
-          <Field label="License number exactly as printed *"><input required maxLength={120} value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
+          <Field label="License number exactly as printed *"><input required inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
           <Field label="Expiry date *"><input required type="date" min={today()} value={row.license_expiry} onChange={e => update(index, { license_expiry: e.target.value })} /></Field>
           <Field label="Supporting credential document *"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => void upload(index, e.target.files?.[0])} />
             {row.fileName && <small>Attached: {row.fileName}</small>}
@@ -65,6 +65,13 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
       <Button disabled={rows.length >= PROFESSIONS.length} onClick={() => patch({ initialCredentials: [...rows, { profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "" }] })}>Add another professional credential</Button>
       <p>Leading zeros are preserved. Format checking does not verify authenticity.</p>
     </section>
+
+  </>
+}
+
+export function RegistrationVerification({ value, onChange }: { value: Partial<Account>; onChange: (value: Partial<Account>) => void }) {
+  const patch = (next: Partial<Account>) => onChange({ ...value, ...next })
+  return (
     <section className="form-section">
       <h3>Admin verification</h3>
       <Field label="Credential decision"><select value={value.credentialDecision || "pending"} onChange={e => patch({ credentialDecision: e.target.value as "pending" | "verified" })}>
@@ -78,5 +85,5 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
         ? "Your review identity, note and time are recorded. Assignments still require matching scope, account activation and availability."
         : "Credentials and specializations are saved. New assignments remain blocked until an appropriate credential is verified."}</p>
     </section>
-  </>
+  )
 }

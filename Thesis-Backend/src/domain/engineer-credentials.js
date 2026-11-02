@@ -47,20 +47,11 @@ export const REQUIREMENT_SPECIALIZATIONS = {
   Facade: [],
   Acoustic: [],
 }
-export const LICENSE_NUMBER_MAX = 120
+export const LICENSE_NUMBER_MAX = 7
 export function licenseNumberError(value) {
-  if (
-    typeof value !== "string" ||
-    !value.length ||
-    value.length > LICENSE_NUMBER_MAX ||
-    value !== value.trim() ||
-    [...value].some(
-      (character) =>
-        character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
-    )
-  )
-    return "Enter the license number exactly as printed, using 1–120 characters without leading/trailing whitespace or control characters. Leading zeros are preserved."
-  return ""
+  return typeof value === "string" && /^[0-9]{7}$/.test(value)
+    ? ""
+    : "Enter exactly 7 digits for the PRC license number. Keep any leading zeros."
 }
 export function isoDateValid(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))

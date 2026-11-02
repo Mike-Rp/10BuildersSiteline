@@ -31,7 +31,7 @@ Sources reviewed November 1, 2026:
 
 ## Number format
 
-No authoritative universal or supported-profession-specific digit length was established from the reviewed sources. The code therefore enforces a 1–120-character string input bound, rejects control characters and leading/trailing whitespace, and preserves leading zeros and punctuation. This is an input safety bound, not a claimed PRC number format. Never infer authenticity from this check. Numeric JSON input is rejected. No existing number is truncated or rewritten; questionable legacy records require review.
+The project requires PRC license numbers to be exactly seven ASCII digits (for example, 0012345). Registration, submission and verification share the same server validator. Fields remain text inputs to preserve leading zeros; numeric JSON values, letters, punctuation, whitespace and other lengths are rejected. This format rule does not establish authenticity. Existing stored numbers are not padded, truncated or rewritten; nonconforming records require Admin review.
 
 ## Independent credential lifecycle
 

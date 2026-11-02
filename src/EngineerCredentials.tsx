@@ -242,7 +242,7 @@ export default function EngineerCredentials({
             <Field label="License number exactly as printed">
               <input
                 required
-                maxLength={120}
+                inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
               />

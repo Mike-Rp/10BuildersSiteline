@@ -1,5 +1,5 @@
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
-import RegistrationCredentials, { validateRegistrationCredentials } from "./RegistrationCredentials"
+import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
@@ -733,10 +733,11 @@ export function AccountForm({
           </Field>
         )}
       </div>
+      {registeringEngineer && <RegistrationCredentials value={credentialDraft} onChange={setCredentialDraft} onBusy={setUploadingCredential} onError={setError} />}
       {!clientOnly && draft.role === "spm" && (
         <section className="form-section">
           <h3>
-            Engineer specializations <span>Choose 1–3</span>
+            Areas of specialization <span>Choose 1–3</span>
           </h3>
           {chips(ENGINEER_SPECIALIZATIONS, draft.scope, "scope", 3)}
           {draft.scope.filter(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag)).map(tag=><p key={tag}>Legacy tag requiring review: {tag} <Button onClick={()=>patch({scope:draft.scope.filter(t=>t!==tag)})}>Remove legacy tag</Button></p>)}
@@ -795,7 +796,7 @@ export function AccountForm({
           ))}
         </section>
       )}
-      {registeringEngineer && <RegistrationCredentials value={credentialDraft} onChange={setCredentialDraft} onBusy={setUploadingCredential} onError={setError} />}
+      {registeringEngineer && <RegistrationVerification value={credentialDraft} onChange={setCredentialDraft} />}
       {!account && !clientOnly && (
         <section className="form-section">
           <h3>Temporary credentials</h3>
