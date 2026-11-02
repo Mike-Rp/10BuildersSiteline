@@ -289,7 +289,27 @@ test(
     assert.equal(verifiedCompany.capabilityReview.reviewedById,user.id)
     assert.equal(verifiedCompany.capabilityReview.note,verifiedBody.verificationNote)
     assert.deepEqual(verifiedCompany.activeProjectIds,[])
-    // Keep registration fixtures out of the deterministic allocation scenario below.
+    // Only Admin may remove an unused company; evidence files remain intact.
+    const unusedId=randomUUID()
+    await api("/subcontractors/registrations",{method:"POST",json:{...suggestion,id:unusedId}})
+    assert.equal((await api("/subcontractors/"+unusedId+"/removal-readiness")).mode,"delete")
+    await assert.rejects(api("/subcontractors/"+unusedId+"/remove",{method:"POST",json:{action:"delete",companyName:"Wrong company"}}),/name changed/)
+    user=await as(source.lead_email)
+    await assert.rejects(api("/subcontractors/"+unusedId+"/removal-readiness"),e=>e.status===403)
+    await assert.rejects(api("/subcontractors/"+unusedId+"/remove",{method:"POST",json:{action:"delete",companyName:suggestion.name}}),e=>e.status===403)
+    user=await as("patricia.domingo@10builders.com")
+    await api("/subcontractors/"+unusedId+"/remove",{method:"POST",json:{action:"delete",companyName:suggestion.name}})
+    assert.equal((await db.query("select id from subcontractors where id=$1",[unusedId])).rowCount,0)
+    assert.equal((await db.query("select count(*)::int as n from audit_log where record_id=$1 and new_values->>'_archive_event'='unused_company_deleted'",[unusedId])).rows[0].n,1)
+    // Historical references force archive, preserving the company and documents.
+    await db.query("insert into project_subcontractor_selections(project_id,subcontractor_id,status) values($1,$2,'declined')",[projectId,verifiedId])
+    assert.equal((await api("/subcontractors/"+verifiedId+"/removal-readiness")).mode,"archive")
+    await assert.rejects(api("/subcontractors/"+verifiedId+"/remove",{method:"POST",json:{action:"delete",companyName:verifiedBody.name}}),/eligibility changed/)
+    await api("/subcontractors/"+verifiedId+"/remove",{method:"POST",json:{action:"archive",companyName:verifiedBody.name}})
+    assert.equal((await loadState(user)).companies.find(c=>c.id===verifiedId).status,"archived")
+    assert.equal((await db.query("select count(*)::int as n from project_subcontractor_selections where subcontractor_id=$1",[verifiedId])).rows[0].n,1)
+    assert.ok(await downloadApiFile(registeredProof))
+        // Keep registration fixtures out of the deterministic allocation scenario below.
     await db.query("update workspace_company_metadata set metadata=jsonb_set(metadata,'{capabilityReview,unavailable}','true') where subcontractor_id=any($1::uuid[])",[[suggestedId,verifiedId]])
     user = await as(source.lead_email)
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: randomUUID() } }), error => error.status === 403)
@@ -381,6 +401,13 @@ test(
     assert.deepEqual(project.siteLocation, cebu)
     assert.equal(allocationCandidates(state, project).find(company => company.id === outsideId).locationIssue, undefined, "A different historical operating area does not exclude a company")
     await directoryApi(`/subcontractors/${outsideId}/capabilities`, { method: "PUT", json: { ...localReview, operatingLocation: cebu } })
+    {
+      user=await as("patricia.domingo@10builders.com")
+      const assigned=state.companies.find(c=>c.id===plan.companyIds[0])
+      assert.equal((await api("/subcontractors/"+assigned.id+"/removal-readiness")).mode,"blocked")
+      await assert.rejects(api("/subcontractors/"+assigned.id+"/remove",{method:"POST",json:{action:"delete",companyName:assigned.name}}),/Resolve current/)
+      user=await as(source.lead_email)
+    }
     assert.equal(plan.companyIds.length, 2)
     assert.equal(project.subcontractorAllocationVersion, 1)
     assert.equal(

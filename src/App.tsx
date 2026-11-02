@@ -59,6 +59,7 @@ import { loadState as loadApiState } from "./api/load"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
+import CompanyRemovalActions from "./CompanyRemovalActions"
 import CompanyForemen from "./CompanyForemen"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
@@ -1668,8 +1669,8 @@ function AppInner() {
                       ),
                     )
                     return (
+                      <div className="company-card-shell" key={c.id}>
                       <button
-                        key={c.id}
                         className="company-card"
                         onClick={() => setDialog({ kind: "company", id: c.id })}
                       >
@@ -1704,6 +1705,8 @@ function AppInner() {
                           <Icon name="arrow" size={17} />
                         </div>
                       </button>
+                      <CompanyRemovalActions company={c} onView={() => setDialog({kind:"company",id:c.id})} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
+                      </div>
                     )
                   })}
                 </div>
@@ -2660,6 +2663,7 @@ function AppInner() {
           </div>
         </div>
         <CompanyForemen company={c} />
+        <CompanyRemovalActions company={c} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
         <p className="section-description">{c.note}</p>
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={previewDoc}
           onUpload={async doc => { await api("/subcontractors/" + c.id + "/supporting-documents", {method:"POST",json:{doc}}); await reloadWorkspace() }}

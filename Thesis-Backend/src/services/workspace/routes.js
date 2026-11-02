@@ -18,6 +18,7 @@ import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
 import { readManpowerFile, registerCompany, withdrawCompanyRequest } from "./manpower-import.utility.js";
 import { assertPhaseCoverage } from "../projects/phase-coverage.utility.js";
+import { companyRemovalReadiness, removeCompany } from "./company-removal.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { Router } from "express";
 import multer from "multer";
@@ -288,6 +289,13 @@ router.post("/subcontractors/registrations", endpoint(["admin"], async (db, user
     const saved = await registerCompany(db, user, req.body, file);
     await event(db, user, null, "Subcontractor company registered by Admin", req.body.name);
     return saved;
+}));
+router.get("/subcontractors/:id/removal-readiness", endpoint(["admin"], async (db, user, req) => {
+    const state = await companyRemovalReadiness(db, user, req.params.id);
+    return { mode: state.mode, companyName: state.company.company_name };
+}));
+router.post("/subcontractors/:id/remove", endpoint(["admin"], async (db, user, req) => {
+    return removeCompany(db, user, req.params.id, req.body);
 }));
 router.post("/subcontractors/:id/withdraw", endpoint(["spm"], async (db, user, req) => {
     await assertLicenseActive(user, db);
