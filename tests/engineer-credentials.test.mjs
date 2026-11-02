@@ -270,7 +270,7 @@ test(
     assert.equal(
       (await call("other", "GET", "/licenses/credentials/" + ids.engineer))
         .status,
-      404,
+      403,
     )
     await assert.rejects(assertEligibleManager(db, ids.engineer, "spm"), {
       status: 422,
@@ -531,5 +531,38 @@ test(
       ).status,
       403,
     )
+    for (const role of ["spm","opm"]) {
+      const account=(await db.query("select id,email from users where email=$1",[role+"verified@10builders.com"])).rows[0]
+      await db.query("update users set temp_password_issued=false,status='active' where id=$1",[account.id])
+      const signed=await fetch(base+"/auth/staff/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:account.email,password:"Password@123"})})
+      const auth=await signed.json();tokens.restricted=auth.data?.token||auth.token;assert.ok(tokens.restricted)
+      await db.query("update user_licenses set license_expiry=(current_timestamp at time zone 'Asia/Manila')::date+24 where user_id=$1 and superseded_at is null",[account.id])
+      assert.equal((await call("restricted","GET","/licenses/me")).data.renewalOnly,true)
+      assert.equal((await call("restricted","GET","/licenses/me")).data.renewalSubmissionAllowed,true)
+      await db.query("update user_licenses set license_expiry=(current_timestamp at time zone 'Asia/Manila')::date+23 where user_id=$1 and superseded_at is null",[account.id])
+      assert.equal((await call("restricted","GET","/licenses/me")).data.renewalOnly,true)
+      for(const endpoint of ["/workspace","/workspace/project-data","/subcontractors","/notifications","/accounts/"+account.id,"/licenses/overview"]){
+        const blocked=await call("restricted","GET",endpoint);assert.equal(blocked.status,403,endpoint);assert.equal(blocked.error.code,"LICENSE_RENEWAL_ONLY")
+      }
+      assert.equal((await call("restricted","POST","/workspace/reconcile-phase-handoffs",{})).status,403)
+      const closed=await call("restricted","POST","/licenses/renewals",form("Civil Engineer","0007654"))
+      assert.equal(closed.status,403);assert.equal(closed.error.code,"LICENSE_ADMIN_REQUIRED")
+      await db.query("update user_licenses set license_expiry=(current_timestamp at time zone 'Asia/Manila')::date+24 where user_id=$1 and superseded_at is null",[account.id])
+      const upload=await call("restricted","POST","/licenses/renewals",form("Civil Engineer","0007654"))
+      assert.equal(upload.status,201,JSON.stringify(upload))
+      await db.query("update user_licenses set license_expiry=(current_timestamp at time zone 'Asia/Manila')::date+23 where user_id=$1 and superseded_at is null",[account.id])
+      assert.equal((await call("restricted","GET","/licenses/me")).data.renewalOnly,true)
+      const mine=await call("restricted","GET","/licenses/credentials/"+account.id)
+      assert.equal(mine.status,200);assert.ok(mine.data.submissions.some(q=>q.status==='under_review'))
+      const stored=(await db.query("select file_ref from license_renewal_requests where id=$1",[upload.data.id])).rows[0].file_ref
+      assert.match(stored,/^db:/)
+      const fileResponse=await fetch(base+"/files/"+stored.slice(3)+"/content",{headers:{Authorization:"Bearer "+tokens.restricted}})
+      assert.equal(fileResponse.status,200)
+      const verified=await call("admin","POST","/licenses/renewals/"+upload.data.id+"/verify",{note:"Renewal evidence manually checked."})
+      assert.equal(verified.status,200,JSON.stringify(verified))
+      assert.equal((await call("restricted","GET","/licenses/me")).data.renewalOnly,false)
+      assert.equal((await call("restricted","GET","/workspace")).status,200)
+    }
+
   },
 )

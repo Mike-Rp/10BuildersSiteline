@@ -1,7 +1,10 @@
 import { getCredentials,putSpecializations,submitLegacyCredential } from "./credentials.controller.js";
 import { Router } from "express";
 import { requireRoles } from "../../common/utilities/access.utility.js";
-import { uploadLicenseFile } from "../accounts/manage.controller.js";
+import multer from "multer";
+import { sendError } from "../../common/utilities/access.utility.js";
+const renewalUpload = multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:1}}).single("file");
+const parseRenewal = (req,res,next) => renewalUpload(req,res,error => error ? sendError(res,"Use one PDF, JPG or PNG file up to 10 MB.",400) : next());
 import { myLicense, submitRenewal, listRenewals, renewalFile, verifyRenewal, rejectRenewal } from "./renewal.controller.js";
 import {
   overrideOptions, overview, createOverride, myRequests, acceptRequest, declineRequest, projectHistory, workRecord,
@@ -17,7 +20,7 @@ router.get("/requests", myRequests);
 router.post("/requests/:id/accept", acceptRequest);
 router.post("/requests/:id/decline", declineRequest);
 // Administrator
-router.post("/renewals", requireRoles("admin", "opm", "spm"), uploadLicenseFile, submitRenewal);
+router.post("/renewals", requireRoles("admin", "opm", "spm"), parseRenewal, submitRenewal);
 router.get("/renewals", listRenewals);
 router.post("/renewals/:id/verify", verifyRenewal);
 router.post("/renewals/:id/reject", rejectRenewal);

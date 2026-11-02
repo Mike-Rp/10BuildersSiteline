@@ -1,6 +1,7 @@
-// Defense-in-depth gate for project writes at the company 30-day license notice.
+import { licenseAccessPolicy } from "../../domain/license-access.js";
+// Defense-in-depth gate for project writes at the 30-day renewal window.
 // The check is made in the backend for every protected command, so the UI cannot bypass it.
-// The account-access gate separately allows seven viewing-only days, then blocks workspace access.
+// Workspace access stops at day 30. Self-service renewal closes at day 23.
 import execute from "./query.utility.js";
 import { HttpError } from "./access.utility.js";
 import { localDay } from "./license-status.utility.js";
@@ -19,7 +20,7 @@ export async function assertLicenseActive(user, db = null, today = localDay()) {
   const current = (await run(
     `select license_expiry::text as license_expiry from user_licenses
       where user_id = $1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc, id desc limit 1`, [user.id])).rows[0];
-  if (current?.license_expiry && current.license_expiry.slice(0, 10) <= new Date(Date.parse(today + "T00:00:00Z") + 30 * 86400000).toISOString().slice(0, 10)) {
+  if (licenseAccessPolicy(current?.license_expiry, today).mode === "view_only") {
     throw new HttpError(403, LICENSE_PAUSED_MESSAGE, LICENSE_PAUSED_CODE);
   }
 }

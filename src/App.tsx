@@ -1,5 +1,6 @@
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
+import RestrictedRenewalPage from "./RestrictedRenewalPage";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
@@ -51,6 +52,7 @@ import {
   ApiError,
   getToken,
   SESSION_REPLACED_EVENT,
+  LICENSE_RENEWAL_ONLY_EVENT,
   login as apiLogin,
   logout as apiLogout,
   tokenUser,
@@ -563,9 +565,11 @@ function AppInner() {
     }
     const timer = window.setInterval(() => { void refresh() }, 15000)
     const onFocus = () => { void refresh() }
+    const onRestricted = () => { loading = false; void refresh() }
+    window.addEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted)
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onFocus)
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
   }, [actor.id, actor.role, signedOut])
   async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
     if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}
@@ -2810,6 +2814,8 @@ function AppInner() {
       />
     )
   }
+  if ((actor.role === "opm" || actor.role === "spm") && state.license?.self?.renewalOnly)
+    return <><RestrictedRenewalPage actor={actor} status={state.license.self} onReload={reloadWorkspace} onSignOut={signOut.request} />{signOut.dialog}</>
   if (actor.role === "opm" || actor.role === "spm")
     return (
       <RoleWorkspace

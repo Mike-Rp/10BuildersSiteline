@@ -897,7 +897,7 @@ export function applyWorkflow(
     "This account is not eligible for an active session.",
   )
   const access = licenseAccessPolicy(actor.expiry)
-  assert(access.mode !== "view_only" || command.type === "view_document", LICENSE_VIEW_ONLY_MESSAGE)
+  assert(access.mode !== "view_only", LICENSE_VIEW_ONLY_MESSAGE)
   assert(
     actor.role === "opm" || actor.role === "spm",
     "This action requires an Office PM or Site PM session.",

@@ -1,3 +1,6 @@
+import { licenseAccessPolicy } from "../../domain/license-access.js";
+import { randomUUID } from "node:crypto";
+import { validateUpload } from "../workspace/upload-policy.utility.js";
 import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import { PROFESSIONS, licenseNumberError, isoDateValid } from "../../domain/engineer-credentials.js";
 // Engineer submissions need review. Administrator saves are verified in the same transaction. Documents are personal data and are
@@ -15,7 +18,7 @@ const UPLOAD_ROOT = path.resolve("uploads");
 const isIsoDate = isoDateValid;
 
 export const publicState = (s) => ({
-  access: s.access,
+  access: s.access, renewalSubmissionAllowed: licenseAccessPolicy(s.expiry).daysToExpiry === null || licenseAccessPolicy(s.expiry).daysToExpiry > 23, renewalOnly: licenseAccessPolicy(s.expiry).mode === "view_only", restrictedOn: licenseAccessPolicy(s.expiry).restrictedOn, noticeOn: licenseAccessPolicy(s.expiry).noticeOn,
   status: s.status, base: s.base, restricted: s.restricted, expiry: s.expiry, daysToExpiry: s.daysToExpiry,
   graceEndsOn: s.graceEndsOn, graceDaysLeft: s.graceDaysLeft, graceEnded: s.graceEnded,
   graceDays: s.rules.graceDays, reminderDays: s.rules.reminderDays, licenseNumber: s.licenseNumber,
@@ -91,13 +94,24 @@ export const submitRenewal = async (req, res) => {
   try {
     const user = await requireUser(req, res, ["admin", "opm", "spm"]);
     if (!user) {
-      if (req.file) fs.unlink(req.file.path, () => {});
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
       return;
     }
-    const data = await withTransaction((db) => createRenewalRequest(db, user, req.body || {}, req.file));
+    const data = await withTransaction(async (db) => {
+      if (!req.file) throw new HttpError(400, "Choose a supporting license document.");
+      const bytes = req.file.buffer || fs.readFileSync(req.file.path);
+      const contentType = await validateUpload({ ...req.file, buffer: bytes }, "document");
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(contentType)) throw new HttpError(400, "Use a PDF, JPG or PNG license document.");
+      const targetId = user.role === "admin" ? (req.body.user_id ?? req.body.userId) : user.id;
+      if (!isUuid(targetId)) throw new HttpError(400, "Select the engineer.");
+      const fileId = randomUUID();
+      await db.query("insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by) values($1,$2,'account',$3,$4,$5,$6,$7)", [fileId,targetId,req.file.originalname,contentType,bytes.length,bytes,user.id]);
+      return createRenewalRequest(db, user, req.body || {}, { path: "db:" + fileId });
+    });
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     return sendOk(res, user.role === "admin" ? "Credential saved and verified." : "Renewal uploaded. It will be reviewed by an Administrator.", 1, data, 201);
   } catch (error) {
-    if (req.file) fs.unlink(req.file.path, () => {});
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     return handleError(res, error);
   }
 };

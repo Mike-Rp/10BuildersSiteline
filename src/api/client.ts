@@ -13,6 +13,7 @@ export const setApiBase = (url: string) => {
 }
 
 const TOKEN_KEY = "siteline-api-token"
+export const LICENSE_RENEWAL_ONLY_EVENT = "siteline-license-renewal-only"
 export const SESSION_REPLACED_EVENT = "siteline-session-replaced"
 let memoryToken = ""
 
@@ -82,6 +83,9 @@ async function request<T>(
       }
       if (response.status === 403 && token && getToken() === token) {
         const failure = await response.clone().json().catch(() => undefined)
+        if (failure?.error?.code === "LICENSE_RENEWAL_ONLY" && typeof window !== "undefined") {
+          window.dispatchEvent(new window.CustomEvent(LICENSE_RENEWAL_ONLY_EVENT))
+        }
         if (failure?.error?.code === "LICENSE_ACCESS_DISABLED") {
           setToken("")
           if (typeof window !== "undefined") window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: failure.error.message }))

@@ -72,3 +72,10 @@ Account creation, scope, credentials, file ownership and verification share a tr
 New accounts retain the existing invited/first-login lifecycle. Pending credentials cannot qualify an account for new assignments. Admin can review saved submissions in Professional credentials without re-entering their details. Renewals, corrections, additional professions and review history remain in that section. Verification does not bypass matching, expiry restrictions, availability or holds.
 
 Requires migration 015 and the matching frontend/backend deployment; no additional schema migration is needed. No live migrations or account creation are performed by this change.
+
+
+## Renewal-only access after the warning period
+
+New assignments remain blocked from 30 days before expiry. From 30 days before expiry, OPM/SPM accounts may authenticate but can access only renewal submission/status, their submitted evidence, session/password operations and sign-out. Normal workspace reads and writes are denied by the backend. The frontend checks license status before fetching workspace data and switches to a dedicated renewal page. Self-service renewal submission is permitted only during the seven-day window; at 23 days before expiry it closes. An account with no pending submission must visit Admin to complete renewal and sees a blocked notice without an upload form. Timely submissions retain the pending-review page. Pending uploads do not lift the restriction. Admin verification recalculates access from the current credential; other account and assignment rules remain in force. Suspended or deactivated accounts do not gain access through this flow.
+
+Renewal uploads are validated and stored in stored_files in the same transaction as the submission. The current renewal endpoint uses memory upload parsing and does not require a writable uploads/licenses directory. Existing disk-file submissions remain readable, and the legacy upload endpoint remains compatible. No new database migration is required beyond the existing credential schema.

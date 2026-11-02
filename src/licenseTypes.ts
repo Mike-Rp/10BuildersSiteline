@@ -9,6 +9,10 @@ export type LicenseRenewal = {
   licenseExpiry?: string
 }
 export type LicenseSelf = {
+  renewalOnly?: boolean
+  renewalSubmissionAllowed?: boolean
+  noticeOn?: string | null
+  restrictedOn?: string | null
   status: "valid" | "expiring_soon" | "expired" | "renewal_under_review" | "missing"
   base: string
   restricted: boolean

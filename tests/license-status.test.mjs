@@ -183,8 +183,8 @@ test("expired engineers cannot mutate or view workspace records after the compan
     }
   }
   const expiring = {...state, accounts: state.accounts.map(a => a.id === spm.id ? {...a,expiry:inDays(28)} : a)}
-  try { applyWorkflow(expiring,spm.id,{type:"add_note",projectId:"p1"}) } catch (error) { assert.notEqual(error.message, LICENSE_VIEW_ONLY_MESSAGE, "28 days before expiry is not viewing-only") }
-  try { applyWorkflow(expired(spm),spm.id,{type:"view_document",projectId:"p1",label:"Notice to Proceed"}) } catch (error) { assert.notEqual(error.message, LICENSE_VIEW_ONLY_MESSAGE, "viewing stays allowed once expired") }
+  try { applyWorkflow(expiring,spm.id,{type:"add_note",projectId:"p1"}) } catch (error) { assert.equal(error.message, LICENSE_VIEW_ONLY_MESSAGE, "28 days before expiry is renewal-only") }
+  assert.throws(() => applyWorkflow(expired(spm),spm.id,{type:"view_document",projectId:"p1",label:"Notice to Proceed"}), {message:LICENSE_VIEW_ONLY_MESSAGE})
 })
 
 test("every command the backend pauses is also paused by the screen", () => {

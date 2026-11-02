@@ -1,3 +1,4 @@
+import { emptyState } from "../model.ts";
 import type { Account, Role, State } from "../model.ts"
 import type { LicenseData } from "../licenseTypes.ts"
 import { fetchMyLicense, fetchOverview, fetchRenewals, fetchRequests } from "./licenses.ts"
@@ -52,6 +53,17 @@ async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>)
 
 // Everything the signed-in role may see, as the app's State.
 export async function loadState(me: { id: string; role: Role; full_name?: string; email?: string }): Promise<State> {
+  let currentLicense: LicenseData["self"]
+  if (["opm", "spm"].includes(me.role)) {
+    const status = await fetchMyLicense()
+    currentLicense = status
+    if (status.renewalOnly) {
+      const state = emptyState()
+      const self = { ...stubAccount(me.id, me.full_name || "Engineer", me.role), email: me.email || "", expiry: status.expiry || "" }
+      state.accounts = [self]; state.license = { self: status }
+      return state
+    }
+  }
   // Catch up completed phases from older sessions and retry resolved blockers
   // before reading the confirmed workflow position. This never sends a phase or percentage.
   const handoffs = me.role === "client" ? [] : await api<{project_id:string;from:string;advanced:boolean;reason?:string}[]>(
@@ -120,7 +132,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   })
   const license: LicenseData = {}
   if (me.role === "opm" || me.role === "spm") {
-    const [mine, requests] = await Promise.all([tolerant(fetchMyLicense(), undefined), tolerant(fetchRequests(), [])])
+    const [mine, requests] = await Promise.all([currentLicense ? Promise.resolve(currentLicense) : tolerant(fetchMyLicense(), undefined), tolerant(fetchRequests(), [])])
     license.self = mine
     license.requests = requests
     const self = loaded.accounts.find((a) => a.id === me.id)

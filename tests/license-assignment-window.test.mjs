@@ -42,12 +42,12 @@ test('backend blocks new OPM/SPM assignments through day 30 and allows day 31', 
  test('company access boundaries and Manila dates', async () => {
  const {licenseAccessPolicy: policy,licensePolicyDay} = await import('../Thesis-Backend/src/domain/license-access.js')
  const expiry='2026-12-03'
- for(const [day,mode] of [['2026-10-30','normal'],['2026-11-03','normal'],['2026-12-03','normal'],['2026-12-04','view_only'],['2027-01-10','view_only']]) assert.equal(policy(expiry,day).mode,mode)
+ for(const [day,mode] of [['2026-10-30','normal'],['2026-11-03','view_only'],['2026-11-09','view_only'],['2026-11-10','view_only'],['2026-12-03','view_only'],['2026-12-04','view_only'],['2027-01-10','view_only']]) assert.equal(policy(expiry,day).mode,mode)
  assert.equal(policy(expiry,'2026-11-03').prepareReplacement,true)
  assert.equal(policy(expiry,'2026-11-02').prepareReplacement,false)
  assert.equal(policy(expiry,'2026-11-03').newAssignmentsBlocked,true)
  assert.equal(policy(expiry,'2026-11-02').newAssignmentsBlocked,false)
  assert.equal(policy(expiry,'2026-11-03').noticeOn,'2026-11-03')
- assert.equal(policy(expiry,'2026-11-03').restrictedOn,'2026-12-04')
+ assert.equal(policy(expiry,'2026-11-03').restrictedOn,'2026-11-10')
  assert.equal(licensePolicyDay(new Date('2026-10-29T16:01:00Z')),'2026-10-30')
 })

@@ -58,7 +58,7 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
     detail = "Submissions, approvals and project changes are disabled until your renewed license is verified. You can still view your records and submit your renewal. Your past work stays on record."
   } else if (policy.prepareReplacement) {
     title = "Replacement preparation notice"
-    detail = "New assignments are blocked and the Admin is preparing a replacement. Submit your renewed license for verification before " + expiry + " to stay eligible."
+    detail = "New assignments are blocked. Only renewal access is available from 30 days before expiry. Submit before " + dateLabel(policy.restrictedOn || "") + "; after that deadline, visit Admin. Your renewal must be verified to restore access."
   } else if (license.status === "renewal_under_review") {
     title = renewal?.submissionKind === "initial" ? "Initial credential under review" : "License renewal under review"
     detail = renewal?.submissionKind === "initial" ? "Your initial credential is awaiting Admin approval. New assignments remain blocked until verification is complete." : "An Administrator is verifying your license renewal."
