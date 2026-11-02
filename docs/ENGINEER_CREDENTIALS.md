@@ -61,3 +61,14 @@ This change does not fix missing-phase activation, redesign phases, change offic
 ## First-use checklist
 
 Apply migration 015 and deploy the matching API/UI before using this feature. Create accounts; submit each credential; manually verify it; record compatible specializations; then assign using the existing intake process. Review legacy records first. Fire Protection, Facade and Acoustic mappings remain unapproved and cannot grant automated eligibility. Company approval of operational mappings and staffing responsibility coverage remains necessary.
+
+
+## Combined SPM and OPM registration
+
+Admin can enter one or more professional credentials during account creation, alongside existing SPM specializations or OPM project-type matching and experience. The form defaults to pending verification. Verifying during creation requires an explicit evidence-review confirmation and a review note. Reviewer identity and time come from the server.
+
+Account creation, scope, credentials, file ownership and verification share a transaction. The existing request ID makes retries idempotent. Credential files must be fresh PDF/JPG/PNG uploads owned by the creating Admin; files linked to other records cannot be reused. Existing API clients may still omit initial credentials and complete them later.
+
+New accounts retain the existing invited/first-login lifecycle. Pending credentials cannot qualify an account for new assignments. Admin can review saved submissions in Professional credentials without re-entering their details. Renewals, corrections, additional professions and review history remain in that section. Verification does not bypass matching, expiry restrictions, availability or holds.
+
+Requires migration 015 and the matching frontend/backend deployment; no additional schema migration is needed. No live migrations or account creation are performed by this change.

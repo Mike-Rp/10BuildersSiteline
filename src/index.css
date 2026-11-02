@@ -474,6 +474,9 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .credential-record { display: flex; align-items: flex-start; gap: 13px; background: var(--surface-subtle); padding: 20px; border: 1px solid var(--color-line); border-radius: 7px; margin-top: 18px; }
 .credential-icon { color: var(--color-muted); }
 .credential-record > div { flex: 1; }
+.registration-credentials .credential-record { display: block; }
+.registration-credentials .credential-record h4 { margin-bottom: 14px; }
+.registration-credentials .credential-record > .button { margin-top: 12px; }
 .credential-record strong { font-size: 14px; font-weight: 500; }
 .credential-record p { color: var(--color-muted); font-size: 14px; margin-top: 6px; }
 .assignment-history { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 15px 0; border: 0; border-bottom: 1px solid var(--color-line); background: none; }

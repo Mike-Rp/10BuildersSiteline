@@ -315,6 +315,7 @@ function AppInner() {
     email: string
     name: string
     password: string
+    credentialDecision?: "pending" | "verified"
   }>()
   const [confirmation, setConfirmation] = useState<{
     title: string
@@ -740,7 +741,7 @@ function AppInner() {
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
       await reloadWorkspace();setDialog(undefined)
-      if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password})
+      if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,credentialDecision:account.credentialDecision})
       setToast(exists?"Account updated":"Account created")
     }catch(error){setToast((error as Error).message);throw error}
   }
@@ -3256,6 +3257,9 @@ function AppInner() {
             </span>
             <h3>{credentials.name}</h3>
             <p>Work email: <strong>{credentials.email}</strong></p>
+            {credentials.credentialDecision && <p role="status">{credentials.credentialDecision === "pending"
+              ? "Credentials saved · Pending Admin verification. New assignments are blocked until an appropriate credential is verified."
+              : "Credentials verified. Matching assignments still require first-login account activation and existing availability checks."}</p>}
           </div>
           <div className="password-display">
             <code>{credentials.password}</code>

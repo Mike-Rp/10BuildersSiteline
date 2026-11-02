@@ -1,4 +1,5 @@
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
+import RegistrationCredentials, { validateRegistrationCredentials } from "./RegistrationCredentials"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
@@ -569,6 +570,12 @@ export function AccountForm({
     setError("")
   }
   const [pass, setPass] = useState(password())
+  const registeringEngineer = !account && !clientOnly && ["spm", "opm"].includes(draft.role)
+  const [credentialDraft, setCredentialDraft] = useState<Partial<Account>>({
+    initialCredentials: [{ profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "" }],
+    credentialDecision: "pending",
+  })
+  const [uploadingCredential, setUploadingCredential] = useState(false)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -580,7 +587,11 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (savingRef.current) return
+    if (savingRef.current || uploadingCredential) return
+    if (registeringEngineer) {
+      const issue = validateRegistrationCredentials(credentialDraft)
+      if (issue) { setError(issue); return }
+    }
     const invalidClientEmail = requiresClientEmail && !generatedIdentity ? clientEmailError(draft.email) : ""
     setEmailError(invalidClientEmail)
     if (invalidClientEmail) { setError(""); return }
@@ -609,6 +620,7 @@ export function AccountForm({
       await onSave(
         {
           ...draft,
+          ...(registeringEngineer ? credentialDraft : {}),
           name: draft.name.trim(),
           email: requiresClientEmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
           phone: draft.phone.trim(),
@@ -652,7 +664,7 @@ export function AccountForm({
   }
   return (
     <form onSubmit={submit} noValidate={requiresClientEmail} aria-busy={saving}>
-      <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+      <fieldset disabled={saving || uploadingCredential} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         {!clientOnly && (
           <Field label="Account role" wide>
@@ -783,7 +795,7 @@ export function AccountForm({
           ))}
         </section>
       )}
-      {!account && !clientOnly && ["spm", "opm"].includes(draft.role) && <p className="notice">After creating this account, open Professional credentials to submit each licensed profession for Admin verification. Account creation does not grant assignment eligibility.</p>}
+      {registeringEngineer && <RegistrationCredentials value={credentialDraft} onChange={setCredentialDraft} onBusy={setUploadingCredential} onError={setError} />}
       {!account && !clientOnly && (
         <section className="form-section">
           <h3>Temporary credentials</h3>
@@ -828,13 +840,13 @@ export function AccountForm({
         </div>
       )}
       <div className="modal-actions">
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? "Saving account…" : account
+        <Button onClick={onClose} disabled={saving || uploadingCredential}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={saving || uploadingCredential}>
+          {uploadingCredential ? "Uploading document…" : saving ? "Saving account…" : account
             ? "Save changes"
             : clientOnly
               ? "Save client for project"
-              : "Create account"}
+              : registeringEngineer ? credentialDraft.credentialDecision === "verified" ? "Create account & verify credentials" : "Create account — pending verification" : "Create account"}
         </Button>
       </div>
       </fieldset>

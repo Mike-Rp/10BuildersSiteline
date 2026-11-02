@@ -170,15 +170,22 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
         delete (payload as Partial<typeof payload>).role;
     const saved = await api<Dto>(existing ? "/accounts/" + account.id : "/accounts", {
         method: existing ? "PATCH" : "POST", json: { ...payload,
-          ...(!existing ? { request_id: account.id } : {}),
+          ...(!existing ? { request_id: account.id,
+            ...(account.initialCredentials ? {
+              initial_credentials: account.initialCredentials.map(({ fileName, ...credential }) => credential),
+              credential_decision: account.credentialDecision,
+              credential_review_note: account.credentialReviewNote,
+              credential_evidence_reviewed: account.credentialEvidenceReviewed,
+            } : {}) } : {}),
           ...(!existing && account.lastName && !account.email ? { email: undefined, auto_work_email: true, last_name: account.lastName } : {}),
           ...(!existing && password ? { password } : {}) },
     });
     const id = saved.id || account.id;
     if (existing && account.status !== previous?.status && ["active", "suspended", "invited"].includes(account.status))
         await api("/accounts/" + id + "/status", { method: "PATCH", json: { status: account.status } });
+    const { initialCredentials, credentialDecision, credentialReviewNote, credentialEvidenceReviewed, ...workspaceAccount } = account;
     await api("/accounts/" + id + "/workspace", {
-        method: "PUT", json: { ...account, email: saved.email || account.email },
+        method: "PUT", json: { ...workspaceAccount, email: saved.email || account.email },
     });
     return { id, email: saved.email || account.email, password: saved.temp_password || password };
 }

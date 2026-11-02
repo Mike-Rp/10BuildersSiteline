@@ -1,3 +1,4 @@
+import { validateUpload } from "../workspace/upload-policy.utility.js";
 import { saveSpecializations,credentialSummary } from "../licenses/credentials.controller.js";
 import { workEmailFromAssignedId, assertWorkEmailAvailable } from "./work-email.utility.js";
 import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
@@ -213,6 +214,31 @@ async function insertAccountRecord(client, actor, body) {
   }
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
   await saveEngineerExperience(client, inserted.rows[0].id, experience);
+  if (body.initial_credentials !== undefined) {
+    if (actor.role !== "admin") throw new HttpError(403, "Administrator access required.");
+    const credentials = body.initial_credentials;
+    if (!["spm", "opm"].includes(role) || !Array.isArray(credentials) || !credentials.length || credentials.length > 6)
+      throw new HttpError(400, "Provide one to six professional credentials for an engineer account.");
+    if (new Set(credentials.map(c => c?.profession)).size !== credentials.length)
+      throw new HttpError(400, "Enter each licensed profession only once.");
+    if (!["pending", "verified"].includes(body.credential_decision)) throw new HttpError(400, "Choose pending verification or verified.");
+    const note = typeof body.credential_review_note === "string" ? body.credential_review_note.trim() : "";
+    if (note.length > 2000 || (body.credential_decision === "verified" && (body.credential_evidence_reviewed !== true || !note)))
+      throw new HttpError(400, "Confirm the evidence review and record a verification note.");
+    for (const credential of credentials) {
+      if (!isUuid(credential?.file_id)) throw new HttpError(400, "Upload a supporting credential document.");
+      const stored = (await client.query("select * from stored_files where id=$1 for update", [credential.file_id])).rows[0];
+      if (!stored || stored.uploaded_by !== actor.id || stored.purpose !== "upload" || stored.project_id)
+        throw new HttpError(404, "Available credential upload not found. Upload a new document.");
+      await validateUpload(stored, "document");
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(stored.content_type))
+        throw new HttpError(400, "Credential documents must be PDF, JPG or PNG.");
+      await client.query("update stored_files set user_id=$2,purpose='account' where id=$1", [stored.id, userId]);
+      await createRenewalRequest(client, actor, { user_id: userId, profession: credential.profession,
+        license_number: credential.license_number, license_expiry: credential.license_expiry },
+        { path: "db:" + stored.id }, { pending: body.credential_decision === "pending", note });
+    }
+  }
   return { ...inserted.rows[0],role,temp_password:password };
 }
 

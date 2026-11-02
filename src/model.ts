@@ -185,7 +185,18 @@ export type Doc = {
   mime?: string
   manpowerCount?: number
 }
+export type RegistrationCredential = {
+  profession: string
+  license_number: string
+  license_expiry: string
+  file_id: string
+  fileName: string
+}
 export type Account = {
+  initialCredentials?: RegistrationCredential[]
+  credentialDecision?: "pending" | "verified"
+  credentialReviewNote?: string
+  credentialEvidenceReviewed?: boolean
   id: string
   name: string
   role: Role

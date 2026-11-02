@@ -34,7 +34,8 @@ export const myLicense = async (req, res) => {
 };
 
 /** An engineer submits their own renewal, or an Administrator records one for them. Used by POST /licenses/renewals. */
-export async function createRenewalRequest(db, user, body, file) {
+export async function createRenewalRequest(db, user, body, file, options = {}) {
+  const verifyNow = user.role === "admin" && options.pending !== true;
   const userId = user.role === "admin" ? (body.user_id ?? body.userId) : user.id;
   if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
   const number = body.license_number ?? body.licenseNumber;
@@ -59,7 +60,7 @@ export async function createRenewalRequest(db, user, body, file) {
     if(!old||(old.profession&&old.profession!==profession))throw new HttpError(422,"The previous credential must belong to this engineer and profession.");
   }
   try {
-    if (user.role === "admin") {
+    if (verifyNow) {
       const pending = (await db.query("select id from license_renewal_requests where user_id=$1 and profession=$2 and status='under_review' for update", [userId, profession])).rows;
       for (const old of pending) {
         await db.query("update license_renewal_requests set status='rejected',reviewed_by=$2,reviewed_at=now(),review_note=$3 where id=$1", [old.id, user.id, "Replaced by a credential saved directly by an Administrator."]);
@@ -70,8 +71,8 @@ export async function createRenewalRequest(db, user, body, file) {
       `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by,profession,replaces_license_id)
        values($1,$2,$3,$4,$5,$6,$7) returning id,status,submitted_at`,
       [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id, profession, replaces]);
-    if (user.role === "admin") {
-      const verified = await reviewRenewalInTransaction(db, user, inserted.rows[0].id, "verified", { note: "Saved directly by Administrator." });
+    if (verifyNow) {
+      const verified = await reviewRenewalInTransaction(db, user, inserted.rows[0].id, "verified", { note: options.note || "Saved directly by Administrator." });
       return { ...inserted.rows[0], ...verified };
     }
     await notify(db, { title: "License renewal to review", recipientIds: await adminIds(db), actorId: user.id,

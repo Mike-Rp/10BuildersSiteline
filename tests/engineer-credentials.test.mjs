@@ -171,7 +171,75 @@ test(
       )
       return f
     }
-    // Test-specific upload evidence cleanup only, never enumerate/remove other files.
+    // Account creation and credentials commit atomically, for both engineer roles.
+    const uploadEvidence = async (who = "admin") => {
+      const id = crypto.randomUUID(), f = new FormData()
+      f.set("id", id); f.set("purpose", "document")
+      f.set("file", new Blob(["%PDF-1.4\n%%EOF"], { type: "application/pdf" }), "credential.pdf")
+      const r = await call(who, "POST", "/files", f)
+      assert.equal(r.status, 200, JSON.stringify(r))
+      return id
+    }
+    for (const role of ["spm", "opm"]) {
+      for (const decision of ["pending", "verified"]) {
+        const fileId = await uploadEvidence()
+        const body = { request_id: crypto.randomUUID(), full_name: "Registration " + role + decision,
+          email: role + decision + "@10builders.com", role, password: "Password@123",
+          scope: role === "spm" ? { disciplines: ["Civil", "Structural"] } : { project_types: ["Residential"] },
+          initial_credentials: [{ profession: "Civil Engineer", license_number: "0004567", license_expiry: future, file_id: fileId }],
+          credential_decision: decision, credential_evidence_reviewed: decision === "verified",
+          credential_review_note: decision === "verified" ? "Evidence checked during registration." : "" }
+        const result = await call("admin", "POST", "/accounts", body)
+        assert.equal(result.status, 201, JSON.stringify(result))
+        const accountId = result.data.id
+        const summary = await call("admin", "GET", "/licenses/credentials/" + accountId)
+        assert.equal(summary.data.submissions[0].status, decision === "pending" ? "under_review" : "verified")
+        assert.equal(summary.data.eligibleForNewAssignment, false, "invited accounts still require first login")
+        assert.equal(summary.data.credentials.length, decision === "pending" ? 0 : 1)
+        if (decision === "verified") {
+          assert.equal(summary.data.credentials[0].verified_by_name, "Patricia N. Domingo")
+          assert.equal(summary.data.credentials[0].verification_note, body.credential_review_note)
+          assert.equal(summary.data.credentials[0].license_number, "0004567")
+        }
+        if (role === "spm") assert.equal(summary.data.specializations.length, 2)
+        else assert.equal((await db.query("select count(*)::int as n from user_project_type_specializations where user_id=$1", [accountId])).rows[0].n, 1)
+        const retry = await call("admin", "POST", "/accounts", body)
+        assert.equal(retry.status, 201, JSON.stringify(retry))
+        assert.equal(retry.data.id, accountId)
+        assert.equal((await db.query("select count(*)::int as n from license_renewal_requests where user_id=$1", [accountId])).rows[0].n, 1)
+        await db.query("update users set status='active' where id=$1", [accountId])
+        const activeSummary = await call("admin", "GET", "/licenses/credentials/" + accountId)
+        assert.equal(activeSummary.data.eligibleForNewAssignment, decision === "verified")
+        if (decision === "pending") {
+          const reviewed = await call("admin", "POST", "/licenses/renewals/" + summary.data.submissions[0].id + "/verify", { note: "Evidence reviewed after registration." })
+          assert.equal(reviewed.status, 200, JSON.stringify(reviewed))
+          assert.equal((await call("admin", "GET", "/licenses/credentials/" + accountId)).data.eligibleForNewAssignment, true)
+        }
+        const decisionResult = await call("admin", "POST", "/accounts", { ...body, request_id: crypto.randomUUID(), email: "blocked" + role + decision + "@10builders.com", credential_decision: "verified", credential_evidence_reviewed: false })
+        assert.equal(decisionResult.status, 400, JSON.stringify(decisionResult))
+        assert.equal((await db.query("select count(*)::int as n from users where email=$1", ["blocked" + role + decision + "@10builders.com"])).rows[0].n, 0)
+      }
+    }
+    const reusableFile = await uploadEvidence()
+    const failedMulti = { request_id: crypto.randomUUID(), full_name: "Rollback registration", email: "rollback.registration@10builders.com", role: "spm",
+      initial_credentials: [
+        { profession: "Civil Engineer", license_number: "0001", license_expiry: future, file_id: reusableFile },
+        { profession: "Electrical Engineer", license_number: "0002", license_expiry: "2000-01-01", file_id: await uploadEvidence() },
+      ], credential_decision: "verified", credential_evidence_reviewed: true, credential_review_note: "Reviewed evidence." }
+    assert.equal((await call("admin", "POST", "/accounts", failedMulti)).status, 400)
+    assert.equal((await db.query("select count(*)::int as n from users where email=$1", [failedMulti.email])).rows[0].n, 0)
+    assert.equal((await db.query("select purpose from stored_files where id=$1", [reusableFile])).rows[0].purpose, "upload", "failed multi-credential creation rolls back earlier file links")
+    failedMulti.initial_credentials[1].license_expiry = future
+    const successfulMulti = await call("admin", "POST", "/accounts", failedMulti)
+    assert.equal(successfulMulti.status, 201, JSON.stringify(successfulMulti))
+    assert.equal((await call("admin", "GET", "/licenses/credentials/" + successfulMulti.data.id)).data.credentials.length, 2)
+    const foreignFile = await uploadEvidence("engineer")
+    const invalidBody = { full_name: "Invalid registration", email: "invalid.registration@10builders.com", role: "spm",
+      initial_credentials: [{ profession: "Civil Engineer", license_number: "001", license_expiry: future, file_id: foreignFile }], credential_decision: "pending" }
+    assert.equal((await call("admin", "POST", "/accounts", invalidBody)).status, 404)
+    assert.equal((await call("engineer", "POST", "/accounts", invalidBody)).status, 403)
+    assert.equal((await db.query("select count(*)::int as n from users where email=$1", [invalidBody.email])).rows[0].n, 0)
+        // Test-specific upload evidence cleanup only, never enumerate/remove other files.
     const submitted = []
     t.after(() => {
       for (const f of submitted) {

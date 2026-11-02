@@ -132,6 +132,11 @@ export default function EngineerCredentials({
               : "Not eligible for new assignments"}
           </p>
           <p>{data.eligibilityNote}</p>
+          {data.submissions.some(q => q.status === "under_review") && <div className="notice" role="status">
+            <strong>Pending Admin verification</strong>
+            <p>Submitted details are saved. Pending credentials do not qualify this account for new assignments.</p>
+            {admin ? <p>View the submitted document and choose Review submission below. No re-entry is needed.</p> : <p>Your credential is awaiting Admin review.</p>}
+          </div>}
           <p>
             Phase coordination matches:{" "}
             {data.qualifiedRequirements.join(", ") || "None"}. This does not
