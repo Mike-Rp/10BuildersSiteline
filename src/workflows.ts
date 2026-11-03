@@ -8,6 +8,7 @@ import {
   DOC_LABELS,
   PHASES,
   PROJECT_PHASE_DEFINITIONS,
+  headcount,
   phaseDefinitions,
   licenseExpired,
   licenseState,
@@ -391,6 +392,25 @@ export function activationChecks(state: State, p: Project) {
   const clientReady =
     !!client && ["active", "invited", "pending-setup"].includes(client.status)
   const own = !!p.clientSubcon && !p.subcontractorAllocation && p.subcontractorAllocationVersion !== 1
+  const legacyAllocation = !own && !p.subcontractorAllocation && p.subcontractorAllocationVersion !== 1
+  const acceptedLegacyCompany = legacyAllocation
+    ? activeSubcontractors(p).find((selection) => selection.status === "accepted")
+    : undefined
+  const workforcePhases = p.team.map((phase) => ({
+    name: phase.phase,
+    disciplines: phase.requiredDisciplines || [],
+  }))
+  const requiredWorkers = headcount(
+    p.type,
+    p.area,
+    p.floors,
+    workforcePhases.length && workforcePhases.every((phase) => phase.disciplines.length)
+      ? workforcePhases
+      : phaseDefinitions(p.type),
+  ).total
+  const acceptedLegacyCompanyRecord = acceptedLegacyCompany
+    ? state.companies.find((company) => company.id === acceptedLegacyCompany.companyId)
+    : undefined
   return [
     {
       id: "office",
@@ -420,6 +440,16 @@ export function activationChecks(state: State, p: Project) {
         : "All selected subcontractors approved and accepted",
       passed: consentComplete(state, p),
     },
+    ...(legacyAllocation && p.status === "pending"
+      ? [{
+          id: "workforce",
+          label: "Required subcontractor workers available",
+          passed: !!acceptedLegacyCompanyRecord && acceptedLegacyCompanyRecord.manpowerCount >= requiredWorkers,
+          detail: acceptedLegacyCompanyRecord
+            ? `${acceptedLegacyCompanyRecord.manpowerCount} available · ${requiredWorkers} required`
+            : `${requiredWorkers} workers required from the accepted subcontractor`,
+        }]
+      : []),
     ...(own
       ? []
       : [

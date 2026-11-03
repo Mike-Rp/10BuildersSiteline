@@ -214,6 +214,7 @@ function LegacyLeadSubcontractorPanel({
   const responsesComplete = checks.find(
     (check) => check.id === "subcontractors",
   )!.passed
+  const workforceReady = checks.find((check) => check.id === "workforce")?.passed ?? true
   const active = project.status === "active"
   const recommendations = subcontractorRecommendations(state, project)
   const candidates = recommendations.filter(
@@ -885,7 +886,9 @@ function LegacyLeadSubcontractorPanel({
               ? "Project active"
               : clientOwned && checks.every((c) => c.passed)
                 ? "Ready to activate"
-                : responsesComplete
+                : responsesComplete && !workforceReady
+                  ? "Subcontractor workforce needed"
+                  : responsesComplete
                   ? "Ready for signed agreement"
                   : clientOwned
                     ? "Awaiting your acknowledgment"
@@ -923,7 +926,9 @@ function LegacyLeadSubcontractorPanel({
               ? checks.every((check) => check.passed)
                 ? "All five requirements passed. Activation revalidates each one before it is applied."
                 : "Activation unlocks after you acknowledge the Admin-assigned subcontractor, any reported issue is resolved, and the other requirements pass."
-              : responsesComplete
+              : responsesComplete && !workforceReady
+                ? "This legacy allocation needs more available workers from its assigned subcontractor. Update that company’s active worker roster; this already-accepted project cannot switch allocation modes in place."
+                : responsesComplete
                 ? "Every selected company accepted. Review and confirm the signed agreement; activation is applied only if every final check still passes."
                 : clientOwned
                   ? "Agreement upload unlocks after you acknowledge the Admin-assigned subcontractor and any reported issue is resolved."
@@ -999,7 +1004,7 @@ function LegacyLeadSubcontractorPanel({
               <Upload
                 label={DOC_LABELS[6]}
                 owner={actor.name}
-                disabled={saving || !responsesComplete || coverageGaps.length > 0}
+                disabled={saving || !responsesComplete || !workforceReady || coverageGaps.length > 0}
                 buttonLabel="Upload signed subcontractor agreement"
                 onSave={async (doc) => {
                   const saved = await command(

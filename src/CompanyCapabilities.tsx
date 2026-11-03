@@ -115,7 +115,8 @@ export default function CompanyCapabilities({
             setDocuments(current => [...new Set([...current, document.id])])
           }} />}
           <p className="capability-help"><Icon name="doc" size={16} />Select records supporting this review. One record can support several capabilities.</p>
-          <Field label="Capability review note"><textarea disabled={busy} value={note} onChange={event => setNote(event.target.value)} placeholder="Which records support these capabilities?" maxLength={2000} /></Field>
+          <Field label="Capability review note (required)"><textarea disabled={busy} value={note} onChange={event => setNote(event.target.value)} placeholder="Which records support these capabilities?" maxLength={2000} aria-required="true" /></Field>
+          {!note.trim() && <p className="role-muted" role="status">Add a short review note to enable saving.</p>}
           <label className="trade-check"><input type="checkbox" disabled={busy} checked={unavailable} onChange={event => setUnavailable(event.target.checked)} />Unavailable for new commitments</label>
         </section>
       </div>
