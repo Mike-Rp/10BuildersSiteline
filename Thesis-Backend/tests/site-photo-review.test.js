@@ -7,13 +7,13 @@ const photoId = "44444444-4444-4444-8444-444444444444";
 const project = { id: "11111111-1111-4111-8111-111111111111", suggested_opm_id: "22222222-2222-4222-8222-222222222222" };
 const opm = { id: project.suggested_opm_id, role: "opm" };
 
-function photoDb(photo = { id: photoId, uploaded_by: "33333333-3333-4333-8333-333333333333", caption: "Foundation pour" }) {
+function photoDb(photo = { id: photoId, uploaded_by: "33333333-3333-4333-8333-333333333333", caption: "Foundation pour", review_status: "pending", is_client_visible: false }) {
   const calls = [];
   return {
     calls,
     async query(sql, params) {
       calls.push({ sql: sql.replace(/\s+/g, " ").trim(), params });
-      if (sql.startsWith("select id,uploaded_by,caption")) return { rows: photo ? [photo] : [], rowCount: photo ? 1 : 0 };
+      if (sql.startsWith("select id,uploaded_by,caption,review_status,is_client_visible")) return { rows: photo ? [photo] : [], rowCount: photo ? 1 : 0 };
       if (sql.startsWith("update project_photos")) return { rows: [], rowCount: 1 };
       throw new Error("Unexpected photo review query: " + sql);
     },
@@ -56,4 +56,7 @@ test("already reviewed or cross-project photos cannot be decided", async () => {
   const db = photoDb(null);
   await assert.rejects(reviewSitePhoto(db, opm, project, { type: "release_photo", photoId }),
     error => error instanceof HttpError && error.status === 404);
+  const released = photoDb({ id: photoId, uploaded_by: "33333333-3333-4333-8333-333333333333", caption: "Foundation pour", review_status: "released", is_client_visible: true });
+  await assert.rejects(reviewSitePhoto(released, opm, project, { type: "release_photo", photoId }),
+    error => error instanceof HttpError && error.status === 409 && /already released/.test(error.message));
 });

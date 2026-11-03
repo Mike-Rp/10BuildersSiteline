@@ -7,10 +7,13 @@ export async function reviewSitePhoto(db, user, project, command) {
   if (!isUuid(command.photoId)) throw new HttpError(400, "photoId must be a valid id.");
 
   const photo = (await db.query(
-    "select id,uploaded_by,caption from project_photos where id=$1 and project_id=$2 and review_status='pending' and not is_client_visible for update",
+    "select id,uploaded_by,caption,review_status,is_client_visible from project_photos where id=$1 and project_id=$2 for update",
     [command.photoId, project.id],
   )).rows[0];
-  if (!photo) throw new HttpError(404, "Photo is no longer awaiting review.");
+  if (!photo) throw new HttpError(404, "Photo not found in this project.");
+  if (photo.is_client_visible || photo.review_status === "released") throw new HttpError(409, "This photo is already released to the client.");
+  if (photo.review_status === "rejected") throw new HttpError(409, "This photo was already returned to the uploading Site PM.");
+  if (photo.review_status !== "pending") throw new HttpError(404, "Photo is no longer awaiting review.");
 
   if (command.type === "reject_photo") {
     const note = typeof command.note === "string" ? command.note.trim() : "";
