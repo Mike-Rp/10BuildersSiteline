@@ -943,10 +943,12 @@ function LegacyLeadSubcontractorPanel({
             <Icon name="alert" />
             <span>
               {client
-                ? `${client.name}'s client account is ${client.status}.`
-                : "The assigned client account cannot be found."}{" "}
-              Ask Admin to resolve the client record. Failed activation does not
-              partially promote the project.
+                ? client.status === "suspended" || client.status === "deactivated"
+                  ? `${client.name}'s client account is ${client.status}. Ask Admin to restore or replace the client record.`
+                  : `The client account for ${client.name} is not linked to this project. Ask Admin to check the project’s client assignment.`
+                : "The assigned client account cannot be found. Ask Admin to check the project’s client assignment."}{" "}
+              Activation remains blocked until the client record and project link
+              are valid.
             </span>
           </div>
         )}
