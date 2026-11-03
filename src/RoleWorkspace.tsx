@@ -3163,6 +3163,30 @@ export default function RoleWorkspace({
   }
   function projectDetail(p: Project) {
     const work = workflowFor(p)
+    const historyRows = p.history.slice().reverse().map((h, i) => (
+      <div className="history-row" key={i}>
+        <Icon name={h.issue ? "alert" : "activity"} size={18} />
+        <div>
+          <strong>{h.text}</strong>
+          <p>
+            {dateLabel(h.date)} · {h.phase || p.phase}
+            {h.clientVisible === false
+              ? " · Pending / internal"
+              : " · Approved or baseline history"}
+          </p>
+          {h.evidence && (isOpm || h.authorId === actor.id) && (
+            <Button
+              variant="text-button"
+              icon="doc"
+              onClick={() => showDoc(p, h.evidence!)}
+            >
+              View retained evidence · {h.evidence.name}
+            </Button>
+          )}
+        </div>
+        <b>{h.progress}%</b>
+      </div>
+    ))
     if (extensionDemo) return <ExtensionWorkflow actor={actor} projectId={p.id} />
     return (
       <>
@@ -3190,34 +3214,22 @@ export default function RoleWorkspace({
           {actor.id === leadId(p) && p.status === "active" ? subcontractorAllocation(p) : <SubcontractorAllocationReadOnly state={state} project={p} />}
         </section>}
         <section className="detail-section">
-          <h3>Progress history</h3>
-          {p.history
-            .slice()
-            .reverse()
-            .map((h, i) => (
-              <div className="history-row" key={i}>
-                <Icon name={h.issue ? "alert" : "activity"} size={18} />
-                <div>
-                  <strong>{h.text}</strong>
-                  <p>
-                    {dateLabel(h.date)} · {h.phase || p.phase}
-                    {h.clientVisible === false
-                      ? " · Pending / internal"
-                      : " · Approved or baseline history"}
-                  </p>
-                  {h.evidence && (isOpm || h.authorId === actor.id) && (
-                    <Button
-                      variant="text-button"
-                      icon="doc"
-                      onClick={() => showDoc(p, h.evidence!)}
-                    >
-                      View retained evidence · {h.evidence.name}
-                    </Button>
-                  )}
-                </div>
-                <b>{h.progress}%</b>
+          {isOpm ? (
+            <details className="opm-progress-history">
+              <summary>
+                <span>Progress history</span>
+                <small>{p.history.length} {p.history.length === 1 ? "record" : "records"}</small>
+              </summary>
+              <div className="opm-progress-history-rows">
+                {historyRows.length ? historyRows : <p className="role-muted">No progress history recorded yet.</p>}
               </div>
-            ))}
+            </details>
+          ) : (
+            <>
+              <h3>Progress history</h3>
+              {historyRows}
+            </>
+          )}
         </section>
         <section className="detail-section">
           <h3>Internal site diary</h3>
