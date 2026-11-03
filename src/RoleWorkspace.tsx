@@ -52,6 +52,7 @@ import PlannedTimeline from "./PlannedTimeline"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
+import NoteRemovalDialog from "./NoteRemovalDialog"
 import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
 import { AttachmentRow, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
@@ -297,6 +298,7 @@ export default function RoleWorkspace({
   const [assignmentFilter, setAssignmentFilter] = useState("all")
   const [assignmentId, setAssignmentId] = useState("")
   const [reviewAction, setReviewAction] = useState<WorkflowCommand>()
+  const [noteRemoval, setNoteRemoval] = useState<{ projectId: string; noteId: string; text: string }>()
   // Ordinary progress report being rejected (separate from checklist evidence and rework decisions).
   const [reportReject, setReportReject] = useState<{ projectId: string; projectName: string; expectedVersion: number }>()
   const [activityFilter, setActivityFilter] = useState("all")
@@ -3244,6 +3246,11 @@ export default function RoleWorkspace({
                     <p>
                       {actorName(n.authorId)} · {dateLabel(n.date)}
                     </p>
+                    {isOpm && p.opmId === actor.id && p.status !== "completed" && (
+                      <Button variant="text-button" onClick={() => setNoteRemoval({ projectId: p.id, noteId: n.id, text: n.text })}>
+                        Remove if unrelated
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
@@ -3964,6 +3971,13 @@ export default function RoleWorkspace({
             setError("")
             setMessage("Progress report rejected. The Site PM can submit a new report.")
           }}
+        />
+      )}
+      {noteRemoval && (
+        <NoteRemovalDialog
+          text={noteRemoval.text}
+          onClose={() => setNoteRemoval(undefined)}
+          onRemove={(reason) => act({ type: "remove_note", projectId: noteRemoval.projectId, noteId: noteRemoval.noteId, note: reason }, "Unrelated site diary note removed. Its audit record was retained.")}
         />
       )}
       {reviewAction && (

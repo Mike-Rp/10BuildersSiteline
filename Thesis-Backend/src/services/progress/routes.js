@@ -3,7 +3,7 @@ import {
   submitProgressUpdate, getPendingUpdate, approveProgressUpdate, rejectProgressUpdate,
   getEscalatedUpdates, sweepOverdueUpdates,
   submitReworkRequest, getReworkRequests, approveRework, rejectRework, getReworkPreview,
-  getProjectHistory, addProjectNote, getProjectNotes,
+  getProjectHistory, addProjectNote, getProjectNotes, removeProjectNote,
 } from "./controller.js";
  
 import { authorizePhaseUpload } from "./phase.controller.js";
@@ -28,5 +28,6 @@ router.post("/rework-requests/:id/reject", async (req, res) => { await rejectRew
 router.get("/projects/:id/history", async (req, res) => { await getProjectHistory(req, res); });
 router.post("/projects/:id/notes", async (req, res) => { await addProjectNote(req, res); });
 router.get("/projects/:id/notes", async (req, res) => { await getProjectNotes(req, res); });
+router.delete("/projects/:id/notes/:noteId", async (req, res) => { await removeProjectNote(req, res); });
  
 export default router;

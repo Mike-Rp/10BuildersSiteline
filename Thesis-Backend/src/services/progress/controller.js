@@ -4,6 +4,8 @@ import {
   handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isUuid, paging,
 } from "../../common/utilities/access.utility.js";
+import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
  
 import { submitPhaseUpdate } from "./phase.controller.js";
 import { reportProjectIssue } from "./phase.controller.js";
@@ -149,6 +151,45 @@ export const getProjectNotes = async (req, res) => {
       [id, limit, offset]
     );
     return sendOk(res, "Resource retrieved successfully.", result.rowCount, result.rows);
+  } catch (error) {
+    return handleError(res, error);
+  }
+};
+
+export const removeProjectNote = async (req, res) => {
+  try {
+    const user = await requireUser(req, res, ["admin", "opm"]);
+    if (!user) return;
+    const { id, noteId } = req.params;
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (!isUuid(id) || !isUuid(noteId)) return sendError(res, "Invalid project or note id.", 400);
+    if (reason.length < 5 || reason.length > 1000) return sendError(res, "Enter a removal reason between 5 and 1,000 characters.", 400);
+    if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
+
+    const data = await withTransaction(async db => {
+      await db.query("select set_config('app.current_user_id',$1,true)", [user.id]);
+      const project = (await db.query("select suggested_opm_id,lifecycle_status from projects where id=$1 and not coalesce(is_deleted,false) for update", [id])).rows[0];
+      if (!project) return { error: [404, "Project not found."] };
+      if (user.role === "opm" && project.suggested_opm_id !== user.id) return { error: [403, "Only the assigned Office PM can remove a site diary note."] };
+      if (project.lifecycle_status === "archived") return { error: [409, "Completed project records are read-only."] };
+      const note = (await db.query("select id,author_id,note_text from project_notes where id=$1 and project_id=$2 for update", [noteId, id])).rows[0];
+      if (!note) return { error: [404, "Site diary note not found."] };
+
+      await db.query("delete from project_notes where id=$1 and project_id=$2", [noteId, id]);
+      const activity = await db.query(`insert into activity_log(activity_type_id,title,detail,actor_user_id,related_project_id)
+        select id,'Site diary note removed',$1,$2,$3 from activity_types where code='notice' returning id`,
+      [`Removal reason: ${reason}`, user.id, id]);
+      if (activity.rowCount) {
+        const recipients = [...new Set([user.id, note.author_id].filter(Boolean))];
+        await db.query(`insert into notification_recipients(activity_log_id,recipient_user_id)
+          select $1,recipient_id from unnest($2::uuid[]) as recipients(recipient_id) on conflict do nothing returning activity_log_id`,
+        [activity.rows[0].id, recipients]);
+        await mirrorLegacyNotifications(db, [activity.rows[0].id]);
+      }
+      return { removed: true };
+    });
+    if (data.error) return sendError(res, data.error[1], data.error[0]);
+    return sendOk(res, "Site diary note removed from the project view. The removal is retained in the audit log.", 1, data);
   } catch (error) {
     return handleError(res, error);
   }

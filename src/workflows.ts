@@ -106,7 +106,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
   type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
-    | "release_photo" | "reject_photo"
+    | "release_photo" | "reject_photo" | "remove_note"
     | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company" | "set_allocation_location"
   siteLocation?: OperatingLocation
   plan?: AllocationPlan
@@ -117,6 +117,7 @@ export type WorkflowCommand = {
   doc?: Doc
   docIndex?: number
   note?: string
+  noteId?: string
   issues?: string[]
   evidence?: Doc
   companyId?: string
@@ -1868,6 +1869,16 @@ export function applyWorkflow(
         "Active sites",
       )
       break
+    case "remove_note": {
+      opm()
+      const noteIndex = work.notes.findIndex(entry => entry.id === command.noteId)
+      assert(noteIndex >= 0, "Site diary note not found.")
+      const reason = command.note?.trim() || ""
+      assert(reason.length >= 5, "Enter a reason for removing this site diary note.")
+      const [removed] = work.notes.splice(noteIndex, 1)
+      record("Site diary note removed", `${removed.text} · Reason: ${reason}`, "account", "Active sites")
+      break
+    }
     case "add_photo":
       assertCurrentOwner(p, actor)
       requireDoc(command.doc)

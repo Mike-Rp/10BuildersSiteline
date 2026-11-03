@@ -146,6 +146,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         case "add_note":
             await post(base + "/notes", { note_text: command.note });
             return;
+        case "remove_note": {
+            if (!command.noteId || !command.note?.trim()) throw new Error("Select a site diary note and enter a removal reason.");
+            await api(base + "/notes/" + command.noteId, { method: "DELETE", json: { reason: command.note.trim() } });
+            return;
+        }
         case "request_company":
             await post(base + "/workspace-command", command);
             return;

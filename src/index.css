@@ -117,6 +117,7 @@ kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--
 .opm-progress-history > summary > span { flex: 1; }
 .opm-progress-history > summary > small { color: var(--color-muted); font-size: 13px; font-weight: 500; }
 .opm-progress-history-rows { padding-top: 8px; }
+.site-diary-removal-quote { margin: 14px 0; padding: 12px 15px; border-left: 3px solid var(--color-line); background: var(--surface-subtle); color: var(--color-muted); overflow-wrap: anywhere; }
 .photo-review-return-note { display: block; max-width: 620px; color: var(--color-danger); margin-top: 5px; white-space: normal; }
 .site-photo-review { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 22px; align-items: start; }
 .site-photo-review-image { min-height: 300px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--color-line); border-radius: 8px; background: #eef3f7; }
