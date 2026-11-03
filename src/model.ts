@@ -184,6 +184,9 @@ export type Doc = {
   size?: number
   mime?: string
   manpowerCount?: number
+  photoReviewStatus?: "pending" | "released" | "rejected"
+  photoReviewNote?: string
+  photoUploaderId?: string
 }
 export type RegistrationCredential = {
   profession: string

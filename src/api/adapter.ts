@@ -157,10 +157,13 @@ export function mapPhoto(
   return {
     id: row.id,
     label: row.caption || "Site photo",
-    name: `${row.caption || "site-photo"}.png`,
+    name: row.original_name || `${row.caption || "site-photo"}.${String(row.content_type || "image/png").split("/")[1] || "png"}`,
     uploaded: true,
     clientVisible: row.client_visible === true,
-    owner: "Site PM",
+    photoReviewStatus: row.review_status || (row.client_visible ? "released" : "pending"),
+    photoReviewNote: row.review_note || undefined,
+    photoUploaderId: row.uploaded_by || undefined,
+    owner: row.uploader_name || "Site PM",
     date: day(row.taken_date || row.created_at),
     mime: "image/png",
   }

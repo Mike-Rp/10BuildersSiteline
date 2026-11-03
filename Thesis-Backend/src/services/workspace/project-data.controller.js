@@ -115,8 +115,9 @@ export async function getProjectData(req,res) {
     from project_progress_history h left join project_stages s on s.id=h.project_stage_id
     where h.project_id=any($1::uuid[]) and ($2<>'client' or h.is_client_visible)
    ) recent where position<=50 order by recorded_at desc,id desc`,[ids,user.role])).rows;
-   const photos=(await db.query(`select * from project_photos where project_id=any($1::uuid[])
-    and ($2<>'client' or is_client_visible) order by created_at`,[ids,user.role])).rows.map(r=>download({...r,client_visible:r.is_client_visible}));
+   const photos=(await db.query(`select ph.*,u.full_name as uploader_name,f.original_name,f.content_type,f.byte_size from project_photos ph left join users u on u.id=ph.uploaded_by
+    left join stored_files f on ph.file_ref='db://'||f.id or ph.file_ref='db:'||f.id
+    where ph.project_id=any($1::uuid[]) and ($2<>'client' or ph.is_client_visible) order by ph.created_at`,[ids,user.role])).rows.map(r=>download({...r,client_visible:r.is_client_visible}));
    const notes=staff?(await db.query(`select * from(
     select n.project_id,n.id,n.author_id,u.full_name as author,n.note_text,n.noted_at,
      row_number() over(partition by n.project_id order by n.noted_at desc) as position

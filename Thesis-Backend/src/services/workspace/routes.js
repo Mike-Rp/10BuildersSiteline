@@ -96,13 +96,14 @@ async function linkDocument(db, user, p, code, fileId) {
  values($1,$2,'uploaded',$3,$4,now()) on conflict(project_id,document_type_id) do update
  set status='uploaded',file_ref=excluded.file_ref,uploaded_by=excluded.uploaded_by,uploaded_at=now() returning id`, [p.id, type.id, "db://" + bytes.id, user.id])).rows[0];
 }
-async function event(db, user, p, title, detail = "") {
+async function event(db, user, p, title, detail = "", extraRecipientIds = []) {
     const result = await db.query(`insert into activity_log(activity_type_id,title,detail,actor_user_id,related_project_id)
  select id,$1,$2,$3,$4 from activity_types where code='notice' returning id`, [title, detail, user.id, p?.id || null]);
     if (result.rowCount) {
         await db.query(`insert into notification_recipients(activity_log_id,recipient_user_id)
  select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
- on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null]);
+ union select $1,recipient_id from unnest($4::uuid[]) as recipients(recipient_id)
+ on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null, extraRecipientIds]);
         await mirrorLegacyNotifications(db, [result.rows[0].id]);
     }
 }
@@ -353,7 +354,7 @@ router.get("/projects/:id/documents", endpoint(null, async (db, user, req) => {
 }));
 router.get("/projects/:id/photos", endpoint(null, async (db, user, req) => {
     const p = await project(db, user, req.params.id);
-    return (await db.query("select * from project_photos where project_id=$1 and ($2<>'client' or is_client_visible) order by created_at", [p.id, user.role])).rows
+    return (await db.query("select ph.*,u.full_name as uploader_name,f.original_name,f.content_type,f.byte_size from project_photos ph left join users u on u.id=ph.uploaded_by left join stored_files f on ph.file_ref='db://'||f.id or ph.file_ref='db:'||f.id where ph.project_id=$1 and ($2<>'client' or ph.is_client_visible) order by ph.created_at", [p.id, user.role])).rows
         .map(r => ({ ...r, client_visible: r.is_client_visible, download_url: r.file_ref?.startsWith("db:") ? "/api/v1/files/" + r.file_ref.replace(/^db:(\/\/)?/, "") + "/content" : null }));
 }));
 router.get("/projects/:id/contracts", endpoint(["admin", "opm", "spm"], async (db, user, req) => {
@@ -489,6 +490,9 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
 }));
 router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), c = req.body;
+    let eventTitle = c.type.replaceAll("_", " ");
+    let eventDetail = c.note || "";
+    let extraEventRecipients = [];
     const lead = (await db.query("select spm_user_id from project_phase_team where project_id=$1 and is_lead order by project_stage_id limit 1", [p.id])).rows[0]?.spm_user_id;
     const opm = () => { if (user.role !== "opm" || p.suggested_opm_id !== user.id)
         throw new HttpError(403, "Only the assigned Office PM can do this."); };
@@ -643,20 +647,32 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5)", [p.id, "db://" + f.id, c.note || "", user.id, false]); // internal until the Office PM or Administrator releases it
             break;
         }
-        case "release_photo": {
+        case "release_photo":
+        case "reject_photo": {
             if (user.role === "spm" || (user.role === "opm" && p.suggested_opm_id !== user.id))
-                throw new HttpError(403, "Only the assigned Office PM or an Administrator can release photos to the client.");
+                throw new HttpError(403, "Only the assigned Office PM or an Administrator can review site photos.");
             if (!isUuid(c.photoId))
                 throw new HttpError(400, "photoId must be a valid id.");
-            const released = await db.query("update project_photos set is_client_visible=true,released_by=$3,released_at=now() where id=$1 and project_id=$2 and not is_client_visible returning id", [c.photoId, p.id, user.id]);
-            if (!released.rowCount)
-                throw new HttpError(404, "Photo not found or already released.");
+            const photo = (await db.query("select id,uploaded_by,caption from project_photos where id=$1 and project_id=$2 and review_status='pending' and not is_client_visible for update", [c.photoId, p.id])).rows[0];
+            if (!photo) throw new HttpError(404, "Photo is no longer awaiting review.");
+            if (c.type === "reject_photo") {
+                const note = typeof c.note === "string" ? c.note.trim() : "";
+                if (!note || note.length > 2000) throw new HttpError(400, "Enter a rejection reason (up to 2,000 characters) so the uploader can correct the photo.");
+                await db.query("update project_photos set review_status='rejected',review_note=$3,reviewed_by=$4,reviewed_at=now(),is_client_visible=false where id=$1 and project_id=$2", [c.photoId, p.id, note, user.id]);
+                eventTitle = "Site photo returned for changes";
+                eventDetail = `${photo.caption || "Site photo"} · ${note}`;
+                extraEventRecipients = photo.uploaded_by ? [photo.uploaded_by] : [];
+            } else {
+                await db.query("update project_photos set review_status='released',review_note=null,reviewed_by=$3,reviewed_at=now(),is_client_visible=true,released_by=$3,released_at=now() where id=$1 and project_id=$2", [c.photoId, p.id, user.id]);
+                eventTitle = "Site photo released to client";
+                eventDetail = photo.caption || "Site photo";
+            }
             break;
         }
         default: throw new HttpError(400, "Unsupported project command.");
     }
     await db.query("insert into workspace_project_metadata(project_id,metadata) values($1,$2) on conflict(project_id) do update set metadata=excluded.metadata", [p.id, JSON.stringify(meta)]);
-    await event(db, user, p, c.type.replaceAll("_", " "), c.note || "");
+    await event(db, user, p, eventTitle, eventDetail, extraEventRecipients);
     return { project_id: p.id };
 }));
 router.post("/accounts/:id/resignation", endpoint(["admin"], async (db, user, req) => {

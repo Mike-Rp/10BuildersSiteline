@@ -2103,10 +2103,10 @@ export default function RoleWorkspace({
   }
   function reviews() {
     const photoReviewItems = allActive.filter((p) =>
-      workflowFor(p).photos.some((photo) => !photo.clientVisible),
+      workflowFor(p).photos.some((photo) => photo.photoReviewStatus === "pending"),
     )
     const photoReviewCount = photoReviewItems.reduce(
-      (count, p) => count + workflowFor(p).photos.filter((photo) => !photo.clientVisible).length,
+      (count, p) => count + workflowFor(p).photos.filter((photo) => photo.photoReviewStatus === "pending").length,
       0,
     )
     const qaItems = allActive.filter((p) =>
@@ -2175,13 +2175,16 @@ export default function RoleWorkspace({
               <p>Review Site PM gallery photos here. Preview each image, then release only the photos approved for client viewing. QA/QC evidence and field inspection uploads stay internal.</p>
             </div>
             {photoReviewItems.length ? photoReviewItems.map((p) => (
-              <Panel key={p.id} title={p.name} subtitle={`${p.phase} · ${workflowFor(p).photos.filter(photo => !photo.clientVisible).length} photos awaiting client release`}>
+              <Panel key={p.id} title={p.name} subtitle={`${p.phase} · ${workflowFor(p).photos.filter(photo => photo.photoReviewStatus === "pending").length} photos awaiting client release`}>
                 <SitePhotoGallery
-                  photos={workflowFor(p).photos.filter(photo => !photo.clientVisible)}
-                  onPreview={doc => showDoc(p, doc)}
-                  onRelease={async photoId => {
+                  photos={workflowFor(p).photos.filter(photo => photo.photoReviewStatus === "pending")}
+                  onApprove={async photoId => {
                     const saved = await act({ type: "release_photo", projectId: p.id, photoId }, "Photo released to the client.")
                     if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
+                  }}
+                  onReject={async (photoId, note) => {
+                    const saved = await act({ type: "reject_photo", projectId: p.id, photoId, note }, "Photo returned to the uploading Site PM with your reason.")
+                    if (!saved) throw new Error("Photo rejection failed. Refresh the project and try again.")
                   }}
                 />
               </Panel>
@@ -3209,10 +3212,14 @@ export default function RoleWorkspace({
         </section>
         <section className="detail-section">
           <h3>Site photo gallery</h3>
-          <SitePhotoGallery photos={work.photos} onPreview={doc => showDoc(p, doc)}
-            onRelease={isOpm && p.opmId === actor.id && p.status !== "completed" ? async photoId => {
+          <SitePhotoGallery photos={work.photos}
+            onApprove={isOpm && p.opmId === actor.id && p.status !== "completed" ? async photoId => {
               const saved = await act({ type: "release_photo", projectId: p.id, photoId }, "Photo released to the client.")
               if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
+            } : undefined}
+            onReject={isOpm && p.opmId === actor.id && p.status !== "completed" ? async (photoId, note) => {
+              const saved = await act({ type: "reject_photo", projectId: p.id, photoId, note }, "Photo returned to the uploading Site PM with your reason.")
+              if (!saved) throw new Error("Photo rejection failed. Refresh the project and try again.")
             } : undefined} />
         </section>
         <section className="detail-section">

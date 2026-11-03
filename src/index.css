@@ -109,6 +109,18 @@ kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--
 .photo-gallery-record > .assignment-history { flex: 1 1 260px; min-width: 0; }
 .photo-gallery-record .assignment-history > span { min-width: 0; overflow-wrap: anywhere; }
 .photo-gallery-record .badge { margin-block: 6px; }
+.photo-review-return-note { display: block; max-width: 620px; color: var(--color-danger); margin-top: 5px; white-space: normal; }
+.site-photo-review { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 22px; align-items: start; }
+.site-photo-review-image { min-height: 300px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--color-line); border-radius: 8px; background: #eef3f7; }
+.site-photo-review-image img, .site-photo-review-image object { display: block; width: 100%; height: min(65vh, 680px); object-fit: contain; }
+.site-photo-review-image > div { padding: 24px; color: var(--color-muted); text-align: center; }
+.site-photo-review-summary { display: flex; flex-direction: column; gap: 5px; padding: 13px 15px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); }
+.site-photo-review-summary span { color: var(--color-muted); font-size: 14px; }
+.site-photo-review-form > p { color: var(--color-muted); line-height: 1.55; }
+.site-photo-review-actions { align-items: center; }
+.site-photo-review-decisions { display: flex; gap: 8px; margin-right: auto; }
+@media (max-width: 760px) { .site-photo-review { grid-template-columns: minmax(0, 1fr); } .site-photo-review-image img, .site-photo-review-image object { height: min(42vh, 420px); } }
+@media (max-width: 560px) { .site-photo-review-actions { justify-content: stretch; } .site-photo-review-decisions { width: 100%; margin: 0; } .site-photo-review-decisions .button, .site-photo-review-actions > .button { flex: 1; } }
 .notification-container { position: relative; }
 .notification-dot { position: absolute; top: 6px; right: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--surface-subtle); border: 1px solid white; pointer-events: none; }
 .notification-popover { position: absolute; top: 48px; right: -45px; width: 410px; border: 1px solid var(--color-line); background: white; box-shadow: 0 12px 35px #172B4D1a; border-radius: 9px; overflow: hidden; }

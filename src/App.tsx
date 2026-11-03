@@ -2277,10 +2277,14 @@ function AppInner() {
             <EngineerHistory projectId={p.id} />
             <section className="detail-section">
               <h3>Site photo gallery</h3>
-              <SitePhotoGallery photos={p.workflow?.photos || []} onPreview={previewDoc}
-                onRelease={p.status !== "completed" ? async photoId => {
+              <SitePhotoGallery photos={p.workflow?.photos || []}
+                onApprove={p.status !== "completed" ? async photoId => {
                   const result = await sendWorkflow({ type: "release_photo", projectId: p.id, photoId })
                   if (!result.ok) throw new Error(result.error || "Photo release failed. Try again.")
+                } : undefined}
+                onReject={p.status !== "completed" ? async (photoId, note) => {
+                  const result = await sendWorkflow({ type: "reject_photo", projectId: p.id, photoId, note })
+                  if (!result.ok) throw new Error(result.error || "Photo rejection failed. Try again.")
                 } : undefined} />
             </section>
             <section className="detail-section">

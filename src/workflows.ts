@@ -106,7 +106,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
   type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
-    | "release_photo"
+    | "release_photo" | "reject_photo"
     | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company" | "set_allocation_location"
   siteLocation?: OperatingLocation
   plan?: AllocationPlan
@@ -1879,6 +1879,8 @@ export function applyWorkflow(
         ...command.doc,
         owner: actor.name,
         clientVisible: false,
+        photoReviewStatus: "pending",
+        photoUploaderId: actor.id,
       })
       record(
         "Site photo uploaded",
@@ -1890,9 +1892,22 @@ export function applyWorkflow(
     case "release_photo": {
       opm()
       const photo = work.photos.find(doc => doc.id === command.photoId)
-      assert(photo && !photo.clientVisible, "Photo not found or already released.")
+      assert(photo && !photo.clientVisible && photo.photoReviewStatus !== "rejected", "Photo not found or not awaiting review.")
       photo.clientVisible = true
+      photo.photoReviewStatus = "released"
+      photo.photoReviewNote = undefined
       record("Site photo released to the client", photo.name, "approval", "Active sites")
+      break
+    }
+    case "reject_photo": {
+      opm()
+      const photo = work.photos.find(doc => doc.id === command.photoId)
+      assert(photo && !photo.clientVisible && photo.photoReviewStatus !== "rejected", "Photo not found or not awaiting review.")
+      const rejectionNote = command.note?.trim() || ""
+      assert(rejectionNote, "Explain why this photo is being returned to the Site PM.")
+      photo.photoReviewStatus = "rejected"
+      photo.photoReviewNote = rejectionNote
+      record("Site photo returned for changes", `${photo.name} · ${rejectionNote}`, "request", "Active sites")
       break
     }
     case "request_company": {
