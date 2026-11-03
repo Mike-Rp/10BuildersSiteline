@@ -242,7 +242,7 @@ export function mapProject(parts: ProjectParts): Project {
         reviewNote: i.review_note || undefined,
         submittedBy: i.submitted_by || undefined,
         submittedByName: i.submitted_by_name || undefined,
-        doc:i.file_id?{id:i.file_id,label:i.title,name:i.original_name||"Checklist evidence.pdf",uploaded:true,clientVisible:false,owner:"Site PM",date:day(i.submitted_at),mime:i.content_type}:undefined,
+        doc:i.file_id?(register(i.file_id,"/api/v1/projects/"+id+"/phase-files/"+i.file_id),{id:i.file_id,label:i.title,name:i.original_name||"Checklist evidence.pdf",uploaded:true,clientVisible:false,owner:"Site PM",date:day(i.submitted_at),mime:i.content_type}):undefined,
       }),
     )
 

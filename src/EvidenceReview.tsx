@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
-import { api } from "./api/client"
+import { api, downloadApiFile } from "./api/client"
 import type { ProgressTotals } from "./project-progress"
-import { Button, Field, Modal } from "./ui"
+import type { Doc } from "./model"
+import { Button, Field, Icon, Modal } from "./ui"
 
 type Preview = {
   activity: string
@@ -14,17 +15,20 @@ const measure = (value: ProgressTotals) => value.earned === null || value.total 
   ? "Unavailable"
   : `${value.earned} / ${value.total} points`
 
-export default function EvidenceReview({projectId,evidenceId,reject,onClose,onConfirm}: {
+export default function EvidenceReview({projectId,evidenceId,doc,onClose,onConfirm}: {
   projectId: string
   evidenceId: string
-  reject: boolean
+  doc?: Doc
   onClose: () => void
-  onConfirm: (token: string, note: string) => Promise<boolean>
+  onConfirm: (token: string, note: string, reject: boolean) => Promise<boolean>
 }) {
   const [preview,setPreview]=useState<Preview>()
   const [error,setError]=useState("")
   const [note,setNote]=useState("")
   const [busy,setBusy]=useState(false)
+  const [reject,setReject]=useState(false)
+  const [fileUrl,setFileUrl]=useState("")
+  const [fileLoading,setFileLoading]=useState(!!doc)
   useEffect(()=>{
     let active=true
     api<Preview>(`/projects/${projectId}/evidence/${evidenceId}/review-preview`)
@@ -32,11 +36,37 @@ export default function EvidenceReview({projectId,evidenceId,reject,onClose,onCo
       .catch(error=>{if(active)setError((error as Error).message)})
     return ()=>{active=false}
   },[projectId,evidenceId])
-  return <Modal title={reject ? "Reject activity evidence" : "Approve activity evidence"} onClose={()=>{if(!busy)onClose()}}>
+  useEffect(()=>{
+    let active=true
+    let objectUrl=""
+    if(!doc){setFileLoading(false);return}
+    setFileLoading(true)
+    downloadApiFile(doc.id).then(file=>{
+      if(!active)return
+      if(file){objectUrl=URL.createObjectURL(file);setFileUrl(objectUrl)}
+      setFileLoading(false)
+    }).catch(()=>{if(active)setFileLoading(false)})
+    return ()=>{active=false;if(objectUrl)URL.revokeObjectURL(objectUrl)}
+  },[doc?.id])
+  return <Modal wide title="Review activity evidence" subtitle={doc?.name} onClose={()=>{if(!busy)onClose()}}>
+    <div className="evidence-review-layout">
+    <section className="evidence-review-preview" aria-label="Submitted evidence preview">
+      <div className="evidence-review-preview-heading"><Icon name="doc"/><strong>{doc?.label || "Submitted evidence"}</strong></div>
+      {fileUrl && doc?.name && /\.(png|jpe?g|gif|webp)$/i.test(doc.name)
+        ? <img src={fileUrl} alt={doc.label} />
+        : fileUrl
+          ? <object data={`${fileUrl}#toolbar=0&navpanes=0`} type="application/pdf" aria-label={doc?.name || "Submitted evidence"}><p>Preview is unavailable in this browser.</p></object>
+          : <div className="evidence-review-preview-empty" role="status">{fileLoading ? "Loading submitted evidence…" : "Evidence preview is unavailable. You can still review the submission details."}</div>}
+    </section>
+    <section className="evidence-review-decision">
+    <h3>{preview?.activity || doc?.label || "Submitted evidence"}</h3>
+    <div className="evidence-review-choice" role="group" aria-label="Evidence decision">
+      <Button variant={!reject ? "primary" : undefined} onClick={()=>setReject(false)}>Approve</Button>
+      <Button variant={reject ? "danger-ghost" : undefined} onClick={()=>setReject(true)}>Reject</Button>
+    </div>
     {!preview && !error && <p role="status">Loading review impact…</p>}
     {error && <p role="alert">{error}</p>}
     {preview && <>
-      <h3>{preview.activity}</h3>
       <p>{preview.phase_name} · This decision applies to this activity only.</p>
       {!reject && preview.after.phase.percentage === 100 && <p>The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass.</p>}
       <div className="notice subsection">
@@ -56,12 +86,14 @@ export default function EvidenceReview({projectId,evidenceId,reject,onClose,onCo
         if(!preview)return
         setBusy(true)
         try {
-          if(await onConfirm(preview.review_token,note.trim()))onClose()
+          if(await onConfirm(preview.review_token,note.trim(),reject))onClose()
           else {setPreview(undefined);setError("Review was not saved. Close this panel and reopen the activity to refresh its current state.")}
         }
         catch(error){setError((error as Error).message)}
         finally{setBusy(false)}
       }}>{busy ? "Saving…" : reject ? "Confirm rejection" : "Confirm approval"}</Button>
+    </div>
+    </section>
     </div>
   </Modal>
 }

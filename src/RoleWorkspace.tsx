@@ -2199,18 +2199,10 @@ export default function RoleWorkspace({
                               ? new Date(item.submittedAt).toLocaleString()
                               : "date unavailable"}
                           </p>
-                          {item.doc && (
-                            <Button
-                              icon="doc"
-                              onClick={() => showDoc(p, item.doc!)}
-                            >
-                              View evidence · {item.doc.name}
-                            </Button>
-                          )}
                           <div className="role-actions">
                             <Button
                               variant="primary"
-                              icon="check"
+                              icon="doc"
                               onClick={() => setEvidenceReview({
                                     type: "approve_checklist",
                                     projectId: p.id,
@@ -2220,20 +2212,7 @@ export default function RoleWorkspace({
                                     expectedVersion: item.version,
                                   })}
                             >
-                              Approve evidence
-                            </Button>
-                            <Button
-                              variant="danger-ghost"
-                              onClick={() => setEvidenceReview({
-                                    type: "reject_checklist",
-                                    projectId: p.id,
-                                    phase: p.phase,
-                                    itemId: item.id,
-                                    evidenceId:item.evidenceId,
-                                    expectedVersion: item.version,
-                                  })}
-                            >
-                              Reject evidence
+                              Review evidence
                             </Button>
                           </div>
                         </div>
@@ -3883,9 +3862,10 @@ export default function RoleWorkspace({
       {evidenceReview && (
         <EvidenceReview key={`${evidenceReview.projectId}-${evidenceReview.evidenceId}-${evidenceReview.type}`}
           projectId={evidenceReview.projectId!} evidenceId={evidenceReview.evidenceId || ""}
-          reject={evidenceReview.type==="reject_checklist"} onClose={()=>setEvidenceReview(undefined)}
-          onConfirm={(expectedReviewToken,note)=>act({...evidenceReview,expectedReviewToken,note},
-            evidenceReview.type==="reject_checklist" ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
+          doc={projects.find(project=>project.id===evidenceReview.projectId)?.workflow?.checklist?.[evidenceReview.phase || ""]?.find(item=>item.id===evidenceReview.itemId)?.doc}
+          onClose={()=>setEvidenceReview(undefined)}
+          onConfirm={(expectedReviewToken,note,reject)=>act({...evidenceReview,type:reject?"reject_checklist":"approve_checklist",expectedReviewToken,note},
+            reject ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
       )}
       {reportReject && (
         <ReportRejectDialog
