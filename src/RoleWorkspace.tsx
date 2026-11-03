@@ -2083,10 +2083,26 @@ export default function RoleWorkspace({
           "Active sites",
         )}
         <ExtensionWorkflow actor={actor} />
-        {pendingSitePhotoCount > 0 && !extensionDemo && <div className="notice subsection active-site-photo-review-shortcut">
-          <Icon name="shield" />
-          <p>{pendingSitePhotoCount} Site PM {pendingSitePhotoCount === 1 ? "photo is" : "photos are"} awaiting your review before client release.</p>
-          <Button onClick={() => document.getElementById("active-sites-photo-review")?.scrollIntoView({ block: "start", behavior: "smooth" })}>Review photos</Button>
+        {isOpm && !extensionDemo && <div id="active-sites-photo-review" className="active-site-review-queue">
+          <Panel title={`Site photos awaiting review (${pendingSitePhotoCount})`} subtitle="Review submitted photos here. Approved photos become visible to the client; rejected photos are returned to the uploading Site PM with your reason.">
+            {pendingSitePhotoCount > 0 ? allActive.filter(project => workflowFor(project).photos.some(photo => photo.photoReviewStatus === "pending")).map(project => (
+              <section className="active-site-review-card" key={project.id}>
+                <header><div><span className="eyebrow">{project.type} · {project.phase}</span><h3>{project.name}</h3></div><Badge tone="amber">{workflowFor(project).photos.filter(photo => photo.photoReviewStatus === "pending").length} awaiting review</Badge></header>
+                <SitePhotoGallery
+                  photos={workflowFor(project).photos.filter(photo => photo.photoReviewStatus === "pending")}
+                  onApprove={async photoId => {
+                    const saved = await act({ type: "release_photo", projectId: project.id, photoId }, "Photo released to the client.")
+                    if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
+                  }}
+                  onReject={async (photoId, note) => {
+                    const saved = await act({ type: "reject_photo", projectId: project.id, photoId, note }, "Photo returned to the uploading Site PM with your reason.")
+                    if (!saved) throw new Error("Photo return failed. Refresh the project and try again.")
+                  }}
+                />
+                <Button variant="text-button" onClick={() => setDialog({ kind: "project", projectId: project.id })}>View project details <Icon name="arrow" size={15} /></Button>
+              </section>
+            )) : <Empty title="No site photos awaiting review" />}
+          </Panel>
         </div>}
         <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
@@ -2152,27 +2168,6 @@ export default function RoleWorkspace({
               requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
             }}>Open phase workspace</Button> : null
           }} />
-        {isOpm && !extensionDemo && <div id="active-sites-photo-review" className="active-site-review-queue">
-          <Panel title={`Site photos awaiting review (${allActive.reduce((count, project) => count + workflowFor(project).photos.filter(photo => photo.photoReviewStatus === "pending").length, 0)})`} subtitle="Open each pending photo, then release it to the client or return it to the uploading Site PM with a reason.">
-            {allActive.some(project => workflowFor(project).photos.some(photo => photo.photoReviewStatus === "pending")) ? allActive.filter(project => workflowFor(project).photos.some(photo => photo.photoReviewStatus === "pending")).map(project => (
-              <section className="active-site-review-card" key={project.id}>
-                <header><div><span className="eyebrow">{project.type} · {project.phase}</span><h3>{project.name}</h3></div><Badge tone="amber">{workflowFor(project).photos.filter(photo => photo.photoReviewStatus === "pending").length} awaiting review</Badge></header>
-                <SitePhotoGallery
-                  photos={workflowFor(project).photos.filter(photo => photo.photoReviewStatus === "pending")}
-                  onApprove={async photoId => {
-                    const saved = await act({ type: "release_photo", projectId: project.id, photoId }, "Photo released to the client.")
-                    if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
-                  }}
-                  onReject={async (photoId, note) => {
-                    const saved = await act({ type: "reject_photo", projectId: project.id, photoId, note }, "Photo returned to the uploading Site PM with your reason.")
-                    if (!saved) throw new Error("Photo return failed. Refresh the project and try again.")
-                  }}
-                />
-                <Button variant="text-button" onClick={() => setDialog({ kind: "project", projectId: project.id })}>View project details <Icon name="arrow" size={15} /></Button>
-              </section>
-            )) : <Empty title="No site photos awaiting review" />}
-          </Panel>
-        </div>}
         {isOpm && !extensionDemo && <div id="active-sites-review" className="active-site-review-queue">
           <Panel title={`Updates and issues needing review (${pendingUpdates.length + pendingRework.length + qaCount})`} subtitle="Review each item in its project card. Your decision updates that site immediately.">
             {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || checklistFor(project).some(item => item.status === "submitted")).map(project => {
