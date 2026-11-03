@@ -971,7 +971,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .active-sites-view-tabs { display: flex; flex-wrap: wrap; gap: 7px; padding: 9px; margin: 0 0 18px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); }
 .active-sites-view-tabs [role="tab"] { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 9px 13px; border: 0; border-radius: 8px; background: transparent; color: var(--color-muted); font: inherit; font-weight: 600; cursor: pointer; }
 .active-sites-view-tabs [role="tab"]:hover { background: var(--surface-subtle); color: var(--color-ink); }
-.active-sites-view-tabs [role="tab"][aria-selected="true"] { background: var(--chrome-selected); color: var(--chrome-foreground); }
+.active-sites-view-tabs [role="tab"][aria-selected="true"] { background: var(--chrome-selected); color: #fff; }
 .active-sites-view-tabs [role="tab"] > span { min-width: 23px; padding: 2px 7px; border-radius: 20px; background: var(--surface-subtle); color: var(--color-steel); text-align: center; font-size: 12px; }
 .active-sites-view-tabs [role="tab"][aria-selected="true"] > span { background: #ffffff26; color: inherit; }
 .active-sites-view-tabs [role="tab"]:focus-visible { outline: 3px solid #5285af; outline-offset: 2px; }
