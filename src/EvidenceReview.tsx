@@ -60,10 +60,6 @@ export default function EvidenceReview({projectId,evidenceId,doc,onClose,onConfi
     </section>
     <section className="evidence-review-decision">
     <h3>{preview?.activity || doc?.label || "Submitted evidence"}</h3>
-    <div className="evidence-review-choice" role="group" aria-label="Evidence decision">
-      <Button variant={!reject ? "primary" : undefined} onClick={()=>setReject(false)}>Approve</Button>
-      <Button variant={reject ? "danger-ghost" : undefined} onClick={()=>setReject(true)}>Reject</Button>
-    </div>
     {!preview && !error && <p role="status">Loading review impact…</p>}
     {error && <p role="alert">{error}</p>}
     {preview && <>
@@ -81,6 +77,10 @@ export default function EvidenceReview({projectId,evidenceId,doc,onClose,onConfi
       </Field>
     </>}
     <div className="modal-actions">
+      <div className="evidence-review-choice" role="group" aria-label="Evidence decision">
+        <Button aria-pressed={!reject} variant={!reject ? "primary" : undefined} disabled={busy} onClick={()=>setReject(false)}>Approve</Button>
+        <Button aria-pressed={reject} variant={reject ? "danger-ghost" : undefined} disabled={busy} onClick={()=>setReject(true)}>Reject</Button>
+      </div>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
       <Button variant="primary" disabled={!preview || busy || (reject && !note.trim())} onClick={async()=>{
         if(!preview)return
