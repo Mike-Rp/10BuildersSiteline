@@ -968,6 +968,13 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
   .checklist-approval-due strong, .checklist-approval-due time { display: inline; margin-right: 6px; }
 }
 .active-site-review-queue { margin-top: 24px; scroll-margin-top: 20px; }
+.active-sites-view-tabs { display: flex; flex-wrap: wrap; gap: 7px; padding: 9px; margin: 0 0 18px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); }
+.active-sites-view-tabs [role="tab"] { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 9px 13px; border: 0; border-radius: 8px; background: transparent; color: var(--color-muted); font: inherit; font-weight: 600; cursor: pointer; }
+.active-sites-view-tabs [role="tab"]:hover { background: var(--surface-subtle); color: var(--color-ink); }
+.active-sites-view-tabs [role="tab"][aria-selected="true"] { background: var(--chrome-selected); color: var(--chrome-foreground); }
+.active-sites-view-tabs [role="tab"] > span { min-width: 23px; padding: 2px 7px; border-radius: 20px; background: var(--surface-subtle); color: var(--color-steel); text-align: center; font-size: 12px; }
+.active-sites-view-tabs [role="tab"][aria-selected="true"] > span { background: #ffffff26; color: inherit; }
+.active-sites-view-tabs [role="tab"]:focus-visible { outline: 3px solid #5285af; outline-offset: 2px; }
 .active-site-review-list { display: grid; gap: 14px; }
 .active-site-review-card { border: 1px solid var(--color-line); border-radius: var(--radius); background: var(--color-surface); padding: 18px; scroll-margin-top: 20px; }
 .active-site-review-card > header, .active-site-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -980,6 +987,8 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .active-site-qa-item > div:first-child { min-width: 0; }
 .active-site-qa-item .role-muted { margin: 5px 0; }
 @media (max-width: 640px) {
+  .active-sites-view-tabs { display: grid; grid-template-columns: 1fr; }
+  .active-sites-view-tabs [role="tab"] { justify-content: flex-start; }
   .active-site-review-card { padding: 14px; }
   .active-site-review-card > header, .active-site-review-heading { align-items: flex-start; }
   .active-site-qa-item { align-items: flex-start; flex-direction: column; }

@@ -232,6 +232,7 @@ export default function RoleWorkspace({
   const isOpm = actor.role === "opm"
   const scheduleToday = useScheduleToday()
   const [activeSitesScheduleFilter, setActiveSitesScheduleFilter] = useState<"" | "delayed">("")
+  const [activeSitesView, setActiveSitesView] = useState<"sites" | "updates" | "uploads">("sites")
   const signOut = useSignOutConfirmation(onPause)
   const urgencyNow = useUrgencyNow()
   useListMemory()
@@ -489,6 +490,7 @@ export default function RoleWorkspace({
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
     setActiveSitesScheduleFilter("")
+    setActiveSitesView("sites")
     setPage(normalizeWorkspacePage(next))
     setConfirmTab("mine")
     setQuery("")
@@ -805,9 +807,9 @@ export default function RoleWorkspace({
         <ExecutiveSummary
           description={`${active.length} active ${active.length === 1 ? "site is" : "sites are"} assigned to you. ${tasks.length} ${tasks.length === 1 ? "assignment awaits" : "assignments await"} your ${isOpm ? "confirmation" : "response"}. ${reviewCount} ${isOpm ? `progress, checklist or rework ${reviewCount === 1 ? "review is" : "reviews are"} pending` : `rework ${reviewCount === 1 ? "flag awaits" : "flags await"} Office PM review`}. You handle ${projects.length} project records, including ${completed} completed.${!isOpm ? ` ${projects.reduce((n, p) => n + p.team.filter(t => t.accountId === actor.id).length, 0)} phases are assigned to you.` : ""}`}
           metrics={[
-            { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => navigate("Active sites") },
+            { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("sites") } },
             { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
-            { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => navigate("Active sites") },
+            { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("updates") } },
             { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
           ]}
         />
@@ -2083,7 +2085,18 @@ export default function RoleWorkspace({
           "Active sites",
         )}
         <ExtensionWorkflow actor={actor} />
-        {isOpm && !extensionDemo && <div id="active-sites-photo-review" className="active-site-review-queue">
+        {isOpm && !extensionDemo && <div className="active-sites-view-tabs" role="tablist" aria-label="Active Sites views">
+          <button type="button" role="tab" aria-selected={activeSitesView === "sites"} onClick={() => setActiveSitesView("sites")}>
+            <Icon name="building" size={17} /> Active sites <span>{allActive.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeSitesView === "updates"} onClick={() => setActiveSitesView("updates")}>
+            <Icon name="shield" size={17} /> Updates &amp; issues <span>{pendingUpdates.length + pendingRework.length + qaCount}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeSitesView === "uploads"} onClick={() => setActiveSitesView("uploads")}>
+            <Icon name="doc" size={17} /> Site uploads <span>{pendingSitePhotoCount}</span>
+          </button>
+        </div>}
+        {isOpm && !extensionDemo && activeSitesView === "uploads" && <div id="active-sites-photo-review" className="active-site-review-queue">
           <Panel title={`Site photos awaiting review (${pendingSitePhotoCount})`} subtitle="Review submitted photos here. Approved photos become visible to the client; rejected photos are returned to the uploading Site PM with your reason.">
             {pendingSitePhotoCount > 0 ? allActive.filter(project => workflowFor(project).photos.some(photo => photo.photoReviewStatus === "pending")).map(project => (
               <section className="active-site-review-card" key={project.id}>
@@ -2104,7 +2117,7 @@ export default function RoleWorkspace({
             )) : <Empty title="No site photos awaiting review" />}
           </Panel>
         </div>}
-        <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
+        {(!isOpm || extensionDemo || activeSitesView === "sites") && <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),
@@ -2167,8 +2180,8 @@ export default function RoleWorkspace({
               setPickedId(id)
               requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
             }}>Open phase workspace</Button> : null
-          }} />
-        {isOpm && !extensionDemo && <div id="active-sites-review" className="active-site-review-queue">
+          }} />}
+        {isOpm && !extensionDemo && activeSitesView === "updates" && <div id="active-sites-review" className="active-site-review-queue">
           <Panel title={`Updates and issues needing review (${pendingUpdates.length + pendingRework.length + qaCount})`} subtitle="Review each item in its project card. Your decision updates that site immediately.">
             {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || checklistFor(project).some(item => item.status === "submitted")).map(project => {
               const work = workflowFor(project)
@@ -2619,6 +2632,7 @@ export default function RoleWorkspace({
             className="deadline-list-item"
             onClick={() => {
               navigate("Active sites")
+              setActiveSitesView("updates")
               requestAnimationFrame(() => document.getElementById(`active-site-review-${p.id}`)?.scrollIntoView({ block: "center" }))
             }}
           >
@@ -2641,6 +2655,7 @@ export default function RoleWorkspace({
             className="deadline-list-item"
             onClick={() => {
               navigate("Active sites")
+              setActiveSitesView("updates")
               requestAnimationFrame(() => document.getElementById(`active-site-review-${p.id}`)?.scrollIntoView({ block: "center" }))
             }}
           >
