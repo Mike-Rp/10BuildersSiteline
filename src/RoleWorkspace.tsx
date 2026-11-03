@@ -2102,6 +2102,13 @@ export default function RoleWorkspace({
     )
   }
   function reviews() {
+    const photoReviewItems = allActive.filter((p) =>
+      workflowFor(p).photos.some((photo) => !photo.clientVisible),
+    )
+    const photoReviewCount = photoReviewItems.reduce(
+      (count, p) => count + workflowFor(p).photos.filter((photo) => !photo.clientVisible).length,
+      0,
+    )
     const qaItems = allActive.filter((p) =>
       checklistFor(p).some((i) => i.status === "submitted"),
     )
@@ -2150,6 +2157,7 @@ export default function RoleWorkspace({
             ["progress", `Progress updates (${pendingUpdates.length})`],
             ["qa", `QA/QC evidence (${qaCount})`],
             ["rework", `Rework / issues (${pendingRework.length})`],
+            ...(isOpm ? [["photos", `Site photos to release (${photoReviewCount})`]] : []),
           ].map(([value, label]) => (
             <button
               key={value}
@@ -2160,7 +2168,26 @@ export default function RoleWorkspace({
             </button>
           ))}
         </div>
-        {tab === "qa" ? (
+        {tab === "photos" && isOpm ? (
+          <>
+            <div className="notice subsection">
+              <Icon name="shield" />
+              <p>Review Site PM gallery photos here. Preview each image, then release only the photos approved for client viewing. QA/QC evidence and field inspection uploads stay internal.</p>
+            </div>
+            {photoReviewItems.length ? photoReviewItems.map((p) => (
+              <Panel key={p.id} title={p.name} subtitle={`${p.phase} · ${workflowFor(p).photos.filter(photo => !photo.clientVisible).length} photos awaiting client release`}>
+                <SitePhotoGallery
+                  photos={workflowFor(p).photos.filter(photo => !photo.clientVisible)}
+                  onPreview={doc => showDoc(p, doc)}
+                  onRelease={async photoId => {
+                    const saved = await act({ type: "release_photo", projectId: p.id, photoId }, "Photo released to the client.")
+                    if (!saved) throw new Error("Photo release failed. Refresh the project and try again.")
+                  }}
+                />
+              </Panel>
+            )) : <Empty title="No site photos awaiting client release" />}
+          </>
+        ) : tab === "qa" ? (
           <>
             <ListSection
               list={qaList}
