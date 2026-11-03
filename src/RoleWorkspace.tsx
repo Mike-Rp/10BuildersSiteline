@@ -171,7 +171,6 @@ const OPM_NAV = [
   ["Documents", "folder"],
   ["Active sites", "building"],
   ["Deadlines", "clock"],
-  ["Rework & approvals", "shield"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
@@ -510,8 +509,8 @@ export default function RoleWorkspace({
     updateListQuery(`${actor.role}:review-qa`, current => ({
       ...current, search: "", filters, page: 1,
     }))
-    navigate("Rework & approvals")
-    setTab("qa")
+    navigate("Active sites")
+    requestAnimationFrame(() => document.getElementById("active-sites-review")?.scrollIntoView({ block: "start" }))
   }
   function openUrgentItem(item: UrgentItem) {
     const priority = staffUrgentItems(state, actor, "Dashboard", urgencyNow).find(entry => entry.key === item.key)
@@ -520,8 +519,8 @@ export default function RoleWorkspace({
     setPickedId(project.id)
     if (priority.target === "qa") openChecklistApprovals(project)
     else if (priority.target === "progress" || priority.target === "rework") {
-      updateListQuery(`${actor.role}:review-${priority.target}`, current => ({ ...current, search: "", filters: { project: project.id }, page: 1 }))
-      navigate("Rework & approvals"); setTab(priority.target)
+      navigate("Active sites")
+      requestAnimationFrame(() => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center" }))
     } else if (priority.target === "assignment") { navigate("Assignments"); setAssignmentId(project.id) }
     else if (priority.target === "responses") { openSiteResponses(); setDialog({ kind: "project", projectId: project.id }) }
     else if (priority.target === "documents") openDocuments(project)
@@ -803,7 +802,7 @@ export default function RoleWorkspace({
           metrics={[
             { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => navigate("Active sites") },
             { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
-            { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => navigate(isOpm ? "Rework & approvals" : "Active sites") },
+            { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => navigate("Active sites") },
             { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
           ]}
         />
@@ -2088,13 +2087,45 @@ export default function RoleWorkspace({
               <Button icon="bell" disabled={saving} onClick={async () => {
                 await act({ type: "request_update", projectId: id }, "Site PM update reminder recorded.")
               }}>Request update</Button>
-              {p.workflow?.pendingRework && <Button onClick={() => { navigate("Rework & approvals"); setTab("rework") }}>Review issue</Button>}
-              {p.workflow?.pendingUpdate && <Button onClick={() => { navigate("Rework & approvals"); setTab("progress") }}>Review update</Button>}
             </> : active.some(site => site.id === id) ? <Button onClick={() => {
               setPickedId(id)
               requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
             }}>Open phase workspace</Button> : null
           }} />
+        {isOpm && !extensionDemo && <div id="active-sites-review" className="active-site-review-queue">
+          <Panel title={`Updates and issues needing review (${pendingUpdates.length + pendingRework.length + qaCount})`} subtitle="Review each item in its project card. Your decision updates that site immediately.">
+            {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || checklistFor(project).some(item => item.status === "submitted")).map(project => {
+              const work = workflowFor(project)
+              const update = work.pendingUpdate
+              const rework = work.pendingRework
+              return <section id={`active-site-review-${project.id}`} className="active-site-review-card" key={project.id} aria-label={`${project.name} review items`}>
+                <header><div><span className="eyebrow">{project.type} · {project.phase}</span><h3>{project.name}</h3></div><Badge tone="amber">{Number(!!update) + Number(!!rework)} awaiting review</Badge></header>
+                {update && <div className="active-site-review-item">
+                  <div className="active-site-review-heading"><strong>Progress update</strong><Status value={update.escalated ? "escalated — review required" : "pending review"} /></div>
+                  <div className="submission-meta"><span>Submitted by {actorName(update.authorId)}</span><span>{new Date(update.submittedAt).toLocaleString()}</span></div>
+                  <p className="submission-note">{update.note || "No additional note provided."}</p>
+                  {submissionDocs(update).length > 0 && <div className="report-attachments"><h4>Attachments ({submissionDocs(update).length})</h4><ul>{submissionDocs(update).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  <p className="role-muted">Approving records this progress note. It does not approve checklist evidence or change phase progress.</p>
+                  <div className="role-actions"><Button variant="primary" icon="check" disabled={saving} onClick={() => void act({ type: "approve_update", projectId: project.id, expectedVersion: update.version }, "Progress note approved and added to visible history.")}>Approve progress note</Button><Button variant="danger-ghost" disabled={saving} onClick={() => setReportReject({ projectId: project.id, projectName: project.name, expectedVersion: update.version })}>Reject report</Button></div>
+                </div>}
+                {rework && <div className="active-site-review-item">
+                  <div className="active-site-review-heading"><strong>Site issue / rework request</strong><Status value={rework.escalated ? "escalated — review required" : "pending review"} /></div>
+                  <div className="submission-meta"><span>Submitted by {actorName(rework.authorId)}</span><span>{new Date(rework.submittedAt).toLocaleString()}</span></div>
+                  {rework.issues.length > 0 && <div className="tag-list subsection">{rework.issues.map(issue => <span key={issue}>{issue}</span>)}</div>}
+                  <p className="submission-note">{rework.note || "No additional note provided."}</p>
+                  {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  <p className="role-muted">Review the affected activities and progress impact before confirming targeted rework.</p>
+                  <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework impact</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
+                </div>}
+                {checklistFor(project).some(item => item.status === "submitted") && <div className="active-site-review-item">
+                  <div className="active-site-review-heading"><strong>QA/QC evidence</strong><Status value={`${checklistFor(project).filter(item => item.status === "submitted").length} awaiting review`} /></div>
+                  {checklistFor(project).filter(item => item.status === "submitted").map(item => <div className="active-site-qa-item" key={item.id}><div><strong>{item.label}</strong><p className="role-muted">{item.submittedByName || (item.submittedBy ? actorName(item.submittedBy) : "Evidence submitted")} · {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "Date unavailable"}</p>{item.doc && <Button icon="doc" onClick={() => showDoc(project, item.doc!)}>View {item.doc.name}</Button>}</div><Button variant="primary" icon="doc" disabled={saving} onClick={() => setEvidenceReview({ type: "approve_checklist", projectId: project.id, phase: project.phase, itemId: item.id, evidenceId: item.evidenceId, expectedVersion: item.version })}>Review evidence</Button></div>)}
+                </div>}
+                <Button variant="text-button" onClick={() => setDialog({ kind: "project", projectId: project.id })}>View project details <Icon name="arrow" size={15} /></Button>
+              </section>
+            })}</div> : <Empty title="No progress updates or issues awaiting review">New submissions will appear here inside their active site.</Empty>}
+          </Panel>
+        </div>}
         {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
           <Panel title={`${picked.name} - Phase workspace`}><DelayedProjectNotice project={picked} today={scheduleToday} />{progressForm(picked)}</Panel>
         </div>}
@@ -2511,8 +2542,8 @@ export default function RoleWorkspace({
             key={`${p.id}-rework`}
             className="deadline-list-item"
             onClick={() => {
-              navigate("Rework & approvals")
-              setTab("rework")
+              navigate("Active sites")
+              requestAnimationFrame(() => document.getElementById(`active-site-review-${p.id}`)?.scrollIntoView({ block: "center" }))
             }}
           >
             <Icon name="alert" />
@@ -2533,8 +2564,8 @@ export default function RoleWorkspace({
             key={`${p.id}-update`}
             className="deadline-list-item"
             onClick={() => {
-              navigate("Rework & approvals")
-              setTab("progress")
+              navigate("Active sites")
+              requestAnimationFrame(() => document.getElementById(`active-site-review-${p.id}`)?.scrollIntoView({ block: "center" }))
             }}
           >
             <Icon name="clock" />
