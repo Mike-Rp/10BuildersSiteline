@@ -337,8 +337,7 @@ const respondToPhase = (newStatus) => async (req, res) => {
               WHERE id = $1 AND lifecycle_status = 'spm_review'
               AND coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')::int,0)=0
               AND EXISTS (SELECT 1 FROM project_documents d JOIN document_types t ON t.id=d.document_type_id WHERE d.project_id=$1 AND t.code='subcontractor_agreement' AND d.status='uploaded')
-              AND EXISTS (SELECT 1 FROM project_subcontractor_assignments a WHERE a.project_id=$1 AND a.status='active')
-              AND (SELECT count(*) FROM subcontractor_workers w WHERE w.current_project_id=$1 AND w.status='active' AND w.availability_status='assigned')>=crew_required`,
+              AND EXISTS (SELECT 1 FROM project_subcontractor_assignments a WHERE a.project_id=$1 AND a.status='active')`,
             [id, user.id]
           );
         }

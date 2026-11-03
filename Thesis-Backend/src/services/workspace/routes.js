@@ -614,12 +614,9 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                     select $1,id,trade_id,0,$3 from subcontractors where id=$2`, [p.id, id, user.id]);
                 assigned = (await db.query("select count(*)::int as n from subcontractor_workers where current_project_id=$1 and availability_status='assigned'", [p.id])).rows[0].n;
             } else if (selected) {
-                const workers = await db.query("select id from subcontractor_workers where subcontractor_id=$1 and status='active' and availability_status='available' order by id limit $2 for update", [selected.subcontractor_id, p.crew_required || 0]);
-                if (workers.rowCount < (p.crew_required || 0))
-                    throw new HttpError(409, "The company has insufficient available workers.");
-                assigned = workers.rowCount;
-                await db.query("update subcontractor_workers set availability_status='assigned',current_project_id=$2 where id=any($1::uuid[])", [workers.rows.map(w => w.id), p.id]);
-                await db.query("insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count) values($1,$2,$3,$4)", [p.id, selected.subcontractor_id, selected.trade_id, workers.rowCount]);
+                // Legacy accepted allocations record the company commitment only.
+                // Individual worker distribution is managed separately from project allocation.
+                await db.query("insert into project_subcontractor_assignments(project_id,subcontractor_id,trade_id,worker_count,created_by) values($1,$2,$3,0,$4)", [p.id, selected.subcontractor_id, selected.trade_id, user.id]);
             }
             await snapshotProjectChecklists(db,p.id);
             await db.query(`update projects set lifecycle_status='active',current_stage_id=(select project_stage_id from (${projectWorkflowSql}) w where w.project_id=projects.id order by sort_order limit 1),crew_assigned=$2,updated_at=now() where id=$1`, [p.id, assigned]);
