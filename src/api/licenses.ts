@@ -1,5 +1,4 @@
-import { LICENSE_RENEWAL_ONLY_EVENT } from "./client";
-import { api, apiList, downloadBlob } from "./client.ts"
+import { LICENSE_RENEWAL_ONLY_EVENT, api, apiList, downloadBlob } from "./client.ts"
 import type {
   HistoryRow,
   LicenseSelf,

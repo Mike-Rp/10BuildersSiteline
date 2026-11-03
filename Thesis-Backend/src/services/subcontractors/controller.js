@@ -12,7 +12,6 @@ import {
 const READ_ROLES = ["admin", "opm", "spm"];
 const WRITE_ROLES = ["admin", "spm"];
 const DECIDE_ROLES = ["admin", "opm"];
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const resolveLookup = async (db, table, { code, id }) => {
   if (id !== undefined && id !== null) {

@@ -128,6 +128,7 @@ test("migration coverage: PostgreSQL prepares backend static SQL including the n
   await db.exec(read("Thesis-Backend/migrations/008-monthly-report-history.sql"))
   await db.exec(read("Thesis-Backend/migrations/009-engineer-license-workflow.sql"))
   await db.exec(read("Thesis-Backend/migrations/010-photo-release.sql"))
+  await db.exec(read("Thesis-Backend/migrations/017-project-photo-review.sql"))
   await db.exec(read("Thesis-Backend/migrations/013-trade-subcontractor-allocation.sql"))
   await db.exec(read("Thesis-Backend/migrations/014-mixed-use-project-scope.sql"))
   await db.exec(read("Thesis-Backend/migrations/015-engineer-credentials.sql"))

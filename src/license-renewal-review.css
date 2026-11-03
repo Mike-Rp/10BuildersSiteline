@@ -1,0 +1,141 @@
+#root .modal:has(.renewal-review-form) {
+  width: min(660px, calc(100vw - 36px));
+  max-height: min(94dvh, 1120px);
+}
+
+#root .modal:has(.renewal-review-form) .modal-header {
+  padding: 22px 26px;
+}
+
+#root .modal:has(.renewal-review-form) .modal-header h2 {
+  font-size: 25px;
+}
+
+#root .renewal-review-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  color: var(--color-ink);
+}
+
+#root .renewal-review-form > .badge {
+  align-self: flex-start;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 8px 13px;
+}
+
+#root .renewal-review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+#root .renewal-review-section h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+#root .renewal-review-section > p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+#root .renewal-review-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+#root .renewal-review-field > span {
+  color: var(--color-muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+#root .renewal-review-field > strong {
+  color: var(--color-ink);
+  font-size: 19px;
+  line-height: 1.45;
+}
+
+#root .renewal-review-field > small {
+  color: var(--color-muted);
+  font-size: 16px;
+}
+
+#root .renewal-review-form .field > label {
+  font-size: 16px;
+}
+
+#root .renewal-review-form .field select,
+#root .renewal-review-form .field textarea {
+  font-size: 17px;
+  min-height: 50px;
+}
+
+#root .renewal-review-form .field textarea {
+  min-height: 120px;
+  line-height: 1.55;
+}
+
+#root .renewal-review-actions {
+  position: sticky;
+  bottom: -18px;
+  display: flex;
+  justify-content: stretch;
+  gap: 10px;
+  padding: 16px 0 2px;
+  background: var(--color-surface);
+}
+
+#root .renewal-review-actions .button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 54px;
+  justify-content: center;
+  font-size: 17px;
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  #root .modal:has(.renewal-review-form) {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  #root .modal:has(.renewal-review-form) .modal-header {
+    padding: 17px 18px;
+  }
+
+  #root .modal:has(.renewal-review-form) .modal-header h2 {
+    font-size: 22px;
+  }
+
+  #root .renewal-review-form {
+    gap: 17px;
+  }
+
+  #root .renewal-review-section {
+    gap: 12px;
+    padding-bottom: 17px;
+  }
+
+  #root .renewal-review-actions {
+    bottom: -14px;
+    flex-direction: column-reverse;
+  }
+
+  #root .renewal-review-actions .button {
+    width: 100%;
+  }
+}

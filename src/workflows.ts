@@ -1903,7 +1903,9 @@ export function applyWorkflow(
     case "release_photo": {
       opm()
       const photo = work.photos.find(doc => doc.id === command.photoId)
-      assert(photo && !photo.clientVisible && photo.photoReviewStatus !== "rejected", "Photo not found or not awaiting review.")
+      assert(photo, "Photo not found.")
+      assert(!photo.clientVisible, "This photo is already released to the client.")
+      assert(photo.photoReviewStatus !== "rejected", "This photo was already returned to the uploading Site PM.")
       photo.clientVisible = true
       photo.photoReviewStatus = "released"
       photo.photoReviewNote = undefined
@@ -1913,7 +1915,9 @@ export function applyWorkflow(
     case "reject_photo": {
       opm()
       const photo = work.photos.find(doc => doc.id === command.photoId)
-      assert(photo && !photo.clientVisible && photo.photoReviewStatus !== "rejected", "Photo not found or not awaiting review.")
+      assert(photo, "Photo not found.")
+      assert(!photo.clientVisible, "This photo is already released to the client.")
+      assert(photo.photoReviewStatus !== "rejected", "This photo was already returned to the uploading Site PM.")
       const rejectionNote = command.note?.trim() || ""
       assert(rejectionNote, "Explain why this photo is being returned to the Site PM.")
       photo.photoReviewStatus = "rejected"

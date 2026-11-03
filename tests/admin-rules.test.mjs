@@ -137,6 +137,15 @@ test("active project leads cannot be recommended to another project", () => {
     ),
   )
 })
+test("Office PM replacement choices use only project-authorized, backend-eligible candidates", () => {
+  const state = initialState()
+  const candidate = state.accounts.find(account => account.id === "a4")
+  candidate.assignmentCandidateProjectIds = ["p1"]
+  candidate.eligibleForNewAssignment = true
+  candidate.expiry = "" // The OPM receives an eligibility result, not the candidate's license date.
+  assert.ok(spmCandidates(state, "Residential", "Mobilization", "p1").some(row => row.account.id === candidate.id))
+  assert.ok(!spmCandidates(state, "Residential", "Mobilization", "p2").some(row => row.account.id === candidate.id))
+})
 test("routine resignation blocks active assignments and holds eligible employees", () => {
   const state = initialState()
   assert.ok(activeAssignmentsForAccount(state, "a6").length > 0)

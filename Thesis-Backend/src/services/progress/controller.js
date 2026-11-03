@@ -182,7 +182,7 @@ export const removeProjectNote = async (req, res) => {
       if (activity.rowCount) {
         const recipients = [...new Set([user.id, note.author_id].filter(Boolean))];
         await db.query(`insert into notification_recipients(activity_log_id,recipient_user_id)
-          select $1,recipient_id from unnest($2::uuid[]) as recipients(recipient_id) on conflict do nothing returning activity_log_id`,
+          select $1::bigint,recipient_id from unnest($2::uuid[]) as recipients(recipient_id) on conflict do nothing returning activity_log_id`,
         [activity.rows[0].id, recipients]);
         await mirrorLegacyNotifications(db, [activity.rows[0].id]);
       }

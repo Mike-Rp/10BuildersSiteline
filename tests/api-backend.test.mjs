@@ -69,6 +69,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-photo-release.sql"),"utf8"))
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/017-project-photo-review.sql"),"utf8"))
 
   await installCredentialFixture(db)
 
@@ -1267,6 +1268,13 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222])
     const site = await asUser("karlo.espiritu@10builders.com")
     const project = site.state.projects.find(p => p.name === "Brookfield Warehouse Ext.")
+    await db.query("update workspace_settings set rules=jsonb_set(rules,'{cap}','100'::jsonb) where singleton")
+    await db.query("update user_licenses set license_number='1234567' where user_id in (select u.id from users u join roles r on r.id=u.role_id where r.code='spm') and superseded_at is null")
+    await asUser("renz.villaverde@10builders.com")
+    const replacements = await api(`/projects/${project.id}/phase-assignment-candidates`)
+    assert.ok(replacements.length, "the assigned Office PM gets eligible replacement choices")
+    assert.ok(replacements.every(candidate => candidate.role === "spm" && !("email" in candidate) && !("license" in candidate)))
+    await asUser("karlo.espiritu@10builders.com")
     const fileId = randomUUID()
     await uploadFile(fileId, new File([png], "gate.png", { type: "image/png" }))
     const command = (payload) => api("/projects/" + project.id + "/workspace-command", { method: "POST", json: payload })

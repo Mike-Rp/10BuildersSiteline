@@ -19,11 +19,13 @@ import { validateUpload } from "./upload-policy.utility.js";
 import { readManpowerFile, registerCompany, withdrawCompanyRequest } from "./manpower-import.utility.js";
 import { assertPhaseCoverage } from "../projects/phase-coverage.utility.js";
 import { companyRemovalReadiness, removeCompany } from "./company-removal.utility.js";
+import { reviewSitePhoto } from "./site-photo-review.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
+import { credentialSummary } from "../licenses/credentials.controller.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
-import { requireUser, requireLogin, hasProjectAccess, HttpError, handleError, sendOk, isUuid, paging } from "../../common/utilities/access.utility.js";
+import { requireUser, requireLogin, hasProjectAccess, isProjectOpmOrAdmin, HttpError, handleError, sendOk, isUuid, paging } from "../../common/utilities/access.utility.js";
 import { login, staffLogin, adminLogin, logout, reset } from "../auth/controller.js";
 import { getSubcontractors, createSubcontractor } from "../subcontractors/controller.js";
 import subcontractors from "../subcontractors/routes.js";
@@ -101,8 +103,8 @@ async function event(db, user, p, title, detail = "", extraRecipientIds = []) {
  select id,$1,$2,$3,$4 from activity_types where code='notice' returning id`, [title, detail, user.id, p?.id || null]);
     if (result.rowCount) {
         await db.query(`insert into notification_recipients(activity_log_id,recipient_user_id)
- select $1,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
- union select $1,recipient_id from unnest($4::uuid[]) as recipients(recipient_id)
+ select $1::bigint,id from users where id=$2 or id=$3 or role_id=(select id from roles where code='admin')
+ union select $1::bigint,recipient_id from unnest($4::uuid[]) as recipients(recipient_id)
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null, extraRecipientIds]);
         await mirrorLegacyNotifications(db, [result.rows[0].id]);
     }
@@ -180,6 +182,33 @@ router.use(phases);
 router.use(progress);
 router.use(subcontractors);
 router.get("/workspace/project-data",getProjectData);
+router.get("/projects/:id/phase-assignment-candidates", endpoint(["admin", "opm"], async (db, user, req) => {
+    const p = await project(db, user, req.params.id);
+    if (!(await isProjectOpmOrAdmin(user, p.id, db))) throw new HttpError(403, "Only the assigned Office PM or an Administrator can reassign phases.");
+    if (p.lifecycle_status !== "active") return [];
+    const cap = Number((await db.query("select rules->>'cap' as cap from workspace_settings where singleton")).rows[0]?.cap) || 5;
+    const users = (await db.query(`select u.id,u.full_name,u.status,m.metadata,
+       (select count(distinct other.id)::int from projects other where other.lifecycle_status='active' and not coalesce(other.is_deleted,false) and other.id<>$1
+         and (exists(select 1 from project_phase_team t where t.project_id=other.id and t.spm_user_id=u.id)
+           or exists(select 1 from project_engineers e where e.project_id=other.id and e.user_id=u.id and e.unassigned_at is null))) as active_projects
+      from users u join roles r on r.id=u.role_id left join workspace_account_metadata m on m.user_id=u.id
+      where r.code='spm' and u.status='active' and not coalesce(u.is_deleted,false) order by u.full_name`, [p.id])).rows;
+    const candidates = [];
+    for (const account of users) {
+      if (account.active_projects >= cap) continue;
+      const profile = await credentialSummary(db, account.id);
+      if (!profile.eligibleForNewAssignment || !profile.qualifiedRequirements.length) continue;
+      candidates.push({
+        id: account.id, full_name: account.full_name, role: "spm", status: account.status,
+        date_added: null, scope: profile.specializations.map(item => item.specialization),
+        specializations: profile.specializations.map(item => item.specialization),
+        qualifiedRequirements: profile.qualifiedRequirements,
+        credentialEligibility: true,
+        experience_by_type: account.metadata?.experienceByType,
+      });
+    }
+    return candidates;
+}));
 router.post("/workspace/reconcile-phase-handoffs",reconcilePhaseHandoffs);
 router.get("/workspace", endpoint(null, async (db, user) => {
     await db.query(`update users u set status='suspended',updated_at=now() from workspace_account_metadata m
@@ -649,24 +678,10 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         case "release_photo":
         case "reject_photo": {
-            if (user.role === "spm" || (user.role === "opm" && p.suggested_opm_id !== user.id))
-                throw new HttpError(403, "Only the assigned Office PM or an Administrator can review site photos.");
-            if (!isUuid(c.photoId))
-                throw new HttpError(400, "photoId must be a valid id.");
-            const photo = (await db.query("select id,uploaded_by,caption from project_photos where id=$1 and project_id=$2 and review_status='pending' and not is_client_visible for update", [c.photoId, p.id])).rows[0];
-            if (!photo) throw new HttpError(404, "Photo is no longer awaiting review.");
-            if (c.type === "reject_photo") {
-                const note = typeof c.note === "string" ? c.note.trim() : "";
-                if (!note || note.length > 2000) throw new HttpError(400, "Enter a rejection reason (up to 2,000 characters) so the uploader can correct the photo.");
-                await db.query("update project_photos set review_status='rejected',review_note=$3,reviewed_by=$4,reviewed_at=now(),is_client_visible=false where id=$1 and project_id=$2", [c.photoId, p.id, note, user.id]);
-                eventTitle = "Site photo returned for changes";
-                eventDetail = `${photo.caption || "Site photo"} · ${note}`;
-                extraEventRecipients = photo.uploaded_by ? [photo.uploaded_by] : [];
-            } else {
-                await db.query("update project_photos set review_status='released',review_note=null,reviewed_by=$3,reviewed_at=now(),is_client_visible=true,released_by=$3,released_at=now() where id=$1 and project_id=$2", [c.photoId, p.id, user.id]);
-                eventTitle = "Site photo released to client";
-                eventDetail = photo.caption || "Site photo";
-            }
+            const decision = await reviewSitePhoto(db, user, p, c);
+            eventTitle = decision.title;
+            eventDetail = decision.detail;
+            extraEventRecipients = decision.recipientIds;
             break;
         }
         default: throw new HttpError(400, "Unsupported project command.");

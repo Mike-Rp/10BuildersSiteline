@@ -97,7 +97,7 @@ export const reinstateAccount = async (req,res) => {
 };
 export const reassignPhase = async (req,res) => {
   try {
-    const actor=await requireUser(req,res,["admin"]);
+    const actor=await requireUser(req,res,["admin","opm"]);
     if(!actor) return;
     if(!isBigintId(req.params.assignmentId) || !isUuid(req.body?.new_user_id)) return sendError(res,"Invalid assignment or new_user_id.",400);
     const note=archiveNote(req.body?.note);
@@ -105,6 +105,7 @@ export const reassignPhase = async (req,res) => {
       const lookup=await db.query("SELECT project_id FROM project_phase_team WHERE id=$1",[req.params.assignmentId]);
       if(!lookup.rowCount) throw new HttpError(404,"Assignment not found.");
       const p=await phaseProject(db,actor,lookup.rows[0].project_id);
+      if(!(await isProjectOpmOrAdmin(actor,p.id,db))) throw new HttpError(403,"Only the assigned Office PM or an Administrator can reassign phases.");
       if(p.lifecycle_status==="archived") throw new HttpError(409,"Archived projects are read-only.");
       const found=await db.query("SELECT * FROM project_phase_team WHERE id=$1 FOR UPDATE",[req.params.assignmentId]);
       const old=found.rows[0];

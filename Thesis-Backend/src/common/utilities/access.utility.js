@@ -116,7 +116,7 @@ export const getCurrentUser = async (req) => {
       const renewalFile = read && /\/licenses\/renewals\/\d+\/file$/.test(url);
       let ownStoredFile = false;
       const storedFileId = read && url.match(/\/files\/([0-9a-f-]+)\/content$/i)?.[1];
-      if (storedFileId && policy.mode === "view_only") ownStoredFile = (await execute("select 1 from license_renewal_requests where user_id=$1 and file_ref in ($2,$3) limit 1", [user.id,"db:"+storedFileId,"db://"+storedFileId])).rowCount > 0;
+      if (storedFileId && renewalOnly) ownStoredFile = (await execute("select 1 from license_renewal_requests where user_id=$1 and file_ref in ($2,$3) limit 1", [user.id,"db:"+storedFileId,"db://"+storedFileId])).rowCount > 0;
       if (renewalOnly && !accountAction && !renewalAction && !ownCredentials && !licenseStatus && !renewalFile && !ownStoredFile)
         throw new HttpError(403, LICENSE_VIEW_ONLY_MESSAGE, "LICENSE_RENEWAL_ONLY");
     }

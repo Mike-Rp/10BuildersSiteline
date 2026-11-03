@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { dateLabel, daysUntil, licenseExpiresDuringProject } from "./model"
 import { LICENSE_PAUSED_MESSAGE } from "./workflows"
+import "./license-renewal-review.css"
 import * as licenses from "./api/licenses"
 import type {
   HistoryRow,
@@ -182,14 +183,35 @@ export function RenewalQueue({
           </div>
         </div>
       ))}
-      {verifying && <Modal title={verifying.submission_kind === "initial" ? "Verify initial credential" : "Verify license renewal"} subtitle="Manual review; no automatic PRC integration." onClose={()=>setVerifying(undefined)}>
-        <form onSubmit={async e=>{e.preventDefault();await run(async()=>{await licenses.verifyRenewal(verifying.id,{profession,note:verificationNote});setVerifying(undefined)})}}>
-          <p><a href="https://verification.prc.gov.ph/" target="_blank" rel="noreferrer">Open official PRC verification website</a></p>
-          <Field label="Licensed profession"><select required value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
-          <Field label="Manual verification result"><textarea required maxLength={2000} value={verificationNote} onChange={e=>setVerificationNote(e.target.value)} /></Field>
-          <p>The system saves your identity and the review time. A format match alone does not establish authenticity.</p>
+      {verifying && <Modal title={verifying.submission_kind === "initial" ? "Review initial credential" : "Review license renewal"} subtitle="Review the submitted details and supporting evidence." onClose={()=>setVerifying(undefined)}>
+        <form className="renewal-review-form" onSubmit={async e=>{e.preventDefault();await run(async()=>{await licenses.verifyRenewal(verifying.id,{profession,note:verificationNote});setVerifying(undefined)})}}>
+          <Badge tone="amber">{verifying.submission_kind === "initial" ? "Initial credential awaiting approval" : "License renewal under review"}</Badge>
+          <section className="renewal-review-section" aria-labelledby="renewal-review-person-title">
+            <h3 id="renewal-review-person-title">Personnel</h3>
+            <div className="renewal-review-field"><span>Account holder</span><strong>{verifying.full_name}</strong><small>{verifying.role === "opm" ? "Office PM" : "Site PM"}</small></div>
+          </section>
+          <section className="renewal-review-section" aria-labelledby="renewal-review-license-title">
+            <h3 id="renewal-review-license-title">Submitted license details</h3>
+            <Field label="Confirm licensed profession"><select required value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
+            <div className="renewal-review-field"><span>PRC license number</span><strong>{verifying.license_number}</strong></div>
+            <div className="renewal-review-field"><span>Submitted expiry date</span><strong>{dateLabel(verifying.license_expiry)}</strong></div>
+            <div className="renewal-review-field"><span>Submitted on</span><strong>{dateLabel(verifying.submitted_at)}</strong></div>
+          </section>
+          <section className="renewal-review-section" aria-labelledby="renewal-review-document-title">
+            <h3 id="renewal-review-document-title">Supporting document</h3>
+            <p>Open and inspect the submitted license evidence before recording a decision.</p>
+            <Button type="button" icon="doc" onClick={() => licenses.openRenewalFile(verifying.id).catch(err => setError(messageOf(err)))}>View license document</Button>
+          </section>
+          <section className="renewal-review-section" aria-labelledby="renewal-review-result-title">
+            <h3 id="renewal-review-result-title">Manual verification</h3>
+            <p><a href="https://verification.prc.gov.ph/" target="_blank" rel="noreferrer">Open official PRC verification website</a>. A format match alone does not establish authenticity.</p>
+            <Field label="Verification result and review note"><textarea required rows={4} maxLength={2000} value={verificationNote} onChange={e=>setVerificationNote(e.target.value)} placeholder="Record what you checked and the verification result." /></Field>
+          </section>
           {error&&<p role="alert" className="error">{error}</p>}
-          <Button disabled={busy} type="submit" variant="primary">{verifying.submission_kind === "initial" ? "Verify credential" : "Verify renewal"}</Button>
+          <div className="renewal-review-actions">
+            <Button type="button" variant="danger-ghost" disabled={busy} onClick={() => { setRejecting(verifying); setVerifying(undefined); setReason(""); setError("") }}>{verifying.submission_kind === "initial" ? "Request correction" : "Reject renewal"}</Button>
+            <Button disabled={busy} type="submit" variant="primary">{busy ? "Saving review…" : verifying.submission_kind === "initial" ? "Verify credential" : "Verify renewal"}</Button>
+          </div>
         </form>
       </Modal>}
       {rejecting && (

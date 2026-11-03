@@ -80,6 +80,25 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   // Accounts: the admin lists everyone; other roles only know their own record.
   let accounts: Account[] = []
   const projectIdsByName = new Map(projectList.map((p) => [String(p.name).toLowerCase(), p.id as string]))
+  if (me.role === "opm") {
+    const activeProjects = projectData.filter(part => part.list.lifecycle_status === "active")
+    const projectCandidateRows = await pool(
+      activeProjects,
+      4,
+      async part => optional(apiList<Dto>(`/projects/${part.list.id}/phase-assignment-candidates`), []),
+    )
+    const byId = new Map<string, { row: Dto; projectIds: Set<string> }>()
+    projectCandidateRows.forEach((rows, index) => rows.forEach(row => {
+      const id = String(row.id)
+      const found = byId.get(id) || { row, projectIds: new Set<string>() }
+      found.projectIds.add(String(activeProjects[index].list.id))
+      byId.set(id, found)
+    }))
+    accounts = [...byId.values()].map(({ row, projectIds }) => ({
+      ...mapAccount(row, row, projectIdsByName),
+      assignmentCandidateProjectIds: [...projectIds],
+    }))
+  }
   if (me.role === "admin") {
     const list = await apiList<Dto>("/accounts")
     accounts = await pool(list, 6, async (a) => {

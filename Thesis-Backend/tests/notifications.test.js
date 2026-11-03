@@ -37,9 +37,14 @@ test("independent notifications: local dry run, recipient-only HTTP API, prefere
   await db.exec((await read("../../supabase/migrations/20261017000002_thesis_backend_schema.sql")).replace(/^create extension if not exists pgcrypto.*$/m, ""));
   await db.exec(await read("../migrations/003-react-integration.sql"));
   await db.exec(await read("../migrations/009-engineer-license-workflow.sql"));
+  await db.exec(await read("../migrations/014-mixed-use-project-scope.sql"));
+  await db.exec(await read("../migrations/015-engineer-credentials.sql"));
   await db.exec(await read("../../supabase/seed/dummy-data.sql"));
   const people = (await db.query(`SELECT u.id,r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' ORDER BY u.id`)).rows;
   const admin = people.find(p => p.role === "admin"), spm = people.find(p => p.role === "spm"), client = people.find(p => p.role === "client");
+  // The seeded SPM license is intentionally expired in the demo dataset. Keep
+  // this notification API test focused on notifications, not license gating.
+  await db.query("UPDATE user_licenses SET license_expiry=current_date+365 WHERE user_id=$1 AND superseded_at IS NULL", [spm.id]);
   const previousSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = "notification-local-test-only-0123456789012345";
   t.after(() => { if (previousSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previousSecret; });
@@ -135,7 +140,7 @@ test("independent notifications: local dry run, recipient-only HTTP API, prefere
     });
     await t.test("unsafe links are refused and bare browser roles have no table privileges", async () => {
       for (const link of ["https://example.com", "//example.com", "/\\example.com", "/projects\n"]) {
-        await assert.rejects(utility.createNotification(db, { recipientId: spm.id, title: "Unsafe", link }), /inside Siteline/);
+        await assert.rejects(utility.createNotification(db, { recipientId: spm.id, title: "Unsafe", link }), /inside 10BuildLine/);
       }
       for (const role of ["anon", "authenticated"]) {
         assert.equal((await db.query("SELECT has_table_privilege($1,'public.notifications','SELECT') AS allowed", [role])).rows[0].allowed, false);
@@ -144,7 +149,7 @@ test("independent notifications: local dry run, recipient-only HTTP API, prefere
     await t.test("real renewal approvals and rejections resolve their task messages in the business transaction", async () => {
       for (const decision of ["verified", "rejected", "failed-resolution"]) {
         await db.query("SAVEPOINT renewal_workflow");
-        const saved = await renewal.createRenewalRequest(db, admin, { user_id: spm.id, license_number: "TEST-ONLY", license_expiry: "2100-01-01" }, { path: "uploads/test-only.pdf" });
+        const saved = await renewal.createRenewalRequest(db, admin, { user_id: spm.id, profession: "Civil Engineer", license_number: "1234567", license_expiry: "2100-01-01" }, { path: "uploads/test-only.pdf" }, { pending: true });
         const task = (await db.query("SELECT * FROM notifications WHERE subject_type='license_renewal' AND subject_id=$1", [String(saved.id)])).rows;
         assert.ok(task.length > 0); assert.ok(task.every(n => n.resolved_at === null));
         const logs = await snapshot("activity_log"), audits = await snapshot("audit_log");

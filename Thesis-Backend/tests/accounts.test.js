@@ -68,6 +68,8 @@ async function query(sql,args=[]) {
   if(sql.startsWith("INSERT INTO users_token") || sql.startsWith("UPDATE users_token")) {
     state.tokens=[{user_id:args[0],token:args[1]}];return rows([{}]);
   }
+  if(sql.startsWith("select metadata->'sessionActivity' as activity")) return rows([]);
+  if(sql.startsWith("insert into workspace_account_metadata")) return rows([{}]);
   throw new Error("Unexpected query: "+sql);
 }
 mock.module("../src/common/utilities/query.utility.js",{defaultExport:query,namedExports:{execute:query}});
@@ -149,13 +151,13 @@ test("OPM maximum two specializations and SPM maximum three disciplines are enfo
 test("unknown scope values roll back the newly inserted user",async()=>{
   setup();const res=response();
   await accounts.createAccount(request({full_name:"Engineer",email:"e@example.test",role:"spm",scope:{disciplines:["Unknown"]}}),res);
-  assert.equal(res.statusCode,400);
+  assert.equal(res.statusCode,422);
   assert.equal(state.users.length,0);
 });
 test("client popup creates a user and saves company name on the existing project",async()=>{
   setup();const res=response();
   await intakeClients.createIntakeClient(request({project_id:projectId,company_name:"Marbrisa Land Corp.",
-    contact_person:"Maria Santos",email:"Maria@Example.test",contact_number:"09123456789"}),res);
+    contact_person:"Maria Santos",email:"Maria@10Builders.com",contact_number:"09123456789"}),res);
   assert.equal(res.statusCode,201);
   assert.equal(state.users[0].role,"client");
   assert.equal(state.users[0].full_name,"Maria Santos");

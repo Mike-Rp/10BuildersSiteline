@@ -49,7 +49,8 @@ function setup(options = {}) {
       lifecycle_status: "active", project_type_id: 1 },
     phaseOwner: spm.id,
     evidence: { id: "7", project_id: projectId, project_stage_id: 4,
-      checklist_item_id: "1", status: "pending", file_id: fileId, submitted_by: spm.id, phase_update_id: null },
+      checklist_item_id: "1", status: "pending", file_id: fileId, submitted_by: spm.id, phase_update_id: null,
+      required: true, weight: 10, activity_title: "Activity", phase_name: "Structure" },
     items: Array.from({ length: 5 }, (_, i) => ({ id: String(i + 1), required: true, status: "missing" })),
     queries: [], history: [], issues: [], update: null, next: null, fileRows: [],
     ...options,
@@ -60,6 +61,9 @@ function setup(options = {}) {
       state.queries.push({ sql, params });
       const result = rows => ({ rows, rowCount: rows.length });
       if (sql.startsWith("SELECT p.*")) return result([state.p]);
+      if (sql.startsWith("select id from projects where id=$1 for update")) return result([{ id: projectId }]);
+      if (sql.startsWith("select coalesce((select sum(byte_size) from stored_files")) return result([{ used: 0 }]);
+      if (sql.startsWith("WITH workflow AS")) return result([]);
       if (sql.startsWith("SELECT selected.sort_order")) return result([{locked:Number(params[1])>Number(state.p.current_stage_id),on_hold:false}]);
       if (sql.startsWith("SELECT w.project_stage_id")) return result(updateUtility.STAGES.map((code,index)=>({project_stage_id:index+1,on_hold:false})));
       if (sql.startsWith("WITH added AS")) return result([]);
@@ -134,6 +138,18 @@ function setup(options = {}) {
 const request = (actor = spm, body = {}, params = {}) => ({
   actor, body, params: { id: projectId, evidenceId: "7", itemId: "1", ...params },
 });
+async function approveWithPreview(req, res) {
+  const preview = response();
+  await controller.getEvidenceReviewPreview(req, preview);
+  assert.equal(preview.statusCode, 200, preview.body?.message);
+  await controller.approveEvidence({ ...req, body: { ...req.body, expected_review_token: preview.body.data.review_token } }, res);
+}
+async function rejectWithPreview(req, res) {
+  const preview = response();
+  await controller.getEvidenceReviewPreview(req, preview);
+  assert.equal(preview.statusCode, 200, preview.body?.message);
+  await controller.rejectEvidence({ ...req, body: { ...req.body, expected_review_token: preview.body.data.review_token } }, res);
+}
 
 
 test("required checklist progress rounds percentages and handles no configured items", () => {
@@ -182,7 +198,7 @@ test("manual percentage is rejected even if it equals the calculated percentage"
 test("OPM approval advances progress by one fifth and records approved history", async () => {
   const state = setup();
   const res = response();
-  await controller.approveEvidence(request(opm), res);
+  await approveWithPreview(request(opm), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.current_pct, 20);
   assert.equal(state.p.current_pct, 20);
@@ -194,7 +210,7 @@ test("OPM approval advances progress by one fifth and records approved history",
 
 test("a second approval cannot increment progress again", async () => {
   const state = setup();
-  await controller.approveEvidence(request(opm), response());
+  await approveWithPreview(request(opm), response());
   const res = response();
   await controller.approveEvidence(request(opm), res);
   assert.equal(res.statusCode, 409);
@@ -224,7 +240,7 @@ test("rejected evidence requires a reason and contributes no progress", async ()
   await controller.rejectEvidence(request(opm), empty);
   assert.equal(empty.statusCode, 400);
   const res = response();
-  await controller.rejectEvidence(request(opm, { review_note: "Missing test results." }), res);
+  await rejectWithPreview(request(opm, { review_note: "Missing test results." }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.current_pct, 0);
   assert.equal(state.evidence.status, "rejected");
@@ -237,7 +253,7 @@ test("reviewing a previous stage does not overwrite the current stage percentage
   const state = setup();
   state.evidence.project_stage_id = 3;
   const res = response();
-  await controller.approveEvidence(request(opm), res);
+  await approveWithPreview(request(opm), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.p.current_pct, 0);
   assert.equal(state.history[0][1], 3);
@@ -345,6 +361,9 @@ test("approving a crew assigns available workers and refreshes the project numer
     if (sql.startsWith("SELECT lifecycle_status FROM projects")) return result([{lifecycle_status:"active"}]);
     if (sql.startsWith("SELECT r.id")) return result([{ id: fileId, project_id: projectId,
       subcontractor_id: opm.id, status: "pending", trade_id: 1 }]);
+    if (sql.startsWith("SELECT lifecycle_status,coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')")) return result([{ lifecycle_status: "active", allocation_version: 0 }]);
+    if (sql.startsWith("select count(*)::int as n from (select subcontractor_id, project_id from project_subcontractor_assignments")) return result([{ n: 0 }]);
+    if (sql.startsWith("select id from subcontractors where id=$1 for update")) return result([{ id: opm.id }]);
     if (sql.startsWith("SELECT 1 FROM project_subcontractor_assignments")) return result([]);
     if (sql.startsWith("SELECT id FROM subcontractor_workers")) return result(workerIds.map(id => ({ id })));
     if (sql.startsWith("INSERT INTO project_subcontractor_assignments")) return result([{ id: fileId }]);
@@ -370,6 +389,9 @@ test("crew approval with zero available workers does not create an assignment", 
     const result = rows => ({ rows, rowCount: rows.length });
     if (sql.startsWith("SELECT r.id")) return result([{ id: fileId, project_id: projectId,
       subcontractor_id: opm.id, status: "pending", trade_id: 1 }]);
+    if (sql.startsWith("SELECT lifecycle_status,coalesce((to_jsonb(projects)->>'subcontractor_allocation_version')")) return result([{ lifecycle_status: "active", allocation_version: 0 }]);
+    if (sql.startsWith("select count(*)::int as n from (select subcontractor_id, project_id from project_subcontractor_assignments")) return result([{ n: 0 }]);
+    if (sql.startsWith("select id from subcontractors where id=$1 for update")) return result([{ id: opm.id }]);
     return result([]);
   } };
   const res = response();
@@ -451,7 +473,7 @@ test("final OPM activity approval automatically hands off once, retaining approv
     nextItems: [{ id: "6", required: true, status: "missing" }] });
   state.items.forEach(item => item.status = "approved");
   const res = response();
-  await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+  await approveWithPreview(request(opm, {}, { evidenceId: "7" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.handoff.advanced, true);
   assert.equal(state.p.current_stage_id, 5);
@@ -474,7 +496,7 @@ test("automatic handoff blockers preserve a successful activity approval", async
     const state = setup(options);
     state.items.forEach(item => item.status = "approved");
     const res = response();
-    await controller.approveEvidence(request(opm, {}, { evidenceId: "7" }), res);
+    await approveWithPreview(request(opm, {}, { evidenceId: "7" }), res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.data.handoff.advanced, false);
     assert.ok(res.body.data.handoff.reason);
@@ -646,7 +668,7 @@ test("individual evidence can be reviewed without approving its parent report", 
   const state = setup();
   await controller.submitPhaseUpdate(request(spm, { submitted_item_ids: ["1"] }), response());
   const res = response();
-  await controller.approveEvidence(request(opm), res);
+  await approveWithPreview(request(opm), res);
   assert.equal(res.statusCode, 200);
   assert.equal(state.evidence.status, "approved");
   assert.equal(state.update.status, "pending");

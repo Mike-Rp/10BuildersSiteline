@@ -8,7 +8,7 @@ export async function notify(db, { title, detail = "", actorId = null, projectId
      select id,$1,$2,$3,$4 from activity_types where code=$5 returning id`, [title, detail, actorId, projectId, type]);
   if (!created.rowCount) return null;
   await db.query(
-    "insert into notification_recipients(activity_log_id,recipient_user_id) select $1,unnest($2::uuid[]) on conflict do nothing",
+    "insert into notification_recipients(activity_log_id,recipient_user_id) select $1::bigint,unnest($2::uuid[]) on conflict do nothing",
     [created.rows[0].id, ids]);
   await mirrorLegacyNotifications(db, [created.rows[0].id], notification);
   return created.rows[0].id;

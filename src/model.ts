@@ -221,6 +221,7 @@ export type Account = {
   suspendedAt?: string
   qualifiedRequirements?: string[]
   eligibleForNewAssignment?: boolean
+  assignmentCandidateProjectIds?: string[]
   assignmentHold?: boolean
   resignation?: ResignationRecord
   resignationHistory?: ResignationRecord[]
@@ -800,7 +801,10 @@ export function spmCandidates(
   return state.accounts
     .filter(
       (a) =>
-        eligible(state, a, "spm", excluding) && !activeLeads.includes(a.id),
+        (a.assignmentCandidateProjectIds
+          ? a.role === "spm" && a.status === "active" && a.eligibleForNewAssignment === true && !(a.cooldown && a.cooldown > Date.now())
+          : eligible(state, a, "spm", excluding)) && !activeLeads.includes(a.id) &&
+        (!a.assignmentCandidateProjectIds || a.assignmentCandidateProjectIds.includes(excluding)),
     )
     .map((a) => ({
       account: a,
