@@ -339,7 +339,15 @@ export function subcontractorRecommendation(
   p: Project,
   company: Company,
 ) {
+  const assignedToProject =
+    company.activeProjectIds.includes(p.id) ||
+    workflowFor(p).selections.some(
+      (selection) =>
+        selection.companyId === company.id &&
+        ["contacted", "accepted"].includes(selection.status),
+    )
   const committed =
+    !assignedToProject &&
     !!company.committedUntil &&
     Date.parse(company.committedUntil) > Date.parse(p.start)
   const otherProjects = company.activeProjectIds.filter(
@@ -358,6 +366,7 @@ export function subcontractorRecommendation(
   return {
     company,
     committed,
+    assignedToProject,
     availableManpower,
     otherProjects: otherProjects.length,
   }

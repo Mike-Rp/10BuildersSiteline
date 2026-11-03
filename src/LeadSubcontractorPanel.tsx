@@ -37,7 +37,9 @@ type Recommendation = ReturnType<typeof subcontractorRecommendation>
 function CompanyAvailability({ candidate }: { candidate: Recommendation }) {
   return (
     <div className="subcon-availability">
-      {candidate.committed || candidate.company.availability === "committed" ? (
+      {candidate.assignedToProject ? (
+        <Badge tone="green">Assigned to this project</Badge>
+      ) : candidate.committed || candidate.company.availability === "committed" ? (
         <Badge tone="amber">
           {candidate.company.committedUntil
             ? `Committed through ${dateLabel(candidate.company.committedUntil)}`
