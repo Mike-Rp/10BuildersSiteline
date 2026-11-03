@@ -122,7 +122,7 @@ export async function allocationCommand(db, p, meta, user, c) {
   if (
     (c.plan &&
       (!Array.isArray(c.plan.companyIds) ||
-        c.plan.companyIds.length > 3 ||
+        c.plan.companyIds.length > 25 ||
         c.plan.companyIds.some((id) => !isUuid(id)) ||
         !Array.isArray(c.plan.coverage))) ||
     (c.companyId !== undefined && !isUuid(c.companyId))

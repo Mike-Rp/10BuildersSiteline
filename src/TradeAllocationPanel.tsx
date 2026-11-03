@@ -61,7 +61,7 @@ export function TradeAllocationOverview({
     <div className="trade-allocation">
       <h3>Trade-based subcontractor allocation</h3>
       <p>
-        {requiredCompanies(project.type)} companies required · Up to 2
+        At least {requiredCompanies(project.type)} companies required · Up to 2
         concurrent commitments per company.
       </p>
       {!plan ? (
@@ -72,7 +72,7 @@ export function TradeAllocationOverview({
       ) : (
         <>
           <div className="trade-company-grid">
-            {plan.companyIds.map((id) => {
+            {plan.companyIds.filter((id) => work.selections.find((s) => s.companyId === id)?.status !== "archived").map((id) => {
               const status =
                 work.selections.find((s) => s.companyId === id)?.status ||
                 "selected"
@@ -150,7 +150,9 @@ export default function TradeAllocationPanel({
     [statusMessage, setStatusMessage] = useState("")
   const [alternatives, setAlternatives] = useState<string>(),
     [manual, setManual] = useState(false),
-    [team, setTeam] = useState<string[]>([])
+    [team, setTeam] = useState<string[]>([]),
+    [addingCompany, setAddingCompany] = useState(""),
+    [addingScope, setAddingScope] = useState(-1)
   const [action, setAction] = useState<{
     id: string
     type: "contact_company" | "respond_company" | "release_allocation_company"
@@ -173,6 +175,26 @@ export default function TradeAllocationPanel({
     ["contacted", "accepted"].includes(statusOf(id))
   const name = (id: string) =>
     candidates.find((c) => c.id === id)?.name || "Company record unavailable"
+  const addableScopes = (companyId: string) =>
+    plan?.coverage.map((row, index) => ({ row, index })).filter(({ row }) =>
+      candidates.find((candidate) => candidate.id === companyId)?.disciplines.includes(row.discipline) &&
+      !protectedCompany(row.companyId) && scopeFor(plan!, row.companyId).length > 1,
+    ) || []
+  function removeUncontactedCompany(id: string) {
+    if (!plan || plan.companyIds.length <= count) return
+    const nextPlan = structuredClone(plan)
+    const rows = nextPlan.coverage.map((row, index) => ({ row, index })).filter(({ row }) => row.companyId === id)
+    for (const { row, index } of rows) {
+      const replacement = candidates.filter((candidate) => candidate.id !== id && nextPlan.companyIds.includes(candidate.id) && candidate.disciplines.includes(row.discipline) && !protectedCompany(candidate.id)).sort((a, b) => compareCandidatePreference(a, b) || a.name.localeCompare(b.name))[0]
+      if (!replacement) {
+        setError(`Could not remove ${name(id)}: reassign its ${row.phase} · ${row.discipline} scope first.`)
+        return
+      }
+      nextPlan.coverage[index] = { ...row, companyId: replacement.id }
+    }
+    nextPlan.companyIds = nextPlan.companyIds.filter((companyId) => companyId !== id)
+    void send({ type: "save_allocation_plan", plan: nextPlan }, `${name(id)} removed from the proposed project roster. Its phase coverage was reassigned.`)
+  }
   async function send(command: WorkflowCommand, message: string) {
     if (lock.current || saving) return false
     lock.current = true
@@ -242,7 +264,7 @@ export default function TradeAllocationPanel({
         reserves one project slot after acceptance. The crew foreman handles
         workforce distribution.
       </p>
-      <p>{eligible.length} eligible companies · {count} required.</p>
+      <p>{eligible.length} eligible companies · minimum {count} for this project.</p>
       {project.clientSubcon && !plan && (
         <p className="notice">
           The client-nominated company must be registered and reviewed in the
@@ -302,7 +324,7 @@ export default function TradeAllocationPanel({
       ) : (
         <>
           <div className="trade-company-grid">
-            {plan.companyIds.map((id) => {
+            {plan.companyIds.filter((id) => !active || statusOf(id) !== "archived").map((id) => {
               const company = candidates.find((c) => c.id === id),
                 status = statusOf(id),
                 reason = eligibility(company)
@@ -367,6 +389,9 @@ export default function TradeAllocationPanel({
                     </p>
                   )}
                   <div className="trade-actions">
+                    {!active && status === "selected" && plan.companyIds.length > count && (
+                      <Button disabled={disabled} onClick={() => removeUncontactedCompany(id)}>Remove from project</Button>
+                    )}
                     {!active && !protectedCompany(id) && (
                       <>
                         <Button
@@ -465,6 +490,34 @@ export default function TradeAllocationPanel({
               )
             })}
           </div>
+          {!active && (
+            <section className="trade-company">
+              <h4>Add subcontractor to project</h4>
+              <p>Add an eligible company to the project roster, then assign it a phase scope. The minimum applies to distinct companies across the whole project.</p>
+              <div className="trade-actions">
+                <Field label="Subcontractor">
+                  <select value={addingCompany} disabled={disabled} onChange={(event) => { setAddingCompany(event.target.value); setAddingScope(-1) }}>
+                    <option value="">Choose an eligible company</option>
+                    {eligible.filter((company) => !plan.companyIds.includes(company.id) && addableScopes(company.id).length > 0).map((company) => <option key={company.id} value={company.id}>{company.name} · {company.disciplines.join(", ")}</option>)}
+                  </select>
+                </Field>
+                {addingCompany && <Field label="Assign phase scope">
+                  <select value={addingScope} disabled={disabled} onChange={(event) => setAddingScope(Number(event.target.value))}>
+                    <option value={-1}>Choose a phase and discipline</option>
+                    {addableScopes(addingCompany).map(({ row, index }) => <option key={`${row.phase}/${row.discipline}`} value={index}>{row.phase} · {row.discipline} (currently {name(row.companyId)})</option>)}
+                  </select>
+                </Field>}
+                <Button variant="primary" disabled={disabled || !addingCompany || addingScope < 0} onClick={() => {
+                  const nextPlan = structuredClone(plan)
+                  nextPlan.companyIds.push(addingCompany)
+                  nextPlan.coverage[addingScope] = { ...nextPlan.coverage[addingScope], companyId: addingCompany }
+                  void send({ type: "save_allocation_plan", plan: nextPlan }, `${name(addingCompany)} added to the project roster and assigned to ${nextPlan.coverage[addingScope].phase} · ${nextPlan.coverage[addingScope].discipline}.`)
+                  setAddingCompany(""); setAddingScope(-1)
+                }}>Add and assign subcontractor</Button>
+              </div>
+              {eligible.filter((company) => !plan.companyIds.includes(company.id)).length > 0 && !eligible.some((company) => !plan.companyIds.includes(company.id) && addableScopes(company.id).length > 0) && <p className="role-muted">No additional eligible company can cover an uncontacted phase scope. Review verified disciplines or phase coverage.</p>}
+            </section>
+          )}
           <details className="trade-company">
             <summary>Review phase and discipline coverage</summary>
             <Coverage state={state} plan={plan} />
@@ -601,7 +654,7 @@ export default function TradeAllocationPanel({
       {manual && (
         <Modal
           title="Choose company team"
-          subtitle={`${count} companies required`}
+          subtitle={`At least ${count} companies required`}
           onClose={() => !disabled && setManual(false)}
         >
           <div className="trade-checks">
@@ -663,7 +716,7 @@ export default function TradeAllocationPanel({
             action.type === "contact_company"
               ? "Record company contact"
               : action.type === "release_allocation_company"
-                ? "Formally release company?"
+                ? "Remove subcontractor from active project?"
                 : action.accepted
                   ? "Record actual acceptance?"
                   : "Record actual decline?"
@@ -673,7 +726,7 @@ export default function TradeAllocationPanel({
         >
           <p>
             {action.type === "release_allocation_company"
-              ? "The agreed phase scope is complete. Formal release frees this project’s commitment slot."
+              ? "The agreed phase scope is complete. This removes the company from the active roster and frees its project commitment. The prior assignment remains in project history."
               : "Contact the company outside 10BuildLine and record its actual response. Acceptance reserves a project slot; it does not activate the project."}
           </p>
           <Field label="Contact or response details">
