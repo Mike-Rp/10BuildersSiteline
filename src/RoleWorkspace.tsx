@@ -2082,6 +2082,53 @@ export default function RoleWorkspace({
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
+          renderDeadlines={isOpm && !extensionDemo ? id => {
+            const project = allActive.find(site => site.id === id)
+            if (!project) return null
+            const work = workflowFor(project)
+            const pendingQa = checklistFor(project).filter(item => item.status === "submitted")
+            const reminders: { label: string; detail: string; due?: number; action: () => void }[] = []
+            if (work.deadline) reminders.push({
+              label: "Assignment response",
+              detail: `Soft target ${new Date(work.deadline.soft).toLocaleString()} · hard deadline ${new Date(work.deadline.hard).toLocaleString()}`,
+              due: Date.parse(work.deadline.soft),
+              action: () => { setPickedId(project.id); openSiteResponses() },
+            })
+            if (work.pendingRework) reminders.push({
+              label: "Review rework request",
+              detail: `Submitted ${dateLabel(work.pendingRework.submittedAt)} · manual review required`,
+              action: () => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
+            })
+            if (work.pendingUpdate) reminders.push({
+              label: "Review progress update",
+              detail: `Three-day review window ends ${new Date(Date.parse(work.pendingUpdate.submittedAt) + REVIEW_MS).toLocaleString()}`,
+              due: Date.parse(work.pendingUpdate.submittedAt) + REVIEW_MS,
+              action: () => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
+            })
+            if (pendingQa.length) {
+              const dueTimes = pendingQa.filter(item => item.submittedAt).map(item => Date.parse(item.submittedAt!) + REVIEW_MS).filter(Number.isFinite)
+              const due = dueTimes.length ? Math.min(...dueTimes) : undefined
+              reminders.push({
+                label: "Review QA/QC evidence",
+                detail: `${pendingQa.length} evidence ${pendingQa.length === 1 ? "item" : "items"} pending · three-day review window`,
+                due,
+                action: () => openChecklistApprovals(project),
+              })
+            }
+            if (!reminders.length) return null
+            return <section className="as-deadlines" aria-label={`Deadlines for ${project.name}`}>
+              <h3><Icon name="clock" size={16} /> Due and follow-up</h3>
+              <ul>{reminders.map((reminder, index) => {
+                const overdue = reminder.due !== undefined && reminder.due < Date.now()
+                return <li key={`${reminder.label}-${index}`}>
+                  <button type="button" onClick={reminder.action}>
+                    <span className="as-deadline-copy"><strong>{reminder.label}</strong><small>{reminder.detail}</small></span>
+                    <span className={`as-deadline-status${overdue ? " is-overdue" : ""}`}>{reminder.due === undefined ? "Needs review" : overdue ? "Overdue" : "Due soon"}</span>
+                  </button>
+                </li>
+              })}</ul>
+            </section>
+          } : undefined}
           renderActions={id => {
             const p = allActive.find(site => site.id === id)!
             if (extensionDemo) return <Button onClick={() => setDialog({ kind: "project", projectId: id })}>View extension requests</Button>

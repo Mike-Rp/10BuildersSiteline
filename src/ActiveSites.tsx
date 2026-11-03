@@ -33,6 +33,7 @@ export default function ActiveSites({
   projects,
   onOpen,
   renderActions,
+  renderDeadlines,
   reviewAvailable = false,
   phaseDefinitionsByType,
   initialScheduleFilter = "",
@@ -45,6 +46,7 @@ export default function ActiveSites({
   onOpen: (id: string) => void
 
   renderActions?: (id: string) => ReactNode
+  renderDeadlines?: (id: string) => ReactNode
   reviewAvailable?: boolean
   phaseDefinitionsByType?: Record<string, PhaseDefinition[]>
   initialScheduleFilter?: "" | "delayed"
@@ -321,6 +323,7 @@ export default function ActiveSites({
                   <dd>{p.end ? dateLabel(p.end) : "Not set"}</dd>
                 </div>
               </dl>
+              {renderDeadlines && renderDeadlines(p.id)}
               <div className="as-card-actions">
                 {renderActions && <div className="as-workflow-actions">{renderActions(p.id)}</div>}
                 <Button className="as-details" onClick={() => open(p.id)}>
