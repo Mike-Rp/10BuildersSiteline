@@ -244,6 +244,7 @@ export default function RoleWorkspace({
     () =>
       projects.find((p) => p.status === "pending")?.id || projects[0]?.id || "",
   )
+  const [phaseWorkspaceOpen, setPhaseWorkspaceOpen] = useState(false)
   const [dialog, setDialog] = useState<RoleDialog>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
@@ -307,6 +308,7 @@ export default function RoleWorkspace({
     Object.fromEntries(projects.map((p) => [p.id, p.status])),
   )
   const picked = projects.find((p) => p.id === pickedId) || projects[0]
+  const phaseWorkspaceProject = projects.find((p) => p.id === pickedId && p.status === "active")
   const detail = state.projects.find((p) => p.id === dialog?.projectId)
   const company = state.companies.find((c) => c.id === dialog?.companyId)
   const events = visibleEvents(state, actor)
@@ -2116,7 +2118,7 @@ export default function RoleWorkspace({
               }}>Request update</Button>
             </> : active.some(site => site.id === id) ? <Button onClick={() => {
               setPickedId(id)
-              requestAnimationFrame(() => document.getElementById("active-phase-workspace")?.scrollIntoView({ block: "start" }))
+              setPhaseWorkspaceOpen(true)
             }}>Open phase workspace</Button> : null
           }} />}
         {isOpm && !extensionDemo && activeSitesView === "updates" && <div id="active-sites-review" className="active-site-review-queue">
@@ -2153,21 +2155,6 @@ export default function RoleWorkspace({
             })}</div> : <Empty title="No progress updates or issues awaiting review">New submissions will appear here inside their active site.</Empty>}
           </Panel>
         </div>}
-        {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <details className="as-site-workspace" id="active-phase-workspace">
-          <summary>
-            <span className="as-phase-workspace-icon"><Icon name="building" size={18} /></span>
-            <span className="as-phase-workspace-copy">
-              <strong>My phase workspace · {picked.name}</strong>
-              <small>Current phase: {picked.phase} · {actorName(phaseOwner(picked))} owns this phase</small>
-            </span>
-            <Badge>{picked.team.filter(t => t.accountId === actor.id && projectPhaseNames(picked).indexOf(t.phase) < projectPhaseNames(picked).indexOf(picked.phase)).length} completed phases</Badge>
-            <Icon name="chevron" size={18} />
-          </summary>
-          <div className="as-phase-workspace-content">
-            <DelayedProjectNotice project={picked} today={scheduleToday} />
-            {progressForm(picked)}
-          </div>
-        </details>}
       </>
     )
   }
@@ -2942,7 +2929,7 @@ export default function RoleWorkspace({
   function resourcesWorkspace() {
     return <>
       {header("Resources")}
-      <div className="tabs standalone" role="tablist" aria-label="Site PM resources">
+      <div className="as-tabs directory-tabs" role="tablist" aria-label="Site PM resources">
         <button type="button" role="tab" aria-selected={resourcesTab === "documents"} onClick={() => setResourcesTab("documents")}>
           <Icon name="folder" size={17} /> Document repository
         </button>
@@ -3835,6 +3822,17 @@ export default function RoleWorkspace({
               Continue to Document Upload
             </Button>
           </div>
+        </Modal>
+      )}
+      {phaseWorkspaceOpen && !extensionDemo && !isOpm && phaseWorkspaceProject && (
+        <Modal
+          title={`My phase workspace · ${phaseWorkspaceProject.name}`}
+          subtitle={`Current phase: ${phaseWorkspaceProject.phase} · ${actorName(phaseOwner(phaseWorkspaceProject))} owns this phase`}
+          onClose={() => setPhaseWorkspaceOpen(false)}
+          wide
+        >
+          <DelayedProjectNotice project={phaseWorkspaceProject} today={scheduleToday} />
+          {progressForm(phaseWorkspaceProject)}
         </Modal>
       )}
       {dialog?.kind === "changes" && detail && (

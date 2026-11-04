@@ -59,20 +59,6 @@
 .as-recent { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; margin-top: 12px; }
 .as-recent > span { color: #62758a; }
 .as-recent button { border: 1px solid #e2eaf2; background: #f0f5fa; border-radius: 20px; padding: 6px 10px; color: #315f85; cursor: pointer; overflow-wrap: anywhere; }
-.as-site-workspace { margin-top: 18px; border: 1px solid #dce4ec; border-radius: 10px; background: #fff; overflow: hidden; }
-.as-site-workspace > summary { display: flex; align-items: center; gap: 12px; min-height: 66px; padding: 12px 16px; list-style: none; cursor: pointer; }
-.as-site-workspace > summary::-webkit-details-marker { display: none; }
-.as-site-workspace > summary:hover { background: #f8fafc; }
-.as-phase-workspace-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 8px; background: #eef4f9; color: #315f85; }
-.as-phase-workspace-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
-.as-phase-workspace-copy strong { color: #102c4c; font-size: 15px; }
-.as-phase-workspace-copy small { color: #62758a; font-size: 12px; }
-.as-site-workspace > summary > .badge { flex: none; }
-.as-site-workspace > summary > svg:last-child { color: #315f85; transition: transform .16s ease; }
-.as-site-workspace[open] > summary > svg:last-child { transform: rotate(180deg); }
-.as-phase-workspace-content { padding: 0 16px 16px; border-top: 1px solid #e2eaf2; }
-.as-phase-workspace-content > .panel { margin-top: 14px; }
-@media(max-width:640px) { .as-site-workspace > summary { flex-wrap: wrap; } .as-phase-workspace-copy { flex-basis: calc(100% - 52px); } .as-site-workspace > summary > .badge { margin-left: 50px; } }
 @media(max-width: 1100px) { .as-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width: 640px) { .as-grid { grid-template-columns: minmax(0,1fr); } .as-summary { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; } .as-summary > div { padding: 12px; min-height: 100px; } .as-summary .as-summary-icon { display: none; } .as-card-body { padding: 16px; } .as-card h2 { min-height: 0; } }
 @media(prefers-reduced-motion: reduce) { .as-card { transition: none; } .as-card:hover { transform: none; } }
@@ -83,6 +69,12 @@
 .as-tabs button:hover { background: #eef4f9; }
 .as-tabs button span { background: #eaf0f6; color: #315f85; border-radius: 12px; padding: 2px 8px; font-size: 11px; }
 .as-tabs button[aria-selected="true"] span { background: #dcebf6; }
+.as-tabs.directory-tabs { gap: 6px; border: 0; margin: 0 0 20px; }
+.as-tabs.directory-tabs button { min-height: 50px; border: 0; border-radius: 9px; padding: 12px 16px; color: #62758a; background: transparent; font-size: 15px; }
+.as-tabs.directory-tabs button[aria-selected="true"] { color: #fff; background: #193b59; }
+.as-tabs.directory-tabs button:hover:not([aria-selected="true"]) { background: #eaf0f6; }
+.as-tabs.directory-tabs button span { background: #eaf0f6; }
+.as-tabs.directory-tabs button[aria-selected="true"] span { background: #31536f; color: #fff; }
 
 /* Schedule displays use the existing 10BuildLine tokens and readable text sizes. */
 #root .active-sites :is(label, input, select, small, .as-summary > div > span, .as-type, .as-review, .as-phase, .as-progress-label, dt, dd, .as-pagination, .as-recent, .as-tabs button, .as-tabs button span, .as-results p, .as-card-actions .button) { font-size: 14px; }
