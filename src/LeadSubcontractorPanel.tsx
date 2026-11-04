@@ -938,17 +938,16 @@ function LegacyLeadSubcontractorPanel({
             </span>
           </div>
         )}
-        {!clientReady && (
+        {!active && !clientReady && (
           <div className="role-error">
             <Icon name="alert" />
             <span>
               {client
                 ? client.status === "suspended" || client.status === "deactivated"
                   ? `${client.name}'s client account is ${client.status}. Ask Admin to restore or replace the client record.`
-                  : `The client account for ${client.name} is not linked to this project. Ask Admin to check the project’s client assignment.`
+                  : `The client account for ${client.name} is not ready for project activation. Ask Admin to check the client account and project assignment.`
                 : "The assigned client account cannot be found. Ask Admin to check the project’s client assignment."}{" "}
-              Activation remains blocked until the client record and project link
-              are valid.
+              Activation remains blocked until the client account is ready.
             </span>
           </div>
         )}
