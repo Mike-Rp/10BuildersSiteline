@@ -178,8 +178,7 @@ const OPM_NAV = [
 const SPM_NAV = [
   ["Dashboard", "grid"],
   ["Active sites", "building"],
-  ["Document repository", "folder"],
-  ["Subcon directory", "users"],
+  ["Resources", "folder"],
   ["Archive", "archive"],
   ["Activity log", "activity"],
   ["Preferences", "settings"],
@@ -230,6 +229,7 @@ export default function RoleWorkspace({
   const scheduleToday = useScheduleToday()
   const [activeSitesScheduleFilter, setActiveSitesScheduleFilter] = useState<"" | "delayed">("")
   const [activeSitesView, setActiveSitesView] = useState<"sites" | "updates" | "uploads" | "assignments" | "deadlines">("sites")
+  const [resourcesTab, setResourcesTab] = useState<"documents" | "subcontractors">("documents")
   const signOut = useSignOutConfirmation(onPause)
   const urgencyNow = useUrgencyNow()
   useListMemory()
@@ -487,6 +487,13 @@ export default function RoleWorkspace({
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
     let nextActiveSitesView: typeof activeSitesView | undefined
+    if (!isOpm && next === "Document repository") {
+      setResourcesTab("documents")
+      next = "Resources"
+    } else if (!isOpm && next === "Subcon directory") {
+      setResourcesTab("subcontractors")
+      next = "Resources"
+    }
     if (!extensionDemo && next === "Assignments") {
       nextActiveSitesView = "assignments"
       next = "Active sites"
@@ -1308,7 +1315,7 @@ export default function RoleWorkspace({
       />
     )
   }
-  function documentWorkspace() {
+  function documentWorkspace(embedded = false) {
     if (!picked)
       return (
         <Empty title="No projects available.">
@@ -1318,7 +1325,7 @@ export default function RoleWorkspace({
     if (!isOpm)
       return (
         <>
-          {header(
+          {!embedded && header(
             "Document repository",
           )}
           {repositoryBrowser(projects)}
@@ -1326,7 +1333,7 @@ export default function RoleWorkspace({
       )
     return (
       <>
-        {header(
+        {!embedded && header(
           "Project documents",
         )}
         {repositoryBrowser(projects.filter((p) => p.opmId === actor.id))}
@@ -3047,7 +3054,7 @@ export default function RoleWorkspace({
       </>
     )
   }
-  function directory() {
+  function directory(embedded = false) {
     const directoryItems = state.companies.filter(
       (company) =>
         company.status === "approved" ||
@@ -3072,7 +3079,7 @@ export default function RoleWorkspace({
     })
     return (
       <>
-        {header(
+        {!embedded && header(
           "Subcontractor directory",
           undefined,
         )}
@@ -3130,6 +3137,20 @@ export default function RoleWorkspace({
         />
       </>
     )
+  }
+  function resourcesWorkspace() {
+    return <>
+      {header("Resources")}
+      <div className="tabs standalone" role="tablist" aria-label="Site PM resources">
+        <button type="button" role="tab" aria-selected={resourcesTab === "documents"} onClick={() => setResourcesTab("documents")}>
+          <Icon name="folder" size={17} /> Document repository
+        </button>
+        <button type="button" role="tab" aria-selected={resourcesTab === "subcontractors"} onClick={() => setResourcesTab("subcontractors")}>
+          <Icon name="users" size={17} /> Subcon directory
+        </button>
+      </div>
+      {resourcesTab === "documents" ? documentWorkspace(true) : directory(true)}
+    </>
   }
   function archives() {
     const historical = state.projects.filter((p) =>
@@ -3750,6 +3771,8 @@ export default function RoleWorkspace({
       case "Documents":
       case "Document repository":
         return documentWorkspace()
+      case "Resources":
+        return resourcesWorkspace()
       case "Assignments":
         return assignmentPage()
       case "Active sites":
