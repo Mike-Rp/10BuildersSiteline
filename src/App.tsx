@@ -146,6 +146,7 @@ import {
   inDateRange,
   optionsFrom,
   stableSort,
+  withFilter,
   withPage,
   type FilterDef,
 } from "./listing"
@@ -1056,6 +1057,13 @@ function AppInner() {
       { ...roleFilter_, options: roleFilter_.options!.filter((o) => o.value !== "client") },
       accountStatusFilter,
       licenseFilter_,
+      {
+        id: "credentials",
+        label: "Professional credentials",
+        allLabel: "All credential records",
+        options: [{ value: "missing", label: "Not on file" }],
+        test: (a, value) => value !== "missing" || (["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status)),
+      },
     ],
   }
   const engineerPath = engineerQueryString(getListQuery("admin:engineers"))
@@ -1600,31 +1608,34 @@ function AppInner() {
     const workforceAccounts = state.accounts.filter(
       (a) => ["opm", "spm"].includes(a.role) && ["active", "invited"].includes(a.status),
     )
+    function reviewMissingCredentials() {
+      updateListQuery("admin:engineers", (query) => withFilter(query, "credentials", "missing"))
+      window.requestAnimationFrame(() => document.getElementById("engineer-directory-list")?.scrollIntoView({ behavior: "smooth", block: "start" }))
+    }
     const engineersTab = () => (
         <>
           {accountsMissingCredentials.length > 0 && (
-            <div className="notice team-license-notice account-credentials-notice" role="status">
-              <Icon name="alert" />
-              <p>
-                <strong>
-                  {accountsMissingCredentials.length} SPM/OPM {accountsMissingCredentials.length === 1 ? "account was" : "accounts were"} created without professional credentials.
-                </strong>{" "}
-                Open the account to review or add its credentials.
-              </p>
-            </div>
+            <button className="engineer-credential-banner" type="button" onClick={reviewMissingCredentials}>
+              <span className="engineer-credential-banner-icon"><Icon name="alert" size={18} /></span>
+              <span className="engineer-credential-banner-copy">
+                <strong>{accountsMissingCredentials.length} SPM/OPM {accountsMissingCredentials.length === 1 ? "account needs" : "accounts need"} professional credentials</strong>
+                <small>Open the filtered directory to review them.</small>
+              </span>
+              <span className="engineer-credential-banner-action">Review accounts <Icon name="arrow" size={16} /></span>
+            </button>
           )}
           <Panel
             title="Workforce by engineer type"
-            subtitle="Active and invited engineer accounts with a professional type on file · Informational counts"
+            subtitle="Active and invited SPM/OPM accounts · Informational counts"
             className="engineer-type-summary-panel"
           >
             <div className="engineer-type-summary-grid">
               {PROFESSIONS.map((profession) => {
                 const count = workforceAccounts.filter((a) => a.professionalTypes?.includes(profession)).length
                 return (
-                  <div className="engineer-type-count" key={profession}>
-                    <span>{profession.replace(/ Engineer$/, "")}</span>
+                  <div className="engineer-type-count" key={profession} aria-label={`${count} ${profession}${count === 1 ? "" : "s"}`}>
                     <strong>{count}</strong>
+                    <span>{profession.replace(/ Engineer$/, "")}</span>
                   </div>
                 )
               })}
@@ -1633,6 +1644,7 @@ function AppInner() {
           <Panel
             title="In-house personnel"
             subtitle={`${engineers.length} engineers and administrators`}
+            className="engineer-directory-personnel"
           >
             <ListSection
               list={engineersList}

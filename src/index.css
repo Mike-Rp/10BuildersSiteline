@@ -293,10 +293,36 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag-list > span { background: var(--surface-subtle); color: var(--color-muted); border: 1px solid var(--color-line); padding: 3px 6px; border-radius: 4px; font-size: 14px; }
 .engineer-card .tag-list { margin-top: 16px; min-height: 26px; }
-.engineer-type-summary-panel .panel-header { min-height: 0; padding: 15px 18px 11px; border-bottom: 0; }
-.engineer-type-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; padding: 0 16px 15px; }
-.engineer-type-count { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 9px 11px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--surface-subtle); color: var(--color-muted); font-size: 13px; }
-.engineer-type-count strong { color: var(--color-primary); font-size: 20px; font-weight: 650; line-height: 1; }
+.engineer-type-summary-panel .panel-header { min-height: 0; padding: 14px 18px; border-bottom: 1px solid var(--color-line); }
+.engineer-type-summary-panel .panel-header p { margin-top: 2px; font-size: 12px; }
+.engineer-credential-banner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; margin-bottom: 12px; padding: 11px 15px; border: 1px solid #e4c47c; border-left: 3px solid #b7791f; border-radius: 8px; background: #fffaf0; color: #634b1d; text-align: left; }
+.engineer-credential-banner:hover { background: #fff5df; border-color: #d6ae57; box-shadow: 0 2px 8px #172b4d0d; }
+.engineer-credential-banner-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #f7ebce; color: #8a641a; }
+.engineer-credential-banner-copy { display: grid; gap: 2px; }
+.engineer-credential-banner-copy strong { color: #4f3b17; font-size: 13px; font-weight: 650; }
+.engineer-credential-banner-copy small { color: #796743; font-size: 12px; }
+.engineer-credential-banner-action { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; color: #193c5a; font-size: 13px; font-weight: 600; }
+.engineer-directory-personnel { scroll-margin-top: 92px; }
+.engineer-type-summary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 4px 10px; }
+.engineer-type-count { display: flex; min-width: 0; min-height: 69px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--color-muted); font-size: 12px; }
+.engineer-type-count + .engineer-type-count { border-left: 1px solid var(--color-line); }
+.engineer-type-count strong { color: var(--color-primary); font-size: 23px; font-weight: 650; line-height: 1.1; }
+@media (max-width: 760px) {
+  .engineer-type-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .engineer-type-count + .engineer-type-count { border-left: 0; }
+  .engineer-type-count:nth-child(3n + 2), .engineer-type-count:nth-child(3n + 3) { border-left: 1px solid var(--color-line); }
+  .engineer-type-count:nth-child(-n + 3) { border-bottom: 1px solid var(--color-line); }
+  .engineer-type-summary-panel .panel-header { align-items: flex-start; }
+}
+@media (max-width: 480px) {
+  .engineer-type-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .engineer-type-count:nth-child(n) { border-left: 0; border-bottom: 0; }
+  .engineer-type-count:nth-child(2n) { border-left: 1px solid var(--color-line); }
+  .engineer-type-count:nth-child(2n + 1):not(:last-child) { border-bottom: 1px solid var(--color-line); }
+  .engineer-type-summary-panel .panel-header { flex-wrap: wrap; }
+  .engineer-credential-banner { grid-template-columns: auto 1fr; }
+  .engineer-credential-banner-action { grid-column: 2; }
+}
 .engineer-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--color-line); padding-top: 15px; margin-top: 20px; color: var(--color-muted); font-size: 14px; }
 .company-monogram { width: 41px; height: 43px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--green-soft); border: 1px solid var(--color-line); color: var(--color-primary); font-weight: 600; font-size: 15px; }
 .company-monogram.large { width: 62px; height: 65px; font-size: 23px; }

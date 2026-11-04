@@ -9,12 +9,12 @@ const SERVER_STATUSES = ["active", "invited", "suspended"]
 
 /**
  * The /accounts query string for an Engineer Directory query, or undefined when the
- * query uses something the server cannot filter (a license status, or the app-level
+ * query uses something the server cannot filter (a license/credential status, or the app-level
  * "deactivated" status). In that case the list is filtered in the browser instead.
  */
 export function engineerQueryString(query: ListQuery): string | undefined {
   const { search, filters, page, pageSize } = query
-  if (filterIsOn(filters.license)) return undefined
+  if (filterIsOn(filters.license) || filterIsOn(filters.credentials)) return undefined
   const status = filterIsOn(filters.status) ? filters.status : undefined
   if (status && !SERVER_STATUSES.includes(status)) return undefined
   const role = filterIsOn(filters.role) ? filters.role : undefined
