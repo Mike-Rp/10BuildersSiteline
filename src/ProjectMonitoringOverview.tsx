@@ -42,7 +42,9 @@ export default function ProjectMonitoringOverview({ project:p, state, onPreview 
   project:Project;state:State;onPreview:(doc:Doc)=>void
 }) {
   const work=workflowFor(p),today=useScheduleToday()
-  const photos=[...(work.photos || [])].filter(doc=>doc.uploaded && doc.photoReviewStatus==='released' && doc.clientVisible && /\.(png|jpe?g)$/i.test(doc.name) && /^image\/(png|jpeg)$/i.test(doc.mime||"")).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))
+  // Client visibility is the persisted result of OPM approval. Older approved
+  // uploads may not have review-status or MIME metadata populated consistently.
+  const photos=[...(work.photos || [])].filter(doc=>doc.uploaded && doc.clientVisible && /\.(png|jpe?g)$/i.test(doc.name)).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))
   const people=[...new Set([p.opmId,...p.team.map(row=>row.accountId)])].map(id=>state.accounts.find(account=>account.id===id)).filter(account=>!!account)
   const selected=work.selections?.find(row=>row.status==='accepted')
   const company=selected?state.companies.find(row=>row.id===selected.companyId):undefined
