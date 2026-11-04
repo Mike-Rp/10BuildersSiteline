@@ -610,6 +610,77 @@ export default function RoleWorkspace({
       </ol>
     )
   }
+  function opmIntakePriority(p: Project) {
+    if (p.status === "completed") {
+      return {
+        kind: "complete",
+        label: "Complete",
+        title: "Project setup is complete",
+        detail: "All required intake steps are finished. No action is needed here.",
+        action: "View project",
+        icon: "check" as const,
+      }
+    }
+    if (p.status === "draft" || p.status === "changes_requested") {
+      return {
+        kind: "waiting",
+        label: "Waiting on administrator",
+        title: p.status === "draft" ? "Project setup has not been submitted" : "Changes are with the administrator",
+        detail: p.status === "draft" ? "The administrator must submit the project before you can accept it." : "The administrator needs to update and resubmit this project before you can continue.",
+        action: "View project",
+        icon: "clock" as const,
+      }
+    }
+    if (!p.opmAccepted) {
+      return {
+        kind: "action",
+        label: "Action needed",
+        title: "Accept or request changes",
+        detail: "Your decision unlocks project document setup.",
+        action: "Review assignment",
+        icon: "check" as const,
+      }
+    }
+    if (!registeredComplete(p)) {
+      return {
+        kind: "action",
+        label: "Action needed",
+        title: `${6 - registeredCount(p)} required ${6 - registeredCount(p) === 1 ? "document remains" : "documents remain"}`,
+        detail: "Complete the required project document upload to keep setup moving.",
+        action: "Resume document upload",
+        icon: "upload" as const,
+      }
+    }
+    if (!leadConfirmed(p)) {
+      return {
+        kind: "waiting",
+        label: "Waiting on Lead Site PM",
+        title: "Site PM coordination is not ready yet",
+        detail: "The Lead Site PM needs to accept their assigned responsibility.",
+        action: "Track Site PM responses",
+        icon: "clock" as const,
+      }
+    }
+    if (!teamConfirmed(p)) {
+      const awaiting = p.team.filter((member) => member.status !== "confirmed").length
+      return {
+        kind: "waiting",
+        label: "Waiting on Site PMs",
+        title: `${awaiting} Site PM ${awaiting === 1 ? "response" : "responses"} outstanding`,
+        detail: "Subcontractor allocation can begin after every assigned Site PM accepts.",
+        action: "Track Site PM responses",
+        icon: "clock" as const,
+      }
+    }
+    return {
+      kind: "ready",
+      label: "Ready for next phase",
+      title: "Subcontractor allocation is unlocked",
+      detail: "Site PMs have accepted their responsibilities. The Lead Site PM can coordinate subcontractors.",
+      action: "View allocation status",
+      icon: "users" as const,
+    }
+  }
   function assignmentRoster(p: Project, allowReassign = false) {
     return (
       <div className="role-roster">
@@ -824,9 +895,23 @@ export default function RoleWorkspace({
             actions={
               <Button
                 variant="text-button"
-                onClick={() =>
-                  navigate(isOpm ? "Confirmation queue" : "Assignments")
-                }
+                  onClick={() => {
+                    if (!isOpm) {
+                      navigate("Assignments")
+                      return
+                    }
+                    setPickedId(picked.id)
+                    if (!picked.opmAccepted && picked.status === "pending")
+                      navigate("Confirmation queue")
+                    else if (picked.opmAccepted && !registeredComplete(picked))
+                      openDocuments(picked)
+                    else if (picked.opmAccepted && !teamConfirmed(picked))
+                      openSiteResponses()
+                    else {
+                      navigate("Active sites")
+                      setDialog({ kind: "project", projectId: picked.id })
+                    }
+                  }}
               >
                 Open assignment
                 <Icon name="arrow" size={16} />
@@ -834,7 +919,24 @@ export default function RoleWorkspace({
             }
           >
             <div className="role-card-content">
-              {timeline(picked)}
+              {isOpm ? (() => {
+                const priority = opmIntakePriority(picked)
+                return <div className={`opm-priority-card ${priority.kind}`}>
+                  <div className="opm-priority-heading">
+                    <span className="opm-priority-icon"><Icon name={priority.icon} size={19} /></span>
+                    <div><span className="opm-priority-label">{priority.label}</span><h3>{priority.title}</h3><p>{priority.detail}</p></div>
+                    <Button variant={priority.kind === "action" ? "primary" : "secondary"} onClick={() => {
+                      if (!picked.opmAccepted && picked.status === "pending") navigate("Confirmation queue")
+                      else if (priority.action === "Resume document upload") openDocuments(picked)
+                      else if (priority.action === "Track Site PM responses") openSiteResponses()
+                      else if (priority.action === "View allocation status") navigate("Active sites")
+                      else setDialog({ kind: "project", projectId: picked.id })
+                    }}>{priority.action}<Icon name="arrow" size={16} /></Button>
+                  </div>
+                  <details className="opm-process-details"><summary>Show setup progress</summary>{timeline(picked)}</details>
+                </div>
+              })() : timeline(picked)}
+              {!isOpm && (
               <div className="next-step-callout">
                 <span className="file-icon">
                   <Icon
@@ -889,6 +991,7 @@ export default function RoleWorkspace({
                   </Button>
                 )}
               </div>
+              )}
             </div>
           </Panel>
         )}
