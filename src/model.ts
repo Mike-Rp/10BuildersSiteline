@@ -221,6 +221,8 @@ export type Account = {
   suspendedAt?: string
   qualifiedRequirements?: string[]
   eligibleForNewAssignment?: boolean
+  hasProfessionalCredentials?: boolean
+  professionalTypes?: string[]
   assignmentCandidateProjectIds?: string[]
   assignmentHold?: boolean
   resignation?: ResignationRecord
@@ -762,6 +764,7 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     a.role === role &&
     a.status === "active" &&
     !a.assignmentHold &&
+    a.hasProfessionalCredentials === true &&
     a.eligibleForNewAssignment !== false &&
     Boolean(a.expiry) && daysUntil(a.expiry) > 30 &&
     workload(state, a.id, excluding) < state.rules.cap &&
@@ -776,7 +779,7 @@ export function opmCandidates(
 ) {
   return state.accounts
     .filter(
-      (a) => eligible(state, a, "opm", excluding) && !excluded.includes(a.id),
+      (a) => eligible(state, a, "opm", excluding) && a.projectTypes.includes(type) && !excluded.includes(a.id),
     )
     .sort(
       (a, b) =>
@@ -811,7 +814,7 @@ export function spmCandidates(
       matched: tags.filter((t) => (a.qualifiedRequirements ?? a.scope).includes(t)).length,
       total: tags.length,
     }))
-    .filter((candidate) => !tags.length || candidate.matched > 0)
+    .filter((candidate) => tags.length > 0 && candidate.matched > 0)
     .sort(
       (a, b) =>
         b.matched - a.matched ||

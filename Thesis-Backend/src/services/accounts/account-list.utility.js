@@ -59,6 +59,13 @@ export function accountListQuery(query = {}) {
     countSql:`SELECT count(*)::int AS total ${from} ${filters}`,
     dataSql:`SELECT u.id,u.id AS user_id,u.full_name,u.email,u.phone,u.role_id,r.code AS role,r.label AS role_name,
       u.status,u.date_added::text AS date_added,u.created_at,u.last_login_at,scopes.scope,
+      CASE WHEN r.code IN ('opm','spm') THEN EXISTS (
+        SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL
+      ) ELSE NULL END AS has_professional_credentials,
+      COALESCE((SELECT array_agg(DISTINCT l.profession ORDER BY l.profession)
+        FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL
+          AND l.profession IN ('Civil Engineer','Mechanical Engineer','Electrical Engineer','Sanitary Engineer','Electronics Engineer','Geodetic Engineer')),
+        '{}'::text[]) AS professional_types,
       (SELECT count(*)::int FROM user_client_project_links l JOIN projects p ON p.id=l.project_id
         WHERE l.user_id=u.id AND COALESCE(p.is_deleted,false)=false) AS linked_projects_count,
       COALESCE((SELECT array_agg(DISTINCT p.client_name) FILTER (WHERE p.client_name IS NOT NULL)

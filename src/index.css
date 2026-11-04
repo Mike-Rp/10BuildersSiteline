@@ -293,6 +293,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag-list > span { background: var(--surface-subtle); color: var(--color-muted); border: 1px solid var(--color-line); padding: 3px 6px; border-radius: 4px; font-size: 14px; }
 .engineer-card .tag-list { margin-top: 16px; min-height: 26px; }
+.engineer-type-summary-panel .panel-header { min-height: 0; padding: 15px 18px 11px; border-bottom: 0; }
+.engineer-type-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; padding: 0 16px 15px; }
+.engineer-type-count { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 9px 11px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--surface-subtle); color: var(--color-muted); font-size: 13px; }
+.engineer-type-count strong { color: var(--color-primary); font-size: 20px; font-weight: 650; line-height: 1; }
 .engineer-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--color-line); padding-top: 15px; margin-top: 20px; color: var(--color-muted); font-size: 14px; }
 .company-monogram { width: 41px; height: 43px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--green-soft); border: 1px solid var(--color-line); color: var(--color-primary); font-weight: 600; font-size: 15px; }
 .company-monogram.large { width: 62px; height: 65px; font-size: 23px; }

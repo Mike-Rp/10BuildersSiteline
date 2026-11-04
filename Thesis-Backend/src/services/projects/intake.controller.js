@@ -77,6 +77,11 @@ export const createIntake = async (req, res) => {
       if(typeof company!=="string" || !company.trim() || company.length>150) throw Object.assign(new Error("Invalid client_name."),{status:400});
       const projectType=await client.query("SELECT id FROM project_types WHERE code=$1",[project_type]);
       if(!projectType.rowCount) throw Object.assign(new Error("Invalid project_type."),{status:422});
+      const opmScope=await client.query(
+        "SELECT 1 FROM user_project_type_specializations WHERE user_id=$1 AND project_type_id=$2 LIMIT 1",
+        [suggested_opm_id,projectType.rows[0].id],
+      );
+      if(!opmScope.rowCount) throw Object.assign(new Error("Selected Office PM is missing the project-type qualification required for this intake."),{status:422});
       if (draft?.phase_scope) {
         if (Number(draft.project_type_id)!==Number(projectType.rows[0].id))
           throw Object.assign(new Error("The project type is locked by its saved phase scope."),{status:409});

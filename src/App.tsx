@@ -21,6 +21,7 @@ import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
 import { EXPERIENCE_PROJECT_TYPES, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
+import { PROFESSIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
@@ -1593,8 +1594,42 @@ function AppInner() {
           </Panel>
         </>
       )
+    const accountsMissingCredentials = state.accounts.filter(
+      (a) => ["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status),
+    )
+    const workforceAccounts = state.accounts.filter(
+      (a) => ["opm", "spm"].includes(a.role) && ["active", "invited"].includes(a.status),
+    )
     const engineersTab = () => (
         <>
+          {accountsMissingCredentials.length > 0 && (
+            <div className="notice team-license-notice account-credentials-notice" role="status">
+              <Icon name="alert" />
+              <p>
+                <strong>
+                  {accountsMissingCredentials.length} SPM/OPM {accountsMissingCredentials.length === 1 ? "account was" : "accounts were"} created without professional credentials.
+                </strong>{" "}
+                Open the account to review or add its credentials.
+              </p>
+            </div>
+          )}
+          <Panel
+            title="Workforce by engineer type"
+            subtitle="Active and invited engineer accounts with a professional type on file · Informational counts"
+            className="engineer-type-summary-panel"
+          >
+            <div className="engineer-type-summary-grid">
+              {PROFESSIONS.map((profession) => {
+                const count = workforceAccounts.filter((a) => a.professionalTypes?.includes(profession)).length
+                return (
+                  <div className="engineer-type-count" key={profession}>
+                    <span>{profession.replace(/ Engineer$/, "")}</span>
+                    <strong>{count}</strong>
+                  </div>
+                )
+              })}
+            </div>
+          </Panel>
           <Panel
             title="In-house personnel"
             subtitle={`${engineers.length} engineers and administrators`}
@@ -1619,6 +1654,9 @@ function AppInner() {
                       </div>
                       <h3>{a.name}</h3>
                       <p>{ROLE_NAMES[a.role]}</p>
+                      {a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) && (
+                        <Badge tone="amber">Professional credentials not on file</Badge>
+                      )}
                       <div className="tag-list">
                         {(a.scope.length && a.role === "spm"
                           ? a.scope
