@@ -40,6 +40,7 @@ export default function ActiveSites({
   showDelayNotice = false,
   today,
   overallOnly = false,
+  showAllStatuses = false,
 }: {
   projects: SiteCard[]
 
@@ -53,6 +54,7 @@ export default function ActiveSites({
   showDelayNotice?: boolean
   today?: string
   overallOnly?: boolean
+  showAllStatuses?: boolean
 }) {
   const localToday = useScheduleToday()
   const reportingDate = today ?? localToday
@@ -61,10 +63,12 @@ export default function ActiveSites({
   const [layout, setLayout] = useState<"cards" | "list">("cards")
   const [type, setType] = useState("")
   const [phase, setPhase] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [tab, setTab] = useState<"all" | "review">("all")
   const tabId = useId()
   const selectedTab = reviewAvailable ? tab : "all"
   const activeProjects = useMemo(() => projects.filter(p => p.status === "active"), [projects])
+  const displayedProjects = showAllStatuses ? projects : activeProjects
   const reviewProjects = activeProjects.filter(p => p.needsReview === true)
   const [sort, setSort] = useState("name")
   const size = 9
@@ -77,10 +81,11 @@ export default function ActiveSites({
 
   const filtered = useMemo(
     () =>
-      activeProjects
+      displayedProjects
         .filter(
           (p) =>
             (selectedTab === "all" || p.needsReview === true) &&
+            (!showAllStatuses || statusFilter === "all" || p.status === statusFilter) &&
             (!scheduleFilter || projectScheduleStatus(p, reportingDate).status === "Delayed") &&
             p.name
               .toLocaleLowerCase()
@@ -100,7 +105,7 @@ export default function ActiveSites({
 
           return a.name.localeCompare(b.name)
         }),
-    [activeProjects, query, type, phase, selectedTab, sort, scheduleFilter, reportingDate, overallOnly],
+    [displayedProjects, query, type, phase, statusFilter, showAllStatuses, selectedTab, sort, scheduleFilter, reportingDate, overallOnly],
   )
 
   const pages = Math.max(1, Math.ceil(filtered.length / size))
@@ -120,7 +125,7 @@ export default function ActiveSites({
   ).length
 
   const open = (id: string) => {
-    if (!activeProjects.some((p) => p.id === id)) return
+    if (!displayedProjects.some((p) => p.id === id)) return
 
     setRecent((previous) =>
       [id, ...previous.filter((x) => x !== id)].slice(0, 3),
@@ -133,6 +138,7 @@ export default function ActiveSites({
     setQuery("")
     setType("")
     setPhase("")
+    setStatusFilter("all")
     setScheduleFilter("")
     setPage(1)
   }
@@ -221,6 +227,17 @@ export default function ActiveSites({
             ))}
           </select>
         </label>
+        {showAllStatuses && <label>
+          Project status
+          <select value={statusFilter} onChange={event => { setStatusFilter(event.target.value); setPage(1) }}>
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Upcoming / pending</option>
+            <option value="completed">Completed</option>
+            <option value="declined">Declined</option>
+            <option value="expired">Expired</option>
+          </select>
+        </label>}
         <label>
           Sort by
           <select
@@ -239,11 +256,11 @@ export default function ActiveSites({
           <Button icon="alert" variant={scheduleFilter ? "primary" : ""} aria-pressed={scheduleFilter === "delayed"} onClick={() => { setScheduleFilter(current => current ? "" : "delayed"); setPage(1) }}>Delayed</Button>
         </div>
       </div>
-      {recent.some((id) => activeProjects.some((p) => p.id === id)) && (
+      {recent.some((id) => displayedProjects.some((p) => p.id === id)) && (
         <div className="as-recent">
           <span>Recently viewed</span>
           {recent
-            .map((id) => activeProjects.find((p) => p.id === id))
+            .map((id) => displayedProjects.find((p) => p.id === id))
             .filter((p) => p !== undefined)
             .map((p) => (
               <button key={p.id} onClick={() => open(p.id)}>
@@ -265,7 +282,7 @@ export default function ActiveSites({
         tabs[next].click()
       }}>
         <button type="button" role="tab" id={`${tabId}-all`} aria-controls={`${tabId}-panel`} aria-selected={selectedTab === "all"} tabIndex={selectedTab === "all" ? 0 : -1} onClick={() => { setTab("all"); setPage(1) }}>
-          All active projects <span>{activeProjects.length}</span>
+          {showAllStatuses ? "All projects" : "All active projects"} <span>{displayedProjects.length}</span>
         </button>
         {reviewAvailable && <button type="button" role="tab" id={`${tabId}-review`} aria-controls={`${tabId}-panel`} aria-selected={selectedTab === "review"} tabIndex={selectedTab === "review" ? 0 : -1} onClick={() => { setTab("review"); setPage(1) }}>
           Awaiting review <span>{reviewProjects.length}</span>
@@ -280,7 +297,7 @@ export default function ActiveSites({
         <div className="as-layout" role="group" aria-label="Project layout">
           <Button variant={layout === "cards" ? "primary" : ""} aria-pressed={layout === "cards"} onClick={() => setLayout("cards")} icon="grid">Cards</Button>
           <Button variant={layout === "list" ? "primary" : ""} aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="doc">List</Button>
-          {(query || type || phase || scheduleFilter) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
+          {(query || type || phase || statusFilter !== "all" || scheduleFilter) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
         </div>
       </div>
       {layout === "cards" ? <div className="as-grid">
@@ -291,6 +308,7 @@ export default function ActiveSites({
                 <span className="as-type">{p.type}</span>
                 <div className="as-card-flags">
                   {reviewAvailable && p.needsReview === true && <span className="as-review" title="A progress update or site issue is awaiting Office PM review."><Icon name="alert" size={12} />Awaiting review</span>}
+                    {showAllStatuses && p.status !== "active" && <span className="as-review">{p.status === "pending" ? "Upcoming" : p.status.replace(/_/g, " ")}</span>}
                 </div>
               </div>
               <h2>{p.name}</h2>
@@ -347,10 +365,10 @@ export default function ActiveSites({
       {!visible.length && (
         <Empty
           title={
-            query || type || phase ? "No matching projects" : scheduleFilter ? "No delayed projects" : selectedTab === "review" ? "No projects awaiting review" : "No active sites yet"
+            query || type || phase || statusFilter !== "all" ? "No matching projects" : scheduleFilter ? "No delayed projects" : selectedTab === "review" ? "No projects awaiting review" : showAllStatuses ? "No assigned projects yet" : "No active sites yet"
           }
         >
-          {query || type || phase
+          {query || type || phase || statusFilter !== "all"
             ? "Try another name or clear the filters."
             : scheduleFilter ? "No active projects in your access have passed their target completion date."
             : selectedTab === "review"
