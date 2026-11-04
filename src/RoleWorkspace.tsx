@@ -2345,9 +2345,21 @@ export default function RoleWorkspace({
             })}</div> : <Empty title="No progress updates or issues awaiting review">New submissions will appear here inside their active site.</Empty>}
           </Panel>
         </div>}
-        {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
-          <Panel title={`${picked.name} - Phase workspace`}><DelayedProjectNotice project={picked} today={scheduleToday} />{progressForm(picked)}</Panel>
-        </div>}
+        {!extensionDemo && !isOpm && picked && active.some(p => p.id === picked.id) && <details className="as-site-workspace" id="active-phase-workspace">
+          <summary>
+            <span className="as-phase-workspace-icon"><Icon name="building" size={18} /></span>
+            <span className="as-phase-workspace-copy">
+              <strong>My phase workspace · {picked.name}</strong>
+              <small>Current phase: {picked.phase} · {actorName(phaseOwner(picked))} owns this phase</small>
+            </span>
+            <Badge>{picked.team.filter(t => t.accountId === actor.id && projectPhaseNames(picked).indexOf(t.phase) < projectPhaseNames(picked).indexOf(picked.phase)).length} completed phases</Badge>
+            <Icon name="chevron" size={18} />
+          </summary>
+          <div className="as-phase-workspace-content">
+            <DelayedProjectNotice project={picked} today={scheduleToday} />
+            {progressForm(picked)}
+          </div>
+        </details>}
       </>
     )
   }
