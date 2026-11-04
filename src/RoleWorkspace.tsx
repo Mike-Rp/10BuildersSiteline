@@ -3536,20 +3536,20 @@ export default function RoleWorkspace({
             {header(
               "Confirmation queue",
             )}
-            <div className="tabs standalone">
-              {[
-                ["mine", `Intake overview (${intakes.length})`],
-                [
-                  "responses",
-                  `Site PM responses (${responsesNeedingAction.length})`,
-                ],
-              ].map(([value, label]) => (
+            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Confirmation queue views">
+              {([
+                ["mine", "Intake overview", intakes.length, "check"],
+                ["responses", "Site PM responses", responsesNeedingAction.length, "users"],
+              ] as const).map(([value, label, count, icon]) => (
                 <button
                   key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={confirmTab === value}
                   className={confirmTab === value ? "active" : ""}
                   onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
-                  {label}
+                  <Icon name={icon} size={17} /> {label} <span>{count}</span>
                 </button>
               ))}
             </div>
