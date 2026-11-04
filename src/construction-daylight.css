@@ -102,9 +102,9 @@ body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink
 #root .demo-session-picker > span { font-size: 14px; line-height: 1.3; color: var(--color-muted); }
 #root .demo-session-picker select { min-height: 38px; font-size: 14px; border-color: var(--color-line); background: var(--surface-subtle); padding-block: 7px; }
 #root .main-content { max-width: 1690px; padding: 20px 24px; }
-#root .workspace-meta { color: var(--color-muted); font-size: 14px; margin-bottom: var(--space-section); }
+#root .workspace-meta { color: var(--color-muted); font-size: 14px; margin-bottom: 6px; }
 #root .workspace-meta > span { gap: 8px; }
-#root .workspace-meta.has-greeting { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: var(--space-section); }
+#root .workspace-meta.has-greeting { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 6px; }
 #root .workspace-meta.has-greeting > .dashboard-welcome { flex: 1 1 300px; margin: 0; }
 #root .workspace-meta.has-greeting > span { display: flex; flex-shrink: 0; margin-left: auto; }
 #root .page-heading { align-items: center; gap: 16px; margin-bottom: var(--space-section); }
