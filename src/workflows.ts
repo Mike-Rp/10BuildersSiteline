@@ -438,9 +438,8 @@ export function activationChecks(state: State, p: Project) {
           ? "Client active and project access linked"
           : "Client record ready for final activation",
       passed:
-        !!client &&
-        clientReady &&
-        (p.status !== "active" || client.scope.includes(p.id)),
+        ["active", "completed"].includes(p.status) ||
+        (!!client && clientReady && client.scope.includes(p.id)),
     },
   ]
 }
