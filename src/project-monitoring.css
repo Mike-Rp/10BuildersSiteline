@@ -16,6 +16,12 @@
 #root .monitor-card h3 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin-bottom: 16px; }
 #root .monitor-side { display: grid; gap: 16px; min-width: 0; }
 #root .monitor-photo { width: 100%; display: block; background: #f5f9fc; border: 1px solid #e1eaf2; border-radius: 12px; overflow: hidden; text-align: left; padding: 0; color: #182d50; }
+#root .monitor-photo-roulette { min-width: 0; }
+#root .monitor-photo-controls { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 8px 0 0; color: #5d718f; font-size: 13px; }
+#root .monitor-photo-controls button { width: 32px; height: 32px; border: 1px solid #d5e2ef; border-radius: 50%; background: #fff; color: #182d50; font-size: 22px; line-height: 1; cursor: pointer; }
+#root .monitor-photo-controls button:hover { background: #edf5fc; }
+#root .monitor-photo-controls button:focus-visible { outline: 3px solid #86add3; outline-offset: 2px; }
+#root .monitor-photo-controls { min-height: 42px; }
 #root .monitor-photo img { width: 100%; aspect-ratio: 16/10; display: block; object-fit: cover; }
 #root .monitor-photo > span:last-child { display: grid; padding: 10px; gap: 4px; overflow-wrap: anywhere; }
 #root .monitor-photo small { font-size: 12px; color: #5d718f; }
@@ -29,6 +35,8 @@
 #root .monitor-updates li:last-child { border: 0; padding-bottom: 0; }
 #root .monitor-updates p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
 #root .monitor-updates small,#root .monitor-muted { color: #5d718f; font-size: 13px; }
+#root .history-pagination { display: flex; justify-content: center; align-items: center; gap: 14px; padding-top: 14px; border-top: 1px solid var(--color-line); color: var(--color-muted); }
+#root .history-pagination .button { min-height: 38px; }
 #root .monitor-person { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
 #root .monitor-person > div { min-width: 0; display: grid; gap: 5px; }
 #root .monitor-person strong { font-size: 14px; overflow-wrap: anywhere; }

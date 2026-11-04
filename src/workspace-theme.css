@@ -17,6 +17,18 @@
   background: var(--color-canvas);
   color: var(--color-ink);
 }
+#root:has(.app-shell.admin-workspace) {
+  --color-warning: #6250b5;
+  --amber: #6250b5;
+  --amber-soft: #f1efff;
+  --warning-border: #c9c2ee;
+  --color-danger: #a03f72;
+  --red: #a03f72;
+  --red-soft: #fff0f6;
+  --danger-border: #e9bfd0;
+}
+#root:has(.app-shell.admin-workspace) :is(.urgent-action-banner,.license-banner.amber) { background: var(--amber-soft); border-color: var(--warning-border); }
+#root:has(.app-shell.admin-workspace) :is(.urgent-action-banner.urgent-critical,.license-banner.red) { background: var(--red-soft); border-color: var(--danger-border); }
 #root .app-shell .main-shell { background: var(--color-canvas); }
 #root .app-shell .sidebar {
   top: 12px; left: 12px; bottom: 12px; height: calc(100dvh - 24px);

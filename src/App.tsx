@@ -303,6 +303,7 @@ function AppInner() {
   const [page, setPage] = useState("Dashboard")
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
+  const [projectHistoryPage, setProjectHistoryPage] = useState(1)
   const [preview, setPreview] = useState<Doc>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
@@ -329,6 +330,8 @@ function AppInner() {
     destructive?: boolean
   }>()
   const [signedOut, setSignedOut] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
+  const signOutInFlight = useRef(false)
   const [loginPortal, setLoginPortal] = useState<LoginPortal>(currentLoginPortal)
   const [routePath, setRoutePath] = useState(() => window.location.pathname)
   useEffect(() => {
@@ -394,6 +397,7 @@ function AppInner() {
   const projectFor = (id: string) =>
     state.projects.find((p) => p.id === id)?.name || "No project"
   const selectedProject = state.projects.find((p) => p.id === dialog?.id)
+  useEffect(() => setProjectHistoryPage(1), [selectedProject?.id])
   const selectedAccount = state.accounts.find((a) => a.id === dialog?.id)
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
@@ -406,7 +410,7 @@ function AppInner() {
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
-  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
+  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate})
   useEffect(() => {
     const signInPage = /^\/(?:(?:admin|staff)\/)?login\/?$/i.test(window.location.pathname)
     if (signInPage || !tokenUser()) {
@@ -711,7 +715,10 @@ function AppInner() {
       /* The session remains in memory until the tab closes. */
     }
   }
-  function endSession() {
+  async function endSession() {
+    if (signOutInFlight.current) return
+    signOutInFlight.current = true
+    setSigningOut(true)
     const portal = currentLoginPortal()
     window.history.replaceState(null, "", loginPath(portal))
     setRoutePath(window.location.pathname)
@@ -721,10 +728,13 @@ function AppInner() {
     setWelcomeGreeting(undefined)
     setSignedOut(true)
     setSessionId("")
-    apiLogout()
+    const revocation = apiLogout()
     const empty = emptyState()
     stateRef.current = empty
     setState(empty)
+    await revocation
+    signOutInFlight.current = false
+    setSigningOut(false)
   }
   async function sendWorkflow(command:WorkflowCommand) {
     if(signedOut)return {ok:false,error:"Your session has ended. Sign in again to continue."}
@@ -2173,6 +2183,9 @@ function AppInner() {
     return null
   }
   function projectDetails(p: Project, docsOnly = false) {
+    const projectHistory = p.history.slice().reverse()
+    const historyPageCount = Math.max(1, Math.ceil(projectHistory.length / 3))
+    const recentHistory = projectHistory.slice((projectHistoryPage - 1) * 3, projectHistoryPage * 3)
     const staff = [...new Set([p.opmId, ...p.team.map((t) => t.accountId)])]
       .map((id) => state.accounts.find((a) => a.id === id))
       .filter(Boolean) as Account[]
@@ -2301,7 +2314,7 @@ function AppInner() {
             </section>
             <section className="detail-section">
               <h3>Project progress & review history</h3>
-              {p.history.map((h, i) => (
+              {recentHistory.length ? recentHistory.map((h, i) => (
                 <div className="history-row" key={i}>
                   <span>
                     <Icon
@@ -2329,7 +2342,12 @@ function AppInner() {
                   </div>
                   <b>{h.progress}%</b>
                 </div>
-              ))}
+              )) : <p className="role-muted">No project progress or review history yet.</p>}
+              {projectHistory.length > 3 && <div className="history-pagination" aria-label="Project history pagination">
+                <Button disabled={projectHistoryPage <= 1} onClick={() => setProjectHistoryPage(page => Math.max(1, page - 1))}>Previous</Button>
+                <span>Page {projectHistoryPage} of {historyPageCount}</span>
+                <Button disabled={projectHistoryPage >= historyPageCount} onClick={() => setProjectHistoryPage(page => Math.min(historyPageCount, page + 1))}>Next</Button>
+              </div>}
             </section>
             {p.status === "active" && (
               <section className="detail-section">
@@ -2734,6 +2752,7 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
+  if (signingOut) return <WorkspaceSkeleton role={loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)} />
   if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)} />
   if (signedOut && restoreError)
     return (

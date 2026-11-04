@@ -434,6 +434,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .document-browser-path { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 15px 24px; border-bottom: 1px solid var(--color-line); background: var(--surface-subtle); color: var(--color-muted); }
 .document-browser-path .button { padding: 0; min-height: auto; }
 .document-browser-back { padding: 12px 24px 0; }
+.history-pagination { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 14px 0; color: var(--color-muted); }
 .document-browser-crumb { display: inline-flex; align-items: center; gap: 7px; color: var(--color-muted); font-size: 14px; }
 .document-browser-path strong { color: var(--color-ink); font-size: 14px; font-weight: 550; }
 .document-browser-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 14px; padding: 18px; }

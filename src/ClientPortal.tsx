@@ -177,7 +177,7 @@ export default function ClientPortal({
     setBell(false)
     setError("")
   }
-  const swipe = useSwipeNavigation({identity:actor.id,page,dashboard:"Project Overview",allowedPages:NAV.map(([label])=>label),enabled:!paused,blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
+  const swipe = useSwipeNavigation({identity:actor.id,page,dashboard:"Project Overview",allowedPages:NAV.map(([label])=>label),enabled:!paused,blocked:navigation.compact && navigation.expanded,navigate})
   function openDocument(
     documentId: string,
     kind: Viewer["kind"] = "document",

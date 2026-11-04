@@ -28,6 +28,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
   const [data, setData] = useState<{ summary: MonthlySummary; snapshot: string }>()
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [refresh, setRefresh] = useState(0)
   const [filters, setFilters] = useState<SummaryFilters>(SUMMARY_FILTERS)
+  const [projectPage, setProjectPage] = useState(1)
   const [exporting, setExporting] = useState(false), [exportError, setExportError] = useState("")
   const [detail, setDetail] = useState<{ id: string; month: string }>()
   const revision = useRef(0), printFrame = useRef<HTMLIFrameElement | null>(null)
@@ -47,7 +48,14 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
   const metrics = summaryMetrics(summary?.projection || "client")
   const types = useMemo(() => [...new Set(summary?.rows.map(row => row.type))].sort(), [summary])
   const filtered = filters.search !== "" || filters.type !== "" || filters.outstanding !== "all"
-  const setFilter = (key: keyof SummaryFilters, value: string) => setFilters(current => ({ ...current, [key]: value }))
+  const projectsPerPage = 10
+  const projectPageCount = Math.max(1, Math.ceil((view?.rows.length || 0) / projectsPerPage))
+  const currentProjectPage = Math.min(projectPage, projectPageCount)
+  const pageRows = view?.rows.slice((currentProjectPage - 1) * projectsPerPage, currentProjectPage * projectsPerPage) || []
+  const setFilter = (key: keyof SummaryFilters, value: string) => {
+    setProjectPage(1)
+    setFilters(current => ({ ...current, [key]: value }))
+  }
 
   async function exportSummary(format: ReportExportFormat) {
     if (!data || !view || exporting) return
@@ -77,7 +85,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
     <section className="report-summary" aria-labelledby="report-summary-title">
       <div className="section-title"><h2 id="report-summary-title"><Icon name="doc" /> Overall Monthly Project Summary</h2><span>{summary ? periodLabel(summary).toUpperCase() : "MONTHLY"}</span></div>
       <div className="report-summary-controls">
-        <label htmlFor={ids.month}>Reporting month<input id={ids.month} type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e => setMonth(e.target.value)} /></label>
+        <label htmlFor={ids.month}>Reporting month<input id={ids.month} type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e => { setProjectPage(1); setMonth(e.target.value) }} /></label>
         <div className="report-summary-actions">
           <Button icon="clock" onClick={() => setRefresh(n => n + 1)} disabled={loading || !validMonth || future}>Refresh</Button>
           <ReportExportActions disabled={!view || loading} busy={exporting} onExport={format => void exportSummary(format)} />
@@ -105,7 +113,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
             {metrics.pending && <label htmlFor={ids.outstanding}>Outstanding reviews<select id={ids.outstanding} value={filters.outstanding} onChange={e => setFilter("outstanding", e.target.value)}>
               <option value="all">All projects</option><option value="pending">With pending reviews</option><option value="none">No pending reviews</option>
             </select></label>}
-            {filtered && <Button onClick={() => setFilters(SUMMARY_FILTERS)}>Clear filters</Button>}
+            {filtered && <Button onClick={() => { setProjectPage(1); setFilters(SUMMARY_FILTERS) }}>Clear filters</Button>}
           </div>
           <p role="status" className="role-muted">Showing {view.rows.length} of {summary.rows.length} {summary.rows.length === 1 ? "project" : "projects"}. Figures, statements and exports follow these filters.</p>
           <h3 className="report-summary-group">During {monthName(summary.period.month)}</h3>
@@ -129,14 +137,14 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
             {view.highlights.outstanding.length > 0 && <section aria-labelledby="report-outstanding"><h3 id="report-outstanding"><Icon name="clock" /> Outstanding work at cutoff</h3><ul>{view.highlights.outstanding.map(text => <li key={text}>{text}</li>)}</ul></section>}
           </div>
           {view.highlights.coverage.map(text => <p className="monthly-report-limitation" key={text}>{text}</p>)}
-          {!view.rows.length ? <div className="report-summary-empty"><p>No projects match these filters.</p><Button onClick={() => setFilters(SUMMARY_FILTERS)}>Clear filters</Button></div> :
+          {!view.rows.length ? <div className="report-summary-empty"><p>No projects match these filters.</p><Button onClick={() => { setProjectPage(1); setFilters(SUMMARY_FILTERS) }}>Clear filters</Button></div> :
             <div className="report-summary-table" tabIndex={0} role="region" aria-label="Project summary table">
               <table>
                 <caption className="report-sr-only">Project summary for {monthName(summary.period.month)}</caption>
                 <thead><tr><th scope="col">Project</th><th scope="col">Type</th><th scope="col">Progress at month start</th><th scope="col">Progress at cutoff</th><th scope="col">Change</th>
                   {metrics.approvals && <th scope="col">Approval events</th>}<th scope="col">Phases completed</th>{metrics.rework && <th scope="col">Confirmed rework</th>}
                   {metrics.pending && <th scope="col">Pending reviews</th>}<th scope="col"><span className="report-sr-only">Details</span></th></tr></thead>
-                <tbody>{view.rows.map(row => <tr key={row.id}>
+                <tbody>{pageRows.map(row => <tr key={row.id}>
                   <th scope="row" data-label="Project">{row.name}</th>
                   <td data-label="Type">{row.type}</td>
                   <td data-label="Progress at month start">{percentText(row.opening)}</td>
@@ -150,6 +158,10 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
                 </tr>)}</tbody>
               </table>
             </div>}
+          {view.rows.length > projectsPerPage && <nav className="report-summary-pagination" aria-label="Monthly report project pages">
+            <span role="status">Projects {(currentProjectPage - 1) * projectsPerPage + 1}–{Math.min(currentProjectPage * projectsPerPage, view.rows.length)} of {view.rows.length}</span>
+            <div><Button disabled={currentProjectPage === 1} onClick={() => setProjectPage(currentProjectPage - 1)}>Previous</Button><span>Page {currentProjectPage} of {projectPageCount}</span><Button disabled={currentProjectPage === projectPageCount} onClick={() => setProjectPage(currentProjectPage + 1)}>Next</Button></div>
+          </nav>}
         </>}
       </>}
     </section>

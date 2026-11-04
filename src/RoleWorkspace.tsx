@@ -40,7 +40,6 @@ import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -248,29 +247,21 @@ export default function RoleWorkspace({
   const [dialog, setDialog] = useState<RoleDialog>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
-  // Project Monitoring modal: one modal that switches between its monitoring
-  // content and the project repository. Reset whenever the modal closes.
-  const [monitorView, setMonitorView] = useState<"monitoring" | "repository">(
-    "monitoring",
-  )
+  const [repositoryOpen, setRepositoryOpen] = useState(false)
   const [repoPath, setRepoPath] = useState<RepositoryPath>({})
   const [repoQuery, setRepoQuery] = useState("")
-  const monitorScroll = useRef(0)
-  const modalBody = useRef<Element | null>(null)
-  // Runs right after the modal switches views: the repository starts at the
-  // top, and Project Monitoring returns to where it was.
-  useLayoutEffect(() => {
-    if (modalBody.current)
-      modalBody.current.scrollTop =
-        monitorView === "repository" ? 0 : monitorScroll.current
-  }, [monitorView])
   useEffect(() => {
     if (dialog?.kind === "project") return
-    setMonitorView("monitoring")
+    setRepositoryOpen(false)
     setRepoPath({})
     setRepoQuery("")
-    monitorScroll.current = 0
   }, [dialog?.kind, dialog?.projectId])
+  useEffect(() => {
+    if (!repositoryOpen) {
+      setRepoPath({})
+      setRepoQuery("")
+    }
+  }, [repositoryOpen])
   const [preview, setPreview] = useState<Doc>()
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
@@ -514,7 +505,7 @@ export default function RoleWorkspace({
     navigation.closeMobile()
     setBell(false)
   }
-  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:roleNav.map(([label])=>label),enabled:!paused && !extensionDemo,blocked:navigation.compact && navigation.expanded,navigate,requestSignOut:signOut.request})
+  const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:roleNav.map(([label])=>label),enabled:!paused && !extensionDemo,blocked:navigation.compact && navigation.expanded,navigate})
   // Old SPM responses links open the Site PM responses tab of Confirmation queue.
   function openSiteResponses() {
     navigate("Confirmation queue")
@@ -3393,15 +3384,7 @@ export default function RoleWorkspace({
         ) : (
           <p className="role-muted subsection">No documents available yet.</p>
         )}
-        <Button
-          icon="folder"
-          onClick={(event) => {
-            const body = event.currentTarget.closest(".modal-body")
-            modalBody.current = body
-            monitorScroll.current = body?.scrollTop ?? 0
-            setMonitorView("repository")
-          }}
-        >
+        <Button icon="folder" onClick={() => setRepositoryOpen(true)}>
           View All in Document Repository
         </Button>
       </>
@@ -3410,18 +3393,6 @@ export default function RoleWorkspace({
   function monitoringRepository(p: Project) {
     return (
       <div>
-        <div className="document-browser-back">
-          <Button
-            variant="text-button"
-            onClick={(event) => {
-              const body = event.currentTarget.closest(".modal-body")
-              modalBody.current = body
-              setMonitorView("monitoring")
-            }}
-          >
-            ← Back to Project Monitoring
-          </Button>
-        </div>
         <DocumentRepository
           listKey={`${actor.role}:monitor-documents`}
           className="role-document-browser"
@@ -3936,24 +3907,24 @@ export default function RoleWorkspace({
         detail &&
         projects.some((p) => p.id === detail.id) && (
           <Modal
-            title={
-              monitorView === "repository"
-                ? "Project documents"
-                : "Project monitoring"
-            }
-            subtitle={
-              monitorView === "repository"
-                ? `${ROLE_NAMES[actor.role]} · ${detail.name}`
-                : detail.name
-            }
+            title="Project monitoring"
+            subtitle={detail.name}
             wide
             onClose={() => setDialog(undefined)}
           >
-            {monitorView === "repository" && isOpm
-              ? monitoringRepository(detail)
-              : projectDetail(detail)}
+            {projectDetail(detail)}
           </Modal>
         )}
+      {repositoryOpen && detail && dialog?.kind === "project" && isOpm && (
+        <Modal
+          title="Project document repository"
+          subtitle={`${ROLE_NAMES[actor.role]} · ${detail.name}`}
+          wide
+          onClose={() => setRepositoryOpen(false)}
+        >
+          {monitoringRepository(detail)}
+        </Modal>
+      )}
       {monthlySummaryOpen && <MonthlySummaryDialog onClose={() => setMonthlySummaryOpen(false)} />}
       {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
       {dialog?.kind === "company" && company && (

@@ -196,12 +196,17 @@ export async function login(email: string, password: string, replaceSession = fa
 }
 
 export async function logout() {
+  const token = getToken()
+  setToken("")
+  if (!token) return
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
   try {
-    if (getToken()) await api("/auth/logout", { method: "POST" })
+    await api("/auth", { method: "DELETE", headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
   } catch {
     /* The session is cleared locally either way. */
   } finally {
-    setToken("")
+    clearTimeout(timeout)
   }
 }
 

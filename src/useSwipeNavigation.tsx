@@ -9,9 +9,8 @@ type Options = {
   enabled: boolean
   blocked?: boolean
   navigate: (page: string) => void
-  requestSignOut: () => void
 }
-type Destination = { page?: string; identity: string; from: string }
+type Destination = { page: string; identity: string; from: string }
 type Gesture = { id: number; x: number; y: number; started: number; page: string; identity: string; direction: number; target: Element }
 const excluded = "input,textarea,select,a,form,[contenteditable]:not([contenteditable=false]),[role=slider],[role=tablist],[aria-roledescription=carousel],[data-no-swipe],nav,aside,.notification-container"
 const hasDialog = () => !!document.querySelector('[role="dialog"],dialog[open],[aria-modal="true"]')
@@ -85,9 +84,7 @@ export default function useSwipeNavigation(options: Options) {
   function execute(destination: Destination) {
     const current=latest.current
     if(!current.enabled || current.blocked || current.identity!==destination.identity || current.page!==destination.from) return
-    if(destination.page) {
-      if(current.allowedPages.includes(destination.page)) current.navigate(destination.page)
-    } else if(current.page===(current.dashboard || "Dashboard")) current.requestSignOut()
+    if(current.allowedPages.includes(destination.page)) current.navigate(destination.page)
   }
   useEffect(()=>{
     if(!surface || !options.enabled || options.blocked) return
@@ -133,15 +130,19 @@ export default function useSwipeNavigation(options: Options) {
       if(suppress && target.closest('button,[role="button"]'))rememberClick(target)
       let destination: Destination | undefined
       const mobile=window.matchMedia?.('(max-width: 1000px)').matches ?? window.innerWidth<=1000
-      if(dx>0 || mobile)destination={identity,from,...(current.page!==dashboard?{page:dashboard}:{})}
+      if(mobile) {
+        if(current.page!==dashboard)destination={identity,from,page:dashboard}
+      } else if(dx>0) {
+        if(current.page!==dashboard)destination={identity,from,page:dashboard}
+      }
       else if(current.page===dashboard && previous.current?.identity===identity && current.allowedPages.includes(previous.current.page))destination={identity,from,page:previous.current.page}
       if(!destination)return
       for(const el of dirty.current.keys())if(!el.isConnected || !surface.contains(el) || valueOf(el as HTMLInputElement)===dirty.current.get(el))dirty.current.delete(el)
       if(dirty.current.size)setPending(destination);else execute(destination)
     }
-    const finish=(completed:Gesture,x:number,y:number,time:number,maxDuration=1500)=>{
+    const finish=(completed:Gesture,x:number,y:number,time:number,maxDuration=1500,minDistance=64)=>{
       const dx=x-completed.x,dy=y-completed.y,duration=time-completed.started
-      if(Math.abs(dx)<64 || Math.abs(dx)<Math.abs(dy)*1.5 || Math.abs(dy)>70 || duration<30 || duration>maxDuration || (completed.direction && completed.direction!==Math.sign(dx)))return
+      if(Math.abs(dx)<minDistance || Math.abs(dx)<Math.abs(dy)*1.5 || Math.abs(dy)>70 || duration<30 || duration>maxDuration || (completed.direction && completed.direction!==Math.sign(dx)))return
       navigateDirection(dx,completed.page,completed.identity,completed.target)
     }
     const start=(event: TouchEvent)=>{
@@ -168,7 +169,7 @@ export default function useSwipeNavigation(options: Options) {
       const completed=gesture;gesture=undefined
       if(!completed || event.touches.length)return
       const touch=Array.from(event.changedTouches).find(t=>t.identifier===completed.id)
-      if(touch)finish(completed,touch.clientX,touch.clientY,event.timeStamp)
+      if(touch)finish(completed,touch.clientX,touch.clientY,event.timeStamp,1500,88)
     }
     const pointerStart=(event:PointerEvent)=>{
       if(event.pointerType!=="mouse" || event.button!==0 || event.isPrimary===false || hasDialog() || ignore(event.target) || insideEdge(event.clientX))return

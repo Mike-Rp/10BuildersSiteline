@@ -54,10 +54,13 @@
 .report-summary-table tbody th { font-weight:600; color:var(--color-primary); }
 .report-summary-table small { display:block; font-size:14px; }
 .report-summary-table .button { min-height:44px; white-space:nowrap; }
+.report-summary-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding-top:12px; border-top:1px solid var(--color-line); color:var(--color-muted); }
+.report-summary-pagination > div { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
 @media(max-width:760px) {
   .report-summary { padding:18px; }
   .report-summary-actions, .report-summary-actions .button { width:100%; }
   .report-summary-actions .button { justify-content:center; min-height:48px; }
+  .report-summary-pagination > div { width:100%; justify-content:space-between; }
   /* Rows become labelled cards on narrow screens instead of a wide scrolling table. */
   .report-summary-table { border:0; overflow:visible; }
   .report-summary-table table { min-width:0; }

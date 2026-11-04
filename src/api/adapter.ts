@@ -165,7 +165,7 @@ export function mapPhoto(
     photoUploaderId: row.uploaded_by || undefined,
     owner: row.uploader_name || "Site PM",
     date: day(row.taken_date || row.created_at),
-    mime: "image/png",
+    mime: row.content_type || "image/png",
   }
 }
 
