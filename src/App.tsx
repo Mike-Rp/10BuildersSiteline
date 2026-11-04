@@ -1637,7 +1637,7 @@ function AppInner() {
     const subcontractorsTab = () => (
         <>
           <div className="modal-actions"><Button variant="primary" icon="plus" onClick={() => setDialog({kind:"add-company"})}>Add company</Button></div>
-          <div className="tabs standalone">
+          <div className="active-sites-view-tabs" role="tablist" aria-label="Subcontractor directory views">
             {[
               ["registered", "Registered companies"],
               ["pending", `Pending verification (${pending.length})`],
@@ -1646,7 +1646,19 @@ function AppInner() {
             ].map(([v, l]) => (
               <button
                 key={v}
-                className={subconTab === v ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={subconTab === v}
+                tabIndex={subconTab === v ? 0 : -1}
+                onKeyDown={event => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
+                  event.preventDefault()
+                  const tabs = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') || [])
+                  const index = tabs.indexOf(event.currentTarget)
+                  const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length
+                  tabs[next]?.focus()
+                  tabs[next]?.click()
+                }}
                 onClick={() => setSubconTab(v)}
               >
                 {l}
@@ -1731,7 +1743,7 @@ function AppInner() {
       active: T,
       select: (tab: T) => void,
     ) => (
-      <div className="tabs standalone" role="tablist" aria-label={label}>
+      <div className="active-sites-view-tabs" role="tablist" aria-label={label}>
         {items.map(([id, text], index) => (
           <button
             key={id}

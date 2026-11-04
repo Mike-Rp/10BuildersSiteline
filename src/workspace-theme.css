@@ -70,6 +70,15 @@
 #root .app-shell :is(.panel,.ao-panel,.executive-summary,.reset-request-panel,.role-card,.project-card,.as-card,.document-browser,.metric-card,.co-highlights,.co-update,.co-photos,.client-document-card) {
   border: 1px solid #e1eaf2; border-radius: 18px; background: #fff; box-shadow: none;
 }
+#root .app-shell :is(button.folder-card,button.engineer-card,button.company-card,button.executive-metric,button.pp-comparison,button.client-photo,button.assignment-history) {
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+#root .app-shell :is(button.folder-card,button.engineer-card,button.company-card,button.executive-metric,button.pp-comparison,button.client-photo,button.assignment-history):hover:not(:disabled) {
+  transform: translateY(-2px); border-color: #83a6c3; background-color: #fff; box-shadow: 0 7px 18px #193b5918;
+}
+#root .app-shell :is(button.folder-card,button.engineer-card,button.company-card,button.executive-metric,button.pp-comparison,button.client-photo,button.assignment-history):focus-visible {
+  outline: 3px solid #5285af; outline-offset: 3px;
+}
 #root .app-shell :is(.panel-header,.ao-panel-header) { background: #fff; padding: 16px 18px; }
 #root .app-shell :is(.metric-card,.executive-metric) { border-radius: 14px; min-width: 0; }
 #root .app-shell .executive-summary { padding: 18px; }

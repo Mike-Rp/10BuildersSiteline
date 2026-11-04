@@ -890,7 +890,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .role-workspace .panel-header { min-height: 90px; }
 .role-workspace .panel-header p { margin-top: 6px; }
 .role-two-column { display: grid; grid-template-columns: 1.15fr 1fr; align-items: start; gap: 16px; }
-.dashboard-secondary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.dashboard-secondary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; margin-top: 14px; }
 .dashboard-secondary > details { min-width: 0; border: 1px solid var(--color-line); border-radius: 9px; background: var(--color-surface); }
 .dashboard-secondary > details > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 7px 12px; cursor: pointer; list-style: none; color: var(--color-primary); font-size: 14px; font-weight: 600; }
 .dashboard-secondary > details > summary::-webkit-details-marker { display: none; }

@@ -2929,7 +2929,7 @@ export default function RoleWorkspace({
   function resourcesWorkspace() {
     return <>
       {header("Resources")}
-      <div className="as-tabs directory-tabs" role="tablist" aria-label="Site PM resources">
+      <div className="active-sites-view-tabs" role="tablist" aria-label="Site PM resources">
         <button type="button" role="tab" aria-selected={resourcesTab === "documents"} onClick={() => setResourcesTab("documents")}>
           <Icon name="folder" size={17} /> Document repository
         </button>

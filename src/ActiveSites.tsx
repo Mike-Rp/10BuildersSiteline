@@ -269,7 +269,7 @@ export default function ActiveSites({
             ))}
         </div>
       )}
-      <div className="as-tabs" role="tablist" aria-label="Active project views" onKeyDown={event => {
+      <div className="active-sites-view-tabs" role="tablist" aria-label="Active project views" onKeyDown={event => {
         const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
         const index = tabs.indexOf(event.target as HTMLButtonElement)
         if (index < 0) return
