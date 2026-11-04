@@ -15,7 +15,6 @@
   box-shadow: none;
 }
 #root .page-title-copy { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
-#root .page-title-eyebrow { font-size: var(--text-caption, 14px); font-weight: 600; line-height: 1.4; letter-spacing: 1px; color: #526b87; }
 #root .page-title-panel .page-title-copy h1 { color: #102c4c; font-size: 30px; line-height: 1.25; margin: 6px 0 0; letter-spacing: -.6px; }
 #root .page-title-panel .page-title-copy > h1:first-child { margin-top: 0; }
 #root .page-title-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; max-width: 100%; }

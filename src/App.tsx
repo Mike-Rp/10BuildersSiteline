@@ -1461,7 +1461,7 @@ function AppInner() {
   function pageHeading(title: string, action?: ReactNode) {
     return (
       <>
-      <PageTitlePanel title={title} eyebrow={["Team", "Settings", "Archive", "Activity log"].includes(page) ? "ORGANIZATION" : "CONSTRUCTION OPERATIONS"}>
+      <PageTitlePanel title={title}>
         {action}
       </PageTitlePanel>
       <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />

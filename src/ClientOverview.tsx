@@ -21,7 +21,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
   const validProgress = typeof overall === "number" && Number.isFinite(overall) && overall >= 0 && overall <= 100
   const endSet = calendarDay(project.end) !== null
   return <div className="client-overview">
-    <PageTitlePanel title="Project overview" eyebrow={project.name}>
+    <PageTitlePanel title="Project overview">
       <div className="co-heading-actions">
         <Button variant="text-button" onClick={onDetails}>Project details & contacts</Button>
         <InfoPopover title="About your project progress" label="Help: project progress">

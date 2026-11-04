@@ -755,7 +755,7 @@ export default function ClientPortal({
             </div>
           )}
           {page !== "Project Overview" && (project || page === "Active sites") && (
-            <PageTitlePanel title={page} eyebrow={page === "Active sites" ? "YOUR CONSTRUCTION PROJECTS" : project?.name} />
+            <PageTitlePanel title={page} />
           )}
           {error && (
             <div className="role-error" role="alert">

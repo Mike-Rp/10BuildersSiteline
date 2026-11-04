@@ -62,7 +62,6 @@
 #root .app-shell .dashboard-welcome { color: var(--color-muted); font-weight: 400; }
 #root .app-shell .page-heading.page-title-panel { background: transparent; padding: 0; border: 0; border-radius: 0; gap: 16px; margin-bottom: 20px; }
 #root .app-shell .page-title-panel .page-title-copy h1 { font-size: clamp(29px,3vw,44px); line-height: 1.18; font-weight: 550; letter-spacing: -1.5px; color: var(--color-ink); }
-#root .app-shell .page-title-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: .8px; }
 #root .app-shell .button { min-height: 42px; border-radius: 12px; font-size: 14px; padding: 10px 14px; box-shadow: none; }
 #root .app-shell .button.primary { background: #193b59; border-color: #193b59; color: #fff; }
 #root .app-shell .button.primary:hover:not(:disabled) { background: #244f73; }

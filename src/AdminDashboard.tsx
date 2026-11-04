@@ -44,7 +44,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   const current = Math.min(page, pages)
   const visible = filtered.slice((current - 1) * 6, current * 6)
   return <div className="admin-overview">
-    <PageTitlePanel title="Dashboard" eyebrow="ADMINISTRATOR WORKSPACE">
+    <PageTitlePanel title="Dashboard">
       <div className="dashboard-actions">
         <Button icon="doc" onClick={onMonthlyReport}>Monthly report</Button>
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>

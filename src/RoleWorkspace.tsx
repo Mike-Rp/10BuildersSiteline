@@ -575,7 +575,7 @@ export default function RoleWorkspace({
   function header(title: string, action?: ReactNode) {
     return (
       <>
-        <PageTitlePanel title={title} eyebrow={isOpm ? "OFFICE PROJECT MANAGEMENT" : "SITE OPERATIONS"}>
+        <PageTitlePanel title={title}>
           {action}
         </PageTitlePanel>
         {urgentBanner()}
