@@ -49,7 +49,6 @@ import {
   today,
   uid,
   validateFile,
-  uploadRequirements,
   endAfterStart,
   plannedDays,
   addDays,
@@ -141,7 +140,6 @@ export function Upload({
   // Internal by default, including site photos that still require an authorized release.
   clientVisible?: boolean
 }) {
-  const hintId = useId()
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File>()
   const [error, setError] = useState("")
@@ -185,7 +183,6 @@ export function Upload({
         className="hidden"
         type="file"
         aria-label={ariaLabel || label}
-        aria-describedby={hintId}
         disabled={disabled || saving}
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
         onChange={(e) => {
@@ -204,14 +201,13 @@ export function Upload({
         {file && <AttachmentRow name={file.name} size={file.size} disabled={disabled || saving} onRemove={clear} />}
         <div className="attachment-actions">
           <Button icon="plus" className="attachment-add" disabled={disabled || saving}
-            aria-label={ariaLabel || buttonLabel} aria-describedby={hintId} onClick={() => input.current?.click()}>
+            aria-label={ariaLabel || buttonLabel} onClick={() => input.current?.click()}>
             Add attachments
           </Button>
           {file && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
             {saving ? "Uploading?" : "Confirm upload"}
           </Button>}
         </div>
-        <span className="upload-limit" id={hintId}>{uploadRequirements(spreadsheet)}</span>
         {error && <p className="error" role="alert">{error}</p>}
       </div>
     </>
@@ -272,11 +268,6 @@ export function DocumentList({
         <div className="document-upload">
           <div>
             <strong>{uploadLabel || "Add a signed document"}</strong>
-            <p>
-              {spreadsheet
-                ? "Excel manpower list (.xlsx or .xls) · Maximum 15 MB"
-                : "PDF, JPG, JPEG or PNG · Maximum 10 MB"}
-            </p>
           </div>
           <Upload
             spreadsheet={spreadsheet}

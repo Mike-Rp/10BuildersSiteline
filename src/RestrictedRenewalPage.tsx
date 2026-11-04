@@ -51,7 +51,6 @@ export default function RestrictedRenewalPage({ actor, status, onReload, onSignO
           <Field label="PRC license number"><input required disabled={busy} inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="0012345" value={number} onChange={e => setNumber(e.target.value)} /></Field>
           <Field label="New expiry date"><input required disabled={busy} type="date" value={expiry} onChange={e => setExpiry(e.target.value)} /></Field>
           <Field label="Supporting license document"><input required disabled={busy} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setFile(e.target.files?.[0])} /></Field>
-          <p>Exactly seven digits, including leading zeros. PDF, JPG or PNG, up to 10 MB.</p>
           <Button type="submit" variant="primary" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin verification"}</Button>
         </form>
       </>}

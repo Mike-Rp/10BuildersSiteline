@@ -13,7 +13,6 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
   const generatedId = useId()
   const inputId = id || generatedId
   const resultsId = `${inputId}-results`
-  const hintId = `${inputId}-hint`
   const root = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const results = useRef<HTMLDivElement>(null)
@@ -68,7 +67,7 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
       <Icon name="search" size={18} />
       <input id={inputId} ref={input} type="text" inputMode="search" role="combobox" required
         aria-haspopup="dialog" aria-expanded={expanded} aria-controls={expanded ? resultsId : undefined}
-        aria-describedby={hintId} autoComplete="off" placeholder="Search clients by name or email"
+        autoComplete="off" placeholder="Search clients by name or email"
         disabled={disabled} value={selected?.name || query}
         onChange={event => {
           onChange("")
@@ -92,9 +91,6 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
       {!disabled && (selected || query) && <Button onClick={clear}
         aria-label={selected ? "Change selected client" : "Clear client search"}>{selected ? "Change" : "Clear"}</Button>}
     </div>
-    <small id={hintId} className="client-search-hint">{selected
-      ? `Selected: ${selected.name} · ${selected.email}`
-      : "Start typing to find an existing client."}</small>
     {expanded && <div ref={results} id={resultsId} className="client-search-results" role="dialog" aria-label="Matching clients">
       <div className="client-search-count" role="status">{matches.length} matching {matches.length === 1 ? "client" : "clients"}</div>
       {matches.slice(currentPage * 3, currentPage * 3 + 3).map(client => <div key={client.id} className="client-search-row">

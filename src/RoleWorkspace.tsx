@@ -917,7 +917,7 @@ export default function RoleWorkspace({
                       <p>
                         {doc?.uploaded
                           ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
-                          : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
+                          : "Required"}
                       </p>
                     </div>
                     {doc?.uploaded ? (
@@ -1820,10 +1820,6 @@ export default function RoleWorkspace({
               <div className="field-evidence">
                 <div>
                   <strong>General photo / report</strong>
-                  <p>
-                    Optional supporting evidence · PDF, JPG or PNG · 10 MB total across this project
-                    maximum
-                  </p>
                   {evidence && (
                     <small>{evidence.name} · Confirmed locally</small>
                   )}

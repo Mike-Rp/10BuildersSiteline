@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Badge, Button, Empty, Field, Modal } from "./ui"
-import { dateLabel, uploadRequirements, validateFile } from "./model"
+import { dateLabel, validateFile } from "./model"
 import { useExtensionDemo } from "./ExtensionDemoContext"
 import {
   canSeeProject,
@@ -523,7 +523,7 @@ export default function ExtensionWorkflow({
                 }
               />
             </Field>
-            <Field label="Supporting Documents / Site Evidence" hint={uploadRequirements()}>
+            <Field label="Supporting Documents / Site Evidence">
               <input
                 type="file"
                 multiple

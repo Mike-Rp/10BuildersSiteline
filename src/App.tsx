@@ -2589,9 +2589,6 @@ function AppInner() {
               <div className="document-upload">
                 <div>
                   <strong>Employment contract</strong>
-                  <p>
-                    Company-wide signed agreement · PDF, JPG or PNG, up to 10 MB
-                  </p>
                 </div>
                 {a.docs.some((d) => d.label === "Employment Contract") ? (
                   <Badge tone="green">On file</Badge>

@@ -226,7 +226,6 @@ export function Empty({
 export function Field({
   label,
   children,
-  hint,
   error,
   wide = false,
 }: {
@@ -248,16 +247,14 @@ export function Field({
         ? cloneElement(control, {
             id,
             ...(error ? { "aria-invalid": true } : {}),
-            ...(error || hint ? { "aria-describedby": [control.props["aria-describedby"], descriptionId].filter(Boolean).join(" ") } : {}),
+            ...(error ? { "aria-describedby": [control.props["aria-describedby"], descriptionId].filter(Boolean).join(" ") } : {}),
           })
         : children}
       {error ? (
         <small id={descriptionId} className="field-error" role="alert">
           {error}
         </small>
-      ) : (
-        hint && <small id={descriptionId}>{hint}</small>
-      )}
+      ) : null}
     </div>
   )
 }

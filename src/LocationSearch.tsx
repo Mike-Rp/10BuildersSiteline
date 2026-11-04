@@ -9,7 +9,7 @@ type Props = Pick<InputHTMLAttributes<HTMLInputElement>, "id" | "aria-describedb
 const searchKey = (text: string) => text.normalize("NFKD").replace(/\p{M}/gu, "").trim().toLocaleLowerCase()
 
 export default function LocationSearch({ id, label, options, value, onChange, disabled = false, placeholder, ...aria }: Props) {
-  const generatedId = useId(), inputId = id || generatedId, listId = `${inputId}-locations`, statusId = `${inputId}-location-status`
+  const generatedId = useId(), inputId = id || generatedId, listId = `${inputId}-locations`
   const root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState(""), [open, setOpen] = useState(false), [active, setActive] = useState(0)
   const [popup, setPopup] = useState({ above: false, height: 250 })
@@ -57,7 +57,6 @@ export default function LocationSearch({ id, label, options, value, onChange, di
       <input {...aria} id={inputId} ref={input} type="text" inputMode="search" role="combobox" required disabled={disabled}
         aria-autocomplete="list" aria-haspopup="listbox" aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
         aria-activedescendant={expanded && activeIndex >= 0 ? optionId(activeIndex) : undefined}
-        aria-describedby={[aria["aria-describedby"], statusId].filter(Boolean).join(" ")}
         autoComplete="off" title={selected?.name} placeholder={placeholder || "Type or select a location"} value={selected?.name || query}
         onFocus={() => { setOpen(true); setActive(0) }}
         onChange={event => { setQuery(event.target.value); setOpen(true); setActive(0); onChange("") }}
@@ -80,8 +79,5 @@ export default function LocationSearch({ id, label, options, value, onChange, di
       </ul>
       {!matches.length && <p role="status">No matching locations in this area. Check the spelling or parent location.</p>}
     </div>}
-    <small id={statusId} className="location-search-status" role="status" aria-live="polite">{expanded
-      ? `${matches.length} matching location${matches.length === 1 ? "" : "s"}. Use arrow keys and Enter to select.`
-      : selected ? "Location selected." : disabled ? "Complete the parent location first." : "Type to search, then select a matching location."}</small>
   </div>
 }

@@ -1012,10 +1012,6 @@ function LegacyLeadSubcontractorPanel({
                 }}
               />
             )}
-            <small className="role-muted">
-              PDF, JPG, JPEG or PNG · 10 MB total across this project · File preview and explicit
-              confirmation required
-            </small>
           </>
         )}
       </section>
