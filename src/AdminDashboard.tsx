@@ -66,7 +66,6 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
       title="Priority items" showReviewButton={false}
       description={`${readinessAvailable && blockers.length ? `${blockers.length} ${blockers.length === 1 ? "project cannot" : "projects cannot"} advance. ` : ""}Open an item to review its details and take action.`}
       onOpen={item => { const source = priorities.find(priority => priority.key === item.key); if (source) onOpen(source) }} />
-      {!priorities.length && <Empty title="No priority items">Urgent deadlines and license alerts will appear here.</Empty>}
     </div>
     <div id="password-requests-panel" role="tabpanel" aria-labelledby="password-requests-tab" hidden={attentionView!=='password'}>
       {attentionView==='password' && <PasswordResetRequestPanel requests={resetRequests} onOpen={onOpenReset}/>}

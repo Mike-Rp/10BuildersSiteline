@@ -18,15 +18,18 @@ export default function PasswordResetRequestPanel({requests,onOpen}:{requests:Pa
     <Badge tone={r.status==='completed'?'green':waitLevel(r.requested_at)==='red'?'red':'amber'}>{r.status==='completed'?'Completed':'Pending'}</Badge>
     <Button onClick={()=>{setAll(false);onOpen(r.id,r.requested_at)}}>{r.status==='completed'?'View details':'Review request'}</Button>
   </li>
-  return <section className="reset-request-panel" aria-labelledby="reset-requests-title">
+  return <>
+    {pending.length > 0 && <section className="reset-request-panel" aria-labelledby="reset-requests-title">
     <header><Icon name="shield" size={24}/><div><h2 id="reset-requests-title">Password reset requests</h2><p>Opening a request marks it as read. It stays pending until the reset is completed.</p></div><Badge tone={overdue?'red':'amber'}>{pending.length} pending · {unread} unread{overdue>0 && ` · ${overdue} overdue`}</Badge></header>
-    {pending.length?<ul>{pending.slice(0,3).map(row)}</ul>:<Empty title="No pending password reset requests">New requests will appear here.</Empty>}
+    <ul>{pending.slice(0,3).map(row)}</ul>
     {completed.length>0 && <><h3 className="reset-completed-label">Recently completed</h3><ul>{completed.slice(0,3).map(row)}</ul></>}
     <footer><small>Blue highlight: unread · White: read and pending · Green badge: completed</small><Button variant="text-button" onClick={()=>setAll(true)}>View all requests <Icon name="arrow" size={15}/></Button></footer>
+    </section>}
+    {pending.length === 0 && completed.length > 0 && <Button variant="text-button" onClick={()=>{setFilter("completed");setSearch("");setPage(1);setAll(true)}}>View completed reset requests ({completed.length}) <Icon name="arrow" size={15}/></Button>}
     {all && <Modal title="Password reset requests" subtitle="Pending requests and the 20 most recent completed resets" wide onClose={()=>setAll(false)}>
       <div className="reset-request-tools"><Field label="Search requests"><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder="Search name, role or email…"/></Field><Field label="Status"><select value={filter} onChange={e=>{setFilter(e.target.value);setPage(1)}}><option value="pending">Pending ({pending.length})</option><option value="completed">Completed ({completed.length})</option><option value="all">All requests</option></select></Field></div>
       {filtered.length?<ul className="reset-all-list">{filtered.slice((current-1)*6,current*6).map(row)}</ul>:<Empty title="No matching requests">Try another search or status.</Empty>}
       <div className="modal-actions"><Button disabled={current===1} onClick={()=>setPage(current-1)}>Previous</Button><span>Page {current} of {pages}</span><Button disabled={current===pages} onClick={()=>setPage(current+1)}>Next</Button></div>
     </Modal>}
-  </section>
+  </>
 }
