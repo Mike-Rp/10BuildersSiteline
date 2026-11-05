@@ -2021,7 +2021,7 @@ export default function RoleWorkspace({
           {isOpm ? <button type="button" role="tab" aria-selected={activeSitesView === "updates"} onClick={() => setActiveSitesView("updates")}>
             <Icon name="shield" size={17} /> Updates &amp; issues <span>{pendingUpdates.length + pendingRework.length + qaCount}</span>
           </button> : <button type="button" role="tab" aria-selected={activeSitesView === "assignments"} onClick={() => setActiveSitesView("assignments")}>
-            <Icon name="check" size={17} /> Assignments <span>{projects.filter(project => assignmentInfo(project).group === "upcoming").length}</span>
+            <Icon name="check" size={17} /> Assignments <span>{navigationCounts.Assignments?.count ?? 0}</span>
           </button>}
           {isOpm && <button type="button" role="tab" aria-selected={activeSitesView === "uploads"} onClick={() => setActiveSitesView("uploads")}>
             <Icon name="doc" size={17} /> Site uploads <span>{pendingSitePhotoCount}</span>
