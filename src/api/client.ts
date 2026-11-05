@@ -198,6 +198,11 @@ export const registerFileUrl = (
 ) => {
   if (url) fileUrls.set(docId, url)
 }
+// Lets a restored workspace keep its documents downloadable before the fresh load registers them again.
+export const fileUrlSnapshot = (): Record<string, string> => Object.fromEntries(fileUrls)
+export const restoreFileUrls = (urls: Record<string, string>) => {
+  for (const [docId, url] of Object.entries(urls)) fileUrls.set(docId, url)
+}
 export async function downloadApiFile(
   docId: string,
 ): Promise<Blob | undefined> {

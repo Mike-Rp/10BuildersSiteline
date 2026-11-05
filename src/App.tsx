@@ -10,6 +10,7 @@ import { adminDashboardOverview } from "./admin-dashboard"
 import ProjectProgress from "./ProjectProgress"
 import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
+import { ScheduleDetails } from "./ScheduleBadge"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
 import { persistAdminChanges, saveApiAccount, saveApiProject, sendApiWorkflow, createCompany } from "./api/actions"
@@ -30,6 +31,7 @@ import {
   tokenUser,
 } from "./api/client"
 import { loadState as loadApiState } from "./api/load"
+import { clearWorkspaceCache, readWorkspaceCache, saveWorkspaceCache } from "./workspaceCache"
 import { ClientSubconAdminCard } from "./ClientSubconReview"
 import ClientPortal from "./ClientPortal"
 import PlannedTimeline from "./PlannedTimeline"
@@ -74,6 +76,7 @@ import {
   Upload,
 } from "./panels"
 import {
+  companyCommitments,
   dateLabel,
   headcount,
   initials,
@@ -94,6 +97,7 @@ import {
   type Event,
   type Project,
   type State,
+  UPLOAD_LIMIT_LABEL,
 } from "./model"
 import { projectDocumentIndex } from "./project-document-index"
 import {
@@ -276,9 +280,13 @@ function AppInner() {
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("engineers")
   const [tab, setTab] = useState("closed")
   const [mobileNav, setMobileNav] = useState(false)
+  // Set only by the "Delayed projects" attention row; any other navigation clears it.
+  const [siteDelayed, setSiteDelayed] = useState(false)
   const [notifications, setNotifications] = useState(false)
   const [credentials, setCredentials] = useState<{
     name: string
+    idNumber?: string
+    email?: string
     password: string
   }>()
   const [confirmation, setConfirmation] = useState<{
@@ -292,6 +300,8 @@ function AppInner() {
   const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
   const [readinessAvailable, setReadinessAvailable] = useState(false)
   const [mustResetPassword,setMustResetPassword]=useState(false)
+  const mustResetRef = useRef(mustResetPassword)
+  mustResetRef.current = mustResetPassword
   const [idleWarning, setIdleWarning] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
@@ -329,13 +339,34 @@ function AppInner() {
   const [restoreError, setRestoreError] = useState("")
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   useEffect(() => {
-    if (!tokenUser()) {
+    const token = tokenUser()
+    if (!token) {
+      clearWorkspaceCache()
       setCheckingSession(false)
       return
     }
     let cancelled = false
-    setCheckingSession(true)
     setRestoreError("")
+    // Show the workspace this tab last loaded right away; the load below replaces it and stays authoritative.
+    // Only an account that could still sign in is shown, and nothing is shown to a password-reset account.
+    let remembered = readWorkspaceCache(token.id)
+    const rememberedAccount = remembered?.state.accounts.find((a) => a.id === token.id)
+    try {
+      if (!remembered || !rememberedAccount) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
+      assertCanSignIn(remembered.state, rememberedAccount)
+    } catch {
+      if (remembered) clearWorkspaceCache()
+      remembered = undefined
+    }
+    if (remembered) {
+      stateRef.current = remembered.state
+      setState(remembered.state)
+      setMustResetPassword(remembered.mustReset)
+      setReadinessAvailable(false)
+      setSessionId(token.id)
+      setSignedOut(false)
+      setCheckingSession(false)
+    } else setCheckingSession(true)
     api<Parameters<typeof startApiSession>[0]>("/auth/me")
       .then(startApiSession)
       .then((account) => {
@@ -349,11 +380,15 @@ function AppInner() {
           error instanceof TypeError ||
           (error instanceof ApiError && (error.status === 0 || error.status >= 500))
         if (transient && tokenUser()) {
-          setRestoreError("Your session is still active, but the workspace could not be loaded.")
+          if (remembered) setToast("Showing your last loaded workspace. It could not be refreshed.")
+          else setRestoreError("Your session is still active, but the workspace could not be loaded.")
           return
         }
-        clearSession()
-        apiLogout()
+        if (remembered) endSession()
+        else {
+          clearSession()
+          apiLogout()
+        }
       })
       .finally(() => {
         if (!cancelled) setCheckingSession(false)
@@ -444,6 +479,7 @@ function AppInner() {
     stateRef.current=loaded
     setState(loaded)
     setReadinessAvailable(true)
+    saveWorkspaceCache(actor.id, loaded, mustResetRef.current)
     return loaded
   }
   // Let the next Site PM see an OPM handoff without a manual page reload.
@@ -456,7 +492,7 @@ function AppInner() {
       const snapshot = stateRef.current
       try {
         const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
-        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true) }
+        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true); saveWorkspaceCache(actor.id, loaded, mustResetRef.current) }
       } catch { if(active)setReadinessAvailable(false) /* A failed read does not assert current blockers. */ }
       finally { loading = false }
     }
@@ -487,6 +523,7 @@ function AppInner() {
   function navigate(next: string) {
     const target = resolveAdminTarget(next)
     setPage(target ? target.page : normalizeWorkspacePage(next))
+    setSiteDelayed(false)
     resetListState()
     if (target?.documentsTab) setDocumentsTab(target.documentsTab)
     if (target?.directoryTab) setDirectoryTab(target.directoryTab)
@@ -514,6 +551,7 @@ function AppInner() {
   }
   function clearSession() {
     resetListMemory()
+    clearWorkspaceCache()
     try {
       sessionStorage.removeItem(SESSION_KEY)
     } catch {
@@ -530,7 +568,8 @@ function AppInner() {
     setLoadingWorkspaceRole(user.role)
     setReadinessAvailable(false)
     try {
-      setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
+      const mustReset = !!(user as {temp_password_issued?:boolean}).temp_password_issued
+      setMustResetPassword(mustReset)
       const loaded = await loadApiState(user)
       const account = loaded.accounts.find((a) => a.id === user.id)
       try {
@@ -543,6 +582,7 @@ function AppInner() {
       stateRef.current = loaded
       setState(loaded)
       setReadinessAvailable(true)
+      saveWorkspaceCache(user.id, loaded, mustReset)
       return account
     } finally {
       setLoadingWorkspaceRole(undefined)
@@ -616,7 +656,7 @@ function AppInner() {
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
       await reloadWorkspace();setDialog(undefined)
-      if(!exists&&saved.password)setCredentials({name:account.name,password:saved.password})
+      if(!exists&&saved.password)setCredentials({name:account.name,idNumber:saved.idNumber,email:saved.email,password:saved.password})
       setToast(exists?"Account updated":"Account created")
     }catch(error){setToast((error as Error).message);throw error}
   }
@@ -1309,7 +1349,7 @@ function AppInner() {
       onNavigate={navigate}
       onNewIntake={() => setDialog({ kind: "intake" })}
       onActivity={() => setDialog({ kind: "activity" })}
-      onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
+      onOpen={item => item.key === "delayed-projects" ? (navigate("Active sites"), setSiteDelayed(true)) : item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
     />}</PasswordResetRequests>
   }
@@ -1340,7 +1380,7 @@ function AppInner() {
           {pageHeading(
             "Active sites",
           )}
-          <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
+          <ActiveSites key={`${actor.id}:${siteDelayed}`} initialDelayed={siteDelayed} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
             ...p,
             lead: state.accounts.find(a => a.id === leadId(p))?.name,
             needsReview: hasPendingSiteReview(p),
@@ -1546,7 +1586,7 @@ function AppInner() {
                         <div className="company-meta">
                           <span>
                             <Icon name="users" size={16} />
-                            {c.manpowerCount} available manpower
+                            {c.manpowerCount} names on manpower list
                           </span>
                           <span>
                             <Icon name="building" size={16} />
@@ -2039,6 +2079,7 @@ function AppInner() {
           </div>
           <Status status={p.status} />
         </div>
+        {!docsOnly && <ScheduleDetails project={p} />}
         {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
@@ -2510,7 +2551,7 @@ function AppInner() {
                 <div>
                   <strong>Employment contract</strong>
                   <p>
-                    Company-wide signed agreement · PDF, JPG or PNG, up to 10 MB
+                    Company-wide signed agreement · PDF, JPG or PNG, up to {UPLOAD_LIMIT_LABEL}
                   </p>
                 </div>
                 {a.docs.some((d) => d.label === "Employment Contract") ? (
@@ -2566,6 +2607,7 @@ function AppInner() {
     )
   }
   function companyDetails(c: Company) {
+    const commitments = companyCommitments(state, c)
     return (
       <>
         <div className="detail-hero">
@@ -2591,19 +2633,27 @@ function AppInner() {
             <strong>{c.availability.replace("_", " ")}</strong>
           </div>
           <div>
-            <small>AVAILABLE MANPOWER</small>
+            <small>NAMES ON MANPOWER LIST</small>
             <strong>{c.manpowerCount}</strong>
           </div>
         </div>
         <p className="section-description">{c.note}</p>
         <section className="detail-section">
           <h3>Active project commitments</h3>
-          <div className="tag-list subsection">
-            {c.activeProjectIds.map((projectId) => (
-              <span key={projectId}>{projectFor(projectId)}</span>
-            ))}
-          </div>
-          {!c.activeProjectIds.length && (
+          {commitments.count ? (
+            <>
+              <p className="section-description">
+                {commitments.count} active project commitments
+              </p>
+              {commitments.visible.length > 0 && (
+                <div className="tag-list subsection">
+                  {commitments.visible.map((p) => (
+                    <span key={p.id}>{p.name}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
             <Empty title="No active project commitments" />
           )}
         </section>
@@ -3352,6 +3402,16 @@ function AppInner() {
             </span>
             <h3>{credentials.name}</h3>
           </div>
+          {credentials.email && (
+            <div className="detail-grid account-detail-grid">
+              {credentials.email && (
+                <div>
+                  <small>SIGN-IN EMAIL</small>
+                  <strong>{credentials.email}</strong>
+                </div>
+              )}
+            </div>
+          )}
           <div className="password-display">
             <code>{credentials.password}</code>
             <Button

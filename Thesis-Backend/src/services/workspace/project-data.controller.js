@@ -4,7 +4,7 @@ import { requireUser, sendOk, handleError } from "../../common/utilities/access.
 import { LIST_SELECT, LIST_FROM, stripInternal } from "../projects/read.controller.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
-import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
+import { transitionPhase, assessPhaseHandoffs } from "../progress/handoff.utility.js";
 import { ensureChecklist } from "../progress/phase.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
@@ -166,10 +166,13 @@ export async function getProjectData(req,res) {
    // Read the same gates as automatic handoff, only for already-authorized
    // Administrator projects. Do not initialize future scope for a banner read.
    const readiness = new Map();
-   if (user.role === "admin") for (const project of projects) {
-    const result = await assessPhaseHandoff(db, project);
-    readiness.set(project.id, { state: result.state, stageId: String(project.current_stage_id),
-     reason: result.reason, reasonCode: result.reasonCode });
+   if (user.role === "admin") {
+    const assessed = await assessPhaseHandoffs(db, projects);
+    for (const project of projects) {
+     const result = assessed.get(project.id);
+     readiness.set(project.id, { state: result.state, stageId: String(project.current_stage_id),
+      reason: result.reason, reasonCode: result.reasonCode });
+    }
    }
    const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts,progress].map(group);
    return projects.map(p=>{

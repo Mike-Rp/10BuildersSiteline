@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import execute from "../../common/utilities/query.utility.js";
+import { MAX_UPLOAD_BYTES } from "../../domain/upload-limits.js";
 import {
   handleError, sendOk, sendError, requireUser, isUuid, paging,
 } from "../../common/utilities/access.utility.js";
@@ -239,7 +240,7 @@ const contractUpload = multer({
     },
     filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString("hex") + ALLOWED_TYPES[file.mimetype]),
   }),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
   fileFilter: (req, file, cb) =>
     ALLOWED_TYPES[file.mimetype] ? cb(null, true) : cb(new Error("Only PDF, JPG or PNG files are allowed.")),
 });

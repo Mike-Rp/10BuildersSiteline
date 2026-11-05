@@ -2,6 +2,7 @@ import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { hasNameParts, parseWorkerName } from "./worker-name.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isProjectOpmOrAdmin, isUuid, paging,
@@ -269,7 +270,8 @@ export const getWorkers = async (req, res) => {
     if (exists.rowCount === 0) return sendError(res, "Subcontractor not found.", 404);
 
     const result = await execute(
-      `SELECT w.id, w.full_name, w.role_title, w.phone, w.status, d.code AS discipline,
+      `SELECT w.id, w.id_number, w.full_name, w.first_name, w.middle_name, w.last_name, w.suffix,
+              w.role_title, w.phone, w.status, d.code AS discipline,
               w.license_number, w.license_expiry, w.availability_status, w.availability_note,
               w.current_project_id, w.current_project_until
          FROM subcontractor_workers w
@@ -289,7 +291,9 @@ export const addWorker = async (req, res) => {
     const { id } = req.params;
     const b = req.body || {};
     if (!isUuid(id)) return sendError(res, "Invalid subcontractor id.", 400);
-    if (!b.full_name || !String(b.full_name).trim()) return sendError(res, "full_name is required.", 400);
+    // Name parts are preferred. A request with only full_name still works, but then the parts stay empty.
+    const name = hasNameParts(b) ? parseWorkerName(b) : undefined;
+    if (!name && (!b.full_name || !String(b.full_name).trim())) return sendError(res, "first_name and last_name are required.", 400);
     if (b.license_expiry && Number.isNaN(Date.parse(b.license_expiry))) return sendError(res, "license_expiry must be a valid date.", 400);
 
     const exists = await execute(`SELECT 1 FROM subcontractors WHERE id = $1 AND COALESCE(is_deleted,false) = false`, [id]);
@@ -297,13 +301,15 @@ export const addWorker = async (req, res) => {
 
     const disciplineId = await resolveLookup(execute, "disciplines", { code: b.discipline, id: b.discipline_id });
 
+    // id_number is left out on purpose: a trigger always assigns the next number for this company.
     const result = await execute(
       `INSERT INTO subcontractor_workers
-         (id, subcontractor_id, full_name, role_title, phone, status, discipline_id,
+         (id, subcontractor_id, full_name, first_name, middle_name, last_name, suffix, role_title, phone, status, discipline_id,
           license_number, license_expiry, availability_status, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8, 'available', $9, $9)
-       RETURNING id, full_name, status, availability_status`,
-      [uuidv4(), id, String(b.full_name).trim(), b.role_title ?? null, b.phone ?? null,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, 'available', $13, $13)
+       RETURNING id, id_number, full_name, first_name, middle_name, last_name, suffix, status, availability_status`,
+      [uuidv4(), id, name ? name.fullName : String(b.full_name).trim(), name?.firstName ?? null, name?.middleName || null,
+       name?.lastName ?? null, name?.suffix || null, b.role_title ?? null, b.phone ?? null,
        disciplineId, b.license_number ?? null, b.license_expiry ?? null, user.id]
     );
     return sendOk(res, "Worker added.", 1, result.rows[0], 201);
@@ -312,7 +318,7 @@ export const addWorker = async (req, res) => {
   }
 };
 
-const WORKER_PLAIN = ["full_name", "role_title", "phone", "license_number", "license_expiry", "availability_note"];
+const WORKER_PLAIN = ["role_title", "phone", "license_number", "license_expiry", "availability_note"];
 
 export const updateWorker = async (req, res) => {
   try {
@@ -331,7 +337,8 @@ export const updateWorker = async (req, res) => {
     const data = await withTransaction(async (client) => {
       const db = (sql, params) => client.query(sql, params);
       const found = await client.query(
-        `SELECT id, availability_status, current_project_id FROM subcontractor_workers WHERE id = $1 FOR UPDATE`, [id]);
+        `SELECT id, availability_status, current_project_id, full_name, first_name, middle_name, last_name, suffix
+           FROM subcontractor_workers WHERE id = $1 FOR UPDATE`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Worker not found.");
       const w = found.rows[0];
 
@@ -339,6 +346,16 @@ export const updateWorker = async (req, res) => {
       const params = [id];
       const set = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
 
+      // The stored full name is always rebuilt from the parts, so the two cannot drift apart.
+      if (hasNameParts(b)) {
+        const name = parseWorkerName(b, w);
+        set("full_name", name.fullName); set("first_name", name.firstName); set("middle_name", name.middleName || null);
+        set("last_name", name.lastName); set("suffix", name.suffix || null);
+      } else if (b.full_name !== undefined) {
+        if (w.first_name) throw new HttpError(400, "Edit first_name, middle_name, last_name and suffix instead of full_name.");
+        if (!String(b.full_name).trim() || String(b.full_name).trim().length > 150) throw new HttpError(400, "full_name must be 1-150 characters.");
+        set("full_name", String(b.full_name).trim());
+      }
       for (const f of WORKER_PLAIN) if (b[f] !== undefined) set(f, b[f]);
       if (b.status !== undefined) set("status", b.status);
       if (b.discipline !== undefined || b.discipline_id !== undefined) {

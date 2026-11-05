@@ -64,6 +64,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   // lifecycle workflows are not about licenses, so every engineer starts with a valid one here.
   await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
+  // Staff ID numbers and generated work emails: account creation now reads and writes these columns.
+  await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-id-numbers.sql"),"utf8"))
 
   const dbPort = await freePort()
   const apiPort = await freePort()
@@ -181,9 +183,15 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const self=state.accounts.find(a=>a.id===user.id)
     await saveApiAccount({...self,phone:"09171234567"},true)
-    const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",email:"integration.admin@example.test",docs:[]},false,"Password@123")
+    const created=await saveApiAccount({...self,id:randomUUID(),phone:"09171234567",name:"Integration Admin",firstName:"Integration",lastName:"Admin",email:"",docs:[]},false,"Password@123")
     assert.ok(created.id)
-    assert.equal((await api("/accounts/"+created.id)).email,"integration.admin@example.test")
+    // The server assigns the staff ID and builds the work email from its digits.
+    assert.match(created.idNumber,/^10B-\d{5,}$/)
+    assert.equal(created.email,"i.admin."+created.idNumber.slice(4)+"@10builders.com")
+    const stored=await api("/accounts/"+created.id)
+    assert.equal(stored.email,created.email)
+    assert.equal(stored.id_number,created.idNumber)
+    assert.equal(stored.work_email,created.email)
     const fileId=randomUUID()
     await uploadFile(fileId,new File(["%PDF-1.4\nIntegration company document"],"company.pdf",{type:"application/pdf"}))
     const source=state.companies[0]
@@ -193,9 +201,11 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     state=await loadState(user)
     assert.equal(state.companies.find(c=>c.id===saved.id).documents[0].id,fileId)
     assert.equal((await downloadApiFile(fileId)).type,"application/pdf")
-    const after={...state,rules:{...state.rules,grace:9}}
+    assert.equal(state.rules.cap,2,"the database default cap is unchanged")
+    const after={...state,rules:{...state.rules,grace:9,cap:3}}
     await persistAdminChanges(state,after)
     assert.equal((await loadState(user)).rules.grace,9)
+    assert.equal((await loadState(user)).rules.cap,3)
     assert.equal((await loadState(user)).accounts.find(a=>a.id===self.id).phone,"09171234567")
     await assert.rejects(uploadFile(randomUUID(),new File(["not a pdf"],"fake.pdf",{type:"application/pdf"})),/Supported files/)
   })
@@ -533,9 +543,10 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("password reset requests require admin reauthentication and force a new password", async () => {
     const { user, state } = await asUser("patricia.domingo@10builders.com")
     const self = state.accounts.find(a => a.id === user.id)
-    const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", email:"santos.juan@10builders.com", docs:[]}, false, "Password@123")
+    const saved = await saveApiAccount({...self, id:randomUUID(), phone:"09171234567", name:"Juan Santos", firstName:"Juan", lastName:"Santos", email:"", docs:[]}, false, "Password@123")
+    const santosEmail = saved.email
     setToken("")
-    await api("/auth/password-reset-request", {method:"POST",json:{name:"Juan",email:"santos.juan@10builders.com"}})
+    await api("/auth/password-reset-request", {method:"POST",json:{name:"Juan",email:santosEmail}})
     await api("/auth/password-reset-request", {method:"POST",json:{name:"Unknown Person",email:"unknown@example.com"}})
     await assert.rejects(api("/accounts/password-reset-requests"))
     await asUser("patricia.domingo@10builders.com")
@@ -546,8 +557,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(reset.temp_password, "Santos789")
     assert.equal((await api("/accounts/password-reset-requests")).some(r => r.id === saved.id), false)
     setToken("")
-    await assert.rejects(login("santos.juan@10builders.com", "Password@123"))
-    const target = await login("santos.juan@10builders.com", "Santos789")
+    await assert.rejects(login(santosEmail, "Password@123"))
+    const target = await login(santosEmail, "Santos789")
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
@@ -556,8 +567,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("first-login reset and employee resignation persist and revoke access",async()=>{
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const template=state.accounts.find(a=>a.id===user.id)
-    const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",email:"resignation.admin@example.test",docs:[]},false,"Password@123")
-    const invited=await login("resignation.admin@example.test","Password@123")
+    const saved=await saveApiAccount({...template,id:randomUUID(),phone:"09171234567",name:"Resignation Test Admin",firstName:"Resignation",middleName:"Test",lastName:"Admin",email:"",docs:[]},false,"Password@123")
+    const resignationEmail=saved.email
+    const invited=await login(resignationEmail,"Password@123")
     assert.equal(invited.temp_password_issued,true)
     await assert.rejects(api("/auth/reset-password",{method:"POST",json:{password:"short"}}),/8 to 72/)
     await api("/auth/reset-password",{method:"POST",json:{password:"NewPassword@123"}})
@@ -567,7 +579,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await uploadFile(id,new File(["%PDF-1.4\nResignation letter"],"resignation.pdf",{type:"application/pdf"}))
     await api("/accounts/"+saved.id+"/resignation",{method:"POST",json:{noticeDays:0,letter:{id,name:"resignation.pdf"}}})
     assert.equal((await loadState(user)).accounts.find(a=>a.id===saved.id).status,"deactivated")
-    await assert.rejects(login("resignation.admin@example.test","NewPassword@123"),/Invalid credentials/)
+    await assert.rejects(login(resignationEmail,"NewPassword@123"),/Invalid credentials/)
     ;({user,state}=await asUser("patricia.domingo@10builders.com"))
     await api("/workspace/preferences",{method:"POST",json:{muted:["notice"]}})
     assert.deepEqual((await loadState(user)).muted,["notice"])
@@ -954,6 +966,17 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const readiness=blockedAdmin.find(p=>p.list.id===id).handoffReadiness
     assert.equal(readiness.state,"blocked")
     assert.equal(readiness.reasonCode,"next_assignment")
+    const {assessPhaseHandoff,assessPhaseHandoffs}=await import("../Thesis-Backend/src/services/progress/handoff.utility.js")
+    const sameReadiness=async()=>{
+      const projects=(await db.query("select * from projects where not coalesce(is_deleted,false)")).rows
+      const batch=await assessPhaseHandoffs(db,projects)
+      for(const project of projects){
+        const single=await assessPhaseHandoff(db,project),got=batch.get(project.id)
+        assert.deepEqual({state:got.state,reason:got.reason,reasonCode:got.reasonCode},
+          {state:single.state,reason:single.reason,reasonCode:single.reasonCode},"batch readiness matches per-project readiness for "+project.name)
+      }
+    }
+    await sameReadiness()
     const {adminDashboardOverview}=await import("../src/admin-dashboard.ts")
     const blockedState=await loadState({id:(await api("/auth/me")).id,role:"admin"})
     assert.equal(adminDashboardOverview(blockedState).items.filter(item=>item.id===id && item.blocker).length,1)
@@ -986,6 +1009,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await stage()).current_stage_id,stages[1].id)
     await asUser("patricia.domingo@10builders.com")
     assert.notEqual((await api("/workspace/project-data")).find(p=>p.list.id===id).handoffReadiness.state,"blocked","successful handoff removes blocker")
+    await sameReadiness()
     await asUser(opmEmail)
     assert.equal((await db.query("select count(*)::int AS n from project_progress_history where project_id=$1 and note like 'Automatic handoff:%'",[id])).rows[0].n,1,"concurrent refreshes record one handoff")
     const thirdPhaseItem = items.find(item => item.project_stage_id === stages[2].id)

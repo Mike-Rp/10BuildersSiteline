@@ -1,5 +1,5 @@
-import { blockingReviews, verifiedComplete } from "./lifecycle.utility.js";
-import { readChecklist, recordPhaseHistory } from "./phase.utility.js";
+import { blockedByReviews, blockingReviews, verifiedComplete } from "./lifecycle.utility.js";
+import { readChecklist, readChecklistSummaries, recordPhaseHistory } from "./phase.utility.js";
 
 // Caller owns the project row lock. Expected blockers return without undoing
 // the activity approval; unexpected database failures still roll back atomically.
@@ -26,6 +26,75 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   const upcoming = await readChecklist(db, project.id, phase.project_stage_id, { initialize });
   if (upcoming.verified.percentage === null) return { ...blocked("Configure valid required scope for the next phase before advancing.", "next_scope"), state: initialize || upcoming.items.length ? "blocked" : "unknown" };
   return { state: "ready", phase, upcoming };
+}
+
+// Read-only batch form of assessPhaseHandoff (never initializes checklists) for the Administrator
+// dashboard: the same decisions in the same order, with one query per step instead of per project.
+// Returns Map<projectId, { state, reason?, reasonCode? }>.
+export async function assessPhaseHandoffs(db, projects) {
+  const results = new Map();
+  const active = [];
+  for (const project of projects) {
+    if (project.lifecycle_status === "active") active.push(project);
+    else results.set(project.id, { state: "inactive", advanced: false });
+  }
+  if (!active.length) return results;
+  const blocked = (reason, reasonCode, code = 422) => ({ state: "blocked", advanced: false, reason, reasonCode, code });
+
+  const current = await readChecklistSummaries(db, active.map(project => [project.id, project.current_stage_id]));
+  const complete = [];
+  for (const project of active) {
+    const { verified } = current.get(`${project.id}:${project.current_stage_id}`);
+    if (verifiedComplete(verified)) complete.push(project);
+    else results.set(project.id, { state: verified.percentage === null ? "unknown" : "incomplete", advanced: false,
+      reason: "All required checklist items must be approved before advancing.", code: 422 });
+  }
+  if (!complete.length) return results;
+
+  const nextRows = (await db.query(
+    `SELECT DISTINCT ON (k.project_id) k.project_id, s.id AS project_stage_id, t.status, t.spm_user_id
+       FROM unnest($1::uuid[], $2::int[]) AS k(project_id, stage_id)
+       JOIN projects p ON p.id=k.project_id
+       JOIN project_type_stages w ON w.project_type_id=p.project_type_id AND w.sort_order >
+         (SELECT sort_order FROM project_type_stages WHERE project_type_id=p.project_type_id AND project_stage_id=k.stage_id)
+       JOIN project_stages s ON s.id=w.project_stage_id
+       LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=s.id
+      ORDER BY k.project_id, w.sort_order`,
+    [complete.map(project => project.id), complete.map(project => project.current_stage_id)])).rows;
+  const next = new Map(nextRows.map(row => [row.project_id, row]));
+  const withNext = [];
+  for (const project of complete) {
+    if (next.has(project.id)) withNext.push(project);
+    else results.set(project.id, { state: "final", advanced: false,
+      reason: "This is the project's final assigned phase. Existing completion checks apply.", code: 409 });
+  }
+  if (!withNext.length) return results;
+
+  const reviewing = await blockedByReviews(db, withNext.map(project => project.id));
+  const owners = new Set((await db.query(
+    `SELECT DISTINCT k.project_id FROM unnest($1::uuid[], $2::int[]) AS k(project_id, stage_id)
+       JOIN project_phase_team t ON t.project_id=k.project_id AND t.project_stage_id=k.stage_id
+      WHERE t.status='confirmed' AND t.spm_user_id IS NOT NULL`,
+    [withNext.map(project => project.id), withNext.map(project => project.current_stage_id)])).rows.map(row => row.project_id));
+  const upcomingProjects = [];
+  for (const project of withNext) {
+    const phase = next.get(project.id);
+    if (reviewing.has(project.id)) results.set(project.id, blocked("Resolve pending rework, progress and subcontractor reviews before advancing this phase.", "pending_reviews", 409));
+    else if (!owners.has(project.id)) results.set(project.id, blocked("The current phase SPM must confirm their assignment before handoff.", "current_assignment"));
+    else if (phase.status !== "confirmed" || !phase.spm_user_id) results.set(project.id, blocked("The next phase SPM must confirm their assignment.", "next_assignment"));
+    else upcomingProjects.push(project);
+  }
+  if (!upcomingProjects.length) return results;
+
+  const upcoming = await readChecklistSummaries(db, upcomingProjects.map(project => [project.id, next.get(project.id).project_stage_id]));
+  for (const project of upcomingProjects) {
+    const phase = next.get(project.id);
+    const summary = upcoming.get(`${project.id}:${phase.project_stage_id}`);
+    results.set(project.id, summary.verified.percentage === null
+      ? { ...blocked("Configure valid required scope for the next phase before advancing.", "next_scope"), state: summary.itemCount ? "blocked" : "unknown" }
+      : { state: "ready", phase });
+  }
+  return results;
 }
 
 export async function transitionPhase(db, project, actorId) {

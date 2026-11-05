@@ -90,6 +90,8 @@ export function mapAccount(
     name: a.full_name,
     role,
     email: a.email ?? "",
+    idNumber: a.id_number ?? undefined,
+    workEmail: a.work_email ?? undefined,
     phone: a.phone ?? "",
     scope,
     projectTypes: types,

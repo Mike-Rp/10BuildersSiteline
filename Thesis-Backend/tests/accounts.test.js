@@ -33,15 +33,21 @@ async function query(sql,args=[]) {
   if(sql.startsWith("SELECT id,client_name,lifecycle_status FROM projects")) return rows(state.projects.filter(p=>p.id===args[0]));
   if(sql.startsWith("SELECT id FROM projects")) return rows(state.projects.filter(p=>args[0].includes(p.id)));
   if(sql.startsWith("SELECT id, code FROM disciplines")) return rows(args[0].filter(code=>["Civil","Structural"].includes(code)).map((code,i)=>({id:i+1,code})));
+  if(sql.startsWith("SELECT '10B-'")) {
+    state.staffSeq=(state.staffSeq??0)+1;
+    return rows([{id_number:"10B-"+String(state.staffSeq).padStart(5,"0")}]);
+  }
+  if(sql.startsWith("SELECT u.id, u.work_email")) return rows(state.users.filter(u=>u.id===args[0]).map(u=>({id:u.id,work_email:u.work_email,role:u.role})));
   if(sql.startsWith("SELECT u.id")) {
     return rows(state.users.filter(u=>u.email.toLowerCase()===args[0]));
   }
   if(sql.startsWith("INSERT INTO users ")) {
     if(state.users.some(u=>u.email.toLowerCase()===args[2])) throw Object.assign(new Error("Duplicate email"),{code:"23505"});
     const u={id:args[0],full_name:args[1],email:args[2],phone:args[3],password_hash:args[4],
-      role_id:args[5],role:Object.keys(roles).find(role=>roles[role]===args[5]),status:"invited",temp_password_issued:true};
+      role_id:args[5],role:Object.keys(roles).find(role=>roles[role]===args[5]),status:"invited",temp_password_issued:true,
+      id_number:args[7],work_email:args[8]};
     state.users.push(u);
-    return rows([{id:u.id,full_name:u.full_name,email:u.email,phone:u.phone,status:u.status,date_added:"2026-10-09"}]);
+    return rows([{id:u.id,full_name:u.full_name,email:u.email,phone:u.phone,status:u.status,id_number:u.id_number,work_email:u.work_email,date_added:"2026-10-09"}]);
   }
   if(sql.startsWith("DELETE FROM user_discipline_scopes")) return rows([]);
   if(sql.startsWith("INSERT INTO user_discipline_scopes")) return rows([{}]);
@@ -128,12 +134,67 @@ test("only Admin can list or create team accounts",async()=>{
 });
 test("Admin accounts are created without scope and start Invited",async()=>{
   setup();
-  const res=response();await accounts.createAccount(request({full_name:"New Admin",email:"new@example.test",role:"admin",password:"ExamplePass123"}),res);
+  const res=response();await accounts.createAccount(request({first_name:"New",last_name:"Admin",role:"admin",password:"ExamplePass123"}),res);
   assert.equal(res.statusCode,201);
   assert.equal(res.body.data.status,"invited");
   assert.equal(res.body.data.temp_password,"ExamplePass123");
   assert.equal(await bcrypt.compare("ExamplePass123",state.users[0].password_hash),true);
   assert.equal(res.body.data.password_hash,undefined);
+});
+test("staff get a staff ID and a work email built from it; a typed email is ignored",async()=>{
+  setup();
+  const res=response();
+  await accounts.createAccount(request({first_name:"Renz",middle_name:"Cruz",last_name:"Villaverde",role:"admin",email:"typed@example.test"}),res);
+  assert.equal(res.statusCode,201);
+  assert.equal(res.body.data.id_number,"10B-00001");
+  assert.equal(res.body.data.email,"r.villaverde.00001@10builders.com");
+  assert.equal(res.body.data.work_email,"r.villaverde.00001@10builders.com");
+  assert.equal(res.body.data.full_name,"Renz Cruz Villaverde");
+  assert.equal(state.users.some(u=>u.email==="typed@example.test"),false);
+  const second=response();
+  await accounts.createAccount(request({first_name:"Renz",last_name:"Villaverde",role:"admin"}),second);
+  assert.equal(second.body.data.email,"r.villaverde.00002@10builders.com");
+});
+test("a suffix goes in the full name but never in the email, whether typed or in last_name",async()=>{
+  setup();
+  const typed=response();
+  await accounts.createAccount(request({first_name:"Juan",last_name:"Santos",suffix:"jr",role:"opm"}),typed);
+  assert.equal(typed.body.data.full_name,"Juan Santos Jr.");
+  assert.equal(typed.body.data.email,"j.santos.00001@10builders.com");
+  const inLast=response();
+  await accounts.createAccount(request({first_name:"Ana",last_name:"Dela Cruz, III",role:"spm"}),inLast);
+  assert.equal(inLast.body.data.full_name,"Ana Dela Cruz III");
+  assert.equal(inLast.body.data.email,"a.delacruz.00002@10builders.com");
+  const bad=response();
+  await accounts.createAccount(request({first_name:"Ben",last_name:"Tan",suffix:"Esq.",role:"admin"}),bad);
+  assert.equal(bad.statusCode,400);
+});
+test("staff accounts need a first and last name",async()=>{
+  for(const body of [{last_name:"Admin"},{first_name:"New"},{full_name:"New Admin",email:"new@example.test"}]) {
+    setup();const res=response();
+    await accounts.createAccount(request({...body,role:"admin"}),res);
+    assert.equal(res.statusCode,400);
+    assert.equal(state.users.length,0);
+  }
+});
+test("a generated work email cannot be edited",async()=>{
+  setup();
+  const created=response();
+  await accounts.createAccount(request({first_name:"Renz",last_name:"Villaverde",role:"admin"}),created);
+  const id=created.body.data.id;
+  const req={...request({email:"someone.else@example.test"}),params:{id}};
+  const res=response();await accounts.updateAccount(req,res);
+  assert.equal(res.statusCode,422);
+  assert.match(res.body.message??res.body.error??JSON.stringify(res.body),/work email/);
+});
+test("clients keep the email they are given and still get a staff-format ID number",async()=>{
+  setup();
+  const res=response();
+  await accounts.createAccount(request({full_name:"Maria Santos",email:"Maria@Example.test",role:"client"}),res);
+  assert.equal(res.statusCode,201);
+  assert.equal(res.body.data.email,"maria@example.test");
+  assert.equal(res.body.data.work_email,null);
+  assert.equal(res.body.data.id_number,"10B-00001");
 });
 test("OPM maximum two specializations and SPM maximum three disciplines are enforced",async()=>{
   for(const body of [
@@ -141,14 +202,14 @@ test("OPM maximum two specializations and SPM maximum three disciplines are enfo
     {role:"spm",scope:{disciplines:["A","B","C","D"]}},
   ]) {
     setup();const res=response();
-    await accounts.createAccount(request({...body,full_name:"Engineer",email:"e@example.test"}),res);
+    await accounts.createAccount(request({...body,first_name:"Eng",last_name:"Ineer"}),res);
     assert.equal(res.statusCode,422);
     assert.equal(state.users.length,0);
   }
 });
 test("unknown scope values roll back the newly inserted user",async()=>{
   setup();const res=response();
-  await accounts.createAccount(request({full_name:"Engineer",email:"e@example.test",role:"spm",scope:{disciplines:["Unknown"]}}),res);
+  await accounts.createAccount(request({first_name:"Eng",last_name:"Ineer",role:"spm",scope:{disciplines:["Unknown"]}}),res);
   assert.equal(res.statusCode,400);
   assert.equal(state.users.length,0);
 });

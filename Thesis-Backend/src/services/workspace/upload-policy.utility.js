@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { HttpError } from "../../common/utilities/access.utility.js";
 import { fileType } from "../progress/phase-upload.utility.js";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "../../domain/upload-limits.js";
 
 export async function validateUpload(file, purpose = "document") {
     if (!["document", "manpower"].includes(purpose))
@@ -8,9 +9,9 @@ export async function validateUpload(file, purpose = "document") {
     const name = file.originalname || file.original_name || "";
     const buffer = file.buffer || file.content;
     if (!buffer?.length) throw new HttpError(400, "A non-empty file is required.");
-    const limit = purpose === "manpower" ? 15 : 10;
-    if (buffer.length > limit * 1024 * 1024)
-        throw new HttpError(400, `The file must be ${limit} MB or smaller.`);
+    const limit = MAX_UPLOAD_BYTES;
+    if (buffer.length > limit)
+        throw new HttpError(400, UPLOAD_TOO_LARGE_MESSAGE);
     if (purpose === "document") return fileType({ buffer, originalname: name });
     if (!/\.(xlsx|xls)$/i.test(name))
         throw new HttpError(400, "Manpower lists require Excel files (.xlsx or .xls). CSV is not supported.");

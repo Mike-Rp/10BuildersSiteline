@@ -14,6 +14,8 @@ import { navigationAttention } from "./navigation-attention"
 import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
+import { DelayedBanner, ScheduleDetails } from "./ScheduleBadge"
+import { delayedProjects } from "./schedule-status"
 // @refresh reset
 import {
   useEffect,
@@ -60,6 +62,7 @@ import DocumentRepository, {
 } from "./DocumentRepository"
 import { projectDocumentIndexFor } from "./project-document-index"
 import {
+  companyCommitments,
   dateLabel,
   DOC_LABELS,
   initials,
@@ -79,6 +82,7 @@ import {
   type Event as WorkspaceEvent,
   type Project,
   type State,
+  UPLOAD_LIMIT_LABEL,
 } from "./model"
 import {
   allocationReady,
@@ -209,6 +213,8 @@ export default function RoleWorkspace({
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
   const [page, setPage] = useState("Dashboard")
+  // Set only by the Office PM's "Delayed projects" row; any other navigation clears it.
+  const [siteDelayed, setSiteDelayed] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickedId, setPickedId] = useState(
     () =>
@@ -444,6 +450,7 @@ export default function RoleWorkspace({
   }
   function navigate(next: string) {
     setPage(normalizeWorkspacePage(next))
+    setSiteDelayed(false)
     setConfirmTab("mine")
     setQuery("")
     setError("")
@@ -729,6 +736,23 @@ export default function RoleWorkspace({
           <Icon name="shield" size={24} /><div><strong>{expiryDays < 0 ? "Your professional license has expired" : "Your professional license is expiring soon"}</strong>
           <p>License expiry: {actor.expiry}. {expiryDays < 0 ? "Your license has expired." : expiryDays === 0 ? "Your license expires today." : expiryDays + " days remaining."} Contact your administrator to renew your license and keep your account eligible for new assignments.</p></div>
         </div>}
+        {isOpm && delayedProjects(allActive).length > 0 && (
+          <button
+            type="button"
+            className="schedule-row"
+            onClick={() => {
+              navigate("Active sites")
+              setSiteDelayed(true)
+            }}
+          >
+            <Icon name="alert" size={20} />
+            <span>
+              <strong>Delayed projects ({delayedProjects(allActive).length})</strong>
+              {" · "}Past their target completion date. Open Active Sites to review them.
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+        )}
         <div className="metrics-grid">
           {[
             {
@@ -988,7 +1012,7 @@ export default function RoleWorkspace({
                       <p>
                         {doc?.uploaded
                           ? `${doc.name} · confirmed ${dateLabel(doc.date)}`
-                          : "Required · PDF, JPG, JPEG or PNG · Up to 10 MB"}
+                          : `Required · PDF, JPG, JPEG or PNG · Up to ${UPLOAD_LIMIT_LABEL}`}
                       </p>
                     </div>
                     {doc?.uploaded ? (
@@ -1443,6 +1467,7 @@ export default function RoleWorkspace({
             {statusLabel}
           </Badge>
         </div>
+        {!isOpm && <DelayedBanner project={p} />}
         <dl className="assignment-facts">
           <div>
             <dt>Assigned</dt>
@@ -1889,7 +1914,7 @@ export default function RoleWorkspace({
                 <div>
                   <strong>General photo / report</strong>
                   <p>
-                    Optional supporting evidence · PDF, JPG or PNG · 10 MB
+                    Optional supporting evidence · PDF, JPG or PNG · {UPLOAD_LIMIT_LABEL}
                     maximum
                   </p>
                   {evidence && (
@@ -2068,7 +2093,7 @@ export default function RoleWorkspace({
         {header(
           "Active sites",
         )}
-        <ActiveSites key={actor.id} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
+        <ActiveSites key={`${actor.id}:${siteDelayed}`} initialDelayed={siteDelayed} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),
@@ -2087,7 +2112,10 @@ export default function RoleWorkspace({
             }}>Open phase workspace</Button> : null
           }} />
         {!isOpm && picked && active.some(p => p.id === picked.id) && <div className="as-site-workspace" id="active-phase-workspace">
-          <Panel title={`${picked.name} - Phase workspace`}>{progressForm(picked)}</Panel>
+          <Panel title={`${picked.name} - Phase workspace`}>
+            <DelayedBanner project={picked} />
+            {progressForm(picked)}
+          </Panel>
         </div>}
       </>
     )
@@ -2832,7 +2860,7 @@ export default function RoleWorkspace({
               <div className="company-meta">
                 <span>
                   <Icon name="users" size={17} />
-                  {company.manpowerCount} available manpower
+                  {company.manpowerCount} names on manpower list
                 </span>
                 <span>
                   <Icon name="building" size={17} />
@@ -3136,6 +3164,7 @@ export default function RoleWorkspace({
           </div>
           <Status value={p.status} />
         </div>
+        {isOpm ? <ScheduleDetails project={p} /> : <DelayedBanner project={p} />}
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
@@ -3390,6 +3419,7 @@ export default function RoleWorkspace({
     )
   }
   function companyDetail(c: Company) {
+    const commitments = companyCommitments(state, c)
     return (
       <>
         <div className="detail-hero">
@@ -3414,18 +3444,26 @@ export default function RoleWorkspace({
             <strong>{c.availability}</strong>
           </div>
           <div>
-            <small>AVAILABLE MANPOWER</small>
+            <small>NAMES ON MANPOWER LIST</small>
             <strong>{c.manpowerCount}</strong>
           </div>
         </div>
         <section className="detail-section">
           <h3>Active project commitments</h3>
-          <div className="tag-list subsection">
-            {c.activeProjectIds.map((projectId) => (
-              <span key={projectId}>{selectedProjectName(projectId)}</span>
-            ))}
-          </div>
-          {!c.activeProjectIds.length && (
+          {commitments.count ? (
+            <>
+              <p className="role-muted subsection">
+                {commitments.count} active project commitments
+              </p>
+              {commitments.visible.length > 0 && (
+                <div className="tag-list subsection">
+                  {commitments.visible.map((p) => (
+                    <span key={p.id}>{p.name}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
             <Empty title="No active project commitments" />
           )}
         </section>

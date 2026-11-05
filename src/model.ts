@@ -1,4 +1,7 @@
 import type { LicenseData } from "./licenseTypes.ts"
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB, UPLOAD_TOO_LARGE_MESSAGE } from "../Thesis-Backend/src/domain/upload-limits.js"
+export { MAX_UPLOAD_BYTES }
+export const UPLOAD_LIMIT_LABEL = `${MAX_UPLOAD_MB} MB`
 export const PHASES = [
   "Mobilization",
   "Design",
@@ -193,6 +196,11 @@ export type Account = {
   projectTypes: string[]
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
+  idNumber?: string // staff ID like 10B-00012, assigned by the database
+  workEmail?: string // generated 10builders.com address; fixed once created
+  firstName?: string // name parts are sent when an account is created; the database stores full_name
+  middleName?: string
+  suffix?: string
   lastName?: string
   license: string
   expiry: string
@@ -590,12 +598,13 @@ export function validateFile(file: File, spreadsheet = false) {
   const extensions = spreadsheet
     ? ["xlsx", "xls"]
     : ["pdf", "jpg", "jpeg", "png"]
-  const max = spreadsheet ? 15 : 10
   if (!file.size) return "Choose a non-empty file."
   if (!extensions.includes(file.name.split(".").pop()?.toLowerCase() || ""))
     return `Use ${extensions.join(", ").toUpperCase()} files only.`
-  if (file.size > max * 1024 * 1024)
-    return `The file must be ${max} MB or smaller.`
+  if (file.size > MAX_UPLOAD_BYTES)
+    return /\.pdf$/i.test(file.name)
+      ? `${UPLOAD_TOO_LARGE_MESSAGE} For a scanned PDF, rescan at 150–200 DPI or compress it.`
+      : UPLOAD_TOO_LARGE_MESSAGE
   return ""
 }
 // Whole days from the viewer's LOCAL today to a YYYY-MM-DD date (negative once it has passed).
@@ -717,6 +726,15 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     workload(state, a.id, excluding) < state.rules.cap &&
     !(a.cooldown && a.cooldown > Date.now())
   )
+}
+// The count covers every commitment; only projects the viewer can see are named.
+export function companyCommitments(state: State, company: Company) {
+  return {
+    count: company.activeProjectIds.length,
+    visible: company.activeProjectIds.flatMap((id) =>
+      state.projects.filter((p) => p.id === id),
+    ),
+  }
 }
 export function opmCandidates(
   state: State,
@@ -841,7 +859,7 @@ export function emptyState(): State {
     projects: [],
     companies: [],
     events: [],
-    rules: { grace: 30, cap: 2, response: 3, idle: 15 },
+    rules: { grace: 30, cap: 3, response: 3, idle: 15 },
     muted: [],
   }
 }

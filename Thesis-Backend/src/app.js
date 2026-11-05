@@ -24,6 +24,7 @@ import licenseRoutes from "./services/licenses/routes.js";
 import cronRoutes from "./services/cron/routes.js";
 
 import types from 'pg-types';
+import { UPLOAD_TOO_LARGE_MESSAGE } from './domain/upload-limits.js';
  
 types.setTypeParser(1082, (val) => val);
 const apiURL = process.env.API_URL || '/api/v1';
@@ -107,7 +108,7 @@ app.use(`${apiURL}/activity-logs`, activityLogRoutes);
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   if (error?.name === 'MulterError') {
-    return sendError(res, error.code === 'LIMIT_FILE_SIZE' ? 'File is too large.' : 'Invalid upload.', 400);
+    return sendError(res, error.code === 'LIMIT_FILE_SIZE' ? UPLOAD_TOO_LARGE_MESSAGE : 'Invalid upload.', 400);
   }
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500) {
     return sendError(res, error.status === 413 ? 'Request body too large.' : error.message, error.status);

@@ -15,6 +15,7 @@ import {
   type Doc,
   type Project,
   type State,
+  UPLOAD_LIMIT_LABEL,
 } from "./model"
 import {
   activationChecks,
@@ -1003,7 +1004,7 @@ export default function LeadSubcontractorPanel({
               />
             )}
             <small className="role-muted">
-              PDF, JPG, JPEG or PNG · Maximum 10 MB · File preview and explicit
+              PDF, JPG, JPEG or PNG · Maximum {UPLOAD_LIMIT_LABEL} · File preview and explicit
               confirmation required
             </small>
           </>

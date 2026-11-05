@@ -2,7 +2,8 @@
 // enforced by the backend; these components only show the state and send the requests.
 import { useEffect, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
-import { dateLabel, daysUntil, licenseExpiresDuringProject, validateFile } from "./model"
+import { UPLOAD_LIMIT_LABEL, dateLabel, daysUntil, licenseExpiresDuringProject, validateFile } from "./model"
+import { fitImageToLimit } from "./imageFit"
 import { LICENSE_PAUSED_MESSAGE } from "./workflows"
 import * as licenses from "./api/licenses"
 import type {
@@ -133,8 +134,11 @@ export function RenewalUploadDialog({
         <Field label="New expiry date *" hint="Pick the date from the calendar.">
           <input type="date" min={min} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
         </Field>
-        <Field label="Renewed license (PDF, JPG or PNG, up to 10 MB) *" wide>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} />
+        <Field label={`Renewed license (PDF, JPG or PNG, up to ${UPLOAD_LIMIT_LABEL}) *`} wide>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={async (e) => {
+            const picked = e.target.files?.[0]
+            setFile(picked && (await fitImageToLimit(picked)))
+          }} />
         </Field>
         <p className="license-note wide">Only you and Administrators can see this document.</p>
         {error && (

@@ -4,11 +4,11 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { execute } from './query.utility.js';
 import { HttpError, isUuid } from './access.utility.js';
+import { MAX_UPLOAD_BYTES } from '../../domain/upload-limits.js';
 
 const md5 = data => crypto.createHash('md5').update(data).digest('hex');
 
 const UPLOAD_ROOT = './uploads';
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 const DOC_TYPE_PATTERN = /^[a-z0-9_-]{1,40}$/;
 

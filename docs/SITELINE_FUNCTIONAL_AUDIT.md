@@ -773,7 +773,7 @@ No explicit activity calls verified for rule changes, notification preference/re
 
 - [ ] Verify all four roles, separate Lead/nonlead SPMs and multiple projects/accounts.
 - [ ] Check unauthorized direct handler/API paths, not just hidden buttons.
-- [ ] Check missing/invalid files, 10/15MB boundary, Back/Retry/same-file reselection.
+- [ ] Check missing/invalid files, 4 MB boundary, Back/Retry/same-file reselection.
 - [ ] Check decline/reassignment, no eligible candidates, invited/suspended/expired users.
 - [ ] Check every final activation prerequisite and client suspended/missing recovery.
 - [ ] Check accepted subcontractor/phase lock and stale-version actions.

@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { requireLicenseAdmin, listLicenseWarnings, renewPrcLicense } from './prc-monitor.controller.js';
+import { MAX_UPLOAD_BYTES } from '../../domain/upload-limits.js';
 
 const router = Router();
 const directory = path.resolve('uploads', 'prc-licenses');
@@ -17,7 +18,7 @@ const upload = multer({
       callback(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
     }
   }),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter(req, file, callback) {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = (ext === '.pdf' && file.mimetype === 'application/pdf') ||

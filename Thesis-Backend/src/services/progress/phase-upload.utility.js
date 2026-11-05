@@ -1,14 +1,15 @@
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import { HttpError, handleError } from "../../common/utilities/access.utility.js";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "../../domain/upload-limits.js";
 
 const parser = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 16, fieldSize: 32768 },
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 16, fieldSize: 32768 },
 }).single("file");
 
 export const phaseUpload = (req, res, next) => parser(req, res, error => {
-  if (error) return handleError(res, new HttpError(400, error.message));
+  if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? UPLOAD_TOO_LARGE_MESSAGE : error.message));
   return next();
 });
 

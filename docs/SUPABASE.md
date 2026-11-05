@@ -33,7 +33,7 @@ Account creation and edits, client creation, license documents, intake submissio
 
 Project activation checks registered documents, confirmations and subcontractor consent. Directory allocation uses actual available worker rows and runs in one transaction. Project progress comes from approved required checklist items. Retired requests containing manually entered percentages are retained in the database and do not appear in the current review queue.
 
-Files are stored as database bytes and downloaded using the session token. Account documents are scoped to their account owner and administrators; project access and client visibility are checked on the server. General documents and evidence have a 10 MB limit; workforce spreadsheets have a 15 MB limit.
+Files are stored as database bytes and downloaded using the session token. Account documents are scoped to their account owner and administrators; project access and client visibility are checked on the server. Every upload (documents, evidence, photos and workforce spreadsheets) has one 4 MB limit, set in `Thesis-Backend/src/domain/upload-limits.js` and shared by the server and the browser. Oversized photos are shrunk in the browser before upload.
 
 ## Verification
 
@@ -60,7 +60,7 @@ Production always uses `/api/v1` on the website's own HTTPS domain and ignores `
 
 After deployment, open `https://10builderssiteline.vercel.app/api/v1/health`. A 200 response with `{"ok":true,"database":true}` confirms that both the function and database work. A JSON 503 response means the function is running but database configuration or connectivity needs attention. A Vercel 404 means the API function was not deployed.
 
-Vercel Functions limit request and response payloads to 4.5 MB, below this app's existing 10-15 MB upload limits. Larger files require a separate API host or a direct storage upload design. Legacy disk-backed upload endpoints also require adapting storage before using them on serverless hosting; the integrated workspace endpoints store file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
+Vercel Functions limit request and response payloads to 4.5 MB, which is why the app's upload limit is 4 MB. Larger files require a separate API host or a direct storage upload design. Legacy disk-backed upload endpoints also require adapting storage before using them on serverless hosting; the integrated workspace endpoints store file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
 
 ## Project-type phases
 

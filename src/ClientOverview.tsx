@@ -3,6 +3,8 @@ import type { ClientProjectView } from "./client-access"
 import { dateLabel } from "./model"
 import { calendarDay } from "./project-progress"
 import PhaseTimeline from "./PhaseTimeline"
+import ScheduleBadge from "./ScheduleBadge"
+import { scheduleStatus } from "./schedule-status"
 import InfoPopover from "./InfoPopover"
 import { Badge, Button, Icon } from "./ui"
 import "./client-overview.css"
@@ -46,6 +48,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
           {validProgress && <progress aria-label="Current phase progress" value={project.progress} max={100} />}
         </div>
         <div><span>Target completion</span><div className="co-target"><strong>{endSet ? dateLabel(project.end!) : "Not set"}</strong>
+          <ScheduleBadge status={scheduleStatus(project)} withDays />
           {!endSet && <InfoPopover title="Target completion date" label="Help: target completion date"><p>A valid target end date has not been recorded. Contact your project team for the planned completion date.</p></InfoPopover>}
         </div></div>
       </div>

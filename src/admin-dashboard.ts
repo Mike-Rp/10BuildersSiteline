@@ -1,11 +1,12 @@
 import { dateLabel, licenseState, type State } from "./model.ts"
 import { hasPendingSiteReview } from "./active-sites-review.ts"
+import { delayedProjects } from "./schedule-status.ts"
 
 export type DashboardCategory = "requests" | "licenses" | "updates" | "intake"
 export type DashboardItem = {
   key: string
   id: string
-  kind: "company" | "account" | "project" | "intake"
+  kind: "company" | "account" | "project" | "intake" | "schedule"
   category: DashboardCategory
   title: string
   detail: string
@@ -15,7 +16,8 @@ export type DashboardItem = {
 }
 
 // Uses only the Administrator's existing authorized workspace; no additional reads.
-export function adminDashboardOverview(state: State) {
+export function adminDashboardOverview(state: State, today?: string) {
+  const delayed = delayedProjects(state.projects, today)
   const intake = state.projects.filter(p => ["pending", "draft", "changes_requested"].includes(p.status))
   const blockers = state.projects.filter(p => p.status === "active" && p.handoffReadiness?.state === "blocked" &&
     ["pending_reviews", "current_assignment", "next_assignment", "next_scope"].includes(p.handoffReadiness.reasonCode || "") && p.handoffReadiness.reason)
@@ -28,6 +30,12 @@ export function adminDashboardOverview(state: State) {
   const items: DashboardItem[] = [
     ...blockers.map(p => ({ key: `project:${p.id}`, id: p.id, kind: "project" as const, category: "updates" as const,
       title: p.name, detail: p.handoffReadiness!.reason!, label: "Handoff blocked", icon: "alert", blocker: true })),
+    // One row that opens the Active Sites list filtered to delayed projects.
+    ...(delayed.length ? [{
+      key: "delayed-projects", id: "delayed", kind: "schedule" as const, category: "updates" as const,
+      title: `Delayed projects (${delayed.length})`,
+      detail: "Past their target completion date. Open Active Sites to review them.", label: "Delayed", icon: "calendar",
+    }] : []),
     ...state.companies.filter(c => c.status === "pending").map(c => ({
       key: `company:${c.id}`, id: c.id, kind: "company" as const, category: "requests" as const,
       title: c.name, detail: "Subcontractor request awaiting approval", label: "Request", icon: "shield",

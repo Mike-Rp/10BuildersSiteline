@@ -48,29 +48,29 @@ test("registered document visibility fails closed for internal agreements and bu
 })
 test("upload presets preserve exact size limits and case-insensitive extensions", () => {
   assert.equal(
-    validateFile(new File([new Uint8Array(10 * 1024 * 1024)], "contract.PDF")),
+    validateFile(new File([new Uint8Array(4 * 1024 * 1024)], "contract.PDF")),
     "",
   )
   assert.match(
     validateFile(
-      new File([new Uint8Array(10 * 1024 * 1024 + 1)], "contract.pdf"),
+      new File([new Uint8Array(4 * 1024 * 1024 + 1)], "contract.pdf"),
     ),
-    /10 MB/,
+    /4 MB/,
   )
   assert.match(validateFile(new File(["bad"], "contract.exe")), /PDF/)
   assert.equal(
     validateFile(
-      new File([new Uint8Array(15 * 1024 * 1024)], "crew.XLSX"),
+      new File([new Uint8Array(4 * 1024 * 1024)], "crew.XLSX"),
       true,
     ),
     "",
   )
   assert.match(
     validateFile(
-      new File([new Uint8Array(15 * 1024 * 1024 + 1)], "crew.xls"),
+      new File([new Uint8Array(4 * 1024 * 1024 + 1)], "crew.xls"),
       true,
     ),
-    /15 MB/,
+    /4 MB/,
   )
 })
 test("account email uniqueness is case-insensitive and scope limits are enforced", () => {
@@ -115,6 +115,12 @@ test("active workload counts project ownership once, excluding historical projec
 test("Office PM recommendations honor capacity, suspension, cooldown and exclusion", () => {
   const state = initialState()
   assert.equal(opmCandidates(state, "Residential")[0].id, "a2")
+  // a3 has 2 active projects: still a candidate under the default cap of 3, gone at 3.
+  assert.equal(state.rules.cap, 3)
+  assert.deepEqual(opmCandidates(state, "Residential", "", ["a2"]).map((a) => a.id), ["a3"])
+  const a3Project = state.projects.find((p) => p.opmId === "a3" && p.status === "active")
+  state.projects.push({ ...a3Project, id: "p-third" })
+  assert.equal(workload(state, "a3"), 3)
   assert.equal(opmCandidates(state, "Residential", "", ["a2"]).length, 0)
   state.accounts[1].cooldown = Date.now() + 86400000
   assert.equal(opmCandidates(state, "Residential").length, 0)
@@ -272,4 +278,8 @@ test("license grace states are based on current date rather than frozen demo dat
     new Date(Date.now() - d * 86400000).toISOString().slice(0, 10)
   assert.equal(licenseState({ expiry: daysAgo(2) }, 7), "Expired")
   assert.equal(licenseState({ expiry: daysAgo(20) }, 7), "Grace expired")
+})
+test("a scanned PDF over the limit is told how to shrink it; photos are shrunk instead", () => {
+  assert.match(validateFile(new File([new Uint8Array(4 * 1024 * 1024 + 1)], "scan.pdf")), /rescan|compress/i)
+  assert.doesNotMatch(validateFile(new File([new Uint8Array(4 * 1024 * 1024 + 1)], "photo.jpg")), /rescan/i)
 })

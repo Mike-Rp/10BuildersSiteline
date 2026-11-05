@@ -22,7 +22,7 @@ test("documents accept PDF/PNG/JPG/JPEG, check content and reject Excel, CSV and
     await assert.rejects(validateUpload({originalname:name,buffer:Buffer.from("%PDF-1.4")}),/Supported files/)
   await assert.rejects(validateUpload({originalname:"report.png",buffer:Buffer.from("%PDF-1.4")}),/does not match/)
   assert.throws(()=>fileType({originalname:"photo.webp",buffer:Buffer.from("RIFFxxxxWEBP")}),/Supported files/)
-  await assert.rejects(validateUpload({originalname:"report.pdf",buffer:Buffer.alloc(10*1024*1024+1)}),/10 MB/)
+  await assert.rejects(validateUpload({originalname:"report.pdf",buffer:Buffer.alloc(4*1024*1024+1)}),/4 MB/)
 })
 
 test("Excel manpower lists accept real XLSX/XLS and cannot use document rules",async()=>{
@@ -36,7 +36,7 @@ test("Excel manpower lists accept real XLSX/XLS and cannot use document rules",a
     await assert.rejects(validateUpload({originalname:name,buffer:Buffer.from("test")},"manpower"),/Excel/)
   for(const name of ["crew.xlsx","crew.xls"])
     await assert.rejects(validateUpload({originalname:name,buffer:Buffer.from("renamed text")},"manpower"),/valid/)
-  await assert.rejects(validateUpload({originalname:"crew.xlsx",buffer:Buffer.alloc(15*1024*1024+1)},"manpower"),/15 MB/)
+  await assert.rejects(validateUpload({originalname:"crew.xlsx",buffer:Buffer.alloc(4*1024*1024+1)},"manpower"),/4 MB/)
   await assert.rejects(validateUpload({originalname:"crew.xlsx",buffer:workbook("xlsx")},"anything"),/purpose/)
 })
 

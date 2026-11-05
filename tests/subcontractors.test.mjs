@@ -10,6 +10,7 @@ import {
   subcontractorRecommendations,
   workflowFor,
 } from "../src/workflows.ts"
+import { companyCommitments } from "../src/model.ts"
 
 const NOW = Date.parse("2026-10-14T08:00:00Z")
 const project = (state) => state.projects.find((p) => p.id === "p4")
@@ -63,6 +64,16 @@ test("recommendations use company commitments and available manpower only", () =
   assert.equal("score" in meridian, false)
   assert.equal("coverage" in meridian, false)
   assert.ok(state.companies.every((company) => !("trade" in company)))
+})
+test("company commitments count every project but name only the ones the viewer can see", () => {
+  const state = initialState()
+  const visible = state.projects[0]
+  // A Site PM's state holds only their own projects; the other entry is a project they cannot see.
+  const company = { ...state.companies[0], activeProjectIds: [visible.id, "Another team's project"] }
+  const commitments = companyCommitments(state, company)
+  assert.equal(commitments.count, 2)
+  assert.deepEqual(commitments.visible.map((p) => p.name), [visible.name])
+  assert.deepEqual(companyCommitments(state, { ...company, activeProjectIds: [] }), { count: 0, visible: [] })
 })
 test("manpower document changes do not affect project-level recommendation ranking", () => {
   const state = initialState()

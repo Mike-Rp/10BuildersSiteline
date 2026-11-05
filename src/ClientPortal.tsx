@@ -1,4 +1,6 @@
 import ClientOverview from "./ClientOverview"
+import ScheduleBadge from "./ScheduleBadge"
+import { scheduleStatus } from "./schedule-status"
 import MonthlyReport from "./MonthlyReport"
 import { normalizeWorkspacePage } from "./adminNav"
 import ActiveSites from "./ActiveSites"
@@ -445,7 +447,7 @@ export default function ClientPortal({
         <div><dt>Floor area</dt><dd>{project.area} sqm</dd></div>
         <div><dt>Floors</dt><dd>{project.floors}</dd></div>
         <div><dt>Target start</dt><dd>{project.start ? dateLabel(project.start) : "Not set"}</dd></div>
-        <div><dt>Target completion</dt><dd>{project.end ? dateLabel(project.end) : "Not set"}</dd></div>
+        <div><dt>Target completion</dt><dd>{project.end ? dateLabel(project.end) : "Not set"} <ScheduleBadge status={scheduleStatus(project)} withDays /></dd></div>
       </dl>
       <Panel title="Project contacts">
         <div className="client-contacts">

@@ -15,15 +15,16 @@ import progress from "../progress/routes.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { sweepLicensesThrottled } from "../licenses/sweep.js";
 import { sweepLicenses, sweepLicensesIfDue } from "../accounts/license-sweep.utility.js";
+import { MAX_UPLOAD_BYTES, UPLOAD_TOO_LARGE_MESSAGE } from "../../domain/upload-limits.js";
 const router = Router();
 router.get("/projects/:id/monthly-report", monthlyReport);
 router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
     "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
-    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
+    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? UPLOAD_TOO_LARGE_MESSAGE : error.message));
     return next();
 });
 const codes = ["notice_to_proceed", "building_permit", "owner_contract", "registered_plans", "environmental_certificate", "budget_boq", "subcontractor_agreement"];

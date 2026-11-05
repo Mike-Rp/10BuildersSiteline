@@ -83,6 +83,38 @@ export async function readChecklist(client, projectId, stageId, { initialize = t
     pct: checklistPct(approved, required.length), items: result.rows };
 }
 
+// Read-only batch form of readChecklist for many [projectId, stageId] pairs in one query.
+// Returns Map<"projectId:stageId", { itemCount, verified }> using the same verified-progress rules.
+export async function readChecklistSummaries(client, pairs) {
+  const summaries = new Map();
+  if (!pairs.length) return summaries;
+  const result = await client.query(
+    `SELECT k.project_id, k.stage_id, i.id, i.required, i.weight,
+            CASE WHEN e.status='rejected' AND e.rework_request_id IS NOT NULL THEN 'rework_required' ELSE COALESCE(e.status,'missing') END AS status,
+            e.reviewed_by, e.reviewed_at
+       FROM unnest($1::uuid[], $2::int[]) AS k(project_id, stage_id)
+       JOIN project_phase_checklist_items i ON i.project_id = k.project_id AND i.project_stage_id = k.stage_id
+       LEFT JOIN LATERAL (
+         SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1
+       ) e ON true
+      ORDER BY k.project_id, k.stage_id, i.sort_order, i.id`,
+    [pairs.map(([projectId]) => projectId), pairs.map(([, stageId]) => stageId)]);
+  const rowsByKey = new Map();
+  for (const row of result.rows) {
+    const key = `${row.project_id}:${row.stage_id}`;
+    rowsByKey.set(key, [...(rowsByKey.get(key) || []), row]);
+  }
+  for (const [projectId, stageId] of pairs) {
+    const key = `${projectId}:${stageId}`;
+    const rows = rowsByKey.get(key) || [];
+    summaries.set(key, { itemCount: rows.length, verified: phaseProgress({ id: String(stageId),
+      configured: rows.some(item => item.required),
+      activities: rows.map(item => ({ id: String(item.id), required: item.required, weight: item.weight,
+        status: item.status, approvalValid: !!item.reviewed_by && !!item.reviewed_at })) }) });
+  }
+  return summaries;
+}
+
 export async function recordPhaseHistory(client, project, pct, note, userId, options = {}) {
   const { isIssue = false, issueCategories = [], entryType = "update", updateProject = true } = options;
   const result = await client.query(

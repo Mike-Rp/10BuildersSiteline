@@ -26,7 +26,7 @@ no database migration.** It changes only backend code and `vercel.json`.
   the account status and the deleted flag (same rules as `getCurrentUser`). An
   expired session can no longer be renewed through `PUT /api/v1/auth`.
 - Upload folder names are limited to letters, digits, `_` and `-`; uploads accept
-  PDF, JPG and PNG only, up to 15 MB.
+  PDF, JPG and PNG only, up to 4 MB (Excel manpower lists, 4 MB).
 - `/api/v1/health` returns only `ok`/`database` again. The temporary block that
   returned the database host, user, password length and a password fingerprint
   is removed. **If a build containing that block was ever deployed, treat the

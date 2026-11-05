@@ -3,6 +3,9 @@ import type { VerifiedProgress } from "./project-progress"
 import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, phaseDefinitions, timelineStatus, type PhaseDefinition } from "./model"
 
+import ScheduleBadge from "./ScheduleBadge"
+import "./schedule-status.css"
+import { isDelayed, localToday, scheduleStatus } from "./schedule-status"
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
 export type SiteCard = {
@@ -27,6 +30,8 @@ export default function ActiveSites({
   renderActions,
   reviewAvailable = false,
   phaseDefinitionsByType,
+  initialDelayed = false,
+  today = localToday(),
 }: {
   projects: SiteCard[]
 
@@ -35,10 +40,15 @@ export default function ActiveSites({
   renderActions?: (id: string) => ReactNode
   reviewAvailable?: boolean
   phaseDefinitionsByType?: Record<string, PhaseDefinition[]>
+  // Opens the list already filtered to delayed projects (from a "Delayed projects" row).
+  initialDelayed?: boolean
+  // The user's local date; only tests pass it.
+  today?: string
 }) {
   const [query, setQuery] = useState("")
   const [type, setType] = useState("")
   const [phase, setPhase] = useState("")
+  const [delayedOnly, setDelayedOnly] = useState(initialDelayed)
   const [tab, setTab] = useState<"all" | "review">("all")
   const tabId = useId()
   const selectedTab = reviewAvailable ? tab : "all"
@@ -63,7 +73,8 @@ export default function ActiveSites({
               .toLocaleLowerCase()
               .includes(query.trim().toLocaleLowerCase()) &&
             (!type || p.type === type) &&
-            (!phase || p.phase.toLowerCase() === phase.toLowerCase()),
+            (!phase || p.phase.toLowerCase() === phase.toLowerCase()) &&
+            (!delayedOnly || isDelayed(p, today)),
         )
         .sort((a, b) => {
           if (sort === "progress")
@@ -77,8 +88,9 @@ export default function ActiveSites({
 
           return a.name.localeCompare(b.name)
         }),
-    [activeProjects, query, type, phase, selectedTab, sort],
+    [activeProjects, query, type, phase, selectedTab, sort, delayedOnly, today],
   )
+  const delayedCount = activeProjects.filter((p) => isDelayed(p, today)).length
 
   const pages = Math.max(1, Math.ceil(filtered.length / size))
 
@@ -119,6 +131,7 @@ export default function ActiveSites({
     setQuery("")
     setType("")
     setPhase("")
+    setDelayedOnly(false)
     setPage(1)
   }
 
@@ -220,6 +233,18 @@ export default function ActiveSites({
             <option value="end">Target date: earliest first</option>
           </select>
         </label>
+        <button
+          type="button"
+          className="as-delayed-filter"
+          aria-pressed={delayedOnly}
+          onClick={() => {
+            setDelayedOnly(!delayedOnly)
+            setPage(1)
+          }}
+        >
+          <Icon name="alert" size={16} />
+          Delayed ({delayedCount})
+        </button>
       </div>
       {recent.some((id) => activeProjects.some((p) => p.id === id)) && (
         <div className="as-recent">
@@ -259,7 +284,7 @@ export default function ActiveSites({
           <h2>{selectedTab === "review" ? "Projects awaiting review" : "All active projects"}</h2>
           <p role="status">{filtered.length ? `Showing ${(current - 1) * size + 1}-${Math.min(current * size, filtered.length)} of ${filtered.length} projects` : "0 projects"}</p>
         </div>
-        {(query || type || phase) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
+        {(query || type || phase || delayedOnly) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
       </div>
       <div className="as-grid">
         {visible.map((p) => (
@@ -268,6 +293,7 @@ export default function ActiveSites({
               <div className="as-card-heading">
                 <span className="as-type">{p.type}</span>
                 <div className="as-card-flags">
+                  <ScheduleBadge status={scheduleStatus(p, today)} withDays />
                   {reviewAvailable && p.needsReview === true && <span className="as-review" title="A progress update or site issue is awaiting Office PM review."><Icon name="alert" size={12} />Awaiting review</span>}
                 </div>
               </div>
@@ -312,10 +338,10 @@ export default function ActiveSites({
       {!visible.length && (
         <Empty
           title={
-            query || type || phase ? "No matching projects" : selectedTab === "review" ? "No projects awaiting review" : "No active sites yet"
+            query || type || phase || delayedOnly ? "No matching projects" : selectedTab === "review" ? "No projects awaiting review" : "No active sites yet"
           }
         >
-          {query || type || phase
+          {query || type || phase || delayedOnly
             ? "Try another name or clear the filters."
             : selectedTab === "review"
               ? "No pending progress updates or site issues in your authorized active projects."

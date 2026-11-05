@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    // Identifies this build so a workspace saved in the tab by another build is never shown (src/workspaceCache.ts).
+    define: {
+      __SITELINE_BUILD__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now())),
+    },
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,

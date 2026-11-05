@@ -2,9 +2,12 @@ import { phaseProgress, projectProgress } from "./project-progress.ts"
 import { standardActivities } from "../Thesis-Backend/src/domain/standard-phase-checklist.js"
 import {
   DOC_LABELS,
+  MAX_UPLOAD_BYTES,
   PHASES,
   PROJECT_PHASE_DEFINITIONS,
   phaseDefinitions,
+  UPLOAD_LIMIT_LABEL,
+  dateLabel,
   licenseExpired,
   licenseState,
   projectPhaseNames,
@@ -499,7 +502,7 @@ function requireDoc(doc?: Doc): asserts doc is Doc {
   )
   assert(
     !validateFile({ name: doc.name, size: doc.size } as File),
-    "Documents must be PDF, JPG, JPEG or PNG, up to 10 MB.",
+    `Documents must be PDF, JPG, JPEG or PNG, up to ${UPLOAD_LIMIT_LABEL}.`,
   )
 }
 function requireManpowerDoc(doc?: Doc): asserts doc is Doc {
@@ -507,8 +510,8 @@ function requireManpowerDoc(doc?: Doc): asserts doc is Doc {
     doc &&
       doc.uploaded &&
       /\.(xlsx|xls)$/i.test(doc.name) &&
-      (!doc.size || doc.size <= 15 * 1024 * 1024),
-    "Manpower lists must be XLSX or XLS, up to 15 MB.",
+      (!doc.size || doc.size <= MAX_UPLOAD_BYTES),
+    `Manpower lists must be XLSX or XLS, up to ${UPLOAD_LIMIT_LABEL}.`,
   )
 }
 export function activeAssignmentsForAccount(state: State, accountId: string) {
@@ -597,7 +600,7 @@ export function beginAccountResignation(
     detail: `${target.name} · ${
       noticeDays === 0
         ? "deactivated immediately"
-        : `${noticeDays}-day notice · effective ${effectiveDate.slice(0, 10)}`
+        : `${noticeDays}-day notice · effective ${dateLabel(effectiveDate.slice(0, 10))}`
     }`,
     type: "account",
     date: confirmedAt,

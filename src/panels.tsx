@@ -1,4 +1,5 @@
 import { uploadFile } from "./api/actions"
+import { fitImageToLimit } from "./imageFit"
 import ClientSearch from "./ClientSearch"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
@@ -14,6 +15,7 @@ import { apiEnabled, downloadApiFile } from "./api/client"
 import { canHideNativePdfToolbar, renderPdfFirstPage } from "./pdfFirstPage"
 import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
+import { emailNamePart, splitTrailingSuffix, SUFFIX_LABELS, WORK_EMAIL_DOMAIN } from "./identity"
 import {
   accountError,
   clientForEmail,
@@ -49,6 +51,7 @@ import {
   type Project,
   type Rules,
   type State,
+  UPLOAD_LIMIT_LABEL,
 } from "./model"
 
 const INTAKE_PROJECT_TYPES = [
@@ -169,15 +172,18 @@ export function Upload({
         className="hidden"
         type="file"
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
-        onChange={(e) => {
-          const selected = e.target.files?.[0]
-          if (!selected) return
+        onChange={async (e) => {
+          const field = e.target
+          const picked = field.files?.[0]
+          if (!picked) return
+          // An oversized photo is shrunk to fit instead of rejected; documents and spreadsheets are checked as chosen.
+          const selected = spreadsheet ? picked : await fitImageToLimit(picked)
           const message = validateFile(selected, spreadsheet)
           setError(message)
           if (!message) {
             setFile(selected)
             setPreview(URL.createObjectURL(selected))
-          } else e.target.value = ""
+          } else field.value = ""
         }}
       />
       <Button
@@ -317,8 +323,8 @@ export function DocumentList({
             <strong>{uploadLabel || "Add a signed document"}</strong>
             <p>
               {spreadsheet
-                ? "Excel manpower list (.xlsx or .xls) · Maximum 15 MB"
-                : "PDF, JPG, JPEG or PNG · Maximum 10 MB"}
+                ? `Excel manpower list (.xlsx or .xls) · Maximum ${UPLOAD_LIMIT_LABEL}`
+                : `PDF, JPG, JPEG or PNG · Maximum ${UPLOAD_LIMIT_LABEL}`}
             </p>
           </div>
           <Upload
@@ -601,17 +607,26 @@ export function AccountForm({
       docs: [],
     },
   )
-  const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
-  const generatedIdentity = !account && !clientOnly
-  function updateName(part: "first" | "middle" | "last", value: string) {
+  const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "", suffix: "" })
+  // Staff are named in parts and get an ID number and work email from the server. Clients bring their own email.
+  const generatedIdentity = !account && !clientOnly && draft.role !== "client"
+  // Preview only: the digits are the staff ID, which the database assigns when the account is created.
+  function previewEmail(parts: { first: string; last: string }) {
+    const initial = emailNamePart(parts.first).charAt(0)
+    const last = emailNamePart(splitTrailingSuffix(parts.last).lastName)
+    return initial && last ? initial + "." + last + ".#####@" + WORK_EMAIL_DOMAIN : ""
+  }
+  function updateName(part: "first" | "middle" | "last" | "suffix", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
-    const emailPart = (name: string) => name.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "")
-    const first = emailPart(next.first), last = emailPart(next.last)
+    const split = splitTrailingSuffix(next.last)
     setDraft(current => ({ ...current,
-      lastName: next.last.trim(),
-      name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
-      email: first && last ? last + "." + first + "@10builders.com" : "",
+      firstName: next.first.trim(),
+      middleName: next.middle.trim(),
+      lastName: split.lastName,
+      suffix: next.suffix || split.suffix,
+      name: [next.first, next.middle, split.lastName, next.suffix || split.suffix].map(value => value.trim()).filter(Boolean).join(" "),
+      email: previewEmail(next),
     }))
     setError("")
   }
@@ -623,7 +638,7 @@ export function AccountForm({
     : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim() || !draft.email)) { setError("Enter a first and last name to generate the company email."); return }
+    if (generatedIdentity && (!nameParts.first.trim() || !emailNamePart(nameParts.first) || !emailNamePart(nameParts.last) || !draft.email)) { setError("Enter a first and last name to generate the work email."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
     if (!account && ["spm", "opm"].includes(draft.role) && (!draft.license.trim() || !draft.expiry || !draft.docs.some(d => d.label === "PRC License" && d.uploaded))) { setError("License number, expiry date and supporting document are required."); return }
     const err = clientOnly
@@ -690,13 +705,18 @@ export function AccountForm({
             <select
               value={draft.role}
               disabled={!!account}
-              onChange={(e) =>
+              onChange={(e) => {
+                const role = e.target.value as Account["role"]
+                // Switching to client clears the staff preview so the admin types the client's real email.
                 patch({
-                  role: e.target.value as Account["role"],
+                  role,
                   scope: [],
                   projectTypes: [],
+                  ...(!account && role === "client" ? { email: "" } : {}),
+                  ...(!account && role !== "client" ? { email: previewEmail(nameParts) } : {}),
                 })
-              }
+                setError("")
+              }}
             >
               {Object.entries(ROLE_NAMES).map(([key, name]) => (
                 <option key={key} value={key}>
@@ -710,6 +730,12 @@ export function AccountForm({
           <Field label="First name *"><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
           <Field label="Middle name"><input autoComplete="additional-name" value={nameParts.middle} onChange={e => updateName("middle", e.target.value)} placeholder="Middle name (optional)" /></Field>
           <Field label="Last name *"><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
+          <Field label="Suffix">
+            <select value={nameParts.suffix} onChange={e => updateName("suffix", e.target.value)}>
+              <option value="">None</option>
+              {SUFFIX_LABELS.map(label => <option key={label} value={label}>{label}</option>)}
+            </select>
+          </Field>
         </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"}>
           <input
             required
@@ -718,20 +744,21 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        <Field label="Email address *" wide={generatedIdentity}>
+        <Field label={generatedIdentity || account?.workEmail ? "Work email (generated)" : "Email address *"} wide={generatedIdentity}>
           <input
             required
             type="email"
-            readOnly={generatedIdentity}
+            readOnly={generatedIdentity || !!account?.workEmail}
             value={draft.email}
             onChange={(e) => {
               patch({ email: e.target.value })
               setError("")
             }}
-            placeholder={generatedIdentity ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder={generatedIdentity ? "f.lastname.#####@10builders.com" : "name@company.com"}
           />
         </Field>
-        {generatedIdentity && <p className="field wide">Email is generated from your last name and first name. Middle name is optional.</p>}
+        {generatedIdentity && <p className="field wide">The work email is generated when the account is created, from the first initial, last name and a number, and a suffix is left out. Middle name is optional.</p>}
+        {!!account?.workEmail && <p className="field wide">A generated work email does not change when the name is edited.</p>}
         <Field label="Contact number">
           <input
             value={draft.phone}
@@ -1664,7 +1691,7 @@ export function IntakeForm({
                 <div className="client-subcon-upload">
                   <div>
                     <strong>Client–Subcontractor Agreement *</strong>
-                    <p>PDF, JPG or PNG · Maximum 10 MB</p>
+                    <p>PDF, JPG or PNG · Maximum {UPLOAD_LIMIT_LABEL}</p>
                   </div>
                   {clientSubconAgreement ? (
                     <div className="client-subcon-file">
@@ -2014,12 +2041,12 @@ export function SettingsForm({
   const [error, setError] = useState("")
   const [reminders, setReminders] = useState((rules.reminderDays || [60, 30, 14, 7, 0]).join(", "))
   const parsedReminders = reminders
-    .split(/[s,]+/)
+    .split(/[\s,]+/)
     .filter(Boolean)
     .map(Number)
   const remindersValid =
     parsedReminders.length > 0 && parsedReminders.length <= 12 && parsedReminders.every((n) => Number.isInteger(n) && n >= 0 && n <= 365)
-  const remindersChanged = reminders.replace(/s/g, "") !== (rules.reminderDays || [60, 30, 14, 7, 0]).join(",")
+  const remindersChanged = reminders.replace(/\s/g, "") !== (rules.reminderDays || [60, 30, 14, 7, 0]).join(",")
   const labels: Record<NumericRule, [string, string, number]> = {
     grace: [
       "License grace period",
@@ -2028,7 +2055,7 @@ export function SettingsForm({
     ],
     cap: [
       "Active projects per assignee",
-      "Maximum concurrent project workload for allocation eligibility.",
+      "Maximum active projects per engineer before they stop appearing in recommendations.",
       1,
     ],
     response: [
