@@ -23,7 +23,7 @@ export default function MyProfile({ actor, projects, onClose }: {
       <div><small>CONTACT NUMBER</small><strong>{actor.phone || "Not provided"}</strong></div>
       <div><small>ADDED</small><strong>{actor.added ? dateLabel(actor.added) : "Not on file"}</strong></div>
       <div><small>DISCIPLINE / SPECIALIZATION</small><strong>{[...actor.scope, ...actor.projectTypes].join(", ") || "Not on file"}</strong></div>
-      <div><small>WORKLOAD</small><strong>{assigned.filter(p => p.status === "active").length} active projects</strong></div>
+      {actor.role !== "admin" && <div><small>WORKLOAD</small><strong>{assigned.filter(p => p.status === "active").length} active projects</strong></div>}
     </div>
     {["opm","spm"].includes(actor.role) && <EngineerCredentials key={actor.id} userId={actor.id} />}
     <section className="detail-section">

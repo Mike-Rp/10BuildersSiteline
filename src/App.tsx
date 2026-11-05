@@ -2550,12 +2550,12 @@ function AppInner() {
                   ].join(", ") || "Organization-wide"}
                 </strong>
               </div>
-              <div>
+              {a.role !== "admin" && <div>
                 <small>WORKLOAD</small>
                 <strong>
                   {workload(state, a.id)} / {state.rules.cap} active projects
                 </strong>
-              </div>
+              </div>}
             </div>
             {a.cooldown && a.cooldown > Date.now() && (
               <div className="notice">
