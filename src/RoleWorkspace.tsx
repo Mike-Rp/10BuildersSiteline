@@ -3231,6 +3231,26 @@ export default function RoleWorkspace({
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
+        {actor.role === "spm" && isIntake(p) && p.team.some(t => t.accountId === actor.id && t.status === "pending") && (() => {
+          const ownPending = p.team.filter(t => t.accountId === actor.id && t.status === "pending")
+          const block = assignmentBlock(p, actor.id)
+          return <section className="detail-section" aria-label="Accept this project assignment">
+            <h3>{actor.id === leadId(p) ? "Lead Site PM acceptance" : "Your phase assignments"}</h3>
+            {block
+              ? <div className="notice"><Icon name="shield" /><p>{block}</p></div>
+              : <p>{`Accepting confirms ${ownPending.length === 1 ? "your pending phase" : `all ${ownPending.length} of your pending phases`} on this project: ${ownPending.map(t => t.phase).join(", ")}.`}</p>}
+            <div className="role-actions">
+              <Button variant="primary" icon="check" disabled={saving || !!block} title={block || undefined}
+                onClick={async () => await act({ type: "accept_assignment", projectId: p.id },
+                  actor.id === leadId(p) ? "Lead Site PM accepted. Remaining Site PMs may now respond." : "All your pending phase assignments are confirmed.")}>
+                {actor.id === leadId(p) ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}
+              </Button>
+              <Button disabled={saving || !!block} onClick={() => { setDeclineReason(""); setDialog({ kind: "decline", projectId: p.id, phase: ownPending[0].phase }) }}>
+                Decline {ownPending[0].phase} phase
+              </Button>
+            </div>
+          </section>
+        })()}
         <div className="schedule-timeline"><PlannedTimeline project={p} /></div>
         {p.status === "pending" && timeline(p)}
         <section className="detail-section">
