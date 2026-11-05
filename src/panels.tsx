@@ -674,7 +674,7 @@ export function AccountForm({
                 })
               }
             >
-              {Object.entries(ROLE_NAMES).map(([key, name]) => (
+              {Object.entries(ROLE_NAMES).filter(([key]) => key !== "client" || account?.role === "client").map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>

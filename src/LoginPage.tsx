@@ -104,12 +104,6 @@ export default function LoginPage({
           <span className="brand-mark company-logo-mark"><img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="36" height="54" /></span>
           <span><strong>10BuildLine</strong><small>10 Builders and Development Corporation</small></span>
         </div>}
-        <div className="login-portal-links">
-          <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
-            <Icon name={internal ? "home" : "shield"} size={17} />
-            {internal ? "Client sign-in" : "Staff sign-in"}
-          </a>
-        </div>
       </nav>
       {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
         <p>{existingSessionMessage || "An existing session was active recently."}</p>
