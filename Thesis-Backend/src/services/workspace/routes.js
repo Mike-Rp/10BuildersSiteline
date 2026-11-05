@@ -22,6 +22,7 @@ import { companyRemovalReadiness, removeCompany } from "./company-removal.utilit
 import { reviewSitePhoto } from "./site-photo-review.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { credentialSummary } from "../licenses/credentials.controller.js";
+import { claimFields, claimResetRequest, releaseResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -152,11 +153,14 @@ router.get("/accounts/password-reset-requests", endpoint(["admin"], async (db,us
     const rows=(await db.query(`select u.id,u.full_name,u.email,r.code as role,m.metadata from users u join roles r on r.id=u.role_id
       join workspace_account_metadata m on m.user_id=u.id where not coalesce(u.is_deleted,false)
       and (m.metadata->>'passwordResetRequestedAt' is not null or (m.metadata->'passwordResetHistory') is not null)`)).rows;
+    await sendDueReminders(db,user,rows.filter(r=>r.metadata.passwordResetRequestedAt),event);
     const pending=rows.filter(r=>r.metadata.passwordResetRequestedAt).map(r=>({id:r.id,full_name:r.full_name,email:r.email,role:r.role,status:'pending',
-      requested_at:r.metadata.passwordResetRequestedAt,read_at:r.metadata.passwordResetReadBy?.[user.id]?.requestedAt === r.metadata.passwordResetRequestedAt ? r.metadata.passwordResetReadBy[user.id].readAt : null}));
+      requested_at:r.metadata.passwordResetRequestedAt,read_at:r.metadata.passwordResetReadBy?.[user.id]?.requestedAt === r.metadata.passwordResetRequestedAt ? r.metadata.passwordResetReadBy[user.id].readAt : null,
+      ...claimFields(r.metadata,user.id)}));
     pending.sort((a,b)=>b.requested_at.localeCompare(a.requested_at));
     if(req.query.include_completed !== 'true') return pending;
-    const completed=rows.flatMap(r=>(r.metadata.passwordResetHistory || []).map(h=>({id:r.id,full_name:r.full_name,email:r.email,role:r.role,status:'completed',requested_at:h.requestedAt,completed_at:h.completedAt,completed_by:h.completedBy,read_at:h.completedAt}))).sort((a,b)=>b.completed_at.localeCompare(a.completed_at)).slice(0,20);
+    const names=new Map((await db.query("select id,full_name from users where id=any($1::uuid[])",[[...new Set(rows.flatMap(r=>(r.metadata.passwordResetHistory||[]).map(h=>h.completedBy)).filter(isUuid))]])).rows.map(r=>[r.id,r.full_name]));
+    const completed=rows.flatMap(r=>(r.metadata.passwordResetHistory || []).map(h=>({id:r.id,full_name:r.full_name,email:r.email,role:r.role,status:'completed',requested_at:h.requestedAt,completed_at:h.completedAt,completed_by:h.completedBy,completed_by_name:names.get(h.completedBy)||null,read_at:h.completedAt}))).sort((a,b)=>b.completed_at.localeCompare(a.completed_at)).slice(0,20);
     return [...pending,...completed];
 }));
 router.post("/accounts/:id/password-reset-requests/read", endpoint(["admin"], async(db,user,req)=>{
@@ -168,6 +172,12 @@ router.post("/accounts/:id/password-reset-requests/read", endpoint(["admin"], as
     await db.query(`update workspace_account_metadata set metadata=jsonb_set(metadata,'{passwordResetReadBy}',coalesce(metadata->'passwordResetReadBy','{}'::jsonb)||$2::jsonb) where user_id=$1`,[req.params.id,JSON.stringify({[user.id]:{requestedAt:req.body.requestedAt,readAt}})]);
     return {read_at:readAt};
 }));
+const resetClaim=(fn)=>endpoint(["admin"],async(db,user,req)=>{
+    if(!isUuid(req.params.id) || typeof req.body?.requestedAt !== 'string') throw new HttpError(400,'Invalid reset request.');
+    return fn(db,user,req.params.id,req.body.requestedAt);
+});
+router.post("/accounts/:id/password-reset-requests/claim", resetClaim(claimResetRequest));
+router.post("/accounts/:id/password-reset-requests/release", resetClaim(releaseResetRequest));
 router.post("/auth/login", login);
 router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);

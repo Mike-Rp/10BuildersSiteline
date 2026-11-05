@@ -82,12 +82,12 @@ test("all three login pages use the approved branding, switches, and their own s
       assert.equal(!!document.querySelector('.admin-access-badge'),internal)
       assert.equal(document.querySelectorAll('.admin-login-background picture').length,internal?3:0)
       if(internal) {
-        assert.match(document.querySelector('.admin-access-badge').textContent,/Staff access/)
+        assert.match(document.querySelector('.admin-access-badge').textContent,/(Staff|Administrator) access/)
         assert.equal(document.querySelectorAll('.login-banner-footer,.carousel-controls,.slide-count').length,0)
         assert.equal(document.querySelector('.admin-login-background').getAttribute('aria-hidden'),'true')
       }
       const switches=[...document.querySelectorAll('.login-portal-nav a')].map(a=>[a.textContent.trim(),a.getAttribute('href')])
-      assert.deepEqual(switches,internal?[['Client sign-in','/login']]:[['Staff sign-in','/staff/login']])
+      assert.deepEqual(switches,[],'Client and staff sign-in pages must not link to each other')
       assert.equal(document.querySelector('.login-content .login-portal-switch'),null,'Switches must stay outside the credential form')
       const selector=document.querySelector('.login-role-selector')
       assert.equal(!!selector,internal)

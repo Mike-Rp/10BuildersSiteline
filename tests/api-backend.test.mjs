@@ -680,7 +680,18 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok((await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id).read_at,'read status survives reload')
     await asUser('santos.juan@10builders.com')
     assert.equal((await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id).read_at,null,'another Admin still sees unread')
+    const claimUrl='/accounts/'+saved.id+'/password-reset-requests/', claimBody={method:'POST',json:{requestedAt:pendingRequest.requested_at}}
+    assert.equal((await api(claimUrl+'claim',claimBody)).claimed_by_me,true,'an Admin can take a request')
     await asUser('patricia.domingo@10builders.com')
+    const seen=(await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id)
+    assert.ok(seen.claimed_by_name&&seen.claimed_by_me===false,'the other Admin sees who is handling it')
+    await assert.rejects(api(claimUrl+'claim',claimBody),/already handling/)
+    await assert.rejects(api(claimUrl+'release',claimBody),/only they can release/)
+    await asUser('santos.juan@10builders.com')
+    assert.equal((await api(claimUrl+'release',claimBody)).claimed_by,null,'the Admin who took it can release it')
+    await asUser('patricia.domingo@10builders.com')
+    assert.equal((await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id).claimed_by_name,null)
+    await assert.rejects(api(claimUrl+'claim',{method:'POST',json:{requestedAt:'old request'}}),/changed|completed/)
     await assert.rejects(api('/accounts/'+saved.id+'/password-reset-requests/read',{method:'POST',json:{requestedAt:'old request'}}),/changed|completed/)
 
     await assert.rejects(api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"wrong"}}), /Administrator password/)
@@ -691,7 +702,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.ok(history.completed_at)
     assert.equal(history.requested_at,pendingRequest.requested_at)
     assert.ok(!JSON.stringify(history).includes(reset.temp_password),'history never retains passwords')
-    await assert.rejects(api('/accounts/'+saved.id+'/regenerate-password',{method:'POST',json:{adminPassword:'Password@123',requestedAt:pendingRequest.requested_at}}),/changed|completed/)
+    assert.ok(history.completed_by_name,'completed requests name the Admin who finished them')
+    await assert.rejects(api('/accounts/'+saved.id+'/regenerate-password',{method:'POST',json:{adminPassword:'Password@123',requestedAt:pendingRequest.requested_at}}),new RegExp('already completed by '+history.completed_by_name))
 
     const secondReset = await api("/accounts/"+saved.id+"/regenerate-password", {method:"POST",json:{adminPassword:"Password@123"}})
     assert.notEqual(secondReset.temp_password, reset.temp_password)

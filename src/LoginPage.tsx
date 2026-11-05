@@ -104,12 +104,6 @@ export default function LoginPage({
           <span className="brand-mark company-logo-mark"><img src="/images/10-builders-logo.png" alt="10 Builders company logo" width="36" height="54" /></span>
           <span><strong>10BuildLine</strong><small>10 Builders and Development Corporation</small></span>
         </div>}
-        <div className="login-portal-links">
-          <a className="login-portal-switch" href={internal ? "/login" : "/staff/login"}>
-            <Icon name={internal ? "home" : "shield"} size={17} />
-            {internal ? "Client sign-in" : "Staff sign-in"}
-          </a>
-        </div>
       </nav>
       {deviceChoice && <Modal title="Account already signed in" onClose={keepCurrentDevice}>
         <p>{existingSessionMessage || "An existing session was active recently."}</p>
@@ -132,7 +126,7 @@ export default function LoginPage({
               else setResetStep("contact")
             } else if (resetStep === "confirm") {
               await api("/auth/password-reset-request", { method: "POST", json: { ...names, email: resetEmail } })
-              setResetMessage("Your password reset request has been sent to the administrator.")
+              setResetMessage("Your password reset request has been sent to the administrators. If you have not heard back within 24 hours, please contact your administrator directly.")
             }
           }
           catch (e) { setResetError((e as Error).message) } finally { setResetBusy(false) }
