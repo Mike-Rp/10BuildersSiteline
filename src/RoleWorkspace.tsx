@@ -3263,8 +3263,9 @@ export default function RoleWorkspace({
             <SubcontractorAllocationReadOnly state={state} project={p} />
           </section>
         )}
-        {!isOpm && p.subcontractorAllocation && <section className="detail-section">
-          {actor.id === leadId(p) && p.status === "active" ? subcontractorAllocation(p) : <SubcontractorAllocationReadOnly state={state} project={p} />}
+        {!isOpm && (p.subcontractorAllocation || (actor.id === leadId(p) && allocationReady(p) && p.status !== "completed")) && <section className="detail-section">
+          {/* Once every Site PM has accepted, the Lead picks and contacts companies here too, not only on the Assignments page. */}
+          {actor.id === leadId(p) && (p.status === "active" || (allocationReady(p) && p.status !== "completed")) ? subcontractorAllocation(p) : <SubcontractorAllocationReadOnly state={state} project={p} />}
         </section>}
         <section className="detail-section">
           {isOpm ? (
