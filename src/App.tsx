@@ -1065,7 +1065,7 @@ function AppInner() {
         label: "Professional credentials",
         allLabel: "All credential records",
         options: [{ value: "missing", label: "Not on file" }],
-        test: (a, value) => value !== "missing" || (["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status)),
+        test: (a: Account, value: string) => value !== "missing" || (["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status)),
       },
     ],
   }
