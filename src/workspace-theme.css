@@ -27,8 +27,8 @@
   --red-soft: #fff0f6;
   --danger-border: #e9bfd0;
 }
-#root:has(.app-shell.admin-workspace) :is(.urgent-action-banner,.license-banner.amber) { background: var(--amber-soft); border-color: var(--warning-border); }
-#root:has(.app-shell.admin-workspace) :is(.urgent-action-banner.urgent-critical,.license-banner.red) { background: var(--red-soft); border-color: var(--danger-border); }
+#root:has(.app-shell.admin-workspace) .license-banner.amber { background: var(--amber-soft); border-color: var(--warning-border); }
+#root:has(.app-shell.admin-workspace) .license-banner.red { background: var(--red-soft); border-color: var(--danger-border); }
 #root .app-shell .main-shell { background: var(--color-canvas); }
 #root .app-shell .sidebar {
   top: 12px; left: 12px; bottom: 12px; height: calc(100dvh - 24px);
@@ -104,7 +104,7 @@
 #root .app-shell .dashboard-attention-switch { display: flex; padding: 0; margin: 12px 0 16px; }
 #root .app-shell :is(.tabs button,.ao-filters button,.dashboard-attention-switch button) { border: 1px solid var(--color-line); border-radius: 999px; background: #fff; color: var(--color-ink); min-height: 38px; padding: 9px 16px; font-size: 13px; box-shadow: none; }
 #root .app-shell :is(.tabs button.active,.ao-filters button[aria-pressed=true],.dashboard-attention-switch button[aria-selected=true]) { background: #193b59; color: #fff; border-color: #193b59; }
-#root .app-shell .urgent-action-banner { border-radius: 18px; padding: 18px; border-left-width: 2px; }
+#root .app-shell .urgent-action-banner { border-radius: 18px; padding: 18px; border-left-width: 4px; }
 #root .app-shell .urgent-banner-icon { width: 34px; height: 34px; border-radius: 50%; }
 #root .app-shell .urgent-banner-copy { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 14px; }
 #root .app-shell .urgent-banner-copy > :is(.urgent-banner-eyebrow,h2,p) { grid-column: 1; }
