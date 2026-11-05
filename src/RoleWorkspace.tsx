@@ -1626,7 +1626,8 @@ export default function RoleWorkspace({
         project={p}
         actor={actor}
         saving={saving}
-        onAction={act}
+        // Every allocation command belongs to this project, so the panel never depends on a selected-project state.
+        onAction={(command, message) => act({ ...command, projectId: command.projectId ?? p.id }, message)}
         onCrew={(companyId) =>
           setDialog({ kind: "company", projectId: p.id, companyId })
         }
