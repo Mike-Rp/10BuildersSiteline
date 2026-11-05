@@ -22,6 +22,7 @@ import UrgentActionBanner, { useUrgencyNow } from "./UrgentActionBanner"
 import { staffUrgentItems, type UrgentItem } from "./urgent-actions"
 import { DelayedProjectNotice, DelayedProjectsRow, ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import { delayedProjects } from "./domain/schedule-status"
+import { currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/current-phase-status"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
 import NotificationMessages from "./NotificationMessages"
@@ -123,6 +124,23 @@ import {
   workflowFor,
   type WorkflowCommand,
 } from "./workflows"
+
+function currentPhaseStatusForProject(project: Project, state: State, today: string) {
+  const assignment = project.team.find(member => member.phase === project.phase)
+  const assignedSpm = state.accounts.find(account => account.id === assignment?.accountId)
+  const activities = checklistFor(project)
+  const reassignmentAwaitingAcceptance = Boolean(assignment?.status === "pending" && state.events.some(event => event.projectId === project.id && event.title === "Phase assignment reassigned" && event.detail.startsWith(`${project.phase} ·`)))
+  return currentPhaseStatus({
+    projectStatus: project.status,
+    targetCompletionDate: project.end,
+    activities,
+    assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, today).mode === "view_only") : undefined,
+    waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
+    hasOpenBlockingIssue: Boolean(workflowFor(project).pendingRework?.issues.length),
+    hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(project.phase, activities, project.history),
+    today,
+  })
+}
 
 function Panel({
   title,
@@ -1037,7 +1055,7 @@ export default function RoleWorkspace({
           projectSubtitle: (id: string) => {
             const p = scoped.find((item) => item.id === id)
             return p
-              ? `${p.type} · ${p.phase} · ${p.progress}% recorded progress`
+              ? `Current phase: ${p.phase} · ${currentPhaseStatusForProject(p, state, scheduleToday)}`
               : ""
           },
           projectIntro: (id: string) => (
@@ -2022,6 +2040,7 @@ export default function RoleWorkspace({
               ...p,
               lead: state.accounts.find(a => a.id === leadId(p))?.name,
               needsReview: false,
+              currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
             }))}
             onOpen={projectId => setDialog({ kind: "project", projectId })}
           />
@@ -2052,6 +2071,7 @@ export default function RoleWorkspace({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
           needsReview: hasPendingSiteReview(p),
+          currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
           renderDeadlines={isOpm && !extensionDemo ? id => {
             const project = allActive.find(site => site.id === id)
@@ -2324,7 +2344,7 @@ export default function RoleWorkspace({
                 <Panel
                   key={p.id}
                   title={p.name}
-                  subtitle={`${p.phase} · ${p.progress}% current recorded progress`}
+                  subtitle={`Current phase: ${p.phase} · ${currentPhaseStatusForProject(p, state, scheduleToday)}`}
                   actions={
                     <Status
                       value={

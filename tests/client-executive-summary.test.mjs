@@ -4,14 +4,14 @@ import { clientExecutiveSummary } from "../src/client-executive-summary.ts"
 import { clientProjectViews } from "../src/client-access.ts"
 import { initialState } from "./fixtures/demo-state.ts"
 
-const project = () => ({ ...clientProjectViews(initialState(), "a9")[0], name: "Client project", phase: "Foundation", progress: 50, start: "2026-03-01", end: "2026-10-29", history: [], checklist: [], documents: [], photos: [] })
+const project = () => ({ ...clientProjectViews(initialState(), "a9")[0], name: "Client project", phase: "Foundation", currentPhaseStatus: "Ongoing", progress: 50, start: "2026-03-01", end: "2026-10-29", history: [], checklist: [], documents: [], photos: [] })
 
-test("executive summary keeps phase progress distinct from completion and flags dates without forecasting delivery", () => {
+test("executive summary reports the client-safe phase status and flags dates without forecasting delivery", () => {
   const p = project()
   const source = JSON.stringify(p)
   let summary = clientExecutiveSummary(p, "2026-10-27")
   assert.match(summary.narrative, /Foundation phase/)
-  assert.match(summary.narrative, /current phase is 50%/)
+  assert.match(summary.narrative, /Current phase status: Ongoing/)
   assert.equal(summary.schedule.label, "Target in 2 days")
   assert.match(summary.schedule.detail, /not a completion forecast/)
   summary = clientExecutiveSummary(p, "2026-10-29")
@@ -29,7 +29,7 @@ test("summary handles missing and invalid data and honors the recorded completed
   for (const end of [undefined, "bad-date", "2026-02-30", "2026-02-01"]) {
     const summary = clientExecutiveSummary({ ...project(), end, progress: Number.NaN }, "2026-10-27")
     assert.equal(summary.schedule.label, "Date not confirmed")
-    assert.match(summary.narrative, /progress has not been shared/)
+    assert.match(summary.narrative, /Current phase status: Ongoing/)
     assert.ok(!JSON.stringify(summary).includes("NaN"))
   }
   const completed = clientExecutiveSummary({ ...project(), status: "completed", completedAt: "2026-10-20T10:00:00Z" }, "2026-10-30")

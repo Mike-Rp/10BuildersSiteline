@@ -53,6 +53,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
 
       status: "active",
       progress: i * 5,
+      currentPhaseStatus: "Ongoing",
       start: "2025-01-01",
       end: `2027-01-${String(i + 1).padStart(2, "0")}`,
     }))
@@ -203,10 +204,11 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       onOpen: id => opened.push(id),
     })))
     const summaries = [...document.querySelectorAll(".as-summary > div")]
-    assert.equal(summaries.find(el => el.textContent.includes("Average recorded progress")).querySelector("strong").textContent, "—")
+    assert.equal(summaries.find(el => el.textContent.includes("Ready for handoff")).querySelector("strong").textContent, "0")
     assert.equal(summaries.some(el => el.textContent.includes("On schedule")), false)
     assert.equal(summaries.find(el => el.textContent.includes("Requiring attention")).querySelector("strong").textContent, "1")
-    assert.match(cards()[0].textContent, /Not recorded/)
+    assert.match(cards()[0].textContent, /Current phase: Foundation · Ongoing/)
+    assert.doesNotMatch(cards()[0].textContent, /Recorded progress/)
 
     // Exercise review membership through the same pending-workflow projection used by staff.
     const source = projects.map((project, i) => ({

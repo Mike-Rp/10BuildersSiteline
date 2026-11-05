@@ -13,6 +13,8 @@ import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import { delayedProjects } from "./domain/schedule-status"
+import { currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/current-phase-status"
+import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import AdminDashboard from "./AdminDashboard"
@@ -81,6 +83,7 @@ import {
   registeredComplete,
   teamConfirmed,
   workflowFor,
+  checklistFor,
   type WorkflowCommand,
 } from "./workflows"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -1508,11 +1511,27 @@ function AppInner() {
             "Active sites",
           )}
           <ExtensionWorkflow actor={actor} />
-          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
-            ...p,
-            lead: state.accounts.find(a => a.id === leadId(p))?.name,
-            needsReview: hasPendingSiteReview(p),
-          }))} onOpen={id => setDialog({ kind: "project", id })} />
+          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => {
+            const assigned = p.team.find(member => member.phase === p.phase)
+            const assignedSpm = state.accounts.find(account => account.id === assigned?.accountId)
+            const activities = checklistFor(p)
+            const reassignmentAwaitingAcceptance = Boolean(assigned?.status === "pending" && state.events.some(event => event.projectId === p.id && event.title === "Phase assignment reassigned" && event.detail.startsWith(`${p.phase} ·`)))
+            return {
+              ...p,
+              lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              needsReview: hasPendingSiteReview(p),
+              currentPhaseStatus: currentPhaseStatus({
+                projectStatus: p.status,
+                targetCompletionDate: p.end,
+                activities,
+                assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, scheduleToday).mode === "view_only") : undefined,
+                waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
+                hasOpenBlockingIssue: Boolean(workflowFor(p).pendingRework?.issues.length),
+                hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history),
+                today: scheduleToday,
+              }),
+            }
+          })} onOpen={id => setDialog({ kind: "project", id })} />
         </>
       )
     if (page === "Project intake")
