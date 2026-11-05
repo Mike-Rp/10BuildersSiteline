@@ -1,7 +1,8 @@
 import { HttpError } from "../../common/utilities/access.utility.js";
 
-// A "Taking this" claim only says "I am on it". It never blocks another admin,
-// and it expires so a forgotten claim cannot hide a request.
+// Taking a request locks it to that admin: nobody else can take or reset it, and
+// the claim cannot be released. It only reopens to every admin when the hold below
+// runs out, so a forgotten claim cannot hide a request forever.
 export const CLAIM_HOLD_MS = 2 * 60 * 60 * 1000;
 // A request nobody has finished turns amber after 4 hours and red after 24.
 export const REMINDER_AFTER_MS = 4 * 60 * 60 * 1000;
@@ -45,17 +46,6 @@ export async function claimResetRequest(db, actor, accountId, requestedAt) {
   const claim = { by: actor.id, byName: await adminName(db, actor.id), requestedAt, claimedAt: new Date().toISOString() };
   await db.query("update workspace_account_metadata set metadata=metadata||jsonb_build_object('passwordResetClaim',$2::jsonb) where user_id=$1", [accountId, JSON.stringify(claim)]);
   return claimFields({ ...meta, passwordResetClaim: claim }, actor.id);
-}
-
-export async function releaseResetRequest(db, actor, accountId, requestedAt) {
-  await db.query("select id from users where id=$1 for update", [accountId]);
-  const meta = (await db.query("select metadata from workspace_account_metadata where user_id=$1", [accountId])).rows[0]?.metadata;
-  if (!meta?.passwordResetRequestedAt || meta.passwordResetRequestedAt !== requestedAt)
-    throw new HttpError(409, "This request has changed or was completed. Refresh the requests.");
-  const existing = activeClaim(meta);
-  if (existing && existing.by !== actor.id) throw new HttpError(409, `${existing.byName} is handling this request, so only they can release it.`);
-  await db.query("update workspace_account_metadata set metadata=metadata-'passwordResetClaim' where user_id=$1", [accountId]);
-  return claimFields({ ...meta, passwordResetClaim: undefined }, actor.id);
 }
 
 // Called while an admin loads the list. The conditional update means that if both

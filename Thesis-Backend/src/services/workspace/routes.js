@@ -22,7 +22,7 @@ import { companyRemovalReadiness, removeCompany } from "./company-removal.utilit
 import { reviewSitePhoto } from "./site-photo-review.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { credentialSummary } from "../licenses/credentials.controller.js";
-import { claimFields, claimResetRequest, releaseResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
+import { claimFields, claimResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
 import { Router } from "express";
 import multer from "multer";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -177,7 +177,6 @@ const resetClaim=(fn)=>endpoint(["admin"],async(db,user,req)=>{
     return fn(db,user,req.params.id,req.body.requestedAt);
 });
 router.post("/accounts/:id/password-reset-requests/claim", resetClaim(claimResetRequest));
-router.post("/accounts/:id/password-reset-requests/release", resetClaim(releaseResetRequest));
 router.post("/auth/login", login);
 router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);

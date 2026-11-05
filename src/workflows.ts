@@ -436,10 +436,11 @@ export function activationChecks(state: State, p: Project) {
         ? "Client account ready for activation"
         : p.status === "active"
           ? "Client active and project access linked"
-          : "Client record ready for final activation",
+          : "Client account on file (client activates at first sign-in)",
       passed:
-        ["active", "completed"].includes(p.status) ||
-        (!!client && clientReady && client.scope.includes(p.id)),
+        // The client activates their own account at first sign-in, and activating
+        // the project links their access, so nothing here waits on Admin.
+        ["active", "completed"].includes(p.status) || (!!client && clientReady),
     },
   ]
 }

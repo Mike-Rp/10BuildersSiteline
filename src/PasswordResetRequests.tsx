@@ -37,11 +37,11 @@ export default function PasswordResetRequests({ children }: { children: (request
       setRequests(rows=>rows.map(r=>r.id===id && r.requested_at===item.requested_at ? {...r,read_at:result.read_at} : r))
     } catch(e) {setError((e as Error).message)}
   }
-  async function claim(release: boolean) {
+  async function claim() {
     if(!selected) return
     setBusy(true);setError("")
     try {
-      const fields=await api<Partial<PasswordResetRequest>>(`/accounts/${selected.id}/password-reset-requests/${release?'release':'claim'}`,{method:'POST',json:{requestedAt:selected.requested_at}})
+      const fields=await api<Partial<PasswordResetRequest>>(`/accounts/${selected.id}/password-reset-requests/claim`,{method:'POST',json:{requestedAt:selected.requested_at}})
       const same=(r:PasswordResetRequest)=>r.id===selected.id && r.requested_at===selected.requested_at
       setSelected(current=>current ? {...current,...fields} : current)
       setRequests(rows=>rows.map(r=>same(r) ? {...r,...fields} : r))
@@ -55,8 +55,8 @@ export default function PasswordResetRequests({ children }: { children: (request
       <p><strong>{selected.full_name}</strong></p>
       <p>Requested: {new Date(selected.requested_at).toLocaleString('en-PH')}{selected.status!=='completed' && ` · ${waitLabel(selected.requested_at)}`}</p>
       {selected.status!=='completed' && (selected.claimed_by_name ? <p className="reset-claim-note" role="status">{selected.claimed_by_me ? 'You are handling this request.' : `${selected.claimed_by_name} is handling this request.`} It becomes open to everyone again at {new Date(selected.claim_expires_at || '').toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'})} if it is not finished.</p> : <p>Nobody has taken this request yet.</p>)}
-      {selected.status!=='completed' && (!selected.claimed_by_name || selected.claimed_by_me) && <p><Button disabled={busy} onClick={()=>{void claim(!!selected.claimed_by_me)}}>{selected.claimed_by_me?'Release this request':'Take this request'}</Button></p>}
-      {selected.status==='completed' ? <><p>Password reset completed {selected.completed_at ? new Date(selected.completed_at).toLocaleString('en-PH') : ''}{selected.completed_by_name ? ` by ${selected.completed_by_name}` : ''}. The temporary password is not retained in this history.</p><Button onClick={()=>setSelected(undefined)}>Close</Button></> : <form onSubmit={async event=>{
+      {selected.status!=='completed' && !selected.claimed_by_name && <p><Button disabled={busy} onClick={()=>{void claim()}}>Take this request</Button></p>}
+      {selected.status!=='completed' && selected.claimed_by_name && !selected.claimed_by_me ? <Button onClick={()=>setSelected(undefined)}>Close</Button> : selected.status==='completed' ? <><p>Password reset completed {selected.completed_at ? new Date(selected.completed_at).toLocaleString('en-PH') : ''}{selected.completed_by_name ? ` by ${selected.completed_by_name}` : ''}. The temporary password is not retained in this history.</p><Button onClick={()=>setSelected(undefined)}>Close</Button></> : <form onSubmit={async event=>{
         event.preventDefault();setBusy(true);setError("")
         try {
           const result=await api<{temp_password:string}>(`/accounts/${selected.id}/regenerate-password`,{method:'POST',json:{adminPassword:password,requestedAt:selected.requested_at}})
