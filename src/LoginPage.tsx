@@ -132,7 +132,7 @@ export default function LoginPage({
               else setResetStep("contact")
             } else if (resetStep === "confirm") {
               await api("/auth/password-reset-request", { method: "POST", json: { ...names, email: resetEmail } })
-              setResetMessage("Your password reset request has been sent to the administrator.")
+              setResetMessage("Your password reset request has been sent to the administrators. If you have not heard back within 24 hours, please contact your administrator directly.")
             }
           }
           catch (e) { setResetError((e as Error).message) } finally { setResetBusy(false) }

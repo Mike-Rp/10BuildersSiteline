@@ -422,7 +422,13 @@ export const regeneratePassword = async (req, res) => {
       const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
       if (!target) throw new HttpError(404, "Account not found.");
       const resetMeta = (await client.query("select metadata from workspace_account_metadata where user_id=$1",[id])).rows[0]?.metadata || {};
-      if(req.body?.requestedAt !== undefined && resetMeta.passwordResetRequestedAt !== req.body.requestedAt) throw new HttpError(409,"This reset request has changed or was already completed. Refresh the requests.");
+      if(req.body?.requestedAt !== undefined && resetMeta.passwordResetRequestedAt !== req.body.requestedAt) {
+        const done = (resetMeta.passwordResetHistory || []).find(h => h.requestedAt === req.body.requestedAt);
+        const doneBy = done && (await client.query("select full_name from users where id=$1", [done.completedBy])).rows[0]?.full_name;
+        throw new HttpError(409, done
+          ? `This reset was already completed${doneBy ? ` by ${doneBy}` : ""} on ${new Date(done.completedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}. Refresh the requests.`
+          : "This reset request has changed or was already completed. Refresh the requests.");
+      }
       const tempPassword = makeTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(
@@ -432,7 +438,7 @@ export const regeneratePassword = async (req, res) => {
       await client.query(`DELETE FROM users_token WHERE user_id = $1`, [id]); // old sessions stop working
       const history = [...(resetMeta.passwordResetHistory || [])];
       if(resetMeta.passwordResetRequestedAt) history.push({requestedAt:resetMeta.passwordResetRequestedAt,completedAt:new Date().toISOString(),completedBy:actor.id});
-      await client.query("update workspace_account_metadata set metadata=(metadata - 'passwordResetRequestedAt' - 'passwordResetReadBy')||jsonb_build_object('passwordResetHistory',$2::jsonb) where user_id=$1", [id,JSON.stringify(history.slice(-20))]);
+      await client.query("update workspace_account_metadata set metadata=(metadata - 'passwordResetRequestedAt' - 'passwordResetReadBy' - 'passwordResetClaim' - 'passwordResetRemindedAt')||jsonb_build_object('passwordResetHistory',$2::jsonb) where user_id=$1", [id,JSON.stringify(history.slice(-20))]);
       return { id, temp_password: tempPassword };
     });
     return sendOk(res, "Temporary password issued.", 1, data);

@@ -1,5 +1,6 @@
 import PasswordResetRequestPanel from "./PasswordResetRequestPanel"
 import type { PasswordResetRequest } from "./PasswordResetRequests"
+import { overdueCount } from "./password-reset-wait"
 import { useEffect, useState, type ReactNode } from "react"
 import { Button, Empty, Icon } from "./ui"
 import type { DashboardCategory, DashboardItem } from "./admin-dashboard"
@@ -58,7 +59,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
       event.currentTarget.querySelector<HTMLButtonElement>(next==='priority'?'#priority-items-tab':'#password-requests-tab')?.focus()
     }}>
       <button id="priority-items-tab" role="tab" aria-selected={attentionView==='priority'} aria-controls="priority-items-panel" tabIndex={attentionView==='priority'?0:-1} onClick={()=>setAttentionView('priority')}>Priority items ({priorities.length})</button>
-      <button id="password-requests-tab" role="tab" aria-selected={attentionView==='password'} aria-controls="password-requests-panel" tabIndex={attentionView==='password'?0:-1} onClick={()=>setAttentionView('password')}>Password reset requests ({pendingResets.length}) {resetUnread>0 && <span className="reset-unread-dot" aria-label={resetUnread+' unread requests'}/>}</button>
+      <button id="password-requests-tab" role="tab" aria-selected={attentionView==='password'} aria-controls="password-requests-panel" tabIndex={attentionView==='password'?0:-1} onClick={()=>setAttentionView('password')}>Password reset requests ({pendingResets.length}){overdueCount(pendingResets)>0 && <span className="reset-overdue-badge">{overdueCount(pendingResets)} overdue</span>} {resetUnread>0 && <span className="reset-unread-dot" aria-label={resetUnread+' unread requests'}/>}</button>
     </div>
     <div id="priority-items-panel" role="tabpanel" aria-labelledby="priority-items-tab" hidden={attentionView!=='priority'}>
       <UrgentActionBanner items={priorities.map(adminBannerItem)} label="Priority attention" className={readinessAvailable && blockers.length ? "ao-blocker-banner" : ""}
