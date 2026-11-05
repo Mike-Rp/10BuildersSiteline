@@ -141,31 +141,34 @@ export function Upload({
   clientVisible?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File>()
+  const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   function clear() {
-    setFile(undefined)
+    setFiles([])
     setError("")
     if (input.current) input.current.value = ""
   }
   async function confirm() {
-    if (savingRef.current || disabled || !file) return
-    const validation = validateFile(file, spreadsheet)
+    if (savingRef.current || disabled || !files.length) return
+    const invalidFile = files.find((selected) => validateFile(selected, spreadsheet))
+    const validation = invalidFile && validateFile(invalidFile, spreadsheet)
     if (validation) { setError(validation); return }
     savingRef.current = true
     setSaving(true)
     setError("")
     const finishUpload = beginFileUpload()
     try {
-      const id = uid()
-      const uploaded = await saveFile(id, file, spreadsheet)
-      const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
-      if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
-      const saved=await onSave(doc)
-      if(saved===false)throw new Error("We couldn’t save your upload. Your file is still selected—please try again.")
-      showActionResult(`${label} uploaded and saved successfully.`)
+      for (const file of files) {
+        const id = uid()
+        const uploaded = await saveFile(id, file, spreadsheet)
+        const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
+        if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
+        const saved=await onSave(doc)
+        if(saved===false)throw new Error("We couldn’t save your upload. Your files are still selected—please try again.")
+      }
+      showActionResult(`${files.length === 1 ? label : `${files.length} ${label} files`} uploaded and saved successfully.`)
       clear()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed. Your file is still selected; try again.")
@@ -185,26 +188,26 @@ export function Upload({
         aria-label={ariaLabel || label}
         disabled={disabled || saving}
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
+        multiple={!spreadsheet}
         onChange={(e) => {
-          const selected = e.target.files?.[0]
-          if (!selected) return
+          const selectedFiles = Array.from(e.target.files || [])
+          if (!selectedFiles.length) return
           if (disabled || savingRef.current) { e.target.value = ""; return }
-          const message = validateFile(selected, spreadsheet)
-          clear()
-          setError(message)
-          if (!message) {
-            setFile(selected)
-          }
+          const validFiles = selectedFiles.filter((selected) => !validateFile(selected, spreadsheet))
+          const firstError = selectedFiles.map((selected) => validateFile(selected, spreadsheet)).find(Boolean) || ""
+          setError(firstError)
+          if (validFiles.length) setFiles((current) => [...current, ...validFiles])
+          e.target.value = ""
         }}
       />
       <div className="upload-control attachment-control">
-        {file && <AttachmentRow name={file.name} size={file.size} disabled={disabled || saving} onRemove={clear} />}
+        {files.map((file, index) => <AttachmentRow key={`${file.name}-${file.lastModified}-${index}`} name={file.name} size={file.size} disabled={disabled || saving} onRemove={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} />)}
         <div className="attachment-actions">
           <Button icon="plus" className="attachment-add" disabled={disabled || saving}
             aria-label={ariaLabel || buttonLabel} onClick={() => input.current?.click()}>
             Add attachments
           </Button>
-          {file && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
+          {files.length > 0 && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
             {saving ? "Uploading?" : "Confirm upload"}
           </Button>}
         </div>
