@@ -2682,9 +2682,9 @@ function AppInner() {
               <EngineerCredentials key={a.id} userId={a.id} admin readOnly={page !== "Team"} onChanged={()=>{void reloadWorkspace()}} />
             </>}
             <WorkRecord userId={a.id} />
-            <section className="detail-section">
+            <section className={`detail-section account-documents${a.docs.length ? "" : " is-empty"}`}>
               <h3>Engineer documents</h3>
-              <DocumentList docs={a.docs} onPreview={previewDoc} />
+              {a.docs.length ? <DocumentList docs={a.docs} onPreview={previewDoc} /> : <p className="compact-empty">No documents on file.</p>}
               <div className="document-upload">
                 <div>
                   <strong>Employment contract</strong>
@@ -2726,7 +2726,7 @@ function AppInner() {
                 </button>
               ))
             ) : (
-              <Empty title="No assignments yet" />
+              <p className="compact-empty">No assignments yet.</p>
             )}
           </section>
         )}

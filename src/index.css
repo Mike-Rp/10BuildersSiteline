@@ -479,6 +479,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .document-reference-list { padding: 4px 24px 24px; }
 .document-reference-row { display: flex; align-items: center; gap: 13px; padding: 18px 0; border-bottom: 1px solid var(--color-line); }
 .document-reference-row .document-info small { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: var(--color-primary); font-size: 14px; }
+.document-reference-row-detailed { align-items: flex-start; }
+.document-info-detailed { display: grid; align-content: start; gap: 10px; }
+.document-reference-row .document-info-detailed > p,
+.document-reference-row .document-info-detailed > small { margin-top: 0; line-height: 1.5; }
 .document-reference-row > .button { flex-shrink: 0; }
 .detail-hero { display: flex; align-items: center; gap: 16px; padding: 4px 0 24px; border-bottom: 1px solid var(--color-line); }
 .detail-hero > div { flex: 1; }
@@ -499,6 +503,18 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .phase-timeline > .current > strong { color: var(--color-primary); }
 .detail-section { margin-top: 29px; padding-top: 25px; border-top: 1px solid var(--color-line); }
 .detail-section h3 { display: flex; align-items: center; gap: 10px; }
+.detail-section .compact-empty { margin: 8px 0 0; color: var(--color-muted); font-size: 14px; }
+.account-documents.is-empty .document-upload { margin-top: 10px; padding: 12px 14px; }
+.engineer-credentials > h3 { margin-bottom: 16px; }
+.engineer-credentials .credential-summary { display: grid; gap: 12px; }
+.engineer-credentials .credential-summary > p { margin: 0; line-height: 1.55; }
+.engineer-credentials .credential-summary > .notice { margin: 0; }
+.engineer-credentials .credential-record { margin-top: 0; padding: 16px; }
+.engineer-credentials .credential-record > div { display: grid; gap: 7px; }
+.engineer-credentials .credential-record p { margin: 0; line-height: 1.55; }
+.engineer-credentials .credential-subsection { display: grid; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--color-line); }
+.engineer-credentials .credential-subsection h4 { margin: 0; }
+.engineer-credentials .credential-subsection > p { margin: 0; line-height: 1.55; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
 .section-description { color: var(--color-muted); font-size: 14px; margin: 12px 0 20px; }
 .office-pm-row { display: flex; align-items: center; gap: 10px; background: var(--surface-subtle); padding: 14px; border-radius: 7px; margin-top: 15px; }
