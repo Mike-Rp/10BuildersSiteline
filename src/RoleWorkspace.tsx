@@ -3556,7 +3556,7 @@ export default function RoleWorkspace({
             {confirmTab === "responses" ? (
               responseTracking()
             ) : (
-              <><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /><ListSection
+              <><div className="confirmation-intake-filters"><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /></div><ListSection
                 list={intakesList}
                 placeholder="Search confirmations"
                 noun="project"

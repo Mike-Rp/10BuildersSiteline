@@ -100,10 +100,14 @@
 #root .app-shell .executive-metric-label { display: flex; align-items: center; gap: 10px; }
 #root .app-shell .executive-metric-label svg { box-sizing: content-box; width: 17px; height: 17px; padding: 8px; border-radius: 50%; background: #eaf4fd; color: #315a85; }
 #root .app-shell .executive-metric small { font-size: 12px; }
-#root .app-shell :is(.tabs,.ao-filters,.dashboard-attention-switch) { flex-wrap: wrap; gap: 8px; background: transparent; border: 0; }
+#root .app-shell :is(.tabs,.ao-filters,.dashboard-attention-switch), #root .app-shell .confirmation-intake-filters .intake-tabs { flex-wrap: wrap; gap: 8px; background: transparent; border: 0; }
 #root .app-shell .dashboard-attention-switch { display: flex; padding: 0; margin: 12px 0 16px; }
-#root .app-shell :is(.tabs button,.ao-filters button,.dashboard-attention-switch button) { border: 1px solid var(--color-line); border-radius: 999px; background: #fff; color: var(--color-ink); min-height: 38px; padding: 9px 16px; font-size: 13px; box-shadow: none; }
-#root .app-shell :is(.tabs button.active,.ao-filters button[aria-pressed=true],.dashboard-attention-switch button[aria-selected=true]) { background: #193b59; color: #fff; border-color: #193b59; }
+#root .app-shell :is(.tabs button,.ao-filters button,.dashboard-attention-switch button), #root .app-shell .confirmation-intake-filters .intake-tabs > button { border: 1px solid var(--color-line); border-radius: 999px; background: #fff; color: var(--color-ink); min-height: 38px; padding: 9px 16px; font-size: 13px; box-shadow: none; }
+#root .app-shell :is(.tabs button.active,.ao-filters button[aria-pressed=true],.dashboard-attention-switch button[aria-selected=true]), #root .app-shell .confirmation-intake-filters .intake-tabs > button[aria-pressed=true] { background: #193b59; color: #fff; border-color: #193b59; }
+@media (hover: hover) {
+  #root .app-shell .confirmation-intake-filters .intake-tabs > button:hover:not(:disabled) { background: #edf5fc; border-color: #8ba8c2; box-shadow: 0 2px 6px #193b5914; }
+  #root .app-shell .confirmation-intake-filters .intake-tabs > button[aria-pressed=true]:hover:not(:disabled) { background: #244f73; border-color: #244f73; }
+}
 #root .app-shell .urgent-action-banner { border-radius: 18px; padding: 18px; border-left-width: 4px; }
 #root .app-shell .urgent-banner-icon { width: 34px; height: 34px; border-radius: 50%; }
 #root .app-shell .urgent-banner-copy { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 14px; }
