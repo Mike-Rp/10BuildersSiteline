@@ -211,7 +211,7 @@ export default function EngineerCredentials({
             {admin ? "Saving records the credential as verified with your administrator identity and the save time." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
           </p>
           <form
-            className="form-grid"
+            className={admin ? "form-grid" : "form-grid license-renewal-form"}
             onSubmit={(e) => {
               e.preventDefault()
               const issue = licenseNumberError(number)
@@ -266,10 +266,6 @@ export default function EngineerCredentials({
                 onChange={(e) => setFile(e.target.files?.[0])}
               />
             </Field>
-            <p>
-              Leading zeros are preserved. Format checking does not verify
-              authenticity.
-            </p>
             <Button disabled={busy} type="submit" variant="primary">
               {busy ? "Saving…" : admin ? "Save credential" : "Submit license renewal"}
             </Button>

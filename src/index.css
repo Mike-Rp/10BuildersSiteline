@@ -515,6 +515,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .engineer-credentials .credential-subsection { display: grid; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--color-line); }
 .engineer-credentials .credential-subsection h4 { margin: 0; }
 .engineer-credentials .credential-subsection > p { margin: 0; line-height: 1.55; }
+#root .license-renewal-form > .button[type="submit"] { grid-column: 1 / -1; justify-self: end; width: auto; max-width: 100%; min-height: 44px; padding-block: 8px; white-space: normal; }
+@media (max-width: 480px) {
+  #root .license-renewal-form > .button[type="submit"] { width: 100%; }
+}
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
 .section-description { color: var(--color-muted); font-size: 14px; margin: 12px 0 20px; }
 .office-pm-row { display: flex; align-items: center; gap: 10px; background: var(--surface-subtle); padding: 14px; border-radius: 7px; margin-top: 15px; }
