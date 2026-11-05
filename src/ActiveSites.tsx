@@ -5,6 +5,7 @@ import { useId, useMemo, useState, type ReactNode } from "react"
 import { PROJECT_TYPES, dateLabel, phaseDefinitions, type PhaseDefinition } from "./model"
 import ScheduleStatusBadge, { DelayedProjectNotice, useScheduleToday } from "./ScheduleStatus"
 import { projectScheduleStatus } from "./domain/schedule-status"
+import type { CurrentPhaseStatus } from "./domain/current-phase-status"
 
 import { Button, Empty, Icon } from "./ui"
 import "./active-sites.css"
@@ -21,6 +22,7 @@ export type SiteCard = {
   end?: string
   lead?: string
   needsReview?: boolean
+  currentPhaseStatus?: CurrentPhaseStatus
 }
 
 // Accept only the caller's existing authorized projection, never global state.
@@ -153,14 +155,16 @@ export default function ActiveSites({
           <small>Within your access</small>
         </div>
         <div>
-          <span className="as-summary-icon" aria-hidden="true"><Icon name="trend" size={25} /></span>
-          <span>{overallOnly ? "Average overall progress" : "Average recorded progress"}</span>
+          <span className="as-summary-icon" aria-hidden="true"><Icon name={overallOnly ? "trend" : "check"} size={25} /></span>
+          <span>{overallOnly ? "Average overall progress" : "Ready for handoff"}</span>
           <strong>
-            {recorded.length
-              ? `${Math.round(recorded.reduce((sum, p) => sum + progressValue(p, overallOnly), 0) / recorded.length)}%`
-              : "—"}
+            {overallOnly
+              ? recorded.length
+                ? `${Math.round(recorded.reduce((sum, p) => sum + progressValue(p, true), 0) / recorded.length)}%`
+                : "—"
+              : activeProjects.filter(project => project.currentPhaseStatus === "Ready for handoff").length}
           </strong>
-          <small>{overallOnly ? "Approved work across all phases" : "Recorded completion only"}</small>
+          <small>{overallOnly ? "Approved work across all phases" : "Required activities in the current phase approved"}</small>
         </div>
         {schedules.length > 0 && (
             <div>
@@ -315,19 +319,21 @@ export default function ActiveSites({
               <p className="as-phase">{p.phase || "Phase not recorded"}</p>
               <div className="as-schedule"><ScheduleStatusBadge project={p} today={reportingDate} /></div>
               {showDelayNotice && <DelayedProjectNotice project={p} today={reportingDate} />}
-              <div className="as-progress-label">
-                <span>{overallOnly ? "Overall project progress" : "Recorded progress"}</span>
-                <strong>
-                  {Number.isFinite(progressValue(p, overallOnly))
-                    ? `${progressLabel(progressValue(p, overallOnly))}%`
-                    : overallOnly ? "Unavailable" : "Not recorded"}
-                </strong>
+              <div className="as-current-phase-status" aria-label={`Current phase: ${p.phase || "Phase not recorded"} · ${p.currentPhaseStatus || "Status unavailable"}`}>
+                <Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} />
+                <span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span>
               </div>
-              {(!overallOnly || Number.isFinite(progressValue(p, overallOnly))) && <progress
-                aria-label={`${p.name} ${overallOnly ? "overall project progress" : "recorded progress"}`}
-                max={100}
-                value={Number.isFinite(progressValue(p, overallOnly)) ? progressValue(p, overallOnly) : undefined}
-              />}
+              {overallOnly && <>
+                <div className="as-progress-label">
+                  <span>Overall project progress</span>
+                  <strong>{Number.isFinite(progressValue(p, true)) ? `${progressLabel(progressValue(p, true))}%` : "Unavailable"}</strong>
+                </div>
+                {Number.isFinite(progressValue(p, true)) && <progress
+                  aria-label={`${p.name} overall project progress`}
+                  max={100}
+                  value={progressValue(p, true)}
+                />}
+              </>}
               {!overallOnly && <OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress} />}
               <dl>
                 {p.lead && (
@@ -359,7 +365,7 @@ export default function ActiveSites({
         <thead><tr><th>Project</th><th>Current phase</th><th>Schedule status</th><th>Target completion</th><th>Details</th></tr></thead>
         <tbody>{visible.map(p => {
           const schedule = projectScheduleStatus(p, reportingDate)
-          return <tr key={p.id}><th scope="row">{p.name}</th><td>{p.phase || "Phase not recorded"}</td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
+          return <tr key={p.id}><th scope="row">{p.name}</th><td><div className="as-current-phase-status"><Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} /><span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span></div></td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
         })}</tbody>
       </table></div></div>}
       {!visible.length && (

@@ -8,6 +8,9 @@ import {
   type State,
 } from "./model.ts"
 import { checklistFor, leadId, workflowFor } from "./workflows.ts"
+import { clientPhaseStatus, currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/current-phase-status.ts"
+import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
+import { localScheduleDate } from "./domain/schedule-status.ts"
 
 export const CLIENT_DOCUMENT_LABELS = [
   DOC_LABELS[0],
@@ -32,6 +35,7 @@ export type ClientProjectView = {
   start: string
   end?: string
   phase: string
+  currentPhaseStatus: ReturnType<typeof clientPhaseStatus>
   phases: string[]
   progress: number
   overallProgress?: number | null
@@ -153,6 +157,21 @@ export function clientProjectViews(
       const work = workflowFor(p)
       const office = state.accounts.find((a) => a.id === p.opmId)
       const lead = state.accounts.find((a) => a.id === leadId(p))
+      const phaseAssignment = p.team.find(member => member.phase === p.phase)
+      const assignedSpm = state.accounts.find(account => account.id === phaseAssignment?.accountId)
+      const activities = checklistFor(p)
+      const reassignmentAwaitingAcceptance = Boolean(phaseAssignment?.status === "pending" && state.events.some(event => event.projectId === p.id && event.title === "Phase assignment reassigned" && event.detail.startsWith(`${p.phase} ·`)))
+      const today = localScheduleDate()
+      const phaseStatus = currentPhaseStatus({
+        projectStatus: p.status,
+        targetCompletionDate: p.end,
+        activities,
+        assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, today).mode === "view_only") : undefined,
+        waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
+        hasOpenBlockingIssue: Boolean(work.pendingRework?.issues.length),
+        hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history),
+        today,
+      })
       return {
         id: p.id,
         name: p.name,
@@ -163,6 +182,7 @@ export function clientProjectViews(
         start: p.start,
         end: p.end,
         phase: p.phase,
+        currentPhaseStatus: clientPhaseStatus(phaseStatus),
         phases: projectPhaseNames(p),
         progress: p.progress,
         overallProgress: p.overallProgress ?? p.verifiedProgress?.project.percentage ?? null,
@@ -236,7 +256,7 @@ export function clientProgressReport(
     `Project: ${project.name}`,
     `Type: ${project.type}`,
     `Current phase: ${project.phase}`,
-    `Recorded progress: ${project.progress}%`,
+    `Current phase status: ${project.currentPhaseStatus}`,
     `Status: ${project.status}`,
     `Generated: ${new Date().toISOString()}`,
     "",

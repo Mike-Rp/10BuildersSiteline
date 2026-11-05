@@ -25,6 +25,9 @@
 .as-phase { align-self: flex-start; background: #eaf3fb; border-radius: 6px; color: #315f85; font-size: 11px; line-height: 1.4; padding: 4px 9px; margin: 0 0 14px; }
 .as-progress-label { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #62758a; }
 .as-progress-label strong { color: #102c4c; }
+.as-current-phase-status { display: inline-flex; align-items: flex-start; gap: 8px; max-width: 100%; width: fit-content; min-height: 40px; margin: 0 0 16px; padding: 9px 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); color: var(--color-ink); font-size: 14px; line-height: 1.45; }
+.as-current-phase-status > svg { flex: 0 0 auto; margin-top: 2px; color: var(--color-primary); }
+.as-current-phase-status > span { overflow-wrap: anywhere; }
 .as-card progress { appearance: none; display: block; width: 100%; height: 7px; margin: 8px 0 16px; border: 0; border-radius: 10px; background: #e8eef4; overflow: hidden; flex-shrink: 0; }
 .as-card progress::-webkit-progress-bar { background: #e8eef4; }
 .as-card progress::-webkit-progress-value { background: #3577a8; border-radius: 10px; }
@@ -64,7 +67,7 @@
 @media(prefers-reduced-motion: reduce) { .as-card { transition: none; } .as-card:hover { transform: none; } }
 
 /* Schedule displays use the existing 10BuildLine tokens and readable text sizes. */
-#root .active-sites :is(label, input, select, small, .as-summary > div > span, .as-type, .as-review, .as-phase, .as-progress-label, dt, dd, .as-pagination, .as-recent, .active-sites-view-tabs button, .active-sites-view-tabs button span, .as-results p, .as-card-actions .button) { font-size: 14px; }
+#root .active-sites :is(label, input, select, small, .as-summary > div > span, .as-type, .as-review, .as-phase, .as-progress-label, .as-current-phase-status, dt, dd, .as-pagination, .as-recent, .active-sites-view-tabs button, .active-sites-view-tabs button span, .as-results p, .as-card-actions .button) { font-size: 14px; }
 #root .active-sites .as-deadline-copy strong { font-size: 14px; }
 #root .active-sites .as-deadline-copy small { font-size: 13px; }
 #root .active-sites .as-deadline-status { font-size: 12px; }

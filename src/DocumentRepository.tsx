@@ -447,11 +447,11 @@ export default function DocumentRepository({
           ) : (
           <div className="document-reference-list">
             {filesList.view.items.map((file) => (
-              <div className="document-reference-row" key={file.id}>
+              <div className={`document-reference-row${fileDetails ? " document-reference-row-detailed" : ""}`} key={file.id}>
                 <span className="file-icon">
                   <Icon name="doc" />
                 </span>
-                <div className="document-info">
+                <div className={`document-info${fileDetails ? " document-info-detailed" : ""}`}>
                   <strong>{file.label}</strong>
                   {fileDetails ? (
                     <>

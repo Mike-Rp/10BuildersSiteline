@@ -128,81 +128,83 @@ export default function EngineerCredentials({
         </p>
       ) : (
         <>
-          <p>
-            <strong>Account: {data.accountStatus}</strong> ·{" "}
-            {data.eligibleForNewAssignment
-              ? "Credential requirements satisfied"
-              : "Not eligible for new assignments"}
-          </p>
-          <p>{data.eligibilityNote}</p>
-          {data.submissions.some(q => q.status === "under_review") && <div className="notice" role="status">
-            <strong>Pending Admin verification</strong>
-            <p>Submitted details are saved. Pending credentials do not qualify this account for new assignments.</p>
-            {readOnly ? <p>Manage credential reviews in Team & accounts.</p> : admin ? <p>View the submitted document and choose Review submission below. No re-entry is needed.</p> : <p>Your credential is awaiting Admin review.</p>}
-          </div>}
-          <p>
-            Phase coordination matches:{" "}
-            {data.qualifiedRequirements.join(", ") || "None"}. This does not
-            authorize responsibility for every system in a phase.
-          </p>
-          {data.credentials.map((c) => (
-            <article className="credential-record" key={c.id}>
-              <div>
-                <strong>
-                  {c.profession ||
-                    "Profession not recorded — Admin review required"}
-                </strong>
-                <p>
-                  {c.license_number} · Expiry: {dateLabel(c.license_expiry)} ·{" "}
-                  {c.expiryStatus}
-                </p>
-                <p>
-                  {c.superseded_at
-                    ? "Superseded"
-                    : c.verification_status === "verified"
-                      ? "Verified"
-                      : "Needs review"}{" "}
-                  ·{" "}
-                  {c.eligible
-                    ? "Outside license notice restriction"
-                    : "Does not satisfy new-assignment credential requirements"}
-                </p>
-                {c.needsReview && (
+          <div className="credential-summary">
+            <p className="credential-account-status">
+              <strong>Account: {data.accountStatus}</strong> ·{" "}
+              {data.eligibleForNewAssignment
+                ? "Credential requirements satisfied"
+                : "Not eligible for new assignments"}
+            </p>
+            <p>{data.eligibilityNote}</p>
+            {data.submissions.some(q => q.status === "under_review") && <div className="notice" role="status">
+              <strong>Pending Admin verification</strong>
+              <p>Submitted details are saved. Pending credentials do not qualify this account for new assignments.</p>
+              {readOnly ? <p>Manage credential reviews in Team & accounts.</p> : admin ? <p>View the submitted document and choose Review submission below. No re-entry is needed.</p> : <p>Your credential is awaiting Admin review.</p>}
+            </div>}
+            <p>
+              Phase coordination matches:{" "}
+              {data.qualifiedRequirements.join(", ") || "None"}. This does not
+              authorize responsibility for every system in a phase.
+            </p>
+            {data.credentials.map((c) => (
+              <article className="credential-record" key={c.id}>
+                <div>
+                  <strong>
+                    {c.profession ||
+                      "Profession not recorded — Admin review required"}
+                  </strong>
                   <p>
-                    Review the profession, number and supporting evidence;
-                    existing data has not been automatically verified.
+                    {c.license_number} · Expiry: {dateLabel(c.license_expiry)} ·{" "}
+                    {c.expiryStatus}
                   </p>
-                )}
-                {c.verified_at && (
                   <p>
-                    Reviewed by {c.verified_by_name || "Recorded Administrator"}{" "}
-                    on {new Date(c.verified_at).toLocaleString()}.{" "}
-                    {c.verification_note}
+                    {c.superseded_at
+                      ? "Superseded"
+                      : c.verification_status === "verified"
+                        ? "Verified"
+                        : "Needs review"}{" "}
+                    ·{" "}
+                    {c.eligible
+                      ? "Outside license notice restriction"
+                      : "Does not satisfy new-assignment credential requirements"}
                   </p>
-                )}
-                {admin && !readOnly && c.needsReview && !c.superseded_at && (
-                  <Button
-                    disabled={busy || !profession}
-                    onClick={() =>
-                      run(() =>
-                        api(
-                          "/licenses/credentials/" +
-                            c.id +
-                            "/submit-for-review",
-                          { method: "POST", json: { profession } },
-                        ),
-                      )
-                    }
-                  >
-                    Save legacy credential as verified
-                  </Button>
-                )}
-              </div>
-            </article>
-          ))}
-          {!data.credentials.length && (
-            <p>No verified professional credentials on file.</p>
-          )}
+                  {c.needsReview && (
+                    <p>
+                      Review the profession, number and supporting evidence;
+                      existing data has not been automatically verified.
+                    </p>
+                  )}
+                  {c.verified_at && (
+                    <p>
+                      Reviewed by {c.verified_by_name || "Recorded Administrator"}{" "}
+                      on {new Date(c.verified_at).toLocaleString()}.{" "}
+                      {c.verification_note}
+                    </p>
+                  )}
+                  {admin && !readOnly && c.needsReview && !c.superseded_at && (
+                    <Button
+                      disabled={busy || !profession}
+                      onClick={() =>
+                        run(() =>
+                          api(
+                            "/licenses/credentials/" +
+                              c.id +
+                              "/submit-for-review",
+                            { method: "POST", json: { profession } },
+                          ),
+                        )
+                      }
+                    >
+                      Save legacy credential as verified
+                    </Button>
+                  )}
+                </div>
+              </article>
+            ))}
+            {!data.credentials.length && (
+              <p>No verified professional credentials on file.</p>
+            )}
+          </div>
           {!readOnly && <>
           <h4>{admin ? "Save a credential or renewal" : "Submit license renewal"}</h4>
           <p>
@@ -273,6 +275,7 @@ export default function EngineerCredentials({
             </Button>
           </form>
           </>}
+          {data.submissions.length > 0 && <section className="credential-subsection">
           <h4>Submission & review history</h4>
           {data.submissions.map((q) => (
             <article className="credential-record" key={q.id}>
@@ -378,6 +381,8 @@ export default function EngineerCredentials({
               </Button>
             </form>
           )}
+          </section>}
+          {(data.specializations.length > 0 || admin && !readOnly) && <section className="credential-subsection">
           <h4>Recorded specializations</h4>
           <p>
             Separate from company trade capabilities. Recording these does not
@@ -430,6 +435,7 @@ export default function EngineerCredentials({
               </Button>
             </>
           )}
+          </section>}
         </>
       )}
     </section>

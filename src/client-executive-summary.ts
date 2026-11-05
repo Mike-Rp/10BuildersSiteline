@@ -1,15 +1,13 @@
 import type { ClientProjectView } from "./client-access.ts"
 import { dateLabel, localToday } from "./model.ts"
-import { calendarDay, progressLabel } from "./project-progress.ts"
+import { calendarDay } from "./project-progress.ts"
 
 // Read only the already-authorized Client projection. No additional records or forecasts.
 export function clientExecutiveSummary(project: ClientProjectView, reportingDate = localToday()) {
-  const progress = Number.isFinite(project.progress) && project.progress >= 0 && project.progress <= 100
-    ? `${progressLabel(project.progress)}%` : null
   const phase = project.phase.trim()
   const narrative = project.status === "completed"
     ? `${project.name} is recorded as completed.`
-    : `${project.name} is active${phase ? ` in the ${phase} phase` : ""}. ${progress ? `Recorded progress for the current phase is ${progress}.` : "Current phase progress has not been shared."}`
+    : `${project.name} is active${phase ? ` in the ${phase} phase` : ""}. Current phase status: ${project.currentPhaseStatus}.`
   const end = calendarDay(project.end)
   const start = calendarDay(project.start)
   const current = calendarDay(reportingDate)

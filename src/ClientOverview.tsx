@@ -36,7 +36,9 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
     <ProjectScheduleDetails project={project} today={today} />
     <section className="co-highlights" aria-label="Project highlights">
       <div className="co-metrics">
-        <div><span>Current phase</span><strong>{project.phase}</strong></div>
+        <div><span>Current phase</span>
+          <div className="co-phase-status"><Badge tone="blue"><Icon name={project.currentPhaseStatus === "Ready for handoff" || project.currentPhaseStatus === "Completed" ? "check" : project.currentPhaseStatus === "Delayed" ? "alert" : project.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={14} /> Current phase: {project.phase} · {project.currentPhaseStatus}</Badge></div>
+        </div>
         <div><span>Overall project progress</span><strong>{validProgress ? `${progressLabel(overall)}%` : "Unavailable"}</strong>
           {validProgress ? <progress aria-label="Overall project progress" value={overall} max={100} /> : <small>Complete approved activity totals across all phases are needed.</small>}
         </div>

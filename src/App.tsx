@@ -13,6 +13,8 @@ import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
 import { delayedProjects } from "./domain/schedule-status"
+import { currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/current-phase-status"
+import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 import "./admin-navigation.css"
 import PasswordResetRequests from "./PasswordResetRequests"
 import AdminDashboard from "./AdminDashboard"
@@ -81,6 +83,7 @@ import {
   registeredComplete,
   teamConfirmed,
   workflowFor,
+  checklistFor,
   type WorkflowCommand,
 } from "./workflows"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -1062,7 +1065,7 @@ function AppInner() {
         label: "Professional credentials",
         allLabel: "All credential records",
         options: [{ value: "missing", label: "Not on file" }],
-        test: (a, value) => value !== "missing" || (["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status)),
+        test: (a: Account, value: string) => value !== "missing" || (["opm", "spm"].includes(a.role) && a.hasProfessionalCredentials === false && ["active", "invited"].includes(a.status)),
       },
     ],
   }
@@ -1508,11 +1511,27 @@ function AppInner() {
             "Active sites",
           )}
           <ExtensionWorkflow actor={actor} />
-          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => ({
-            ...p,
-            lead: state.accounts.find(a => a.id === leadId(p))?.name,
-            needsReview: hasPendingSiteReview(p),
-          }))} onOpen={id => setDialog({ kind: "project", id })} />
+          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => {
+            const assigned = p.team.find(member => member.phase === p.phase)
+            const assignedSpm = state.accounts.find(account => account.id === assigned?.accountId)
+            const activities = checklistFor(p)
+            const reassignmentAwaitingAcceptance = Boolean(assigned?.status === "pending" && state.events.some(event => event.projectId === p.id && event.title === "Phase assignment reassigned" && event.detail.startsWith(`${p.phase} ·`)))
+            return {
+              ...p,
+              lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              needsReview: hasPendingSiteReview(p),
+              currentPhaseStatus: currentPhaseStatus({
+                projectStatus: p.status,
+                targetCompletionDate: p.end,
+                activities,
+                assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, scheduleToday).mode === "view_only") : undefined,
+                waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
+                hasOpenBlockingIssue: Boolean(workflowFor(p).pendingRework?.issues.length),
+                hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history),
+                today: scheduleToday,
+              }),
+            }
+          })} onOpen={id => setDialog({ kind: "project", id })} />
         </>
       )
     if (page === "Project intake")
@@ -2531,12 +2550,12 @@ function AppInner() {
                   ].join(", ") || "Organization-wide"}
                 </strong>
               </div>
-              <div>
+              {a.role !== "admin" && <div>
                 <small>WORKLOAD</small>
                 <strong>
                   {workload(state, a.id)} / {state.rules.cap} active projects
                 </strong>
-              </div>
+              </div>}
             </div>
             {a.cooldown && a.cooldown > Date.now() && (
               <div className="notice">
@@ -2663,9 +2682,9 @@ function AppInner() {
               <EngineerCredentials key={a.id} userId={a.id} admin readOnly={page !== "Team"} onChanged={()=>{void reloadWorkspace()}} />
             </>}
             <WorkRecord userId={a.id} />
-            <section className="detail-section">
+            <section className={`detail-section account-documents${a.docs.length ? "" : " is-empty"}`}>
               <h3>Engineer documents</h3>
-              <DocumentList docs={a.docs} onPreview={previewDoc} />
+              {a.docs.length ? <DocumentList docs={a.docs} onPreview={previewDoc} /> : <p className="compact-empty">No documents on file.</p>}
               <div className="document-upload">
                 <div>
                   <strong>Employment contract</strong>
@@ -2707,7 +2726,7 @@ function AppInner() {
                 </button>
               ))
             ) : (
-              <Empty title="No assignments yet" />
+              <p className="compact-empty">No assignments yet.</p>
             )}
           </section>
         )}
