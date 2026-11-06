@@ -4,6 +4,7 @@ import { Badge, Button, Field } from "./ui"
 import { Upload } from "./panels"
 import { DOC_LABELS, type Project } from "./model"
 import type { WorkflowCommand } from "./workflows"
+import { suggestCompanyPair } from "./allocation-suggestion"
 import "./phase-allocation.css"
 
 type Row = {
@@ -333,6 +334,17 @@ export default function PhaseAllocationPanel({
                   ),
                 )
                 if (!suggested) {
+                  // Fallback: two eligible companies that together cover every remaining phase.
+                  const pair = suggestCompanyPair(
+                    eligible.filter((c) => !c.declinedForProject),
+                    remaining,
+                  )
+                  if (pair) {
+                    setError("")
+                    setRoster(pair.companyIds)
+                    setRows(pair.rows.map((r) => ({ ...r, foremanId: "" })))
+                    return
+                  }
                   setError(
                     "No single eligible company covers every remaining phase. Add eligible companies and divide whole phases manually.",
                   )
