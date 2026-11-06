@@ -16,6 +16,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
   "018-phase-foreman-allocation.sql",
   "019-engineer-phase-commitments.sql",
   "020-engineer-phase-responsibilities.sql",
+  "021-admin-recovery-codes.sql",
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({

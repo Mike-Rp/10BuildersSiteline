@@ -133,24 +133,23 @@ export const reset = async (req, res) => {
     const id = actor.id;
     const { password } = req.body;
     if(typeof password!=="string"||password.length<8||password.length>72)return sendError(res,"Password must contain 8 to 72 characters.",400);
-    const hashedPassword = await bcrypt.hash(password, 12);
 
     if (!id) {
       return responseError(res, 'Invalid token.', 400);
     }
 
-    await execute(
-      `UPDATE users SET password_hash = $1, temp_password_issued = false WHERE id = $2`,
-      [
-        hashedPassword,
-        id
-      ]
-    );
+    await withTransaction(async client=>{
+      const current=(await client.query("select temp_password_issued from users where id=$1 and status='active' and not coalesce(is_deleted,false) for update",[id])).rows[0];
+      const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();
+      if(!current||!(await client.query('select 1 from users_token where user_id=$1 and token=$2',[id,token])).rowCount)throw new HttpError(401,'Your session has ended. Sign in again.');
+      if(actor.role==='admin'&&!current.temp_password_issued)throw new HttpError(403,'Use Change password in My profile and confirm your current password.');
+      const hashedPassword = await bcrypt.hash(password, 12);
+      await client.query('UPDATE users SET password_hash=$1,temp_password_issued=false WHERE id=$2',[hashedPassword,id]);
+    });
 
     return responseOk(res, 'Reset password successful', 1);
   } catch (error) {
-    errorlog(error);
-    return responseError(res, error.message, 500);
+    return handleError(res,error);
   }
 };
 

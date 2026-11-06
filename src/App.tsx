@@ -1,6 +1,7 @@
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerScopeReview from "./EngineerScopeReview"
 import EngineerResponsibilities from './EngineerResponsibilities'
+import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
@@ -312,6 +313,8 @@ function AppInner() {
   const [page, setPage] = useState("Dashboard")
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
+  const [securityOpen,setSecurityOpen]=useState(false)
+  const [securityTab,setSecurityTab]=useState<'password'|'codes'>('codes')
   const [projectHistoryPage, setProjectHistoryPage] = useState(1)
   const [preview, setPreview] = useState<Doc>()
   const [reportProjectId,setReportProjectId]=useState("")
@@ -2595,6 +2598,7 @@ function AppInner() {
               </div>
             )}
             <div className="profile-actions">
+              {a.id===actor.id&&actor.role==='admin'&&<><Button icon="shield" onClick={()=>{setDialog(undefined);setSecurityTab('password');setSecurityOpen(true)}}>Change password</Button><Button onClick={()=>{setDialog(undefined);setSecurityTab('codes');setSecurityOpen(true)}}>Recovery codes</Button></>}
               <Button
                 disabled={a.status === "deactivated"}
                 icon="edit"
@@ -3089,9 +3093,11 @@ function AppInner() {
               })}
             </span>
           </div>
+          <AdminRecoveryNotice onManage={()=>{setSecurityTab('codes');setSecurityOpen(true)}}/>
           {renderPage()}
         </main>
       </div>
+      {securityOpen&&<AdminAccountSecurity initialTab={securityTab} onClose={()=>setSecurityOpen(false)} onPasswordChanged={endSession}/>}
       {dialog?.kind === "intake" && (
         <Modal
           title={selectedProject ? "Resubmit project" : "New project intake"}

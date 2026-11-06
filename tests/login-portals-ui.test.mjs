@@ -110,7 +110,7 @@ test("all three login pages use the approved branding, switches, and their own s
       assert.match(document.querySelector('.login-error').textContent,/correct sign-in page/)
       assert.equal(client.getToken(),'')
       await act(()=>document.querySelector('.login-help a').click())
-      assert.ok(document.querySelector('[role="dialog"][aria-label="Request a password reset"]'))
+      assert.ok(document.querySelector(admin?'[role="dialog"][aria-label="Recover administrator access"]':'[role="dialog"][aria-label="Request a password reset"]'))
       await act(()=>root.render(null))
     }
   } finally {

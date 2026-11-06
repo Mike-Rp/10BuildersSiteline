@@ -12,6 +12,7 @@ import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain
 import { normalizeClientCompany } from "../../domain/client-company.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
+import {recoverySummary,generateRecoveryCodes,verifyRecoveryCode,resetWithRecoveryCode,changeAdminPassword} from '../auth/admin-security.controller.js';
 import {registerResponsibilityRoutes} from './phase-responsibilities.js';
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
@@ -184,6 +185,11 @@ router.post("/accounts/:id/password-reset-requests/claim", resetClaim(claimReset
 router.post("/auth/login", login);
 router.post("/auth/staff/login", staffLogin);
 router.post("/auth/admin/login", adminLogin);
+router.get('/auth/admin/recovery-codes',recoverySummary);
+router.post('/auth/admin/recovery-codes',generateRecoveryCodes);
+router.post('/auth/admin/recovery/verify',verifyRecoveryCode);
+router.post('/auth/admin/recovery/reset',resetWithRecoveryCode);
+router.post('/auth/admin/change-password',changeAdminPassword);
 router.post("/auth/logout", logout);
 router.get("/auth/session", sessionStatus);
 router.post("/auth/activity", sessionStatus);

@@ -7,6 +7,7 @@ import { Button, Field, Icon, Modal } from "./ui"
 import { SIGN_IN_MESSAGES, validateSignInFields } from "./signInPolicy"
 import "./login-page.css"
 import LoginBanner from "./LoginBanner"
+import {AdminRecoveryForm} from './AdminAccountSecurity'
 
 export default function LoginPage({
   checkingSession = false,
@@ -22,6 +23,7 @@ export default function LoginPage({
   onSignIn: (email: string, password: string, replaceSession?: boolean) => Promise<void>
 }) {
   const [resetOpen, setResetOpen] = useState(false)
+  const [adminRecoveryOpen,setAdminRecoveryOpen]=useState(false)
   const [resetFirstName, setResetFirstName] = useState("")
   const [resetMiddleName, setResetMiddleName] = useState("")
   const [resetLastName, setResetLastName] = useState("")
@@ -114,6 +116,7 @@ export default function LoginPage({
           <Button variant="primary" disabled={loading} onClick={() => { void attemptSignIn(true) }}>{loading ? "Signing in…" : "Log in on this device"}</Button>
         </div>
       </Modal>}
+      {adminRecoveryOpen&&<AdminRecoveryForm onClose={()=>setAdminRecoveryOpen(false)}/>}
       {resetOpen && <Modal title="Request a password reset" onClose={() => { if (!resetBusy) setResetOpen(false) }}>
         {resetMessage ? <><p role="status">{resetMessage}</p><Button onClick={() => setResetOpen(false)}>Done</Button></> : <form onSubmit={async event => {
           event.preventDefault(); setResetBusy(true); setResetError("")
@@ -238,7 +241,7 @@ export default function LoginPage({
                 </small>
               )}
               <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+                <a href="#password-reset" onClick={event => { event.preventDefault(); if(admin){setAdminRecoveryOpen(true);return} setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
               </p>
               {error && (
                 <div className="login-error" role="alert">
