@@ -57,6 +57,7 @@ export function TradeAllocationOverview({
   const name = (id: string) =>
     state.companies.find((c) => c.id === id)?.name ||
     "Company record unavailable"
+  if (plan?.phaseOwned) return <section className="trade-allocation"><h3>Subcontractor allocation</h3><p>One foreman per phase · Maximum two company project commitments</p><div className="trade-company-grid">{plan.companyIds.map(id=><article className="trade-company" key={id}><h4>{name(id)}</h4><Badge>{work.selections.find(s=>s.companyId===id)?.status||"Recorded"}</Badge>{[...new Set(plan.phaseAssignments?.filter(r=>r.companyId===id).map(r=>r.foremanId)||[])].map(fid=>{const rows=plan.phaseAssignments!.filter(r=>r.companyId===id&&r.foremanId===fid);return <div key={fid}><strong>{rows[0].foremanName||"Recorded foreman"}</strong><div className="tag-list">{rows.map(r=><span key={r.phase}>{r.phase}</span>)}</div></div>})}</article>)}</div></section>
   return (
     <div className="trade-allocation">
       <h3>Trade-based subcontractor allocation</h3>

@@ -119,6 +119,7 @@ export async function allocationCommand(db, p, meta, user, c) {
       "Trade allocation needs database migration 013. Existing project records remain available.",
     )
   let plan = meta.subcontractorAllocation
+  if (plan?.phaseOwned || c.plan?.phaseOwned) fail("Use the phase and foreman allocation workflow for this project.")
   if (
     (c.plan &&
       (!Array.isArray(c.plan.companyIds) ||
@@ -336,6 +337,11 @@ export async function validateAllocationActivation(db, p, meta, command) {
   const plan = meta.subcontractorAllocation
   checkRevision(plan, command)
   if (!plan) fail("Save a complete trade allocation before activation.")
+  if (plan.phaseOwned) {
+    const assignments=(await db.query('select phase from project_phase_foremen where project_id=$1',[p.id])).rows;
+    if (plan.requirements.some(phase => !assignments.some(row => row.phase === phase.name))) fail('Assign one foreman to every project phase before activation.');
+    if ((await db.query("select 1 from project_allocation_requests where project_id=$1 and status in ('draft','pending_admin','approved') limit 1",[p.id])).rowCount) fail('Finish or cancel the open allocation change before activation.');
+  }
   await intakeReady(db, p)
   await lockCompanies(db, plan.companyIds)
   const ctx = await allocationContext(db, p)

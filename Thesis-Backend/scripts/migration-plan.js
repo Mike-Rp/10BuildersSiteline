@@ -13,6 +13,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
   "013-trade-subcontractor-allocation.sql",
   "016-user-id-numbers.sql",
   "017-project-photo-review.sql",
+  "018-phase-foreman-allocation.sql",
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({
@@ -48,6 +49,9 @@ export function migrationPlan(files, appliedNames) {
     }
     if (name === "017-project-photo-review.sql" && !wasApplied("010-photo-release.sql")) {
       throw new Error("Migration 017 requires 010-photo-release.sql to be recorded as applied.")
+    }
+    if (name === "018-phase-foreman-allocation.sql" && !wasApplied("013-trade-subcontractor-allocation.sql")) {
+      throw new Error("Migration 018 requires 013-trade-subcontractor-allocation.sql to be recorded as applied.")
     }
     entries.push({ name, action: "runner" })
     applied.add(name)

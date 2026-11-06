@@ -173,6 +173,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   loaded.portalReads = { [me.id]: preferences.readNoticeIds || [] }
   loaded.backendPhases=workspace.backendPhases
   loaded.tradeAllocationAvailable=workspace.tradeAllocationAvailable
+  loaded.phaseAllocationAvailable=workspace.phaseAllocationAvailable
   loaded.referenceDisciplines=workspace.referenceDisciplines
   for(const account of loaded.accounts)for(const doc of account.docs)if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")
   for(const company of loaded.companies)for(const doc of [...company.documents,...company.manpowerDocuments])if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")

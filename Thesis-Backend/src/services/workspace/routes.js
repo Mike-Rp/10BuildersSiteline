@@ -10,6 +10,7 @@ import { locationError, normalizeLocation, sameLocationRecord } from "../../doma
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { normalizeClientCompany } from "../../domain/client-company.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
+import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
 import { mirrorLegacyNotifications, mirrorLegacyReads } from "../notifications/notification.utility.js";
@@ -258,11 +259,13 @@ router.get("/workspace", endpoint(null, async (db, user) => {
       }
     }
     const tradeAllocationAvailable = (await db.query("select exists(select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='subcontractor_allocation_version') as ready")).rows[0].ready;
-    return { backendPhases, referenceDisciplines, tradeAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
+    const phaseAllocationAvailable = (await db.query("select to_regclass('public.project_phase_foremen') is not null as ready")).rows[0].ready;
+    return { backendPhases, referenceDisciplines, tradeAllocationAvailable, phaseAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
         rules: (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules,
         preferences: accountMeta.find(a => a.id === user.id)?.metadata?.preferences,
         projects: map(projectMeta), accounts: map(accountMeta), companies: map(companyMeta), selections };
 }));
+registerPhaseAllocationRoutes(router,{endpoint,project,event});
 router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
     if (!Array.isArray(req.body.muted) || req.body.muted.length > 4 || req.body.muted.some(t => !["request", "approval", "progress", "notice"].includes(t)))
         throw new HttpError(400, "Invalid notification preferences.");
@@ -537,6 +540,9 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
     const leader = () => { if (user.role !== "spm" || lead !== user.id)
         throw new HttpError(403, "Only the Lead Site PM can do this."); };
     const meta = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    if (!meta.clientSubcon && ["save_allocation_plan","auto_allocate_company","set_allocation_location","select_company","replace_company","archive_company","contact_company","respond_company"].includes(c.type)
+      && (await db.query("select to_regclass('public.project_phase_foremen') is not null as ready")).rows[0].ready)
+      throw new HttpError(409,"Use the phase and foreman allocation flow. Company additions and replacements require the recorded Admin decision.");
     if (LICENSE_COMMANDS.has(c.type))
         await assertLicenseActive(user, db);
     switch (c.type) {
@@ -666,14 +672,10 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             break;
         }
         case "request_company": {
-            leader();
-            await registerCompany(db, user, c.company, file, p.id);
-            break;
+            throw new HttpError(403, "Only Admin can register subcontractor companies. Contact your Administrator.");
         }
         case "archive_company_request": {
-            leader();
-            await withdrawCompanyRequest(db, user, c.companyId, p.id);
-            break;
+            throw new HttpError(403, "The subcontractor directory is read-only for Site PM accounts.");
         }
         case "add_photo": {
             if (user.role !== "spm")

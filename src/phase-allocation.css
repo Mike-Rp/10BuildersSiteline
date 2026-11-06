@@ -1,0 +1,16 @@
+.phase-allocation { display: grid; gap: 18px; min-width: 0; }
+.phase-allocation p { line-height: 1.6; }
+.phase-allocation .trade-company { display: grid; align-content: start; gap: 14px; min-width: 0; }
+.phase-foremen { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.phase-foremen > div { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; display: grid; gap: 12px; align-content: start; overflow-wrap: anywhere; }
+.phase-assignment-list { display: grid; gap: 10px; }
+.phase-assignment-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 14px; align-items: center; padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; }
+.phase-assignment-row small { display: block; color: var(--color-muted); }
+.phase-roster { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.phase-roster > span { min-width: 0; overflow-wrap: anywhere; }
+.phase-allocation .trade-actions { flex-wrap: wrap; }
+.phase-allocation .trade-actions > select { flex: 1 1 220px; min-width: 0; }
+.phase-allocation details { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; overflow-wrap: anywhere; }
+.phase-allocation summary { cursor: pointer; font-weight: 600; }
+.phase-allocation a { color: var(--color-primary); text-decoration: underline; }
+@media(max-width:640px) { .phase-assignment-row,.phase-foremen { grid-template-columns:minmax(0,1fr); } .phase-allocation .trade-actions > .button { flex:1 1 100%; white-space:normal; } }

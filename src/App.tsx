@@ -67,6 +67,7 @@ import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyRemovalActions from "./CompanyRemovalActions"
 import CompanyForemen from "./CompanyForemen"
+import AllocationDirectory, { CompanyProjectPhases } from "./AllocationDirectory"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
 import {
@@ -1716,6 +1717,7 @@ function AppInner() {
     const subcontractorsTab = () => (
         <>
           <div className="modal-actions"><Button variant="primary" icon="plus" onClick={() => setDialog({kind:"add-company"})}>Add company</Button></div>
+          {state.phaseAllocationAvailable && <AllocationDirectory onChanged={reloadWorkspace} />}
           <div className="active-sites-view-tabs" role="tablist" aria-label="Subcontractor directory views">
             {[
               ["registered", "Registered companies"],
@@ -1787,7 +1789,7 @@ function AppInner() {
                         <div className="company-meta">
                           <span>
                             <Icon name="building" size={16} />
-                            {projects.length} active project commitments
+                            {c.commitmentCount ?? projects.length}/2 project commitments
                           </span>
                         </div>
                         <div className="coverage">
@@ -1796,6 +1798,8 @@ function AppInner() {
                             <strong>{c.capabilityReview?.disciplines.length || 0}</strong>
                           </span>
                         </div>
+                        <div className="capability-card-tags">{(c.capabilityReview?.disciplines || []).map(trade=><span key={trade}>{trade}</span>)}</div>
+                        {c.foremen?.map((foreman,index)=><p key={index}>{foreman.name} · {foreman.phone}</p>)}
                         <div className="card-bottom">
                           <span>View company details</span>
                           <Icon name="arrow" size={17} />
@@ -2768,6 +2772,7 @@ function AppInner() {
           </div>
         </div>
         <CompanyForemen company={c} />
+        {state.phaseAllocationAvailable && <CompanyProjectPhases companyId={c.id} />}
         <CompanyRemovalActions company={c} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
         <p className="section-description">{c.note}</p>
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={previewDoc}

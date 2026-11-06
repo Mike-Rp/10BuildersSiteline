@@ -56,11 +56,11 @@ export function validatePlan(type, phases, plan, companies) {
   if (!plan || !Array.isArray(plan.companyIds) || !Array.isArray(plan.coverage))
     throw new Error("An allocation plan is required.")
   if (
-    plan.companyIds.length < requiredCompanies(type) ||
+    plan.companyIds.length < (plan.phaseOwned ? 1 : requiredCompanies(type)) ||
     new Set(plan.companyIds).size !== plan.companyIds.length
   )
     throw new Error(
-      `Choose at least ${requiredCompanies(type)} different companies for this project type.`,
+      `Choose at least ${plan.phaseOwned ? 1 : requiredCompanies(type)} different companies for this project type.`,
     )
   const needed = requirementsFor(phases)
   if (!needed.length || phases.some((p) => !p.disciplines.length))

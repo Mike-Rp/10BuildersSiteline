@@ -242,7 +242,7 @@ export const getSubcontractorById = async (req, res) => {
 
 export const createSubcontractor = async (req, res) => {
   try {
-    const user = await requireUser(req, res, WRITE_ROLES);
+    const user = await requireUser(req, res, ["admin"]);
     if (!user) return;
     return sendError(res, "Use the Administrator company registration form in the Subcontractor directory.", 403);
   } catch (error) { return handleError(res, error); }

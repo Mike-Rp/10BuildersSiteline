@@ -1,7 +1,7 @@
 export type AllocationCandidate = { id: string; name: string; status: string; disciplines: string[]; reviewed: boolean; unavailable: boolean; commitments: number; declined: boolean; locationIssue?: string; proximity?: import("./operating-location.js").Proximity };
 export function compareCandidatePreference(a: AllocationCandidate, b: AllocationCandidate): number;
 export type AllocationCoverage = { phase: string; discipline: string; companyId: string };
-export type AllocationPlan = { companyIds: string[]; coverage: AllocationCoverage[] };
+export type AllocationPlan = { companyIds: string[]; coverage: AllocationCoverage[]; phaseOwned?: boolean; completedPhases?: string[]; phaseAssignments?: {phase: string; companyId: string; foremanId: string; foremanName?: string; foremanPhone?: string}[] };
 export type AllocationPhase = { name: string; disciplines: string[] };
 export const COMPANY_REQUIREMENTS: Readonly<Record<string, number>>;
 export function requiredCompanies(type: string): number;

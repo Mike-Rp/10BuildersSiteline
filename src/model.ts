@@ -325,7 +325,7 @@ export type Company = {
   evidenceReviewed?: boolean
   verificationNote?: string
   operatingLocation?: import("../Thesis-Backend/src/domain/operating-location.js").OperatingLocation
-  foremen?: { name: string; phone: string }[]
+  foremen?: { id?: string; name: string; phone: string }[]
   proposedDisciplines?: string[]
   primaryTrade?: string
   rosterDisciplines?: string[]
@@ -493,6 +493,7 @@ export type Rules = {
 export type State = {
   backendPhases?: Record<string,PhaseDefinition[]>
   tradeAllocationAvailable?: boolean
+  phaseAllocationAvailable?: boolean
   referenceDisciplines?: string[]
   accounts: Account[]
   projects: Project[]

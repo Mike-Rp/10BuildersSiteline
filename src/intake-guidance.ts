@@ -60,10 +60,11 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   const clientReady = checks.find(check => check.id === "client")?.passed === true
   // Client readiness is also a gate on signed-agreement upload, not just activation.
   const mine = actor.role === "spm" && actor.id === lead
-  const tradeBased = tradeAllocationEnabled(state, p)
+  const phaseBased = !!state.phaseAllocationAvailable && !p.clientSubcon
+  const tradeBased = phaseBased || tradeAllocationEnabled(state, p)
   if (!checks.find(check => check.id === "subcontractors")?.passed)
     return step(tradeBased ? "Company team coordination" : p.clientSubcon ? "Client subcontractor review" : "Subcontractor coordination", person(lead, "Lead Site PM"),
-      tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
+      phaseBased ? "Lead Site PM selects an eligible company, assigns one foreman per phase, and records agreement. Additional or replacement companies require Admin approval." : tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
   if (!clientReady) return step("Client account prerequisite", "Administrator",
     "The linked client record is missing or unavailable. Review the existing account and intake details; activation remains blocked.", false, "view", "View details")
   if (!tradeBased && p.clientSubcon && checks.every(check => check.passed)) return step("Ready for Lead activation", person(lead, "Lead Site PM"),

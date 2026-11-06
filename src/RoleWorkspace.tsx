@@ -14,6 +14,7 @@ import PageTitlePanel from "./PageTitlePanel"
 import ProjectClientDetails from "./ProjectClientDetails"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
+import { CompanyProjectPhases } from "./AllocationDirectory"
 import { api } from "./api/client"
 import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
@@ -1646,6 +1647,7 @@ export default function RoleWorkspace({
         saving={saving}
         // Every allocation command belongs to this project, so the panel never depends on a selected-project state.
         onAction={(command, message) => act({ ...command, projectId: command.projectId ?? p.id }, message)}
+        onReload={onReload}
         onCrew={(companyId) =>
           setDialog({ kind: "company", projectId: p.id, companyId })
         }
@@ -2918,7 +2920,7 @@ export default function RoleWorkspace({
               <div className="company-meta">
                 <span>
                   <Icon name="building" size={17} />
-                  {company.activeProjectIds.length} active project commitments
+                  {company.commitmentCount ?? company.activeProjectIds.length}/2 project commitments
                 </span>
                 <span>
                   {company.foremen?.length ? "Primary foreman: " : ""}{company.contact || "No contact supplied"} ·{" "}
@@ -3487,6 +3489,7 @@ export default function RoleWorkspace({
           </div>
         </div>
         <CompanyForemen company={c} />
+        {state.phaseAllocationAvailable && <CompanyProjectPhases companyId={c.id} />}
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={setPreview} />
         <section className="detail-section">
           <h3>Active project commitments</h3>
@@ -3499,7 +3502,7 @@ export default function RoleWorkspace({
             <Empty title="No active project commitments" />
           )}
         </section>
-        {c.status === "pending" &&
+        {actor.role === "admin" && c.status === "pending" &&
           (c.submittedById === actor.id || c.submittedBy === actor.name) && (
             <div className="modal-actions">
               <Button

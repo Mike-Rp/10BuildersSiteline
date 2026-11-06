@@ -30,7 +30,7 @@ export function companyRegistrationErrors(company) {
 export function normalizeCompanyForemen(company) {
     if (company.foremen === undefined) return undefined;
     return company.foremen.filter((foreman, index) => index === 0 || foreman?.name?.trim() || foreman?.phone)
-        .map(foreman => ({ name: foreman.name.trim(), phone: foreman.phone }));
+        .map(foreman => ({ ...(typeof foreman.id === "string" && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(foreman.id) ? { id: foreman.id } : {}), name: foreman.name.trim(), phone: foreman.phone }));
 }
 
 const heading = value => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");

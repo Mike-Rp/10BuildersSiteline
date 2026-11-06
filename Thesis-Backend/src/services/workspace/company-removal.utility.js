@@ -26,9 +26,15 @@ export async function companyRemovalReadiness(db, user, id) {
     or exists(select 1 from pending_subcontractor_requests where subcontractor_id=$1)
     or exists(select 1 from subcontractor_workers where subcontractor_id=$1 and current_project_id is not null)
     or exists(select 1 from workspace_project_metadata where position($1::text in metadata::text)>0)) as history`, [id])).rows[0];
-  const hasHistory = history || !!metadata.projectId;
+  let allocationHistory=false, pendingAllocation=false;
+  if((await db.query("select to_regclass('public.project_allocation_requests') is not null as ready")).rows[0].ready) {
+    const requests=(await db.query(`select exists(select 1 from project_allocation_requests r cross join lateral jsonb_array_elements(r.proposal) a where a->>'companyId'=$1) as history,
+      exists(select 1 from project_allocation_requests r cross join lateral jsonb_array_elements(r.proposal) a where a->>'companyId'=$1 and r.status in ('draft','pending_admin','approved')) as pending`,[id])).rows[0];
+    allocationHistory=requests.history;pendingAllocation=requests.pending;
+  }
+  const hasHistory = history || !!metadata.projectId || allocationHistory;
   const archived = metadata.status === "archived";
-  return { company, metadata, mode: blocked ? "blocked" : archived ? "archived" : hasHistory ? "archive" : "delete" };
+  return { company, metadata, mode: blocked || pendingAllocation ? "blocked" : archived ? "archived" : hasHistory ? "archive" : "delete" };
 }
 
 export async function removeCompany(db, user, id, body) {

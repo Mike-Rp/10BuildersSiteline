@@ -1,4 +1,5 @@
 import { useState } from "react"
+import PhaseAllocationPanel from "./PhaseAllocationPanel"
 import TradeAllocationPanel, { TradeAllocationOverview } from "./TradeAllocationPanel"
 import { tradeAllocationEnabled } from "./subcontractor-allocation"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -75,6 +76,7 @@ export function SubcontractorAllocationReadOnly({
     : undefined
   const log = current?.contactLog || (current?.contactAt ? [current.contactAt] : [])
   const declined = work.selections.filter((s) => s.status === "declined")
+  if (state.phaseAllocationAvailable && !project.clientSubcon) return <PhaseAllocationPanel projectId={project.id} project={project} readOnly />
   if (tradeAllocationEnabled(state, project)) return <TradeAllocationOverview state={state} project={project} />
   const nameOf = (id: string) =>
     state.companies.find((c) => c.id === id)?.name || "Company record unavailable"
@@ -153,6 +155,7 @@ export function SubcontractorAllocationReadOnly({
   )
 }
 export default function LeadSubcontractorPanel(props: Parameters<typeof LegacyLeadSubcontractorPanel>[0]) {
+  if (props.state.phaseAllocationAvailable && !props.project.clientSubcon) return <PhaseAllocationPanel projectId={props.project.id} project={props.project} onAction={props.onAction} onReload={props.onReload} onActivated={props.onActivated} />
   return tradeAllocationEnabled(props.state, props.project)
     ? <TradeAllocationPanel key={props.project.id + ":" + (props.project.subcontractorAllocation?.revision || 0)} {...props} />
     : <LegacyLeadSubcontractorPanel {...props} />
@@ -179,6 +182,7 @@ function LegacyLeadSubcontractorPanel({
   onPreview: (doc: Doc) => void
   onActivated: () => void
   onOpenActive: () => void
+  onReload?: () => unknown
 }) {
   const [availability, setAvailability] = useState("all")
   const [agreementOpen, setAgreementOpen] = useState(false)
