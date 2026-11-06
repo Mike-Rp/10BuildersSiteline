@@ -1,3 +1,5 @@
+import { saveEngineerScopes } from "../projects/engineer-commitments.utility.js";
+import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 import { validateScopedQualifications } from "../projects/type-phases.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { archiveNote,businessDeadline,recordArchiveEvent } from "../archive/audit.utility.js";
@@ -202,7 +204,7 @@ export const reassignConfirmation = async (req, res) => {
      await assertEligibleManager(client, new_user_id, old.role_context);
      if(old.role_context==='spm') {
        const affected=await client.query(`select s.code as stage,p.project_type_id from project_phase_team t join project_stages s on s.id=t.project_stage_id join projects p on p.id=t.project_id where t.project_id=$1 and t.spm_user_id=$2`,[old.project_id,old.target_user_id]);
-       for(const row of affected.rows) await validateScopedQualifications(client,row.project_type_id,[{stage:row.stage,user_id:new_user_id}]);
+       for(const row of affected.rows) await validateScopedQualifications(client,row.project_type_id,[{stage:row.stage,user_id:new_user_id}],{projectId:old.project_id});
      } else {
        const match=await client.query(`select 1 from projects p join user_project_type_specializations s on s.project_type_id=p.project_type_id where p.id=$1 and s.user_id=$2`,[old.project_id,new_user_id]);
        if(!match.rowCount) throw new HttpError(422,'Select an Office PM with the matching project type.');
@@ -290,7 +292,7 @@ const respondToPhase = (newStatus) => async (req, res) => {
 
     const data = await withTransaction(async (client) => {
       const project = await client.query(
-        `SELECT id, lifecycle_status FROM projects WHERE id = $1 AND COALESCE(is_deleted, false) = false FOR UPDATE`, [id]);
+        `SELECT id, project_type_id, lifecycle_status FROM projects WHERE id = $1 AND COALESCE(is_deleted, false) = false FOR UPDATE`, [id]);
       if (!project.rowCount) throw new HttpError(404, "Project not found.");
       if (!["spm_review", "active"].includes(project.rows[0].lifecycle_status)) {
         throw new HttpError(422, "The Office PM must accept the project before phase assignments can be confirmed.");
@@ -310,6 +312,12 @@ const respondToPhase = (newStatus) => async (req, res) => {
         throw new HttpError(409, "The response deadline has passed; ask an admin to reassign.");
       }
 
+      let scopedTeam=[];
+      if(newStatus==='confirmed') {
+        const phase=(await client.query('select code from project_stages where id=$1',[Number(stageId)])).rows[0];
+        scopedTeam=[{stage:phase.code,user_id:user.id}];
+        await validateScopedQualifications(client,project.rows[0].project_type_id,scopedTeam,{projectId:id});
+      }
       const updated = await client.query(
         `UPDATE project_phase_team
             SET status = $2, responded_at = now(), updated_by = $3, updated_at = now()
@@ -318,6 +326,8 @@ const respondToPhase = (newStatus) => async (req, res) => {
         [row.id, newStatus, user.id]
       );
 
+      await saveEngineerScopes(client,id,scopedTeam,user.id);
+      if(await responsibilitiesInstalled(client))await client.query('update project_phase_responsibilities set status=$4,responded_at=now() where project_id=$1 and project_stage_id=$2 and user_id=$3 and status=\'pending\'',[id,Number(stageId),user.id,newStatus]);
       if (newStatus === "confirmed") {
         const open = await client.query(
           `SELECT 1 FROM project_phase_team WHERE project_id = $1 AND status <> 'confirmed' LIMIT 1`,

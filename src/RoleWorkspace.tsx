@@ -1,4 +1,5 @@
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
+import EngineerResponsibilities from './EngineerResponsibilities'
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
@@ -334,6 +335,7 @@ export default function RoleWorkspace({
     (p) =>
       isOpm ||
       phaseOwner(p) === actor.id ||
+      p.team.some(t=>t.engineers?.some(e=>e.accountId===actor.id&&e.status==='confirmed')) ||
       p.team.some(
         (t) =>
           t.accountId === actor.id &&
@@ -348,7 +350,7 @@ export default function RoleWorkspace({
     isOpm
       ? p.status === "pending" && !p.opmAccepted
       : !assignmentBlock(p, actor.id) &&
-        p.team.some((t) => t.accountId === actor.id && t.status === "pending"),
+        p.team.some((t) => (t.accountId === actor.id && t.status === "pending") || t.engineers?.some(e=>e.accountId===actor.id&&e.status==='pending')),
   )
   // Projects with a Site PM phase that is still pending or declined.
   const responseProjects = projects.filter(
@@ -1297,7 +1299,7 @@ export default function RoleWorkspace({
   }
   function assignmentInfo(p: Project) {
     const work = workflowFor(p)
-    const own = p.team.filter((t) => t.accountId === actor.id)
+    const own = p.team.filter((t) => t.accountId === actor.id || t.engineers?.some(e=>e.accountId===actor.id)).map(t=>t.accountId===actor.id?t:{...t,accountId:actor.id,status:t.engineers!.find(e=>e.accountId===actor.id)!.status})
     const pending = own.filter((t) => t.status === "pending")
     const lead = actor.id === leadId(p)
     const group =
@@ -3251,6 +3253,7 @@ export default function RoleWorkspace({
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
+        {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={onReload}/>}
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />

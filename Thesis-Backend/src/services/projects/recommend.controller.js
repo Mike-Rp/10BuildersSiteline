@@ -1,3 +1,6 @@
+import { commitmentsInstalled, engineerCommitments, prepareEngineerAssignments, saveEngineerScopes } from "./engineer-commitments.utility.js";
+import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
+import {allocatePhaseCoverage} from '../../domain/engineer-phase-coverage.js';
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { experienceForProjectSql } from "../accounts/experience.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
@@ -121,8 +124,8 @@ export const updatePhaseTeam = async (req, res) => {
         if (!ownership.rowCount) throw Object.assign(new Error('Not assigned to this project.'), {status:403});
       }
       await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
-      for (const stage of phase_team) await assertEligibleManager(client, stage.user_id, 'spm');
-      await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team);
+      for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
+      await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
@@ -135,6 +138,7 @@ export const updatePhaseTeam = async (req, res) => {
           [project_id,stage.stage,stage.user_id,locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
         if (!inserted.rowCount) throw Object.assign(new Error('Unknown project stage.'), {status:422});
       }
+      await saveEngineerScopes(client,project_id,phase_team,actor.id);
       return {project_id, phase_team};
     });
     return responseOk(res, 'Phase team updated.', 1, data);
@@ -207,6 +211,10 @@ export const getOpm = async (project_type) => {
 }
 
 const getSpm = async (project_type) => {
+  const db={query:execute}; const scoped=await commitmentsInstalled(db);
+  const multi=await responsibilitiesInstalled(db);
+  const typeId=(await execute('select id from project_types where code=$1',[project_type])).rows[0]?.id;
+  const existingCommitments=scoped?await engineerCommitments(db,(await execute("select u.id from users u join roles r on r.id=u.role_id where r.code='spm'")).rows.map(r=>r.id)):undefined;
   const matrix_result = await execute(
     `
     SELECT
@@ -239,7 +247,7 @@ const getSpm = async (project_type) => {
             u.full_name,
             ${experienceForProjectSql("$2")} AS experience_years,
             array_agg(pt.id) FILTER (WHERE uds.discipline_id IS NOT NULL) AS disciplines,
-            CASE WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
+            CASE WHEN $3::boolean THEN 'available' WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
           FROM engineer_qualified_scopes uds
           LEFT JOIN disciplines pt ON pt.id = uds.discipline_id
           JOIN users u ON u.id = uds.user_id AND u.status = 'active' AND COALESCE(u.is_deleted, false) = false
@@ -277,21 +285,43 @@ const getSpm = async (project_type) => {
         matching_count DESC,
         experience_years DESC,
         total_user_tags ASC, full_name ASC, id ASC
-      `, [row.disciplines.map(Number), project_type]
+      `, [row.disciplines.map(Number), project_type, scoped]
     );
 
-    const details = mapMultiple(spm_result.rows, 'id');
+    let details = mapMultiple(spm_result.rows, 'id');
+    if(scoped) {
+      const available=[];
+      for(const candidate of details) {
+        const team=[{stage:row.code,user_id:candidate.id}];
+        try { await prepareEngineerAssignments(db,typeId,team,{lock:false,existingCommitments}); available.push({...candidate,assigned_disciplines:team[0].assigned_disciplines}); }
+        catch(error) { if(error.status!==409) throw error; }
+      }
+      details=available;
+    }
 
     const randomIndex = 0;
 
-    if (spm_result.rowCount > 0) {
+    if(multi) {
+      const required=(await execute('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
+      const candidates=[];
+      for(const person of details) {
+        const qualifiedTags=(await execute('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=$1 and d.id=any($2::int[])',[person.id,row.disciplines.map(Number)])).rows.map(r=>r.code);
+        candidates.push({id:person.id,qualifiedTags});
+      }
+      const result=allocatePhaseCoverage(required,candidates);
+      suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,missing_specializations:result.missing});
+      continue;
+    }
+
+    if (details.length > 0) {
       suggestedSpms.push({
         id: row.project_stage_id,
         stage: row.code,
         is_lead: row.project_stage_id === 1,
         user_id: details[randomIndex].id,
         name: details[randomIndex].full_name,
-        percentage: details[randomIndex].percentage
+        percentage: details[randomIndex].percentage,
+        assigned_disciplines: details[randomIndex].assigned_disciplines
       });
     }
   }

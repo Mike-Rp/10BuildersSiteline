@@ -6,6 +6,7 @@ import { projectChecklistTemplateSql } from "./checklist-template.utility.js";
 import { markPhaseCompleted } from "../licenses/history.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
+import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -27,6 +28,10 @@ export async function phaseProject(client, user, projectId, { active = false } =
 
 export async function isProjectSpm(client, user, project) {
   if (user.role !== "spm") return false;
+  if(await responsibilitiesInstalled(client)) {
+   const rows=(await client.query('select user_id,status,completion_status from project_phase_responsibilities where project_id=$1',[project.id])).rows;
+   if(rows.length)return rows.some(row=>row.user_id===user.id&&row.status==='confirmed'&&row.completion_status!=='approved');
+  }
   const assigned = await client.query(
     `SELECT 1 FROM project_phase_team
       WHERE project_id = $1 AND spm_user_id = $2 AND status = 'confirmed'

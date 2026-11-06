@@ -97,6 +97,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     accounts = [...byId.values()].map(({ row, projectIds }) => ({
       ...mapAccount(row, row, projectIdsByName),
       assignmentCandidateProjectIds: [...projectIds],
+      engineerCommitments: row.engineerCommitments,
     }))
   }
   if (me.role === "admin") {
@@ -118,6 +119,8 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     )
 
   const selfStatus=self.status
+  if(Array.isArray(workspace.engineerAvailability)) for(const account of accounts) if(account.role==='spm') account.engineerCommitments=workspace.engineerAvailability.filter((c:Dto)=>c.user_id===account.id)
+  if(workspace.multiEngineerAllocationAvailable)for(const account of accounts)if(account.role==='spm')account.singleProjectCommitment=true
   Object.assign(self,workspace.accounts?.[me.id]||{})
   if(!(self.status==="deactivated"&&selfStatus==="suspended"))self.status=selfStatus
   // All permitted project data arrives in one request.
@@ -129,6 +132,10 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     mapProject({ ...p, list:{...p.list,...(workspace.projects?.[p.list.id]||{})}, detail:{...p.detail,workspace:workspace.projects?.[p.list.id]||{},selections:(workspace.selections||[]).filter((s:Dto)=>s.project_id===p.list.id)}, clientId: people.clientIds.get(p.list.id) || "", register: registerFileUrl }),
   )
   for(const project of projects) {
+    if(workspace.multiEngineerAllocationAvailable)for(const row of project.team) {
+      const people=(workspace.engineerResponsibilities||[]).filter((r:Dto)=>r.project_id===project.id&&r.phase===row.phase)
+      if(people.length)row.engineers=people.map((r:Dto)=>({accountId:r.user_id,assignedDisciplines:r.assigned_disciplines,status:r.status==='confirmed'?'confirmed':r.status==='pending'?'pending':'declined',completionStatus:r.completion_status,responsibilityId:String(r.id)}))
+    }
     const handoff=handoffs.find(item=>item.project_id===project.id && !item.advanced && item.from===project.phase)
     if(handoff?.reason)project.handoffBlocker=handoff.reason
   }
@@ -174,6 +181,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   loaded.backendPhases=workspace.backendPhases
   loaded.tradeAllocationAvailable=workspace.tradeAllocationAvailable
   loaded.phaseAllocationAvailable=workspace.phaseAllocationAvailable
+  loaded.multiEngineerAllocationAvailable=workspace.multiEngineerAllocationAvailable
   loaded.referenceDisciplines=workspace.referenceDisciplines
   for(const account of loaded.accounts)for(const doc of account.docs)if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")
   for(const company of loaded.companies)for(const doc of [...company.documents,...company.manpowerDocuments])if(doc.uploaded)registerFileUrl(doc.id,"/api/v1/files/"+doc.id+"/content")

@@ -1,4 +1,7 @@
 import { requiresRenewalOnlyAccess } from "./renewal-only";
+import EngineerScopeReview from "./EngineerScopeReview"
+import EngineerResponsibilities from './EngineerResponsibilities'
+import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
 import RestrictedRenewalPage from "./RestrictedRenewalPage";
@@ -1701,8 +1704,7 @@ function AppInner() {
                       </div>
                       <div className="engineer-footer">
                         <span>
-                          {workload(state, a.id)} / {state.rules.cap} active
-                          projects
+                          {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
                         </span>
                         <Badge tone={a.eligibleForNewAssignment ? "green" : "amber"}>{a.eligibleForNewAssignment ? "Credential requirements met" : "View credential eligibility"}</Badge>
                       </div>
@@ -2284,6 +2286,8 @@ function AppInner() {
         {!docsOnly && (
           <>
             <ProjectScheduleDetails project={p} today={scheduleToday} />
+            {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
+            {actor.role==='admin' && <EngineerScopeReview project={p} state={state} onReload={reloadWorkspace} />}
             {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
             {p.status !== "active" && p.status !== "completed" && (
@@ -2557,7 +2561,7 @@ function AppInner() {
               {a.role !== "admin" && <div>
                 <small>WORKLOAD</small>
                 <strong>
-                  {workload(state, a.id)} / {state.rules.cap} active projects
+                  {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
                 </strong>
               </div>}
             </div>

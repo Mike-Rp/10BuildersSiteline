@@ -54,6 +54,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "accept_assignment":
         case "decline_assignment": {
+            const responsibilities=project.team.flatMap(row=>(row.engineers||[]).filter(e=>e.accountId===actor.id&&e.status==='pending'&&(!command.phase||command.phase===row.phase)&&e.responsibilityId).map(e=>e.responsibilityId!));
+            if(responsibilities.length) {
+              for(const responsibilityId of responsibilities)await post(base+'/engineer-responsibilities/'+responsibilityId,{action:command.type==='accept_assignment'?'accept':'decline',note:command.note||'Assignment declined.'});
+              return;
+            }
             const detail = await api<Dto>(base);
             const team = (detail.phase_team || []).filter((t: Dto) => t.spm_user_id === actor.id && t.status === "pending" && (!command.phase || t.stage === command.phase));
             if (!team.length)
@@ -205,7 +210,7 @@ export async function saveApiProject(project: Project, existing: boolean) {
           project.team.map(row => ({name: row.phase, disciplines: projectPhaseDisciplines(project,row.phase)}))).total,
         ...(project.phaseScope ? {phase_scope: project.phaseScope} : {}),
         ...(project.clientSubconCompany ? { client_subcon_company: project.clientSubconCompany } : {}),
-        phase_team: project.team.map((t, index) => ({ stage: t.phase, user_id: t.accountId, is_lead: index === 0 })),
+        phase_team: project.team.map((t, index) => ({ stage: t.phase, user_id: t.accountId, is_lead: index === 0, ...(t.assignedDisciplines ? {assigned_disciplines:t.assignedDisciplines} : {}),...(t.engineers?{engineers:t.engineers.map(e=>({user_id:e.accountId,assigned_disciplines:e.assignedDisciplines}))}:{}) })),
         ...(existing ? { draft_project_id: project.id } : { intake_id: project.id }),
     });
     const id = result.project.id;

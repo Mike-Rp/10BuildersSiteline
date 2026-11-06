@@ -1,4 +1,5 @@
 import { credentialEligible,qualifyingSpecializations,REQUIREMENT_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
+import { commitmentsInstalled, engineerCommitments, prepareEngineerAssignments, saveEngineerScopes } from "../projects/engineer-commitments.utility.js";
 import { localDay } from "../../common/utilities/license-status.utility.js";
 import { sessionStatus } from "../auth/controller.js";
 import { linkProjectFile } from "./project-upload-budget.utility.js";
@@ -11,6 +12,8 @@ import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain
 import { normalizeClientCompany } from "../../domain/client-company.js";
 import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
+import {registerResponsibilityRoutes} from './phase-responsibilities.js';
+import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
 import { mirrorLegacyNotifications, mirrorLegacyReads } from "../notifications/notification.utility.js";
@@ -204,8 +207,11 @@ router.get("/projects/:id/phase-assignment-candidates", endpoint(["admin", "opm"
       from users u join roles r on r.id=u.role_id left join workspace_account_metadata m on m.user_id=u.id
       where r.code='spm' and u.status='active' and not coalesce(u.is_deleted,false) order by u.full_name`, [p.id])).rows;
     const candidates = [];
+    const scopedAvailability=await commitmentsInstalled(db);
+    const commitments=scopedAvailability?await engineerCommitments(db,users.map(a=>a.id)):[];
     for (const account of users) {
-      if (account.active_projects >= cap) continue;
+      const mine=commitments.filter(c=>c.user_id===account.id && c.project_id!==p.id);
+      if (scopedAvailability ? new Set(mine.map(c=>c.project_id)).size>=2 : account.active_projects >= cap) continue;
       const profile = await credentialSummary(db, account.id);
       if (!profile.eligibleForNewAssignment || !profile.qualifiedRequirements.length) continue;
       candidates.push({
@@ -214,6 +220,7 @@ router.get("/projects/:id/phase-assignment-candidates", endpoint(["admin", "opm"
         specializations: profile.specializations.map(item => item.specialization),
         qualifiedRequirements: profile.qualifiedRequirements,
         credentialEligibility: true,
+        ...(scopedAvailability?{engineerCommitments:mine.map(({project_name,user_id,...c})=>c)}:{}),
         experience_by_type: account.metadata?.experienceByType,
       });
     }
@@ -260,12 +267,30 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     }
     const tradeAllocationAvailable = (await db.query("select exists(select 1 from information_schema.columns where table_schema='public' and table_name='projects' and column_name='subcontractor_allocation_version') as ready")).rows[0].ready;
     const phaseAllocationAvailable = (await db.query("select to_regclass('public.project_phase_foremen') is not null as ready")).rows[0].ready;
-    return { backendPhases, referenceDisciplines, tradeAllocationAvailable, phaseAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
+    const engineerAvailability = await commitmentsInstalled(db) && ['admin','spm'].includes(user.role) ? await engineerCommitments(db,user.role==='admin'?accountDetails.filter(a=>a.role==='spm').map(a=>a.id):[user.id]) : undefined;
+    const multiEngineerAllocationAvailable=await responsibilitiesInstalled(db);
+    const engineerResponsibilities=multiEngineerAllocationAvailable&&user.role!=='client'?(await db.query('select r.*,s.code as phase from project_phase_responsibilities r join project_stages s on s.id=r.project_stage_id where r.project_id=any($1::uuid[])',[allowed])).rows:[];
+    return { multiEngineerAllocationAvailable,engineerResponsibilities,engineerAvailability, backendPhases, referenceDisciplines, tradeAllocationAvailable, phaseAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
         rules: (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules,
         preferences: accountMeta.find(a => a.id === user.id)?.metadata?.preferences,
         projects: map(projectMeta), accounts: map(accountMeta), companies: map(companyMeta), selections };
 }));
+router.post('/projects/:id/engineer-scope', endpoint(['admin'],async(db,user,req)=>{
+ const p=await project(db,user,req.params.id,true);
+ const {phase,userId,tags}=req.body || {};
+ if(!await commitmentsInstalled(db)) throw new HttpError(409,'Apply database migration 019 first.');
+ if(p.lifecycle_status==='archived') throw new HttpError(409,'Archived projects are read-only.');
+ const found=await db.query('select t.id,t.assigned_disciplines from project_phase_team t join project_stages s on s.id=t.project_stage_id where t.project_id=$1 and t.spm_user_id=$2 and s.code=$3',[p.id,userId,phase]);
+ if(!found.rowCount) throw new HttpError(404,'Assignment not found.');
+ if(found.rows[0].assigned_disciplines) throw new HttpError(409,'Recorded assignment specializations cannot be rewritten. Use a formal reassignment.');
+ const team=[{stage:phase,user_id:userId,assigned_disciplines:tags}];
+ if(!Array.isArray(tags) || !tags.length) throw new HttpError(422,'Select the specialization actually used by this existing assignment.');
+ await prepareEngineerAssignments(db,p.project_type_id,team,{projectId:p.id,legacyReview:true});
+ await saveEngineerScopes(db,p.id,team,user.id);
+ return {saved:true};
+}));
 registerPhaseAllocationRoutes(router,{endpoint,project,event});
+registerResponsibilityRoutes(router,{endpoint,project});
 router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
     if (!Array.isArray(req.body.muted) || req.body.muted.length > 4 || req.body.muted.some(t => !["request", "approval", "progress", "notice"].includes(t)))
         throw new HttpError(400, "Invalid notification preferences.");

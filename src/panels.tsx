@@ -1,4 +1,5 @@
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
+import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing} from './PhaseEngineerAllocation'
 import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
@@ -1081,13 +1082,16 @@ export function IntakeForm({
     const opms = opmCandidates(state, draft.type, draft.id, draft.excludedOpms)
     const team = phases.map((phase, sequence) => {
       const candidates = spmCandidates(state, draft.type, phase.name, draft.id, phase.disciplines)
+      const engineers=state.multiEngineerAllocationAvailable?recommendPhaseEngineers(state,draft.type,phase.name,phase.disciplines,draft.id):undefined
       return {
         phase: phase.name,
         accountId:
-          candidates[0]?.account.id ||
+          (engineers?engineers[0]?.accountId:candidates[0]?.account.id) ||
           "",
         status: "pending" as const,
         requiredDisciplines: [...phase.disciplines],
+        assignedDisciplines: engineers?engineers[0]?.assignedDisciplines:candidates[0]?.availableTags.slice(0,1),
+        engineers,
         sequence,
       }
     })
@@ -1203,6 +1207,7 @@ export function IntakeForm({
     )
       err =
         "Every phase needs an eligible Site PM. Review team capacity and qualifications."
+    if(state.multiEngineerAllocationAvailable&&draft.team.some(row=>phaseCoverageMissing(row,row.requiredDisciplines||[]).length||!row.engineers?.length||row.engineers.some(e=>!e.accountId||!e.assignedDisciplines.length)))err='Cover every required specialization with qualified engineers before sending assignment requests.'
     setError(err)
     if (!err) try {
       submitGuard.current = true
@@ -1528,8 +1533,7 @@ export function IntakeForm({
               <div>
                 <h3>Site PM team by construction phase</h3>
                 <p>
-                  One qualified Site PM owns each phase. The same Site PM may
-                  own multiple phases when eligible and available.
+                  {state.multiEngineerAllocationAvailable?'Assign enough qualified engineers to cover every specialization. The same engineer may handle succeeding phases within this project.':'One qualified Site PM owns each phase. The same Site PM may own multiple phases when eligible and available.'}
                 </p>
               </div>
               <span>
@@ -1538,6 +1542,10 @@ export function IntakeForm({
             </div>
             <div className="allocation-rows">
               {allocationPhases.map((phase, index) => {
+                if(state.multiEngineerAllocationAvailable) {
+                  const row=draft.team.find(t=>t.phase===phase.name)||{phase:phase.name,accountId:'',status:'pending' as const,requiredDisciplines:phase.disciplines,engineers:[]}
+                  return <PhaseEngineerAllocation key={phase.name} state={state} type={draft.type} row={row} required={phase.disciplines} projectId={draft.id} team={draft.team} onChange={next=>patch({team:draft.team.map(t=>t.phase===phase.name?next:t)})}/>
+                }
                 const candidates = spmCandidates(
                   state,
                   draft.type,
@@ -1579,7 +1587,7 @@ export function IntakeForm({
                           patch({
                             team: draft.team.map((t) =>
                               t.phase === phase.name
-                                ? { ...t, accountId: e.target.value }
+                                ? { ...t, accountId: e.target.value, assignedDisciplines:candidates.find(c=>c.account.id===e.target.value)?.availableTags.slice(0,1) }
                                 : t,
                             ),
                           })
@@ -1592,6 +1600,7 @@ export function IntakeForm({
                           </option>
                         ))}
                       </select>
+                      {current?.account.engineerCommitments && <Field label="Specialization used for this phase"><select aria-label={`${phase.name} assignment specialization`} value={row?.assignedDisciplines?.[0] || current.availableTags[0] || ""} onChange={e=>patch({team:draft.team.map(t=>t.phase===phase.name?{...t,assignedDisciplines:[e.target.value]}:t)})}>{current.availableTags.map(tag=><option key={tag} value={tag}>{tag}</option>)}</select></Field>}
                       <small className={`discipline-match ${current && current.matched === current.total ? "discipline-match-valid" : "discipline-match-invalid"}`}>
                         {current
                           ? `${current.matched} of ${current.total} required discipline tags matched`

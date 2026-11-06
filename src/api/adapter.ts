@@ -208,6 +208,7 @@ export function mapProject(parts: ProjectParts): Project {
     accountId: t.spm_user_id || "",
     status: teamStatus(t.status),
     requiredDisciplines: t.required_disciplines,
+    assignedDisciplines: t.assigned_disciplines,
     sequence: t.sort_order,
   }))
   const docs = mapDocs(id, parts.documents, register)

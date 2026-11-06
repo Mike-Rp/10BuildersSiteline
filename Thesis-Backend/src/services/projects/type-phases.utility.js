@@ -1,5 +1,7 @@
 import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
+import { prepareEngineerAssignments } from "./engineer-commitments.utility.js";
+import {preparePhaseResponsibilities,responsibilitiesInstalled} from './phase-responsibilities.utility.js';
 export async function validatePhaseTeam(db,typeId,team,{projectId,phaseNames}={}) {
  const phases=phaseNames ? phaseNames.map(code=>({code})) : projectId ?
    (await db.query(`SELECT s.code FROM (${projectWorkflowSql}) w JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_id=$1 ORDER BY w.sort_order`,[projectId])).rows :
@@ -9,7 +11,10 @@ export async function validatePhaseTeam(db,typeId,team,{projectId,phaseNames}={}
  phases.some((p,index)=>names[index]!==p.code))throw new HttpError(422,"Assign every phase required by the confirmed project scope, in order, with no extra phases.");
 }
 
-export async function validateScopedQualifications(db,typeId,team) {
+export async function validateScopedQualifications(db,typeId,team,options={}) {
+ if(await responsibilitiesInstalled(db) && (options.requireCoverage || team.some(row=>row.engineers))) {
+  await preparePhaseResponsibilities(db,typeId,team,options);return;
+ }
  for (const phase of team) {
   const matched=await db.query(`SELECT 1 FROM engineer_qualified_scopes u
    JOIN project_stage_discipline_links l ON l.discipline_id=u.discipline_id AND l.project_type_id=$1
@@ -17,4 +22,5 @@ export async function validateScopedQualifications(db,typeId,team) {
    WHERE u.user_id=$2 AND s.code=$3 LIMIT 1`,[typeId,phase.user_id,phase.stage]);
   if (!matched.rowCount) throw new HttpError(422,`Select a Site PM with matching discipline qualifications for ${phase.stage}.`);
  }
+ await prepareEngineerAssignments(db,typeId,team,options);
 }

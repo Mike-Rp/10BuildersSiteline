@@ -196,6 +196,8 @@ export type RegistrationCredential = {
   fileName: string
 }
 export type Account = {
+  singleProjectCommitment?: boolean
+  engineerCommitments?: {project_id:string; phase:string; tags:string[] | null; status:string}[]
   initialCredentials?: RegistrationCredential[]
   credentialDecision?: "pending" | "verified"
   credentialReviewNote?: string
@@ -283,6 +285,8 @@ export type Project = {
     accountId: string
     status: "pending" | "confirmed" | "declined"
     requiredDisciplines?: string[]
+    assignedDisciplines?: string[]
+    engineers?: {accountId:string;assignedDisciplines:string[];status:"pending"|"confirmed"|"declined";completionStatus?:string;responsibilityId?:string}[]
     sequence?: number
   }[]
   phase: string
@@ -491,6 +495,7 @@ export type Rules = {
   reminderDays?: number[]
 }
 export type State = {
+  multiEngineerAllocationAvailable?: boolean
   backendPhases?: Record<string,PhaseDefinition[]>
   tradeAllocationAvailable?: boolean
   phaseAllocationAvailable?: boolean
@@ -753,12 +758,18 @@ export function projectPhaseDisciplines(
   )
 }
 export function workload(state: State, id: string, excluding = "") {
+  const commitments=state.accounts.find(a=>a.id===id)?.engineerCommitments
+  if(commitments) return new Set(commitments.filter(c=>c.project_id!==excluding).map(c=>c.project_id)).size
   return state.projects.filter(
     (p) =>
       p.id !== excluding &&
       p.status === "active" &&
       (p.opmId === id || p.team.some((t) => t.accountId === id)),
   ).length
+}
+export function engineerAvailabilityLabel(account:Account) {
+ const commitments=account.engineerCommitments||[]
+ return commitments.some(c=>c.status==='confirmed')?'Committed to a project':commitments.length?'Reserved — awaiting acceptance':'Available for allocation'
 }
 export function eligible(state: State, a: Account, role: Role, excluding = "") {
   return (
@@ -768,7 +779,7 @@ export function eligible(state: State, a: Account, role: Role, excluding = "") {
     a.hasProfessionalCredentials === true &&
     a.eligibleForNewAssignment !== false &&
     Boolean(a.expiry) && daysUntil(a.expiry) > 30 &&
-    workload(state, a.id, excluding) < state.rules.cap &&
+    workload(state, a.id, excluding) < (a.singleProjectCommitment ? 1 : a.engineerCommitments ? 2 : state.rules.cap) &&
     !(a.cooldown && a.cooldown > Date.now())
   )
 }
@@ -806,13 +817,14 @@ export function spmCandidates(
     .filter(
       (a) =>
         (a.assignmentCandidateProjectIds
-          ? a.role === "spm" && a.status === "active" && a.eligibleForNewAssignment === true && !(a.cooldown && a.cooldown > Date.now())
-          : eligible(state, a, "spm", excluding)) && !activeLeads.includes(a.id) &&
+          ? a.role === "spm" && a.status === "active" && a.eligibleForNewAssignment === true && (!a.engineerCommitments || workload(state,a.id,excluding)<(a.singleProjectCommitment?1:2)) && !(a.cooldown && a.cooldown > Date.now())
+          : eligible(state, a, "spm", excluding)) && (a.engineerCommitments ? true : !activeLeads.includes(a.id)) &&
         (!a.assignmentCandidateProjectIds || a.assignmentCandidateProjectIds.includes(excluding)),
     )
     .map((a) => ({
       account: a,
-      matched: tags.filter((t) => (a.qualifiedRequirements ?? a.scope).includes(t)).length,
+      availableTags: tags.filter(t=>(a.qualifiedRequirements ?? a.scope).includes(t) && !a.engineerCommitments?.some(c=>c.project_id!==excluding && c.phase===phase && (c.tags===null || c.tags.includes(t)))),
+      matched: tags.filter((t) => (a.qualifiedRequirements ?? a.scope).includes(t) && !a.engineerCommitments?.some(c=>c.project_id!==excluding && c.phase===phase && (c.tags===null || c.tags.includes(t)))).length,
       total: tags.length,
     }))
     .filter((candidate) => tags.length > 0 && candidate.matched > 0)

@@ -1,0 +1,185 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+import React, { act } from "react"
+import { JSDOM } from "jsdom"
+import { createServer } from "vite"
+
+test("phase cards cover all areas and engineer response statuses stay consistent with acceptance and review", async () => {
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" }),
+    saved = new Map(),
+    originalFetch = globalThis.fetch
+  for (const [key, value] of Object.entries({
+    window: dom.window,
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    Node: dom.window.Node,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  })) {
+    saved.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
+    Object.defineProperty(globalThis, key, {
+      value,
+      configurable: true,
+      writable: true,
+    })
+  }
+  const server = await createServer({
+    server: { middlewareMode: true, hmr: false, watch: null },
+    appType: "custom",
+    logLevel: "silent",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  })
+  const { createRoot } = await import("react-dom/client"),
+    root = createRoot(document.getElementById("root"))
+  const button = (text) =>
+    [...document.querySelectorAll("button")].find(
+      (b) => b.textContent.trim() === text,
+    )
+  try {
+    const { default: Allocation, recommendPhaseEngineers } =
+      await server.ssrLoadModule("/src/PhaseEngineerAllocation.tsx")
+    const { emptyState } = await server.ssrLoadModule("/src/model.ts"),
+      state = emptyState()
+    const tags = ["Civil", "Structural", "Mechanical", "Electrical", "Plumbing"]
+    state.multiEngineerAllocationAvailable = true
+    state.accounts = [
+      {
+        id: "a",
+        name: "Mika",
+        role: "spm",
+        status: "active",
+        hasProfessionalCredentials: true,
+        eligibleForNewAssignment: true,
+        expiry: "2099-12-31",
+        scope: tags.slice(0, 2),
+        qualifiedRequirements: tags.slice(0, 2),
+        engineerCommitments: [],
+        singleProjectCommitment: true,
+      },
+      {
+        id: "b",
+        name: "Rafael",
+        role: "spm",
+        status: "active",
+        hasProfessionalCredentials: true,
+        eligibleForNewAssignment: true,
+        expiry: "2099-12-31",
+        scope: tags.slice(2),
+        qualifiedRequirements: tags.slice(2),
+        engineerCommitments: [],
+        singleProjectCommitment: true,
+      },
+    ]
+    const engineers = recommendPhaseEngineers(
+      state,
+      "Residential",
+      "Design",
+      tags,
+      "project",
+    )
+    assert.equal(engineers.length, 2)
+    const row = {
+      phase: "Design",
+      accountId: engineers[0].accountId,
+      status: "pending",
+      engineers,
+      requiredDisciplines: tags,
+    }
+    await act(() =>
+      root.render(
+        React.createElement(Allocation, {
+          state,
+          type: "Residential",
+          row,
+          required: tags,
+          projectId: "project",
+          team: [row],
+          onChange() {},
+        }),
+      ),
+    )
+    assert.match(document.body.textContent, /5 of 5 areas covered/)
+    assert.equal(
+      document.querySelectorAll(".phase-engineer-grid article").length,
+      2,
+    )
+    const { default: Responsibilities } = await server.ssrLoadModule(
+      "/src/EngineerResponsibilities.tsx",
+    )
+    const context = {
+      available: true,
+      canReview: false,
+      lifecycle: "active",
+      availabilityLabel: "Reserved — awaiting acceptance",
+      rows: [
+        {
+          id: "1",
+          user_id: "a",
+          name: "Mika",
+          phase: "Design",
+          assigned_disciplines: ["Civil", "Structural"],
+          status: "pending",
+          completion_status: "unfinished",
+        },
+      ],
+    }
+    const writes = []
+    globalThis.fetch = async (_url, init = {}) => {
+      if (init.method === "POST") {
+        const body = JSON.parse(init.body)
+        writes.push(body)
+        if (body.action === "accept") {
+          context.rows[0].status = "confirmed"
+          context.availabilityLabel = "Committed to a project"
+        }
+        if (body.action === "approve_completion") {
+          context.rows[0].completion_status = "approved"
+          context.rows[0].complete = true
+          context.availabilityLabel = "Available for allocation"
+        }
+      }
+      return Response.json({ data: context })
+    }
+    async function render(actor, key) {
+      await act(async () => {
+        root.render(
+          React.createElement(Responsibilities, {
+            key,
+            actor,
+            project: { id: "project" },
+            onReload() {},
+          }),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      })
+    }
+    await render({ id: "a", role: "spm" }, "engineer")
+    assert.match(document.body.textContent, /Reserved — awaiting acceptance/)
+    await act(() => button("Accept responsibility").click())
+    assert.equal(writes[0].action, "accept")
+    assert.match(document.body.textContent, /Committed to a project/)
+    assert.equal(button("Accept responsibility"), undefined)
+    assert.equal(
+      button("Approve completion"),
+      undefined,
+      "engineers cannot approve their own completion",
+    )
+    context.canReview = true
+    context.rows[0].completion_status = "submitted"
+    context.rows[0].completion_note = "All assigned work completed."
+    await render({ id: "admin", role: "admin" }, "reviewer")
+    assert.ok(button("Approve completion"))
+    assert.equal(button("Return for correction").disabled, true)
+    await act(() => button("Approve completion").click())
+    assert.equal(writes.at(-1).action, "approve_completion")
+    assert.match(document.body.textContent, /Responsibilities completed/)
+  } finally {
+    await act(() => root.unmount())
+    globalThis.fetch = originalFetch
+    await server.close()
+    dom.window.close()
+    for (const [key, value] of saved) {
+      if (value) Object.defineProperty(globalThis, key, value)
+      else delete globalThis[key]
+    }
+  }
+})

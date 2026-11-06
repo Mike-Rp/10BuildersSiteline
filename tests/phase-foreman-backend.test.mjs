@@ -11,6 +11,8 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
 import { installCredentialFixture } from "./helpers/credential-fixture.mjs"
 import { COMPANY_TRADES } from "../Thesis-Backend/src/domain/company-trades.js"
 import { api, login, setApiBase, setToken } from "../src/api/client.ts"
+import { loadState } from "../src/api/load.ts"
+import { saveApiProject, sendApiWorkflow, uploadFile } from "../src/api/actions.ts"
 const here = (p) => fileURLToPath(new URL(p, import.meta.url))
 const read = (p) => fs.readFileSync(here(p), "utf8")
 const port = () =>
@@ -28,7 +30,7 @@ test(
     const db = new PGlite({ extensions: { citext } })
     let socket, child
     t.after(async () => {
-      if (child) {
+      if (child && child.exitCode===null && child.signalCode===null) {
         const exit = new Promise((r) => child.once("exit", r))
         child.kill()
         await exit
@@ -157,7 +159,7 @@ test(
     child = spawn(process.execPath, ["src/index.js"], {
       cwd: here("../Thesis-Backend/"),
       windowsHide: true,
-      stdio: "ignore",
+      stdio: ["ignore","ignore","pipe"],
       env: {
         ...process.env,
         NODE_ENV: "development",
@@ -174,12 +176,14 @@ test(
         ARCHIVE_MAINTENANCE_ENABLED: "false",
       },
     })
+    child.stderr.on('data',chunk=>process.stderr.write(chunk));
     setApiBase(`http://127.0.0.1:${apiPort}/api/v1`)
     const deadline = Date.now() + 30000
     while (true) {
       try {
         if ((await fetch(`http://127.0.0.1:${apiPort}/api/v1/health`)).ok) break
       } catch {}
+      if(child.exitCode!==null)throw new Error('Test backend exited before readiness.');
       if (Date.now() > deadline) throw Error("API did not start")
       await new Promise((r) => setTimeout(r, 100))
     }
@@ -579,5 +583,167 @@ test(
       ).rows[0].n,
       rows.length,
     )
+    await t.test("walkthrough: new intake → OPM documents → SPM confirmations → manual foreman allocation", async () => {
+      await db.exec(read('../Thesis-Backend/migrations/019-engineer-phase-commitments.sql'))
+      // Earlier scenarios exercised legacy commitments. Start this connected intake
+      // with released engineer fixtures; all subsequent reservations use migration 019.
+      await db.exec("update project_phase_team set status='declined'")
+      const session = async (email, portal = "staff") => {
+        setToken("")
+        const user = await login(email, "Password@123", true, portal)
+        const state = await loadState(user)
+        return { user, state, actor: state.accounts.find(a => a.id === user.id) }
+      }
+      let s = await session("patricia.domingo@10builders.com", "admin")
+      const template = s.state.projects.find(p => p.id === source.id)
+      assert.ok(template)
+      const client = s.state.accounts.find(a => a.role === "client" && ["active", "invited"].includes(a.status))
+      assert.ok(client)
+      const project = { ...template, id: randomUUID(), name: "Intake to foreman walkthrough", clientId: client.id,
+        area: "100", floors: "1", start: "2027-01-15", end: "2027-10-15", docs: [],
+        clientSubcon: "", clientSubconEmail: "", clientSubconCompany: undefined,
+        team: template.team.map(row => ({ ...row, status: "pending" })) }
+      for (const row of project.team) {
+        const eligible = await db.query(`select q.user_id from engineer_qualified_scopes q join users u on u.id=q.user_id join roles r on r.id=u.role_id
+          join project_stage_discipline_links l on l.discipline_id=q.discipline_id
+          join project_stages ps on ps.id=l.project_stage_id join project_types pt on pt.id=l.project_type_id
+          where ps.code=$1 and pt.code=$2 and u.status='active' and r.code='spm'
+          and not exists(select 1 from license_renewal_requests renewal where renewal.user_id=u.id and renewal.status='under_review')
+          order by (q.user_id=$3) desc,q.user_id limit 1`, [row.phase, project.type, row.accountId])
+        assert.ok(eligible.rowCount, `Qualified SPM for ${row.phase}`)
+        row.accountId = eligible.rows[0].user_id
+      }
+      const simultaneous=await Promise.allSettled([
+        saveApiProject(project,false),
+        saveApiProject({...project,id:randomUUID(),name:'Concurrent engineer commitment'},false),
+      ])
+      assert.equal(simultaneous.filter(result=>result.status==='fulfilled').length,1,'only one conflicting intake may reserve the engineers')
+      assert.match(simultaneous.find(result=>result.status==='rejected').reason.message,/committed|two unfinished/)
+      const id = simultaneous.find(result=>result.status==='fulfilled').value
+      assert.ok((await db.query('select assigned_disciplines from project_phase_team where project_id=$1',[id])).rows.every(row=>row.assigned_disciplines?.length),'new intake reserves explicit specialization snapshots')
+      await assert.rejects(saveApiProject({...project,id:randomUUID(),name:'Duplicate engineer commitment'},false),/committed|two unfinished/,'manual intake cannot bypass the same phase-and-tag reservation')
+      const recommended=await api(`/projects/recommendations?project_type=${encodeURIComponent(project.type)}&floor_area_sqm=100&floor_count=1`)
+      const reserved=(await db.query('select s.code,t.spm_user_id,t.assigned_disciplines from project_phase_team t join project_stages s on s.id=t.project_stage_id where t.project_id=$1',[id])).rows
+      for(const row of recommended.phase_team) assert.ok(!reserved.some(old=>old.code===row.stage&&old.spm_user_id===row.user_id&&row.assigned_disciplines?.some(tag=>old.assigned_disciplines.includes(tag))),'recommendation API excludes identical reserved phase and tag')
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status, "sent_to_opm")
+      const accounts = s.state.accounts
+      s = await session(accounts.find(a => a.id === project.opmId).email)
+      await sendApiWorkflow(s.state, s.actor, { type: "accept_opm", projectId: id })
+      for (let index = 0; index < 6; index++) {
+        const fileId = randomUUID()
+        await uploadFile(fileId, new File(["%PDF-1.4\nWalkthrough supporting record"], "registered.pdf", { type: "application/pdf" }))
+        s.state = await loadState(s.user)
+        await sendApiWorkflow(s.state, s.actor, { type: "upload_registered", projectId: id, docIndex: index,
+          doc: { id: fileId, name: "registered.pdf", uploaded: true } })
+      }
+      for (const accountId of new Set(project.team.map(row => row.accountId))) {
+        s = await session(accounts.find(a => a.id === accountId).email)
+        assert.ok(s.state.projects.some(p => p.id === id), `SPM workspace must include pending intake: ${JSON.stringify({email:s.user.email,role:s.user.role,projects:s.state.projects.map(p=>p.name),renewalOnly:s.state.renewalOnly})}`)
+        await sendApiWorkflow(s.state, s.actor, { type: "accept_assignment", projectId: id })
+      }
+      s = await session(accounts.find(a => a.id === project.team[0].accountId).email)
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status, "spm_review")
+      // Free only disposable fixture commitments so this walkthrough starts with an available company.
+      await db.query("update project_subcontractor_selections set status='archived' where subcontractor_id=$1", [companies[0]])
+      await db.query("update project_subcontractor_assignments set status='released' where subcontractor_id=$1", [companies[0]])
+      const context = await get(id)
+      const assignments = proposal(context, companies[0])
+      const request = await post(id, "submit", { revision: context.revision, assignments })
+      assert.equal(request.status, "approved", "initial single company needs no additional-company approval")
+      await contactAccept(id, request, companies[0])
+      await post(id, "confirm", { requestId: Number(request.id) })
+      const confirmed = await get(id)
+      assert.equal(confirmed.assignments.length, context.phases.length)
+      assert.equal(new Set(confirmed.assignments.map(row => row.phase)).size, context.phases.length)
+      assert.equal(new Set(confirmed.assignments.map(row => row.foremanId)).size, 2)
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status, "spm_review", "allocation cannot bypass the signed agreement")
+      const fileId = randomUUID()
+      await uploadFile(fileId, new File(["%PDF-1.4\nSigned subcontractor agreement"], "agreement.pdf", { type: "application/pdf" }))
+      s.state = await loadState(s.user)
+      await sendApiWorkflow(s.state, s.actor, { type: "upload_agreement", projectId: id,
+        allocationRevision: confirmed.revision, doc: { id: fileId, name: "agreement.pdf", uploaded: true } })
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status, "active")
+      assert.equal((await db.query("select count(*)::int as n from project_subcontractor_assignments where project_id=$1 and status='active'", [id])).rows[0].n, 1)
+    })
+    await t.test('multiple engineers cover each phase and remain committed until all personal responsibilities finish',async()=>{
+      await db.exec(read('../Thesis-Backend/migrations/004-project-type-workflows.sql'))
+      await db.exec(read('../Thesis-Backend/migrations/020-engineer-phase-responsibilities.sql'))
+      await db.exec(read('../Thesis-Backend/migrations/020-engineer-phase-responsibilities.sql'))
+      assert.equal((await db.query('select count(*)::int n from project_phase_responsibilities')).rows[0].n,0,'migration does not invent legacy responsibilities')
+      await db.exec("update project_phase_team set status='declined';update user_licenses set license_expiry=current_date+400 where superseded_at is null;delete from license_renewal_requests where status='under_review';delete from engineer_specializations where user_id in(select u.id from users u join roles r on r.id=u.role_id where r.code='spm')")
+      const personA=(await db.query("select id from users where email='karlo.espiritu@10builders.com'")).rows[0].id
+      const personB=(await db.query("select id from users where email='rafael.mercado@10builders.com'")).rows[0].id
+      await admin()
+      const adminId=(await api('/workspace')).accountDetails
+      const reviewer=Object.values(adminId).find(a=>a.role==='admin').id
+      for(const [person,tags] of [[personA,['Civil','Structural','Geotechnical']],[personB,['Mechanical','Electrical','Sanitary']]])for(const tag of tags)await db.query('insert into engineer_specializations(user_id,specialization,recorded_by) values($1,$2,$3)',[person,tag,reviewer])
+      for(const profession of ['Mechanical Engineer','Electrical Engineer','Sanitary Engineer'])await db.query(`insert into user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,created_by,profession,verification_status,verified_by,verified_at)
+        select $1,'TEST-CREDENTIAL',current_date+400,'uploaded','seed/licenses/test-proof.pdf',$2,$3,'verified',$2,now() where not exists(select 1 from user_licenses where user_id=$1 and profession=$3 and superseded_at is null)`,[personB,reviewer,profession])
+      const as=async(email,portal='staff')=>{setToken('');const user=await login(email,'Password@123',true,portal);const state=await loadState(user);return {user,state,actor:state.accounts.find(a=>a.id===user.id)}}
+      let session=await as('patricia.domingo@10builders.com','admin')
+      const template=session.state.projects.find(p=>p.id===source.id),accounts=session.state.accounts
+      const suggested=await api(`/projects/recommendations?project_type=${encodeURIComponent(template.type)}&floor_area_sqm=100&floor_count=1`)
+      const phaseRequirements=(await db.query(`select s.code as phase,array_agg(d.code order by d.code) as tags from project_stage_discipline_links l join project_types pt on pt.id=l.project_type_id join project_stages s on s.id=l.project_stage_id join disciplines d on d.id=l.discipline_id where pt.code=$1 group by s.code`,[template.type])).rows
+      assert.ok(suggested.phase_team.every(row=>row.coverage_complete),JSON.stringify(suggested.phase_team))
+      assert.ok(suggested.phase_team.some(row=>row.engineers.length>=2),'five-area Design needs complementary engineers')
+      const client=accounts.find(a=>a.role==='client'&&['active','invited'].includes(a.status))
+      const project={...template,id:randomUUID(),name:'Multi-engineer walkthrough',clientId:client.id,area:'100',floors:'1',start:'2027-01-15',end:'2027-10-15',docs:[],clientSubcon:'',clientSubconEmail:'',clientSubconCompany:undefined,
+        team:suggested.phase_team.map(row=>({phase:row.stage,accountId:row.user_id,status:'pending',requiredDisciplines:phaseRequirements.find(p=>p.phase===row.stage).tags,
+          assignedDisciplines:row.engineers[0].assigned_disciplines,engineers:row.engineers.map(e=>({accountId:e.user_id,assignedDisciplines:e.assigned_disciplines,status:'pending'}))}))}
+      const incomplete=structuredClone(project);incomplete.id=randomUUID();const design=incomplete.team.find(row=>row.phase==='Design');design.engineers=design.engineers.slice(0,1)
+      await assert.rejects(saveApiProject(incomplete,false),/Uncovered|cover every/,'a partial phase cannot be submitted')
+      const id=await saveApiProject(project,false)
+      let data=await api(`/projects/${id}/engineer-responsibilities`)
+      assert.ok(data.rows.every(row=>row.status==='pending'&&row.assigned_disciplines.length<=3))
+      const first=data.rows.find(row=>row.user_id===personA&&row.phase==='Mobilization')
+      assert.ok(first)
+      session=await as('karlo.espiritu@10builders.com')
+      data=await api(`/projects/${id}/engineer-responsibilities`)
+      assert.equal(data.availabilityLabel,'Reserved — awaiting acceptance')
+      await assert.rejects(api(`/projects/${id}/engineer-responsibilities/${first.id}`,{method:'POST',json:{action:'accept'}}),/Wait for OPM/)
+      session=await as(accounts.find(a=>a.id===project.opmId).email)
+      await sendApiWorkflow(session.state,session.actor,{type:'accept_opm',projectId:id})
+      for(let index=0;index<6;index++){
+        const fileId=randomUUID();await uploadFile(fileId,new File(['%PDF-1.4\nRegistered record'],'record.pdf',{type:'application/pdf'}));session.state=await loadState(session.user)
+        await sendApiWorkflow(session.state,session.actor,{type:'upload_registered',projectId:id,docIndex:index,doc:{id:fileId,name:'record.pdf',uploaded:true}})
+      }
+      for(const person of [personA,personB]){
+        session=await as(accounts.find(a=>a.id===person).email)
+        assert.ok(session.state.projects.find(p=>p.id===id).team.some(row=>row.engineers?.some(e=>e.accountId===person)),'supporting engineers load their responsibilities')
+        await sendApiWorkflow(session.state,session.actor,{type:'accept_assignment',projectId:id})
+      }
+      session=await as('karlo.espiritu@10builders.com')
+      data=await api(`/projects/${id}/engineer-responsibilities`)
+      assert.equal(data.availabilityLabel,'Committed to a project');assert.ok(data.rows.every(row=>row.status==='confirmed'))
+      await admin();const excluded=await api(`/projects/recommendations?project_type=${encodeURIComponent(template.type)}&floor_area_sqm=100&floor_count=1`)
+      assert.ok(excluded.phase_team.every(row=>!row.engineers.some(e=>[personA,personB].includes(e.user_id))),'unfinished work blocks other projects even for a different phase or tag')
+      await db.query("update project_subcontractor_selections set status='archived' where subcontractor_id=$1",[companies[0]])
+      await db.query("update project_subcontractor_assignments set status='released' where subcontractor_id=$1",[companies[0]])
+      await db.query("update workspace_company_metadata set metadata=metadata||$2::jsonb where subcontractor_id=$1",[companies[0],JSON.stringify({foremen:[{name:'Mika Foreman',phone:'09987654321'},{name:'Yak Foreman',phone:'09123456789'}],capabilityReview:{disciplines:COMPANY_TRADES,reviewedAt:new Date().toISOString(),unavailable:false}})])
+      session=await as('karlo.espiritu@10builders.com')
+      const ctx=await get(id),request=await post(id,'submit',{revision:ctx.revision,assignments:proposal(ctx,companies[0])})
+      await contactAccept(id,request,companies[0]);await post(id,'confirm',{requestId:Number(request.id)})
+      const revision=(await get(id)).revision,fileId=randomUUID();await uploadFile(fileId,new File(['%PDF-1.4\nSigned agreement'],'agreement.pdf',{type:'application/pdf'}));session.state=await loadState(session.user)
+      await sendApiWorkflow(session.state,session.actor,{type:'upload_agreement',projectId:id,allocationRevision:revision,doc:{id:fileId,name:'agreement.pdf',uploaded:true}})
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status,'active')
+      await admin()
+      await assert.rejects(api(`/projects/${id}/advance-phase`,{method:'POST',json:{}}),error=>error.status===409,'unfinished personal responsibilities block phase handoff')
+      session=await as('karlo.espiritu@10builders.com')
+      const file=new FormData();file.set('file',new File(['%PDF-1.4\nMy completed responsibilities'],'completion.pdf',{type:'application/pdf'}));file.set('stage','Mobilization')
+      const proof=await api(`/projects/${id}/phase-files`,{method:'POST',body:file})
+      const respond=(action,body={})=>api(`/projects/${id}/engineer-responsibilities/${first.id}`,{method:'POST',json:{action,...body}})
+      await respond('submit_completion',{note:'Civil and Geotechnical responsibilities completed.',fileId:proof.id})
+      await assert.rejects(respond('approve_completion'),/Only Admin|Office PM/,'engineers cannot approve their own completion')
+      await admin();await respond('approve_completion')
+      session=await as('karlo.espiritu@10builders.com');data=await api(`/projects/${id}/engineer-responsibilities`)
+      assert.equal(data.rows.find(r=>String(r.id)===String(first.id)).completion_status,'approved')
+      assert.equal(data.availabilityLabel,'Committed to a project','unfinished succeeding phases retain the project commitment')
+      // Simulate the remaining independently reviewed approvals in this disposable fixture.
+      await db.query("update project_phase_responsibilities set completion_status='approved',reviewed_by=$2,reviewed_at=now() where project_id=$1 and user_id=$3",[id,reviewer,personA])
+      data=await api(`/projects/${id}/engineer-responsibilities`)
+      assert.equal(data.availabilityLabel,'Available for allocation')
+      assert.equal((await api(`/projects/${id}`)).lifecycle_status,'active','the overall project can remain ongoing')
+      assert.ok((await db.query("select id from audit_log where table_name='project_phase_responsibilities' and new_values->>'_archive_event'='approve_completion'")).rowCount)
+    })
   },
 )

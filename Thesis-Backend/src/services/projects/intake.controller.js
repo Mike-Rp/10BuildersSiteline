@@ -1,3 +1,4 @@
+import { saveEngineerScopes } from "./engineer-commitments.utility.js";
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import { normalizeClientCompany } from "../../domain/client-company.js";
@@ -100,9 +101,9 @@ export const createIntake = async (req, res) => {
       await assertEligibleManager(client, suggested_opm_id, 'opm');
       for (const phase of phase_team) {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
-        await assertEligibleManager(client, phase.user_id, 'spm');
       }
-      await validateScopedQualifications(client,projectType.rows[0].id,phase_team);
+      for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
+      await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true});
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
@@ -138,6 +139,7 @@ export const createIntake = async (req, res) => {
           [project.id,phase.stage,phase.user_id,phaseScope ? index===0 : phase.is_lead ?? false,actor.id]);
         if (!r.rowCount) throw Object.assign(new Error(`Unknown stage: ${phase.stage}`), {status:422});
       }
+      await saveEngineerScopes(client,project.id,phase_team,actor.id);
       if(selectedClient) {
         await client.query("DELETE FROM user_client_project_links WHERE project_id=$1 AND user_id<>$2",[project.id,selectedClient]);
         await client.query("INSERT INTO user_client_project_links (user_id,project_id,created_by,updated_by) VALUES ($1,$2,$3,$3) ON CONFLICT (user_id,project_id) DO NOTHING",[selectedClient,project.id,actor.id]);

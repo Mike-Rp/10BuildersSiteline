@@ -1,6 +1,7 @@
 import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
+import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
 
 // Pure check: every required phase has exactly one row with a valid engineer that is confirmed.
 // `required` comes only from the authoritative workflow; `rows` are the saved assignment rows.
@@ -50,7 +51,16 @@ export async function loadPhaseCoverage(db, projectId) {
     FROM project_phase_team t JOIN project_stages s ON s.id=t.project_stage_id
     LEFT JOIN users u ON u.id=t.spm_user_id LEFT JOIN roles r ON r.id=u.role_id
     WHERE t.project_id=$1 FOR UPDATE OF t`, [projectId])).rows;
-  return evaluatePhaseCoverage(required, rows);
+  const result=evaluatePhaseCoverage(required, rows);
+  if(await responsibilitiesInstalled(db)) {
+   const responsibilities=(await db.query(`select assignment.*,s.code,(u.status='active' and not coalesce(u.is_deleted,false) and ${LICENSE_ELIGIBILITY_SQL} and not exists(select 1 from unnest(assignment.assigned_disciplines) tag where not exists(select 1 from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=u.id and d.code=tag))) as engineer_valid from project_phase_responsibilities assignment join project_stages s on s.id=assignment.project_stage_id join users u on u.id=assignment.user_id where assignment.project_id=$1 for update of assignment`,[projectId])).rows;
+   if(responsibilities.length)for(const phase of required) {
+    const assigned=responsibilities.filter(r=>String(r.project_stage_id)===String(phase.project_stage_id));
+    const requiredTags=(await db.query('select d.code from projects p join project_stage_discipline_links l on l.project_type_id=p.project_type_id join disciplines d on d.id=l.discipline_id where p.id=$1 and l.project_stage_id=$2',[projectId,phase.project_stage_id])).rows.map(r=>r.code);
+    if(!assigned.length || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.some(tag=>!assigned.some(r=>r.status==='confirmed'&&r.engineer_valid&&r.assigned_disciplines.includes(tag)))) {result.ok=false;result.unconfirmed.push(phase.code+' specialization responsibilities');}
+   }
+  }
+  return result;
 }
 
 export async function assertPhaseCoverage(db, projectId) {

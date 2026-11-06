@@ -1,3 +1,4 @@
+import { commitmentsInstalled, prepareEngineerAssignments, saveEngineerScopes } from "../projects/engineer-commitments.utility.js";
 import { needsLicenseReplacement } from "../../common/utilities/license-status.utility.js";
 // Admin-managed replacement from 30 days before expiry. Office signing and Admin approval finalize the switch.
 import execute from "../../common/utilities/query.utility.js";
@@ -73,6 +74,16 @@ async function candidateRows(db, project, stageId, excludeId) {
          from users u join roles r on r.id=u.role_id
         where r.code='spm' and u.status='active' and not coalesce(u.is_deleted,false) and u.id<>$2 and ${LICENSE_ELIGIBILITY_SQL}`,
       [required, excludeId, project.id])).rows;
+    if(await commitmentsInstalled(db)) {
+      const stage=(await db.query('select code from project_stages where id=$1',[stageId])).rows[0];
+      const available=[];
+      for(const row of rows) {
+        const team=[{stage:stage.code,user_id:row.id}];
+        try { await prepareEngineerAssignments(db,project.project_type_id,team,{projectId:project.id,lock:false});available.push({...row,matchPercent:required.length?Math.round(row.matching*100/required.length):100}); }
+        catch(error){if(error.status!==409)throw error;}
+      }
+      return available;
+    }
     return rows
       .filter((row) => row.workload < cap && (required.length === 0 || row.matching === required.length))
       .map((row) => ({ ...row, matchPercent: required.length ? Math.round((row.matching * 100) / required.length) : 100 }));
@@ -269,6 +280,12 @@ export const workRecord = async (req, res) => {
 };
 
 async function applyAdminHandover(db, o, project, actorId) {
+ let scopedTeam=[];
+ if(o.role_code==='spm') {
+  const scope=(await db.query('select p.project_type_id,s.code from projects p join project_stages s on s.id=$2 where p.id=$1',[o.project_id,o.project_stage_id])).rows[0];
+  scopedTeam=[{stage:scope.code,user_id:o.to_user_id}];
+  await prepareEngineerAssignments(db,scope.project_type_id,scopedTeam,{projectId:o.project_id});
+ }
  const lockedHolder = o.role_code === "spm" ? (await db.query("select * from project_phase_team where project_id=$1 and project_stage_id=$2 for update", [o.project_id,o.project_stage_id])).rows[0] : null;
       // The original engineer stays on record: their history row is closed, not removed.
       await ensureOpenHistory(db, { projectId: o.project_id, stageId: o.project_stage_id, role: o.role_code, userId: o.from_user_id,
@@ -280,6 +297,7 @@ async function applyAdminHandover(db, o, project, actorId) {
         await db.query(
           `update project_phase_team set spm_user_id=$3, status='confirmed', responded_at=now(), response_deadline_at=null, updated_by=$4, updated_at=now()
             where project_id=$1 and project_stage_id=$2`, [o.project_id, o.project_stage_id, o.to_user_id, actorId]);
+        await saveEngineerScopes(db,o.project_id,scopedTeam,actorId);
         await db.query(
           `update project_engineers set unassigned_at=now(), updated_by=$3, updated_at=now()
             where project_id=$1 and user_id=$2 and unassigned_at is null

@@ -162,7 +162,7 @@ export function phaseOwner(p: Project, phase = p.phase) {
   return p.team.find((t) => t.phase === phase)?.accountId || ""
 }
 export function isAssigned(p: Project, id: string) {
-  return p.team.some((t) => t.accountId === id)
+  return p.team.some((t) => t.accountId === id || t.engineers?.some(e=>e.accountId===id))
 }
 export function registeredComplete(p: Project) {
   return DOC_LABELS.slice(0, 6).every((label) =>
