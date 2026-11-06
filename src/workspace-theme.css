@@ -18,10 +18,10 @@
   color: var(--color-ink);
 }
 #root:has(.app-shell.admin-workspace) {
-  --color-warning: #6250b5;
-  --amber: #6250b5;
-  --amber-soft: #f1efff;
-  --warning-border: #c9c2ee;
+  --color-warning: #b45309;
+  --amber: #b45309;
+  --amber-soft: #fff4e2;
+  --warning-border: #e8cfad;
   --color-danger: #a03f72;
   --red: #a03f72;
   --red-soft: #fff0f6;
