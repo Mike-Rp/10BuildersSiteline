@@ -15,6 +15,15 @@ export const isIntake = (p: Project) => ["pending", "draft", "changes_requested"
 export const isIntakeHistory = (p: Project) => ["active", "completed"].includes(p.status)
 export const intakeHistoryLabel = (p: Project) => p.status === "completed" ? "Intake Completed · Project Completed" : "Intake Completed · Project Active"
 
+// This is an intake checklist, not a construction-phase schedule or readiness gate.
+export function intakeProgressStep(project: Project, guidance: IntakeGuidance): number {
+  if (project.status === "draft" || project.status === "changes_requested") return 0
+  if (["Office PM unassigned", "Office PM acceptance"].includes(guidance.stage)) return 1
+  if (guidance.stage === "Required documents") return 2
+  if (["Lead Site PM acceptance", "Site PM confirmations", "Phase reassignment", "Phase assignments incomplete"].includes(guidance.stage)) return 3
+  return 4
+}
+
 // Presentation only: all destinations reuse existing screens and commands.
 // Never call this with a client projection or infer access from an account scope label.
 export function intakeGuidance(state: State, p: Project, actor: Account): IntakeGuidance | null {

@@ -178,32 +178,20 @@ export default function ProjectExplorer({
     <div className="project-explorer">
       <dl className="explorer-counters" aria-label="Repository summary">
         <div>
-          <dt>Accessible projects</dt>
+          <dt>Accessible Projects</dt>
           <dd>{counters.projects}</dd>
         </div>
         <div>
-          <dt>Original files</dt>
+          <dt>Original Files</dt>
           <dd>{counters.files}</dd>
         </div>
         <div>
-          <dt>Empty repositories</dt>
-          <dd>{counters.empty}</dd>
+          <dt>Projects Without Files</dt>
+          <dd>{counters.empty}<small>No uploaded documents yet</small></dd>
         </div>
       </dl>
-      {recents.length > 0 && (
-        <section className="explorer-recent" aria-label="Recently accessed">
-          <h3>Recently accessed</h3>
-          <div className="explorer-grid">
-            {recents.map((project) => (
-              <ProjectCard
-                key={project.id}
-                item={byId.get(project.id)!}
-                onExplore={onExplore}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="explorer-search-section" aria-label="Search & Filter Projects">
+      <h3>Search &amp; Filter Projects</h3>
       <ListSection
         list={list}
         placeholder="Search projects or documents"
@@ -223,6 +211,17 @@ export default function ProjectExplorer({
           </div>
         )}
       />
+      </section>
+      {recents.length > 0 && (
+        <section className="explorer-recent" aria-label="Recently accessed">
+          <h3>Recently Accessed</h3>
+          <div className="explorer-grid">
+            {recents.map((project) => (
+              <ProjectCard key={project.id} item={byId.get(project.id)!} onExplore={onExplore} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

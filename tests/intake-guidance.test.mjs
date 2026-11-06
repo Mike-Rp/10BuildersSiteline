@@ -1,11 +1,23 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { emptyState, DOC_LABELS } from "../src/model.ts"
-import { intakeGuidance, intakeViewCounts, isIntake, isIntakeHistory, intakeHistoryLabel } from "../src/intake-guidance.ts"
+import { intakeGuidance, intakeViewCounts, isIntake, isIntakeHistory, intakeHistoryLabel, intakeProgressStep } from "../src/intake-guidance.ts"
 
 const actor = (role,id=role) => ({id,role,status:"active",expiry:"2099-01-01"})
 const project = extra => ({id:"p",name:"Project",type:"Residential",status:"pending",opmId:"opm",opmAccepted:false,clientId:"client",docs:[],team:[{phase:"Mobilization",accountId:"lead",status:"pending"},{phase:"Design",accountId:"spm",status:"pending"}],workflow:{checklist:{},responses:[],selections:[],notes:[],photos:[]},...extra})
 const docs = () => DOC_LABELS.slice(0,6).map(label=>({label,uploaded:true}))
+test("intake tracker follows actual prerequisites without treating intake stages as construction phase dates", () => {
+  const p=project({}), state=workspace(p), admin=actor('admin')
+  assert.equal(intakeProgressStep(p,intakeGuidance(state,p,admin)),1)
+  p.opmAccepted=true
+  assert.equal(intakeProgressStep(p,intakeGuidance(state,p,admin)),2)
+  p.docs=docs()
+  assert.equal(intakeProgressStep(p,intakeGuidance(state,p,admin)),3)
+  p.team=p.team.map(row=>({...row,status:'confirmed'}))
+  assert.equal(intakeProgressStep(p,intakeGuidance(state,p,admin)),4)
+  p.status='changes_requested'
+  assert.equal(intakeProgressStep(p,intakeGuidance(state,p,admin)),0)
+})
 test("activated projects leave current intake and remain in intake history without becoming pending actions", () => {
   for (const status of ["draft", "pending", "changes_requested", "active", "completed", "declined", "expired"]) {
     const p = project({ status }), state = workspace(p)

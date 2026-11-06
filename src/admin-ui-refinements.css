@@ -1,0 +1,61 @@
+/* Admin desktop refinements: retain the existing navigation, data and actions. */
+#root .admin-workspace .workspace-meta.has-greeting { align-items: center; margin-bottom: 10px; gap: 6px 18px; }
+#root .admin-workspace .workspace-meta.has-greeting .dashboard-welcome { color: var(--color-ink); font-size: 20px; font-weight: 600; line-height: 1.45; }
+#root .admin-workspace .workspace-meta.has-greeting > span { color: var(--color-ink); font-size: 16px; font-weight: 500; }
+#root .admin-workspace :is(.admin-overview h2, .panel-header h2, .active-sites-view-tabs button, .dashboard-attention-switch button) { text-transform: capitalize; }
+#root .admin-workspace .admin-overview .page-heading { margin-bottom: 12px; }
+#root .admin-workspace .admin-overview .dashboard-attention-switch { margin: 10px 0 12px; }
+#root .admin-workspace .admin-overview .urgent-action-banner { background: #fbedec; border-color: #d9a5a1; border-left-color: #9b3434; padding: 16px; margin-bottom: 16px; }
+#root .admin-workspace .admin-overview :is(.urgent-banner-eyebrow, .urgent-banner-icon, .urgent-banner-copy h2) { color: #9b3434; }
+#root .admin-workspace .admin-overview .urgent-banner-items { margin-top: 12px; border-color: #e6c5c2; }
+#root .admin-workspace .admin-overview .urgent-banner-item { background: #fff; border-color: #eedcda; padding: 11px 14px; }
+#root .admin-workspace .admin-overview .urgent-banner-item:hover { background: #fff5f4; }
+#root .admin-workspace .admin-overview .executive-summary { padding: 16px; margin-bottom: 16px; }
+#root .admin-workspace .admin-overview .executive-metric { padding: 14px; }
+
+/* Category pills remain separate from repository statistics and filter controls. */
+#root .admin-workspace .active-sites-view-tabs:is([aria-label="Documents sections"], [aria-label="Directory sections"]) { padding: 0; margin: 0 0 14px; border: 0; background: transparent; min-height: 0; gap: 8px; flex-wrap: wrap; }
+#root .admin-workspace .active-sites-view-tabs:is([aria-label="Documents sections"], [aria-label="Directory sections"]) button { padding: 9px 16px; min-height: 42px; border: 1px solid var(--color-line); border-radius: 999px; background: #fff; font-size: 14px; }
+#root .admin-workspace .active-sites-view-tabs:is([aria-label="Documents sections"], [aria-label="Directory sections"]) button[aria-selected="true"] { color: #fff; background: #193b59; border-color: #193b59; }
+#root .admin-workspace .document-browser > .panel-header { padding: 16px 18px 10px; }
+#root .admin-workspace .project-explorer { padding: 12px 18px 18px; gap: 16px; }
+#root .admin-workspace .explorer-counters > div { padding: 12px 14px; background: #fff; }
+#root .admin-workspace .explorer-counters small { display: block; color: var(--color-muted); font-size: 13px; line-height: 1.4; margin-top: 3px; }
+.explorer-search-section { min-width: 0; border-top: 1px solid var(--color-line); padding-top: 16px; }
+.explorer-search-section > h3 { margin: 0 0 8px; font-size: 17px; }
+#root .admin-workspace .explorer-search-section .list-toolbar { padding: 4px 0 12px; }
+#root .admin-workspace .explorer-search-section .list-result-count { margin-top: 0; }
+@media (min-width: 1280px) { #root .admin-workspace .explorer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Make missing credentials visible on the card as well as in the summary. */
+#root .admin-workspace .engineer-credential-banner { background: #fff4e2; border-color: #e8cfad; border-left-color: #b45309; padding: 12px 14px; margin-bottom: 12px; }
+#root .admin-workspace .engineer-credential-banner:hover { background: #ffedce; }
+#root .admin-workspace .engineer-credential-banner :is(strong, .engineer-credential-banner-icon) { color: #944307; }
+#root .admin-workspace .engineer-credential-banner-copy small { color: #78522f; font-size: 14px; line-height: 1.45; }
+#root .admin-workspace .engineer-type-summary-panel { margin-bottom: 12px; }
+#root .admin-workspace .engineer-type-summary-panel .panel-header { padding: 10px 16px; }
+#root .admin-workspace .engineer-type-count { min-height: 56px; }
+#root .admin-workspace .engineer-grid { padding: 14px; gap: 14px; align-items: stretch; }
+#root .admin-workspace .engineer-card { padding: 16px; border-radius: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+#root .admin-workspace .engineer-top { display: flex; gap: 10px; align-items: flex-start; margin: 0; }
+#root .admin-workspace .engineer-top .avatar { width: 42px; height: 42px; flex-shrink: 0; font-size: 16px; }
+#root .admin-workspace .engineer-identity { flex: 1; min-width: 0; }
+#root .admin-workspace .engineer-identity h3 { margin: 0; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+#root .admin-workspace .engineer-identity p { margin: 3px 0 0; font-size: 14px; }
+#root .admin-workspace .engineer-card .badge { font-size: 13px; line-height: 1.45; padding: 4px 7px; white-space: normal; align-self: flex-start; }
+#root .admin-workspace .engineer-top > .badge { flex-shrink: 0; max-width: 90px; }
+#root .admin-workspace .engineer-card .tag-list { margin: 0; min-height: 0; gap: 6px; }
+#root .admin-workspace .engineer-card .tag-list > span { font-size: 13px; padding: 3px 7px; line-height: 1.5; }
+#root .admin-workspace .engineer-footer { display: flex; gap: 8px; padding-top: 10px; margin-top: auto; align-items: center; }
+#root .admin-workspace .engineer-footer > span:first-child { flex-basis: 100%; font-size: 13px; }
+#root .admin-workspace .engineer-profile-action { display: inline-flex; align-items: center; gap: 5px; color: #193b59; font-size: 13px; font-weight: 600; margin-left: auto; }
+#root .admin-workspace .engineer-needs-credentials { border-color: #e8cfad; }
+#root .admin-workspace .engineer-needs-credentials:hover { border-color: #b45309; }
+
+@media (max-width: 640px) {
+  #root .admin-workspace .workspace-meta.has-greeting .dashboard-welcome { font-size: 18px; }
+  #root .admin-workspace .project-explorer { padding: 12px; }
+  #root .admin-workspace .engineer-grid { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  #root .admin-workspace .engineer-credential-banner-action { white-space: normal; }
+  #root .admin-workspace .explorer-counters { grid-template-columns: minmax(0, 1fr); }
+}

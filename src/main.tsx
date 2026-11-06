@@ -5,6 +5,7 @@ import SessionInactivity from "./SessionInactivity"
 import "./index.css"
 import "./construction-daylight.css"
 import "./workspace-theme.css"
+import "./admin-ui-refinements.css"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

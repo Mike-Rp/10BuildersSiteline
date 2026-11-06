@@ -1,0 +1,37 @@
+#root .admin-workspace .admin-intake-cards { display: grid; gap: 14px; padding: 0 16px 16px; }
+#root .admin-workspace .admin-intake-card { min-width: 0; border: 1px solid #cbdbe8; border-radius: 14px; background: #fff; padding: 18px; }
+#root .admin-workspace .admin-intake-card-heading { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 18px; }
+#root .admin-workspace .admin-intake-card-identity { flex: 1 1 230px; min-width: 0; }
+#root .admin-workspace .admin-intake-card-identity h3 { margin: 0; font-size: 20px; line-height: 1.35; }
+#root .admin-workspace .admin-intake-card-identity h3 button { color: var(--color-ink); background: transparent; border: 0; padding: 0; text-align: left; font: inherit; font-weight: 650; overflow-wrap: anywhere; cursor: pointer; }
+#root .admin-workspace .admin-intake-card-identity h3 button:hover { color: #315a85; text-decoration: underline; }
+#root .admin-workspace .admin-intake-card-identity p { margin: 5px 0 0; color: var(--color-muted); font-size: 14px; }
+#root .admin-workspace .admin-intake-card-heading > .intake-stage { max-width: 100%; padding: 5px 9px; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+#root .admin-workspace .admin-intake-card-dates { flex: 0 1 245px; border-left: 1px solid var(--color-line); padding-left: 16px; margin: 0; font-size: 13px; color: var(--color-muted); }
+#root .admin-workspace .admin-intake-card-dates > div { display: flex; flex-wrap: wrap; gap: 3px 6px; }
+#root .admin-workspace .admin-intake-card-dates dd { margin: 0; color: var(--color-ink); }
+#root .admin-workspace .admin-intake-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 20px 0; padding: 0; list-style: none; }
+#root .admin-workspace .admin-intake-progress li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 6px; min-width: 0; color: var(--color-muted); font-size: 13px; line-height: 1.4; text-align: center; }
+#root .admin-workspace .admin-intake-progress li:not(:last-child)::after { content: ""; position: absolute; top: 10px; height: 2px; left: calc(50% + 11px); width: calc(100% - 22px); background: #dce6ef; }
+#root .admin-workspace .admin-intake-progress li.complete::after { background: #7596b1; }
+#root .admin-workspace .admin-intake-step-marker { display: grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid #a3b4c5; background: #fff; }
+#root .admin-workspace .admin-intake-progress .complete .admin-intake-step-marker { background: #193b59; border-color: #193b59; color: #fff; }
+#root .admin-workspace .admin-intake-progress .current { color: #193b59; font-weight: 650; }
+#root .admin-workspace .admin-intake-progress .current .admin-intake-step-marker { border: 5px solid #193b59; }
+#root .admin-workspace .admin-intake-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 9px; background: #edf5fc; }
+#root .admin-workspace .admin-intake-card-footer > div { min-width: 0; }
+#root .admin-workspace .admin-intake-card-footer p { margin: 0; color: var(--color-ink); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+#root .admin-workspace .admin-intake-card-footer small { display: block; margin-top: 4px; color: var(--color-muted); font-size: 13px; line-height: 1.4; }
+#root .admin-workspace .admin-intake-card-footer .button { flex-shrink: 0; max-width: 220px; white-space: normal; }
+@media (max-width: 640px) {
+  #root .admin-workspace .admin-intake-cards { padding: 0 10px 10px; gap: 12px; }
+  #root .admin-workspace .admin-intake-card { padding: 14px; }
+  #root .admin-workspace .admin-intake-card-identity { flex-basis: 100%; }
+  #root .admin-workspace .admin-intake-card-identity h3 { font-size: 18px; }
+  #root .admin-workspace .admin-intake-card-dates { flex-basis: 100%; border: 0; padding: 0; }
+  #root .admin-workspace .admin-intake-progress { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 16px 0; }
+  #root .admin-workspace .admin-intake-progress li { flex-direction: row; text-align: left; min-height: 38px; padding: 0 0 10px; gap: 10px; }
+  #root .admin-workspace .admin-intake-progress li:not(:last-child)::after { left: 10px; top: 22px; width: 2px; height: calc(100% - 22px); }
+  #root .admin-workspace .admin-intake-card-footer { flex-direction: column; align-items: stretch; }
+  #root .admin-workspace .admin-intake-card-footer .button { width: 100%; max-width: none; min-height: 44px; }
+}

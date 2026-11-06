@@ -12,7 +12,7 @@ export function IntakeTabs({ value, counts, onChange, allLabel = "All intake" }:
   </div>
 }
 
-function stageLabel(guidance: Guidance, project: Project) {
+export function stageLabel(guidance: Guidance, project: Project) {
   if (guidance.stage === "Required documents") return `Documents incomplete (${registeredCount(project)}/6)`
   if (guidance.stage === "Client subcontractor review") {
     if (openClientSubconIssue(project)) return "Client agreement issue open"

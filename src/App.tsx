@@ -4,6 +4,7 @@ import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
 import IntakeRecord from "./IntakeRecord"
+import AdminIntakeCards from "./AdminIntakeCards"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
@@ -1575,7 +1576,9 @@ function AppInner() {
               list={intakeList}
               placeholder="Search intake records"
               noun="record"
-              render={(items) => <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} onOpenActive={p => { navigate("Active sites"); setDialog({ kind: "project", id: p.id }) }} />}
+              render={(items) => intakeLogTab === "history"
+                ? <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={p => setDialog({ kind: "intake-record", id: p.id })} onOpenActive={p => { navigate("Active sites"); setDialog({ kind: "project", id: p.id }) }} />
+                : <AdminIntakeCards state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} />}
               empty={<Empty title={intakeLogTab === "history" ? "No completed intake records" : !intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>{intakeLogTab === "history" ? "Activated projects remain here for reference. Ongoing monitoring is available in Active Sites." : "Existing intake records appear here as projects move through setup."}</Empty>}
             />
           </Panel>
@@ -1656,10 +1659,10 @@ function AppInner() {
             <button className="engineer-credential-banner" type="button" onClick={reviewMissingCredentials}>
               <span className="engineer-credential-banner-icon"><Icon name="alert" size={18} /></span>
               <span className="engineer-credential-banner-copy">
-                <strong>{accountsMissingCredentials.length} SPM/OPM {accountsMissingCredentials.length === 1 ? "account needs" : "accounts need"} professional credentials</strong>
-                <small>Open the filtered directory to review them.</small>
+                <strong>{accountsMissingCredentials.length} {accountsMissingCredentials.length === 1 ? "Account Needs" : "Accounts Need"} Credential Review</strong>
+                <small>SPM/OPM credentials are not on file. Review them before allocation.</small>
               </span>
-              <span className="engineer-credential-banner-action">Review accounts <Icon name="arrow" size={16} /></span>
+              <span className="engineer-credential-banner-action">View Accounts <Icon name="arrow" size={16} /></span>
             </button>
           )}
           <Panel
@@ -1694,18 +1697,17 @@ function AppInner() {
                 <div className="engineer-grid">
                   {items.map((a) => (
                     <button
-                      className="engineer-card"
+                      className={`engineer-card ${a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) ? "engineer-needs-credentials" : ""}`}
                       key={a.id}
                       onClick={() => setDialog({ kind: "account", id: a.id })}
                     >
                       <div className="engineer-top">
                         <span className="avatar large">{initials(a.name)}</span>
+                        <div className="engineer-identity"><h3>{a.name}</h3><p>{ROLE_NAMES[a.role]}</p></div>
                         <Status status={a.status} />
                       </div>
-                      <h3>{a.name}</h3>
-                      <p>{ROLE_NAMES[a.role]}</p>
                       {a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) && (
-                        <Badge tone="amber">Professional credentials not on file</Badge>
+                        <Badge tone="amber"><Icon name="alert" size={14} />Professional credentials not on file</Badge>
                       )}
                       <div className="tag-list">
                         {(a.scope.length && a.role === "spm"
@@ -1722,6 +1724,7 @@ function AppInner() {
                           {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
                         </span>
                         <Badge tone={a.eligibleForNewAssignment ? "green" : "amber"}>{a.eligibleForNewAssignment ? "Credential requirements met" : "View credential eligibility"}</Badge>
+                        <span className="engineer-profile-action">View Profile <Icon name="arrow" size={15} /></span>
                       </div>
                     </button>
                   ))}

@@ -230,7 +230,7 @@ export default function DocumentRepository({
   const showBack = !!project && !(lockedProjectId && !category)
 
   const title =
-    folder?.name || category?.name || project?.name || "Project repository"
+    folder?.name || category?.name || project?.name || "Project Repository"
   const subtitle = folder
     ? folder.description
     : category
