@@ -697,7 +697,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             break;
         }
         case "request_company": {
-            throw new HttpError(403, "Only Admin can register subcontractor companies. Contact your Administrator.");
+            throw new HttpError(403, "Only Administrators can register subcontractor companies. Contact your Administrator.");
         }
         case "archive_company_request": {
             throw new HttpError(403, "The subcontractor directory is read-only for Site PM accounts.");

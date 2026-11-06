@@ -1531,7 +1531,7 @@ function AppInner() {
                 assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, scheduleToday).mode === "view_only") : undefined,
                 waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
                 hasOpenBlockingIssue: Boolean(workflowFor(p).pendingRework?.issues.length),
-                hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history),
+                hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history ?? []),
                 today: scheduleToday,
               }),
             }

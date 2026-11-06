@@ -69,6 +69,8 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   await db.exec(read("../Thesis-Backend/migrations/008-monthly-report-history.sql"))
   await db.exec(read("../Thesis-Backend/migrations/009-engineer-license-workflow.sql")) // backfills the seeded holders
   await db.exec("update user_licenses set license_expiry=current_date+400 where superseded_at is null")
+  // Start every engineer from a valid license; the seeded "renewal under review" demo would make Mikaela renewal-only.
+  await db.exec("delete from license_renewal_requests where file_ref like 'seed/licenses/renewal-%'")
   await installCredentialFixture(db)
 
   const dbPort = await freePort()
@@ -138,7 +140,7 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     const f = new FormData()
     f.append("user_id", idOf(who))
     f.append("profession", "Civil Engineer")
-    f.append("license_number", "PRC-RENEWED-1")
+    f.append("license_number", "1234567")
     f.append("license_expiry", addDays(today(), expiryOffset))
     f.append("file", PDF(), "renewal.pdf")
     return f
@@ -231,22 +233,27 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     assert.equal((await call('admin','POST','/licenses/overrides',approval())).status,409,'stale holder cannot be replaced twice')
   })
 
-  await t.test('once expired, access is viewing-only: mutations blocked, reading and renewal submission allowed', async () => {
+  await t.test('once expired, access is renewal-only: workspace blocked, license status readable, self-submission closed', async () => {
     await setExpiry('rafael',-1)
-    assert.equal((await call('rafael','GET','/workspace')).status,200)
+    const workspace=await call('rafael','GET','/workspace')
+    assert.equal(workspace.status,403,workspace.text)
+    assert.equal(workspace.code,'LICENSE_RENEWAL_ONLY')
     const self=await call('rafael','GET','/licenses/me')
+    assert.equal(self.status,200,self.text)
     assert.equal(self.data.access.mode,'view_only')
     for(const [path,body] of [[`/progress/projects/${brook.id}/notes`,{note_text:'blocked'}],[`/projects/${brook.id}/workspace-command`,{type:'add_photo'}],[`/confirmations/projects/${brook.id}/phase-team/${designStage}/decline`,{}]]) {
       const result=await call('rafael','POST',path,body)
-      assert.equal(result.code,'LICENSE_VIEW_ONLY',result.text)
+      assert.equal(result.code,'LICENSE_RENEWAL_ONLY',result.text)
     }
+    // The seven-day self-submission window (30 to 24 days before expiry) has ended; Admin completes the renewal.
     const own=await call('rafael','POST','/licenses/renewals',undefined,renewalForm(400))
-    assert.equal(own.status,201,own.text)
+    assert.equal(own.status,403,own.text)
+    assert.equal(own.code,'LICENSE_ADMIN_REQUIRED')
     assert.equal((await q('select status from users where id=$1',[idOf('rafael')]))[0].status,'active','restriction does not delete or suspend HR account')
-    await q("update license_renewal_requests set status='rejected',reviewed_by=$2,reviewed_at=now(),review_note='test cleanup' where user_id=$1 and status='under_review'",[idOf('rafael'),idOf('admin')])
   })
 
   await t.test('renewal under review does not lift restriction; only verified renewal restores access', async () => {
+    await setExpiry('rafael',25)
     const submitted=await call('rafael','POST','/licenses/renewals',undefined,renewalForm(400,'rafael'))
     assert.equal(submitted.status,201,submitted.text)
     assert.equal((await call('rafael','GET','/licenses/me')).data.access.mode,'view_only')

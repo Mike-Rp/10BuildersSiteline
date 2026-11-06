@@ -22,9 +22,13 @@ test("activity review shows trusted impact before confirmation, requires rejecti
   const {createRoot}=await import("react-dom/client"),root=createRoot(document.getElementById("root"))
   try {
     const {default:EvidenceReview}=await server.ssrLoadModule("/src/EvidenceReview.tsx")
-    const render=async(reject,key)=>{await act(async()=>root.render(React.createElement(EvidenceReview,{key,projectId:"project-1",evidenceId:"7",reject,
-      onClose:()=>closed++,onConfirm:async(token,note)=>{confirmations.push({token,note});return saveResult}})))}
     const button=label=>[...document.querySelectorAll("button")].find(el=>el.textContent===label)
+    // One dialog serves both decisions; the reviewer chooses Approve or Reject inside it.
+    const render=async(reject,key)=>{
+      await act(async()=>root.render(React.createElement(EvidenceReview,{key,projectId:"project-1",evidenceId:"7",
+        onClose:()=>closed++,onConfirm:async(token,note,rejected)=>{confirmations.push({token,note});assert.equal(rejected,reject);return saveResult}})))
+      if(reject)await act(async()=>button("Reject").click())
+    }
     await render(false,"approve")
     assert.match(document.body.textContent,/20 \/ 30 points → 30 \/ 30 points/)
     assert.doesNotMatch(document.body.textContent,/Project:|80 \/ 270|90 \/ 270/)

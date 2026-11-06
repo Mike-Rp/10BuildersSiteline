@@ -4,7 +4,8 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
 const [, , email, ...navLabels] = process.argv
-const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: "http://localhost:8443/", pretendToBeVisual: true })
+// Admin, staff and client accounts each sign in through their own portal page.
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: "http://localhost:8443" + (process.env.SMOKE_LOGIN_PATH || "/"), pretendToBeVisual: true })
 const w = dom.window
 const set = (k, v) => Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true })
 for (const k of ["window", "document", "HTMLElement", "Element", "Node", "Event", "KeyboardEvent", "MouseEvent", "InputEvent", "File", "FileReader", "Blob", "DOMParser", "MutationObserver", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame", "sessionStorage", "localStorage", "HTMLInputElement", "HTMLSelectElement", "HTMLTextAreaElement", "SVGElement", "CustomEvent"])
@@ -117,11 +118,13 @@ for (const label of navLabels) {
     }
   }
   if (label === "Active sites") {
-    const tabs = [...document.querySelectorAll('.as-tabs [role="tab"]')]
+    // Office and Site PMs review work from the Active sites view tabs; clients and Admin have no review tabs.
+    const tabs = [...document.querySelectorAll('.active-sites-view-tabs [role="tab"]')].map(el => el.textContent.trim())
     const isClient = !!document.querySelector('.client-portal')
-    const reviewTab = tabs.find(el => el.textContent.startsWith('Awaiting review'))
-    if (isClient && reviewTab) problems.push('Client received staff review navigation')
-    if (!isClient && !reviewTab) problems.push('Staff review navigation is missing')
+    const isAdmin = !!document.querySelector('.admin-workspace')
+    const reviewTab = tabs.some(label => /^(Updates & issues|Assignments)/.test(label))
+    if (isClient && tabs.length) problems.push('Client received staff review navigation')
+    if (!isClient && !isAdmin && !reviewTab) problems.push('Staff review navigation is missing')
     if (document.querySelector('.as-card .badge')) problems.push('Redundant Active badge remains on a project card')
     if ([...document.querySelectorAll('.as-toolbar label')].some(el => el.textContent.trim().startsWith('Status'))) problems.push('Redundant status filter remains')
     if (reviewTab) {

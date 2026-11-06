@@ -14,7 +14,7 @@ test('monitoring overview preserves trusted totals and renders only passed proje
     project.verifiedProgress=undefined;project.progress=92;project.workflow={...workflowFor(project),photos:[]}
     const html=renderToStaticMarkup(React.createElement(Overview,{project,state,onPreview(){}}))
     assert.match(html,/Construction phases/);assert.match(html,/Assigned team/)
-    assert.match(html,/No site photographs recorded yet/)
+    assert.match(html,/No OPM-approved site photos yet/)
     assert.match(html,/Complete activity totals for all phases are needed/)
     assert.doesNotMatch(html,/92%|58%|sample approved|mailto:/i,'no cached percentages, mock numbers or invented contact actions')
     assert.match(html,/Phase sequence is separate/)

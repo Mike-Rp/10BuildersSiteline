@@ -54,7 +54,9 @@ export function LicenseBanner({ license }: { license?: LicenseSelf }) {
   let title = ""
   let detail: ReactNode = null
   const policy = licenseAccessPolicy(license.expiry)
-  if (policy.mode === "view_only" && license.status !== "renewal_under_review") {
+  // Access is renewal-only from 30 days before expiry, so "expired" depends on the date itself, not the access mode.
+  const expired = policy.daysToExpiry !== null && policy.daysToExpiry < 0
+  if (expired && license.status !== "renewal_under_review") {
     title = "License expired · viewing-only access"
     detail = "Submissions, approvals and project changes are disabled until your renewed license is verified. You can still view your records and submit your renewal. Your past work stays on record."
   } else if (policy.prepareReplacement) {

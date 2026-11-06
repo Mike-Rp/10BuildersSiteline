@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { activeFixture, currentProject } from "./fixtures.mjs"
+import { PROJECT_PHASE_DEFINITIONS } from "../src/model.ts"
 
 function deferred() {
   let resolve, reject
@@ -19,7 +20,10 @@ test("workspace saves prevent duplicate requests, retain failed notes, and allow
       state, actor, onCommand(command) { requests.push(command); return pending.promise },
       onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {},
     })))
+    const feedback = await server.ssrLoadModule("/src/action-feedback.ts")
+    feedback.dismissActionResult()
     await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Active sites"))
+    await click(button("Open phase workspace"))
     let save = button("Add diary note")
     assert.equal(save.disabled, true, "Empty notes should not submit")
     const note = document.querySelector('[placeholder="Add an internal operational note."]')
@@ -30,34 +34,40 @@ test("workspace saves prevent duplicate requests, retain failed notes, and allow
     assert.equal(requests[0].type, "add_note")
     assert.equal(save.disabled, true)
     assert.equal(note.disabled, true, "Prevent edits that could be cleared by the in-flight save")
-    assert.match(document.querySelector('.workflow-feedback[role="status"]').textContent, /Saving changes/)
+    // Errors are reported through the shared action-result dialog; successful saves update the page silently.
     await React.act(async () => { pending.resolve({ ok: false, error: "The server is unavailable. Try again." }) })
     assert.equal(note.value, "Confirm the concrete delivery with the site team.")
     assert.equal(save.disabled, false)
-    assert.match(document.querySelector('.workflow-feedback[role="alert"]').textContent, /server is unavailable/)
+    assert.match(feedback.feedbackSnapshot().result?.message ?? "", /server is unavailable/)
+    assert.equal(feedback.feedbackSnapshot().result?.error, true)
+    feedback.dismissActionResult()
 
     pending = deferred()
     await click(save)
     await React.act(async () => { pending.reject(new Error("Connection interrupted.")) })
-    assert.match(document.querySelector('[role="alert"]').textContent, /Connection interrupted/)
+    assert.match(feedback.feedbackSnapshot().result?.message ?? "", /Connection interrupted/)
     assert.equal(note.value, "Confirm the concrete delivery with the site team.")
+    feedback.dismissActionResult()
 
     pending = deferred()
     await click(save)
     await React.act(async () => { pending.resolve({ ok: true }) })
     assert.equal(requests.length, 3)
     assert.equal(note.value, "", "Clear the note only after confirmed success")
-    assert.match(document.querySelector('.workflow-feedback[role="status"]').textContent, /Site diary updated/)
-    assert.equal(document.querySelector('.workflow-feedback[role="alert"]'), null)
+    assert.equal(feedback.feedbackSnapshot().result, undefined, "Successful saves raise no error dialog")
   })
 })
 
-test("failed signed agreement saves keep the selected file and show the error in its dialog", async () => {
+test("failed signed agreement saves keep the selected file and show the error inline", async () => {
   await withUi(async ({ React, root, server, w, click, button }) => {
     const { default: LeadPanel } = await server.ssrLoadModule("/src/LeadSubcontractorPanel.tsx")
     const state = activeFixture(), project = currentProject(state)
     project.status = "pending"
     project.docs = project.docs.filter(doc => doc.name !== "signed.png")
+    // The shared fixture keeps a legacy seven-phase team; activation requires every Residential workflow phase.
+    project.team = PROJECT_PHASE_DEFINITIONS.Residential.map(({ name, disciplines }, sequence) => ({
+      phase: name, requiredDisciplines: disciplines, sequence, accountId: sequence === 0 ? "a4" : "a5", status: "confirmed",
+    }))
     const actor = state.accounts.find(account => account.id === "a4")
     let pending = deferred(), calls = 0, activated = 0
     await React.act(() => root.render(React.createElement(LeadPanel, {
@@ -70,29 +80,27 @@ test("failed signed agreement saves keep the selected file and show the error in
     const file = new File(["signed agreement"], "agreement.png", { type: "image/png" })
     Object.defineProperty(fileInput, "files", { configurable: true, value: [file] })
     await React.act(() => fileInput.dispatchEvent(new w.Event("change", { bubbles: true })))
+    const control = () => document.querySelector(".attachment-control")
+    assert.match(control().textContent, /agreement.png/)
     const confirm = button("Confirm upload")
+    assert.ok(confirm, "Selecting a file offers an explicit confirmation")
     await React.act(async () => { confirm.click(); confirm.click() })
     assert.equal(calls, 1, "Upload and workflow commands should not be duplicated")
-    let dialog = document.querySelector('[role="dialog"][aria-label="Confirm document upload"]')
-    assert.equal(button("Back", dialog).disabled, true)
-    assert.equal(button("Retry upload", dialog).disabled, true)
-    await click(dialog.querySelector('[aria-label="Close dialog"]'))
-    assert.ok(document.querySelector('[aria-label="Confirm document upload"]'), "Keep the in-flight file preview open")
+    assert.equal(button("Add attachments", control())?.disabled ?? button("Uploading…", control())?.disabled, true, "Keep the selection locked while saving")
+    assert.equal(button("Uploading…", control())?.disabled, true)
     await React.act(async () => { pending.resolve(false) })
-    dialog = document.querySelector('[aria-label="Confirm document upload"]')
-    assert.ok(dialog, "Do not discard the selected agreement on a rejected save")
-    assert.equal(dialog.querySelector('[role="alert"]').textContent, "We couldn’t save your upload. Your file is still selected—please try again.")
-    assert.match(dialog.textContent, /agreement.png/)
+    assert.match(control().textContent, /agreement.png/, "Do not discard the selected agreement on a rejected save")
+    assert.equal(control().querySelector('[role="alert"]').textContent, "We couldn’t save your upload. Your files are still selected—please try again.")
     assert.equal(activated, 0)
-    assert.equal(button("Confirm upload", dialog).disabled, false)
+    assert.equal(button("Confirm upload", control()).disabled, false)
 
     pending = deferred()
-    await click(button("Confirm upload", dialog))
-    assert.equal(dialog.querySelector('[role="alert"]'), null, "Clear the stale error during a retry")
+    await click(button("Confirm upload", control()))
+    assert.equal(control().querySelector('[role="alert"]'), null, "Clear the stale error during a retry")
     await React.act(async () => { pending.resolve(true) })
     assert.equal(calls, 2)
     assert.equal(activated, 1)
-    assert.equal(document.querySelector('[aria-label="Confirm document upload"]'), null)
+    assert.equal(button("Confirm upload"), undefined, "The saved selection is cleared")
   })
 })
 
@@ -109,7 +117,7 @@ test("agreement issue validation explains its minimum and preserves the descript
     await click(button("Report Issue"))
     const note = document.querySelector("textarea")
     const send = button("Send to Admin")
-    assert.match(document.body.textContent, /at least 10 characters/)
+    assert.match(note.placeholder, /at least 10 characters/)
     await input(React, w, note, "short")
     assert.equal(send.disabled, true)
     await input(React, w, note, "The uploaded agreement belongs to another company.")

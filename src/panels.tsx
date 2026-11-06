@@ -213,7 +213,7 @@ export function Upload({
             Add attachments
           </Button>
           {files.length > 0 && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
-            {saving ? "Uploading?" : "Confirm upload"}
+            {saving ? "Uploading…" : "Confirm upload"}
           </Button>}
         </div>
         {error && <p className="error" role="alert">{error}</p>}
