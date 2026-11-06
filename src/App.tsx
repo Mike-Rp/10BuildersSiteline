@@ -2747,7 +2747,7 @@ function AppInner() {
   }
   function companyDetails(c: Company) {
     return (
-      <>
+      <div className="company-detail-compact">
         <div className="detail-hero">
           <span className="company-monogram large">{initials(c.name)}</span>
           <div>
@@ -2756,6 +2756,7 @@ function AppInner() {
             <p>{c.email}</p>
           </div>
           <Badge tone={c.status === "pending" ? "amber" : c.status === "approved" ? "green" : "gray"}>{c.status === "pending" ? "Pending Admin verification" : c.status}</Badge>
+          <CompanyRemovalActions company={c} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
         </div>
         <div className="detail-grid account-detail-grid">
           {!c.foremen?.length && <><div>
@@ -2773,8 +2774,7 @@ function AppInner() {
         </div>
         <CompanyForemen company={c} />
         {state.phaseAllocationAvailable && <CompanyProjectPhases companyId={c.id} />}
-        <CompanyRemovalActions company={c} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
-        <p className="section-description">{c.note}</p>
+        {c.note?.trim() && <p className="section-description">{c.note}</p>}
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={previewDoc}
           onUpload={async doc => { await api("/subcontractors/" + c.id + "/supporting-documents", {method:"POST",json:{doc}}); await reloadWorkspace() }}
           onSave={async review => { await api("/subcontractors/" + c.id + "/capabilities", {method:"PUT",json:review}); await reloadWorkspace() }} />
@@ -2786,7 +2786,7 @@ function AppInner() {
             ))}
           </div>
           {!c.activeProjectIds.length && (
-            <Empty title="No active project commitments" />
+            <p className="compact-empty">No active project commitments.</p>
           )}
         </section>
         <section className="detail-section">
@@ -2817,7 +2817,7 @@ function AppInner() {
             </>
           )}
         </div>
-      </>
+      </div>
     )
   }
   const globalProjects = state.projects.filter((p) =>

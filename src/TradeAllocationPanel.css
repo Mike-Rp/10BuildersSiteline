@@ -73,5 +73,51 @@
 .location-coordinates { margin-top:12px; padding:12px; border:1px solid var(--color-line); border-radius:6px; min-width:0; }
 .location-coordinates summary { cursor:pointer; font-weight:600; }
 .location-coordinates .form-grid { margin-top:10px; }
+
+/* Keep the directory company dialog dense without changing registration forms. */
+#root .app-shell .company-detail-compact { min-width: 0; font-size: 14px; }
+#root .app-shell .company-detail-compact .detail-hero { gap: 12px; padding: 0 0 12px; flex-wrap: wrap; }
+#root .app-shell .company-detail-compact .detail-hero > div:not(.company-removal-actions) { min-width: 160px; }
+#root .app-shell .company-detail-compact .detail-hero h3 { font-size: 20px; overflow-wrap: anywhere; }
+#root .app-shell .company-detail-compact .detail-hero > .company-removal-actions { flex: 0 0 auto; margin-left: auto; }
+#root .app-shell .company-detail-compact .company-action-menu { display: flex; flex-direction: column; gap: 6px; top: calc(100% + 6px); }
+#root .app-shell .company-detail-compact .company-monogram.large { width: 44px; height: 48px; font-size: 20px; }
+#root .app-shell .company-detail-compact .account-detail-grid { margin: 12px 0; gap: 10px 16px; }
+#root .app-shell .company-detail-compact .detail-section { padding: 12px; margin-top: 12px; border-radius: 10px; }
+#root .app-shell .company-detail-compact h3 { font-size: 17px; }
+#root .app-shell .company-detail-compact .company-foremen { margin: 12px 0; }
+#root .app-shell .company-detail-compact .company-foreman-grid { gap: 10px; margin-top: 8px; }
+#root .app-shell .company-detail-compact .foreman-contact-card { padding: 10px 12px; }
+#root .app-shell .company-detail-compact .foreman-contact-card h4 { margin: 0; font-size: 13px; color: var(--color-muted); }
+#root .app-shell .company-detail-compact .foreman-contact-card > strong { margin-top: 4px; }
+#root .app-shell .company-detail-compact .foreman-call { min-height: 36px; }
+#root .app-shell .company-detail-compact .section-description { margin: 10px 0; }
+#root .app-shell .company-detail-compact .trade-allocation p { margin: 8px 0; }
+#root .app-shell .company-detail-compact .capability-summary { gap: 10px; padding: 10px; margin: 10px 0; }
+#root .app-shell .company-detail-compact .capability-summary > div + div { padding-left: 10px; }
+#root .app-shell .company-detail-compact .capability-summary strong { margin-top: 3px; }
+#root .app-shell .company-detail-compact .capability-review-columns { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin-top: 12px; align-items: start; }
+#root .app-shell .company-detail-compact .capability-records { padding-left: 14px; }
+#root .app-shell .company-detail-compact .capability-section-heading { margin-bottom: 6px; }
+#root .app-shell .company-detail-compact .capability-group-grid { gap: 8px; align-items: start; }
+#root .app-shell .company-detail-compact .capability-group { padding: 6px; }
+#root .app-shell .company-detail-compact .capability-choice { min-height: 36px; padding: 5px 6px; gap: 7px; font-size: 14px; }
+#root .app-shell .company-detail-compact .capability-proposal-note { padding: 8px 10px; }
+#root .app-shell .company-detail-compact .company-trade-matches { margin-top: 10px; padding: 6px 10px; }
+#root .app-shell .company-detail-compact .button { min-height: 40px; padding: 8px 12px; font-size: 14px; }
+#root .app-shell .company-detail-compact .icon-button { width: 40px; padding: 8px; }
+#root .app-shell .company-detail-compact .capability-review-footer { gap: 8px 12px; padding: 10px 0; margin-top: 12px; }
+#root .app-shell .company-detail-compact .capability-footer-actions { gap: 8px; margin-left: auto; }
+#root .app-shell .company-detail-compact .document-upload { padding: 10px; margin-top: 10px; }
+#root .app-shell .company-detail-compact .modal-actions { margin-top: 12px; padding-top: 12px; gap: 8px; }
+@media(max-width:700px) {
+  #root .app-shell .company-detail-compact .capability-review-columns { grid-template-columns: 1fr; }
+  #root .app-shell .company-detail-compact .capability-records { padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--color-line); }
+}
+@media(max-width:540px) {
+  #root .app-shell .company-detail-compact .capability-summary > div + div { padding: 8px 0 0; }
+  #root .app-shell .company-detail-compact .capability-choice { min-height: 44px; }
+  #root .app-shell .company-detail-compact .button { min-height: 44px; }
+}
 .service-area-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--color-line); }
 .service-area-row > span { flex:1 1 220px; overflow-wrap:anywhere; }
