@@ -5,8 +5,8 @@ import { Button, Modal } from "./ui"
 import "./company-removal.css"
 
 type Readiness = { mode: "delete" | "archive" | "blocked" | "archived"; companyName: string }
-export default function CompanyRemovalActions({ company, onView, onRemoved }: {
-  company: Company; onView?: () => void; onRemoved: () => Promise<void>
+export default function CompanyRemovalActions({ company, onView, onRemoved, labeled = false }: {
+  company: Company; onView?: () => void; onRemoved: () => Promise<void>; labeled?: boolean
 }) {
   const [open, setOpen] = useState(false), [confirm, setConfirm] = useState(false)
   const [readiness, setReadiness] = useState<Readiness>(), [error, setError] = useState("")
@@ -29,7 +29,7 @@ export default function CompanyRemovalActions({ company, onView, onRemoved }: {
   }
   const deleting = readiness?.mode === "delete"
   return <div className="company-removal-actions">
-    <Button variant="icon-button" aria-label={`Actions for ${company.name}`} aria-expanded={open} onClick={() => void toggle()}>⋮</Button>
+    <Button variant={labeled ? "" : "icon-button"} aria-label={labeled ? `Manage company ${company.name}` : `Actions for ${company.name}`} aria-expanded={open} onClick={() => void toggle()}>{labeled ? "Manage company" : "⋮"}</Button>
     {open && <div className="company-action-menu" aria-label="Company actions">
       {onView && <Button onClick={() => { setOpen(false); onView() }}>View company</Button>}
       {!readiness && !error && <p role="status">Checking project history…</p>}

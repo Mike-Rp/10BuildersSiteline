@@ -2756,7 +2756,6 @@ function AppInner() {
             <p>{c.email}</p>
           </div>
           <Badge tone={c.status === "pending" ? "amber" : c.status === "approved" ? "green" : "gray"}>{c.status === "pending" ? "Pending Admin verification" : c.status}</Badge>
-          <CompanyRemovalActions company={c} onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
         </div>
         <div className="detail-grid account-detail-grid">
           {!c.foremen?.length && <><div>
@@ -2803,7 +2802,8 @@ function AppInner() {
             uploadLabel="Company supporting document"
           />
         </section>
-        <div className="modal-actions">
+        <div className="modal-actions company-detail-actions">
+          <CompanyRemovalActions company={c} labeled onRemoved={async () => { await reloadWorkspace(); setDialog(undefined); setToast("Company removed from the active directory") }} />
           <Button onClick={() => setDialog(undefined)}>Close</Button>
           {c.status === "pending" && (
             <>
