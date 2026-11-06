@@ -578,6 +578,13 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .rule-row h3 { font-size: 15px; }
 .rule-row p { color: var(--color-muted); font-size: 14px; margin-top: 5px; }
 .rule-row input { width: 80px; text-align: center; }
+.rule-row.reminder-rule-row { flex-wrap: wrap; align-items: flex-start; }
+.reminder-rule-row > div:first-child { flex: 1 1 300px; }
+.rule-row > .reminder-rule-controls { display: flex; flex: 1 1 420px; min-width: 0; align-items: center; flex-wrap: wrap; gap: 8px; }
+.rule-row .reminder-rule-controls input { width: 240px; flex: 1 1 220px; min-width: 0; text-align: left; }
+.reminder-rule-controls .button { flex-shrink: 0; }
+.reminder-rule-row > p { flex-basis: 100%; margin: 0; }
+@media(max-width: 600px) { .rule-row > .reminder-rule-controls { min-width: 0; width: 100%; } .reminder-rule-controls input { flex-basis: 100%; } }
 .notification-settings { padding: 0 24px; }
 .preference-row { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--color-line); gap: 16px; }
 .preference-row > span { flex: 1; }

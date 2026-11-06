@@ -1943,20 +1943,23 @@ export function SettingsForm({
   onSave,
 }: {
   rules: Rules
-  onSave: (rules: Rules, label: string) => void
+  onSave: (rules: Rules, label: string) => boolean | void | Promise<boolean | void>
 }) {
   type NumericRule = "grace" | "cap" | "response" | "idle"
   const [draft, setDraft] = useState(rules)
   const [confirm, setConfirm] = useState<NumericRule>()
   const [error, setError] = useState("")
   const [reminders, setReminders] = useState((rules.reminderDays || [60, 30, 14, 7, 0]).join(", "))
-  const parsedReminders = reminders
-    .split(/[s,]+/)
-    .filter(Boolean)
-    .map(Number)
+  const [remindersSaving, setRemindersSaving] = useState(false)
+  const [remindersError, setRemindersError] = useState("")
+  const [remindersSaved, setRemindersSaved] = useState(false)
+  const reminderTokens = reminders.trim().split(/[\s,]+/).filter(Boolean)
+  const parsedReminders = reminderTokens.map(Number)
   const remindersValid =
-    parsedReminders.length > 0 && parsedReminders.length <= 12 && parsedReminders.every((n) => Number.isInteger(n) && n >= 0 && n <= 365)
-  const remindersChanged = reminders.replace(/s/g, "") !== (rules.reminderDays || [60, 30, 14, 7, 0]).join(",")
+    reminderTokens.length > 0 && reminderTokens.length <= 12 && reminderTokens.every(token => /^\d+$/.test(token)) && parsedReminders.every((n) => Number.isInteger(n) && n >= 0 && n <= 365)
+  const normalizedReminders = [...new Set(parsedReminders)].sort((a, b) => b - a)
+  const savedReminders = [...new Set(rules.reminderDays || [60, 30, 14, 7, 0])].sort((a, b) => b - a)
+  const remindersChanged = !remindersValid || normalizedReminders.join(",") !== savedReminders.join(",")
   const labels: Record<NumericRule, [string, string, number]> = {
     grace: [
       "License grace period",
@@ -2026,35 +2029,45 @@ export function SettingsForm({
             </div>
           ),
         )}
-        <div className="rule-row">
+        <div className="rule-row reminder-rule-row">
           <div>
             <h3>License renewal reminders</h3>
             <p>Days before expiry when the engineer, their superior and the Administrator are reminded. Use 0 for the expiry day.</p>
           </div>
+          <div className="reminder-rule-controls">
           <input
             aria-label="License renewal reminder days"
+            aria-describedby="reminder-days-help"
+            aria-invalid={!remindersValid}
+            disabled={remindersSaving}
             value={reminders}
-            onChange={(e) => setReminders(e.target.value)}
+            onChange={(e) => { setReminders(e.target.value); setRemindersError(""); setRemindersSaved(false) }}
           />
           {remindersChanged && (
             <>
               <Button
                 variant="primary"
-                disabled={!remindersValid}
+                disabled={!remindersValid || remindersSaving}
                 onClick={async () => {
-                  const days = [...new Set(parsedReminders)].sort((a, b) => b - a)
-                  await onSave({ ...rules, reminderDays: days }, "License renewal reminders")
-                  setReminders(days.join(", "))
+                  setRemindersSaving(true); setRemindersError(""); setRemindersSaved(false)
+                  try {
+                    const saved = await onSave({ ...rules, reminderDays: normalizedReminders }, "License renewal reminders")
+                    if (saved === false) { setRemindersError("The reminder days could not be saved. Your changes are still here. Try again."); return }
+                    setReminders(normalizedReminders.join(", ")); setRemindersSaved(true)
+                  } catch (reason) {
+                    setRemindersError(reason instanceof Error ? reason.message : "The reminder days could not be saved. Try again.")
+                  } finally { setRemindersSaving(false) }
                 }}
               >
-                Confirm change
+                {remindersSaving ? "Saving…" : "Confirm change"}
               </Button>
-              <Button onClick={() => setReminders((rules.reminderDays || [60, 30, 14, 7, 0]).join(", "))}>Cancel</Button>
+              <Button disabled={remindersSaving} onClick={() => { setReminders(savedReminders.join(", ")); setRemindersError(""); setRemindersSaved(false) }}>Cancel</Button>
             </>
           )}
-          {remindersChanged && !remindersValid && (
-            <p className="error">Enter up to 12 whole numbers from 0 to 365, separated by commas.</p>
-          )}
+          </div>
+          <p id="reminder-days-help" className={remindersValid ? "reminder-rule-hint" : "error"}>Enter up to 12 whole numbers from 0 to 365, separated by commas. Example: 60, 30, 14, 7, 0.</p>
+          {remindersError && <p className="error" role="alert">{remindersError}</p>}
+          {remindersSaved && <p role="status">License renewal reminder days saved.</p>}
         </div>
       </div>
       {error && <p className="error">{error}</p>}
