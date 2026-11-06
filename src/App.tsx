@@ -2,6 +2,7 @@ import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerScopeReview from "./EngineerScopeReview"
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
+import ShareLoginLinks from "./ShareLoginLinks"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
@@ -314,6 +315,7 @@ function AppInner() {
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [dialog, setDialog] = useState<Dialog>()
   const [securityOpen,setSecurityOpen]=useState(false)
+  const [shareLoginLinksOpen, setShareLoginLinksOpen] = useState(false)
   const [securityTab,setSecurityTab]=useState<'password'|'codes'>('codes')
   const [projectHistoryPage, setProjectHistoryPage] = useState(1)
   const [preview, setPreview] = useState<Doc>()
@@ -1905,13 +1907,16 @@ function AppInner() {
         <>
           {pageHeading(
             "Team & accounts",
+            <div className="share-login-header-actions">
+            <Button onClick={() => setShareLoginLinksOpen(true)}>Share login links</Button>
             <Button
               variant="primary"
               icon="plus"
               onClick={() => setDialog({ kind: "add-account" })}
             >
               Add account
-            </Button>,
+            </Button>
+            </div>,
           )}
           <Panel
             title="Organization accounts"
@@ -3098,6 +3103,7 @@ function AppInner() {
         </main>
       </div>
       {securityOpen&&<AdminAccountSecurity initialTab={securityTab} onClose={()=>setSecurityOpen(false)} onPasswordChanged={endSession}/>}
+      {shareLoginLinksOpen && <ShareLoginLinks onClose={() => setShareLoginLinksOpen(false)} />}
       {dialog?.kind === "intake" && (
         <Modal
           title={selectedProject ? "Resubmit project" : "New project intake"}
