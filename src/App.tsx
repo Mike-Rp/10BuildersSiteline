@@ -5,6 +5,7 @@ import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
 import IntakeRecord from "./IntakeRecord"
 import AdminIntakeCards from "./AdminIntakeCards"
+import useIdleWarning from "./useIdleWarning"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
@@ -386,7 +387,7 @@ function AppInner() {
   const [loadingWorkspaceRole, setLoadingWorkspaceRole] = useState<Account["role"]>()
   const [readinessAvailable, setReadinessAvailable] = useState(false)
   const [mustResetPassword,setMustResetPassword]=useState(false)
-  const [idleWarning, setIdleWarning] = useState(false)
+  const { idleWarning, stayActive } = useIdleWarning(!signedOut, state.rules.idle, () => { void endSession() }, getToken())
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
   const [licenseFilter, setLicenseFilter] = useState("all")
@@ -511,34 +512,6 @@ function AppInner() {
       window.removeEventListener("pointerdown", outside)
     }
   }, [signedOut, actor.role])
-  useEffect(() => {
-    if (signedOut) return
-    let warning: ReturnType<typeof setTimeout>
-    let logout: ReturnType<typeof setTimeout>
-    const reset = () => {
-      clearTimeout(warning)
-      clearTimeout(logout)
-      setIdleWarning(false)
-      const time = state.rules.idle * 60000
-      warning = setTimeout(
-        () => setIdleWarning(true),
-        Math.max(0, time - 60000),
-      )
-      logout = setTimeout(() => {
-        endSession()
-        setIdleWarning(false)
-      }, time)
-    }
-    const events = ["pointerdown", "keydown", "scroll"]
-    events.forEach((e) => window.addEventListener(e, reset, { passive: true }))
-    reset()
-    return () => {
-      clearTimeout(warning)
-      clearTimeout(logout)
-      events.forEach((e) => window.removeEventListener(e, reset))
-    }
-  }, [state.rules.idle, signedOut])
-
   function log(
     draft: State,
     title: string,
@@ -2948,7 +2921,7 @@ function AppInner() {
         onResume={endSession}
         onPause={endSession}
         idleWarning={idleWarning}
-        onStayActive={() => setIdleWarning(false)}
+        onStayActive={stayActive}
       />
     )
   }
@@ -2968,7 +2941,7 @@ function AppInner() {
         notificationSave={notificationSettings}
         paused={signedOut}
         idleWarning={idleWarning}
-        onStayActive={() => setIdleWarning(false)}
+        onStayActive={stayActive}
         onResume={endSession}
         onPause={endSession}
       />
@@ -3453,7 +3426,7 @@ function AppInner() {
         <div className="session-warning">
           <Icon name="clock" />
           <span>Your session will pause after inactivity.</span>
-          <Button onClick={() => setIdleWarning(false)}>Stay signed in</Button>
+          <Button onClick={stayActive}>Stay signed in</Button>
         </div>
       )}
       {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings}
