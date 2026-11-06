@@ -20,16 +20,19 @@ export default function CollapsibleSidebarNav({ items, page, counts, onNavigate 
   const icons: Record<string, string> = { WORKSPACE: "grid", RESOURCES: "folder", ORGANIZATION: "users" }
   return <nav className="sidebar-categories" aria-label="Main navigation">
     {groups.map((group, index) => {
-      const open = expanded === group.name
+      const fixed = group.name === "WORKSPACE"
+      const open = fixed || expanded === group.name
       const count = group.items.reduce((sum, item) => sum + (counts[item.label]?.count || 0), 0)
       const title = group.name[0] + group.name.slice(1).toLowerCase()
       const id = `${prefix}-category-${index}`
       return <section className="sidebar-category" key={group.name}>
-        <button type="button" className="sidebar-category-toggle" aria-expanded={open} aria-controls={id} onClick={() => setExpanded(open ? undefined : group.name)}>
+        {fixed ? <div className="sidebar-category-heading">
+          <Icon name={icons[group.name] || "folder"} size={19} /><span>{title}</span>
+        </div> : <button type="button" className="sidebar-category-toggle" aria-expanded={open} aria-controls={id} onClick={() => setExpanded(open ? undefined : group.name)}>
           <Icon name={icons[group.name] || "folder"} size={19} /><span>{title}</span>
           {!open && <NavigationCount item={{ count, description: "attention items across this category's modules" }} />}
           <span className="category-chevron" aria-hidden="true">{open ? "⌄" : "›"}</span>
-        </button>
+        </button>}
         <div id={id} hidden={!open} className="sidebar-category-items">
           {group.items.map(item => <button type="button" key={item.label} aria-label={item.label} aria-current={page === item.label ? "page" : undefined}
             aria-description={counts[item.label]?.count ? `${counts[item.label].count} ${counts[item.label].description}` : undefined}

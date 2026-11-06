@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-test('sidebar categories open one at a time, expose counts, and follow page navigation',async t=>{
+test('Workspace stays visible while other sidebar categories collapse and follow page navigation',async t=>{
  const [{JSDOM},{createServer},React]=await Promise.all([import('jsdom'),import('vite'),import('react')])
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'}),w=dom.window,previous=new Map()
  for(const[k,value]of Object.entries({window:w,document:w.document,navigator:w.navigator,HTMLElement:w.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true})){
@@ -16,17 +16,23 @@ test('sidebar categories open one at a time, expose counts, and follow page navi
  const render=async page=>React.act(()=>root.render(React.createElement(Nav,{...props,page})))
  const headers=()=>[...document.querySelectorAll('.sidebar-category-toggle')]
  const category=name=>headers().find(b=>b.querySelector('span').textContent===name)
- const children=name=>document.getElementById(category(name).getAttribute('aria-controls'))
+ const workspace=()=>document.querySelector('.sidebar-category-heading')
+ const children=name=>name==='Workspace'?workspace().nextElementSibling:document.getElementById(category(name).getAttribute('aria-controls'))
  await render('Dashboard')
  assert.equal(children('Workspace').hidden,false);assert.equal(children('Resources').hidden,true)
+ assert.equal(category('Workspace'),undefined)
+ assert.equal(workspace().textContent,'Workspace')
+ assert.equal(workspace().querySelector('.category-chevron'),null)
  assert.match(category('Organization').textContent,/2/)
  await React.act(()=>category('Resources').click())
- assert.equal(children('Workspace').hidden,true);assert.equal(children('Resources').hidden,false)
+ assert.equal(children('Workspace').hidden,false);assert.equal(children('Resources').hidden,false)
  assert.equal(headers().filter(b=>b.getAttribute('aria-expanded')==='true').length,1)
  await React.act(()=>document.querySelector('[aria-label="Directory"]').click());assert.equal(selected,'Directory')
  await render('Team')
  assert.equal(children('Organization').hidden,false);assert.equal(children('Resources').hidden,true)
+ assert.equal(children('Workspace').hidden,false)
  assert.equal(document.querySelector('[aria-label="Team"]').getAttribute('aria-current'),'page')
  await React.act(()=>category('Organization').click());assert.equal(headers().filter(b=>b.getAttribute('aria-expanded')==='true').length,0)
+ assert.equal(children('Workspace').hidden,false)
  await render('Archive');assert.equal(children('Organization').hidden,false)
 })

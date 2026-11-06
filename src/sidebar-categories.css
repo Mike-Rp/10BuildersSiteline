@@ -1,6 +1,7 @@
 #root .admin-workspace .sidebar-categories { min-height: 0; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
 #root .admin-workspace .sidebar-category { margin: 0 0 8px; }
-#root .admin-workspace .sidebar-category-toggle { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--color-ink); text-align: left; font-size: 14px; font-weight: 650; }
+#root .admin-workspace .sidebar-category-toggle,
+#root .admin-workspace .sidebar-category-heading { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--color-ink); text-align: left; font-size: 14px; font-weight: 650; }
 #root .admin-workspace .sidebar-category-toggle:hover { background: #edf5fc; }
 #root .admin-workspace .sidebar-category-toggle > span:first-of-type { flex: 1; }
 #root .admin-workspace .category-chevron { font-size: 22px; line-height: 1; }
