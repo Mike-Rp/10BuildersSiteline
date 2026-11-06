@@ -3,6 +3,7 @@ import EngineerScopeReview from "./EngineerScopeReview"
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
+import IntakeRecord from "./IntakeRecord"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
@@ -34,7 +35,7 @@ import SitePhotoGallery from "./SitePhotoGallery"
 import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
 import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
 import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
-import { intakeGuidance, intakeViewCounts, type IntakeView } from "./intake-guidance"
+import { intakeGuidance, intakeViewCounts, isIntakeHistory, type IntakeView } from "./intake-guidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import { clearStoredAccountPreferences, clearStoredWorkspaceData } from "./browser-data"
 import { createInFlight } from "./api/in-flight"
@@ -313,6 +314,7 @@ function AppInner() {
     stubAccount("", "", "client")
   const [page, setPage] = useState("Dashboard")
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
+  const [intakeLogTab, setIntakeLogTab] = useState<"current" | "history">("current")
   const [dialog, setDialog] = useState<Dialog>()
   const [securityOpen,setSecurityOpen]=useState(false)
   const [shareLoginLinksOpen, setShareLoginLinksOpen] = useState(false)
@@ -1039,18 +1041,22 @@ function AppInner() {
   }
   const accountSearch = (a: Account) =>
     `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
-  const intakeItems = state.projects.filter((p) =>
+  const intakeHistory = state.projects.filter(isIntakeHistory)
+  const intakeItems = intakeLogTab === "history" ? intakeHistory : state.projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
   const intakeCounts = intakeViewCounts(intakeItems, p => intakeGuidance(state, p, actor))
-  const intakeList = runList("admin:intake", intakeItems.filter(p => intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
+  const intakeList = runList(intakeLogTab === "history" ? "admin:intake-history" : "admin:intake", intakeItems.filter(p => intakeLogTab === "history" || intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
     searchText: projectSearch,
     filters: [
       {
         id: "status",
         label: "Status",
         allLabel: "All intake",
-        options: [
+        options: intakeLogTab === "history" ? [
+          { value: "active", label: "Project Active" },
+          { value: "completed", label: "Project Completed" },
+        ] : [
           { value: "pending", label: "Awaiting confirmation" },
           { value: "changes_requested", label: "Changes requested" },
           { value: "draft", label: "Drafts" },
@@ -1557,16 +1563,20 @@ function AppInner() {
             </Button>,
           )}
           <Panel
-            title="Project intake log"
-            subtitle={`${intake.length} current intake records`}
+            title="Project Intake Log"
+            subtitle={`${intake.length} current intake records · ${intakeHistory.length} completed intake records`}
           >
-            <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />
+            <div className="intake-tabs" role="group" aria-label="Intake log view">
+              <button type="button" aria-pressed={intakeLogTab === "current"} onClick={() => setIntakeLogTab("current")}>Current Intake ({intake.length})</button>
+              <button type="button" aria-pressed={intakeLogTab === "history"} onClick={() => setIntakeLogTab("history")}>Intake History ({intakeHistory.length})</button>
+            </div>
+            {intakeLogTab === "current" && <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />}
             <ListSection
               list={intakeList}
               placeholder="Search intake records"
               noun="record"
-              render={(items) => <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "project", id: p.id })} />}
-              empty={<Empty title={!intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>Existing intake records appear here as projects move through setup.</Empty>}
+              render={(items) => <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} onOpenActive={p => { navigate("Active sites"); setDialog({ kind: "project", id: p.id }) }} />}
+              empty={<Empty title={intakeLogTab === "history" ? "No completed intake records" : !intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>{intakeLogTab === "history" ? "Activated projects remain here for reference. Ongoing monitoring is available in Active Sites." : "Existing intake records appear here as projects move through setup."}</Empty>}
             />
           </Panel>
         </>
@@ -2265,53 +2275,9 @@ function AppInner() {
       )
     return null
   }
-  function projectDetails(p: Project, docsOnly = false) {
-    const projectHistory = p.history.slice().reverse()
-    const historyPageCount = Math.max(1, Math.ceil(projectHistory.length / 3))
-    const recentHistory = projectHistory.slice((projectHistoryPage - 1) * 3, projectHistoryPage * 3)
-    const staff = [...new Set([p.opmId, ...p.team.map((t) => t.accountId)])]
-      .map((id) => state.accounts.find((a) => a.id === id))
-      .filter(Boolean) as Account[]
+  function projectAssignments(p: Project) {
     return (
-      <>
-        {docsOnly && <>
-        <div className="detail-hero">
-          <span className="project-symbol">
-            <Icon name="building" size={28} />
-          </span>
-          <div>
-            <span className="eyebrow">
-              {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
-            </span>
-            <h3>{p.name}</h3>
-            <p>{p.location || "Project location not specified"}</p>
-          </div>
-          <Status status={p.status} />
-        </div>
-        </>}
-        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} />}
-        {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
-        {!docsOnly && (
-          <>
-            <ProjectScheduleDetails project={p} today={scheduleToday} />
-            {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
-            {actor.role==='admin' && <EngineerScopeReview project={p} state={state} onReload={reloadWorkspace} />}
-            {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
-            <PlannedTimeline project={p} />
-            {p.status !== "active" && p.status !== "completed" && (
-              <div className="notice">
-                <Icon name="clock" />
-                <p>
-                  {p.note ||
-                    "Awaiting the assigned Office PM. Administrator submission does not accept assignments or activate client access."}{" "}
-                  {p.docs.slice(0, 6).filter((d) => d.uploaded).length}/6 Office
-                  PM documents uploaded.{" "}
-                  {p.team.filter((t) => t.status === "confirmed").length}/
-                  {p.team.length} phase assignments confirmed.
-                </p>
-              </div>
-            )}
-            <section className="detail-section">
+      <section className="detail-section">
               <h3>Personnel & phase assignments</h3>
               <div className="office-pm-row">
                 <span className="avatar">{initials(nameFor(p.opmId))}</span>
@@ -2384,6 +2350,55 @@ function AppInner() {
                 ))}
               </div>
             </section>
+    )
+  }
+  function projectDetails(p: Project, docsOnly = false) {
+    const projectHistory = p.history.slice().reverse()
+    const historyPageCount = Math.max(1, Math.ceil(projectHistory.length / 3))
+    const recentHistory = projectHistory.slice((projectHistoryPage - 1) * 3, projectHistoryPage * 3)
+    const staff = [...new Set([p.opmId, ...p.team.map((t) => t.accountId)])]
+      .map((id) => state.accounts.find((a) => a.id === id))
+      .filter(Boolean) as Account[]
+    return (
+      <>
+        {docsOnly && <>
+        <div className="detail-hero">
+          <span className="project-symbol">
+            <Icon name="building" size={28} />
+          </span>
+          <div>
+            <span className="eyebrow">
+              {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
+            </span>
+            <h3>{p.name}</h3>
+            <p>{p.location || "Project location not specified"}</p>
+          </div>
+          <Status status={p.status} />
+        </div>
+        </>}
+        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} />}
+        {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
+        {!docsOnly && (
+          <>
+            <ProjectScheduleDetails project={p} today={scheduleToday} />
+            {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
+            {actor.role==='admin' && <EngineerScopeReview project={p} state={state} onReload={reloadWorkspace} />}
+            {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
+            <PlannedTimeline project={p} />
+            {p.status !== "active" && p.status !== "completed" && (
+              <div className="notice">
+                <Icon name="clock" />
+                <p>
+                  {p.note ||
+                    "Awaiting the assigned Office PM. Administrator submission does not accept assignments or activate client access."}{" "}
+                  {p.docs.slice(0, 6).filter((d) => d.uploaded).length}/6 Office
+                  PM documents uploaded.{" "}
+                  {p.team.filter((t) => t.status === "confirmed").length}/
+                  {p.team.length} phase assignments confirmed.
+                </p>
+              </div>
+            )}
+            {projectAssignments(p)}
             <EngineerHistory projectId={p.id} />
             <section className="detail-section">
               <h3>Site photo gallery</h3>
@@ -3148,6 +3163,14 @@ function AppInner() {
           </div>
         </Modal>
       )}
+      {dialog?.kind === "intake-record" && selectedProject && <Modal title="Project Intake Record" subtitle={selectedProject.name} wide onClose={() => setDialog(undefined)}>
+        <IntakeRecord state={state} project={selectedProject} actor={actor} onOpenActive={() => { navigate("Active sites"); setDialog({ kind: "project", id: selectedProject.id }) }} />
+        {!isIntakeHistory(selectedProject) && <>
+          {projectAssignments(selectedProject)}
+          {state.multiEngineerAllocationAvailable && <EngineerResponsibilities project={selectedProject} actor={actor} onReload={reloadWorkspace} />}
+          <EngineerScopeReview project={selectedProject} state={state} onReload={reloadWorkspace} />
+        </>}
+      </Modal>}
       {(dialog?.kind === "project" || dialog?.kind === "project-docs") &&
         selectedProject && (
           <Modal

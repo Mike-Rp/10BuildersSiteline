@@ -27,6 +27,17 @@
 .intake-project-link { border: 0; padding: 0; background: transparent; color: #173654; font-weight: 600; text-align: left; cursor: pointer; }
 .intake-stage { display: inline-block; background: #eaf2f9; color: #315f85; border-radius: 6px; padding: 4px 8px; font-size: 12px; }
 .intake-stage.action { background: #fff2df; color: #8c5715; }
+.intake-stage.completed { background: #edf7ef; color: #15803d; }
+.intake-guidance-table td:last-child .button + .button { margin-top: 8px; }
+.intake-record { display: grid; gap: 20px; }
+.intake-record h3, .intake-record p { margin: 0 0 8px; }
+.intake-record-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.intake-record-summary dt, .intake-record-note { color: var(--color-muted); font-size: 14px; }
+.intake-record-summary dd { margin: 4px 0 0; }
+.intake-record-history { list-style: none; padding: 0; margin: 12px 0 0; max-height: 320px; overflow-y: auto; }
+.intake-record-history li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-line); overflow-wrap: anywhere; }
+.intake-record-history time { color: var(--color-muted); font-size: 14px; }
+@media(max-width: 640px) { .intake-record-summary, .intake-record-history li { grid-template-columns: minmax(0, 1fr); } }
 .intake-guidance-table .button { white-space: normal; text-align: left; }
 .intake-info-trigger:focus-visible, .intake-info-panel button:focus-visible, .intake-tabs button:focus-visible, .intake-project-link:focus-visible { outline: 3px solid #5285af; outline-offset: 2px; }
 @media(max-width: 1100px) { .intake-guidance-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } .intake-guidance-table tbody { display: block; } .intake-guidance-table tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); padding: 12px; border-bottom: 1px solid #dce4ec; } .intake-guidance-table td { display: block; border: 0; padding: 8px; } .intake-guidance-table td::before { content: attr(data-label); display: block; font-size: 11px; color: #62758a; margin-bottom: 6px; } .intake-guidance-table td:first-child { grid-column: 1 / -1; } }

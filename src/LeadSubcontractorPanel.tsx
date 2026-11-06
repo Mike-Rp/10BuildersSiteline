@@ -188,7 +188,6 @@ function LegacyLeadSubcontractorPanel({
   const [agreementOpen, setAgreementOpen] = useState(false)
   const [confirmActivation, setConfirmActivation] = useState(false)
   const [activationError, setActivationError] = useState("")
-  const [activatedNow, setActivatedNow] = useState(false)
   const work = workflowFor(project)
   // One subcontractor per project: the company contacted (awaiting reply) or accepted.
   const current = projectSubcontractor(project)
@@ -1070,7 +1069,7 @@ function LegacyLeadSubcontractorPanel({
                   )
                 ) {
                   setConfirmActivation(false)
-                  setActivatedNow(true)
+                  onActivated()
                 } else
                   setActivationError(
                     "Activation could not be confirmed. Review the workspace error before trying again.",
@@ -1078,32 +1077,6 @@ function LegacyLeadSubcontractorPanel({
               }}
             >
               Confirm Activation
-            </Button>
-          </div>
-        </Modal>
-      )}
-      {activatedNow && (
-        <Modal
-          title="Project Successfully Activated!"
-          subtitle={project.name}
-          onClose={() => setActivatedNow(false)}
-        >
-          <div className="success-state">
-            <span>
-              <Icon name="check" size={32} />
-            </span>
-            <h3>{project.name} is now active.</h3>
-            <p>Mobilization starts at 0%. Client access is enabled.</p>
-          </div>
-          <div className="modal-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                setActivatedNow(false)
-                onOpenActive()
-              }}
-            >
-              Go to Active Sites
             </Button>
           </div>
         </Modal>

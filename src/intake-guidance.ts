@@ -12,6 +12,8 @@ export type IntakeGuidance = {
   label: string
 }
 export const isIntake = (p: Project) => ["pending", "draft", "changes_requested"].includes(p.status)
+export const isIntakeHistory = (p: Project) => ["active", "completed"].includes(p.status)
+export const intakeHistoryLabel = (p: Project) => p.status === "completed" ? "Intake Completed · Project Completed" : "Intake Completed · Project Active"
 
 // Presentation only: all destinations reuse existing screens and commands.
 // Never call this with a client projection or infer access from an account scope label.
@@ -26,7 +28,7 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   function step(stage: string, who: string, next: string, mine: boolean,
     action: IntakeGuidance["action"], label: string): IntakeGuidance {
     const available = mine && canAct
-    return { stage, who, next, kind: available ? "action" : "waiting", action: available ? action : "view", label: available ? label : "View details" }
+    return { stage, who, next, kind: available ? "action" : "waiting", action: available ? action : "view", label: available ? label : "Review intake record" }
   }
   if (p.status === "draft" || p.status === "changes_requested")
     return step(p.status === "draft" ? "Draft" : "Changes requested", "Administrator",

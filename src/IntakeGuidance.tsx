@@ -1,5 +1,5 @@
 import type { Account, Project, State } from "./model"
-import { intakeGuidance, type IntakeGuidance as Guidance, type IntakeView } from "./intake-guidance"
+import { intakeGuidance, isIntakeHistory, intakeHistoryLabel, type IntakeGuidance as Guidance, type IntakeView } from "./intake-guidance"
 import { clientSubconAgreement, openClientSubconIssue, registeredCount } from "./workflows"
 import InfoPopover from "./InfoPopover"
 
@@ -40,10 +40,16 @@ export default function IntakeGuidance({ state, project, actor, details = false 
   </div>
 }
 
-export function AdminIntakeTable({ state, projects, actor, onOpen }: { state: State; projects: Project[]; actor: Account; onOpen: (project: Project, edit: boolean) => void }) {
+export function AdminIntakeTable({ state, projects, actor, onOpen, onOpenActive }: { state: State; projects: Project[]; actor: Account; onOpen: (project: Project, edit: boolean) => void; onOpenActive?: (project: Project) => void }) {
   return <table className="intake-guidance-table"><thead><tr><th>Project</th><th>Current stage</th><th>Responsible person</th><th>Action</th></tr></thead>
     <tbody>{projects.map(project => {
       const guidance = intakeGuidance(state, project, actor)
+      if (isIntakeHistory(project)) return <tr key={project.id}>
+        <td data-label="Project"><button type="button" className="intake-project-link" onClick={() => onOpen(project, false)}>{project.name}</button><small>{project.type}</small></td>
+        <td data-label="Current stage"><span className="intake-stage completed">{intakeHistoryLabel(project)}</span></td>
+        <td data-label="Responsible person"><small>Intake history retained. Continue monitoring in {project.status === "active" ? "Active Sites" : "completed project records"}.</small></td>
+        <td data-label="Action"><button type="button" className="button" onClick={() => onOpen(project, false)}>View Intake History</button>{project.status === "active" && onOpenActive && <button type="button" className="button" onClick={() => onOpenActive(project)}>Open in Active Sites</button>}</td>
+      </tr>
       if (!guidance) return null
       const office = !project.opmId ? "Unassigned" : state.accounts.find(a => a.id === project.opmId)?.name || "Assigned Office PM"
       return <tr key={project.id}>

@@ -76,6 +76,29 @@ test("intake tabs filter before paging and preserve counts, destinations, help f
     assert.match(document.querySelector('.intake-info-panel').textContent,/Office PM must complete the six required documents/)
     await act(()=>root.render(React.createElement(IntakeGuidance,{state,project:blockedProject,actor:{...admin,id:"client",role:"client"}})))
     assert.ok(!document.querySelector('.intake-next'), "Client must receive no internal guidance")
+    const historical = {...state.projects[0], status:"active", created:"2026-11-01", location:"Sample Site", opmAccepted:true,
+      history:[{id:"activation",date:"2026-11-07",text:"Project activated after final checks passed.",progress:0}]}
+    const finished = {...historical,id:"finished",name:"Finished Project",status:"completed"}
+    const activeOpens=[]
+    await act(()=>root.render(React.createElement(AdminIntakeTable,{state,projects:[historical,finished],actor:admin,onOpen:(p,edit)=>opened.push([p.id,edit]),onOpenActive:p=>activeOpens.push(p.id)})))
+    assert.equal(document.querySelectorAll('tbody tr').length,2)
+    assert.match(document.querySelector('tbody').textContent,/Intake Completed · Project Active/)
+    assert.match(document.querySelector('tbody').textContent,/Intake Completed · Project Completed/)
+    const activeButton=[...document.querySelectorAll('button')].filter(b=>b.textContent==='Open in Active Sites')
+    assert.equal(activeButton.length,1,"Only ongoing projects link to Active Sites")
+    await act(()=>activeButton[0].click())
+    assert.deepEqual(activeOpens,[historical.id])
+    await act(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='View Intake History').click())
+    assert.deepEqual(opened.at(-1),[historical.id,false])
+    const {default:IntakeRecord}=await server.ssrLoadModule('/src/IntakeRecord.tsx')
+    const saved=structuredClone(historical)
+    await act(()=>root.render(React.createElement(IntakeRecord,{state,project:historical,actor:admin,onOpenActive:()=>activeOpens.push(historical.id)})))
+    assert.match(document.body.textContent,/Project activated after final checks passed/)
+    assert.ok(!document.querySelector('input,textarea,select'),"Intake history is read-only")
+    assert.ok(!document.querySelector('.project-monitoring-overview'),"Intake record must not render monitoring")
+    await act(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Open in Active Sites').click())
+    assert.equal(activeOpens.length,2)
+    assert.deepEqual(historical,saved,"Viewing history must preserve recorded data")
     let modalClosed=0
     await act(()=>root.render(React.createElement(Modal,{title:"Existing intake details",onClose:()=>modalClosed++},React.createElement(InfoPopover,{title:"Role ownership"},"Only the assigned role can accept."))))
     const help=document.querySelector('.intake-info-trigger')

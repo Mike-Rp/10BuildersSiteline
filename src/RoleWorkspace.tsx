@@ -1661,12 +1661,13 @@ export default function RoleWorkspace({
         onPreview={(doc) => showDoc(p, doc)}
         onOpenActive={() => {
           setPickedId(p.id)
+          setDialog(undefined)
           navigate("Active sites")
         }}
         onActivated={() => {
           setPickedId(p.id)
-          if (p.status === "active") navigate("Active sites")
-          else setDialog({ kind: "activated", projectId: p.id })
+          setDialog(undefined)
+          navigate("Active sites")
         }}
       />
     )
@@ -3986,37 +3987,6 @@ export default function RoleWorkspace({
           onClose={() => setDialog(undefined)}
         >
           {companyDetail(company)}
-        </Modal>
-      )}
-      {dialog?.kind === "activated" && detail && (
-        <Modal
-          title="Project activated"
-          subtitle={detail.name}
-          onClose={() => setDialog(undefined)}
-        >
-          <div className="success-state">
-            <span>
-              <Icon name="check" size={32} />
-            </span>
-            <h3>All final checks passed.</h3>
-            <p>
-              Office PM documents, Site PM acceptances, subcontractor responses,
-              signed agreement and client linkage are complete.
-            </p>
-          </div>
-          <div className="modal-actions">
-            <Button onClick={() => setDialog(undefined)}>Done</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setPickedId(detail.id)
-                setDialog(undefined)
-                navigate("Active sites")
-              }}
-            >
-              View Active Sites
-            </Button>
-          </div>
         </Modal>
       )}
       {evidenceReview && (
