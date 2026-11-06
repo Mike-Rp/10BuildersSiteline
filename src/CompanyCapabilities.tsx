@@ -99,7 +99,6 @@ export default function CompanyCapabilities({
   return (
     <section className="detail-section trade-allocation company-capability-review">
       <h3>Admin capability verification</h3>
-      {!editing && <Button onClick={() => { resetDraft(); setEditing(true) }}>Edit credentials</Button>}
       <p>Select company trades supported by the records. Verification is applied when you save this review.</p>
       <div className="capability-summary">
         <div><span>Directory classification</span><strong>{company.primaryTrade || "Not recorded"}</strong></div>
@@ -150,6 +149,7 @@ export default function CompanyCapabilities({
       {error && <p role="alert">{error}</p>}
       <div className="capability-review-footer">
         <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>
+        {!editing && <div className="capability-footer-actions"><Button variant="primary" onClick={() => { resetDraft(); setEditing(true) }}>Edit credentials</Button></div>}
         {editing && <div className="capability-footer-actions"><Button disabled={busy || uploading || !changed} onClick={resetDraft}>Undo changes</Button><Button disabled={busy || uploading} onClick={() => { resetDraft(); setEditing(false); onCancel?.() }}>Cancel</Button><Button variant="primary" disabled={busy || uploading || (!!review && !changed) || !selected.length || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>}
       </div>
       <p className="capability-help">Company approval and project acceptance are separate.</p>
