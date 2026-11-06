@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { Button, Field, Icon } from "./ui"
 import type { Company, Doc, Role } from "./model"
 import CompanyTradePicker from "./CompanyTradePicker"
@@ -35,10 +35,16 @@ export default function CompanyCapabilities({
     [error, setError] = useState("")
   const locked = useRef(false)
   const editable = role === "admin" && !!onSave
+  const requirementsId = useId()
   const supportingRecords = [...company.documents, ...draftDocuments.filter(doc => !company.documents.some(saved => saved.id === doc.id))].filter(document => document.uploaded)
   const linkedDocuments = documents.filter(id => supportingRecords.some(document => document.id === id))
   const differentSet = (a: string[], b: string[]) => JSON.stringify([...a].sort()) !== JSON.stringify([...b].sort())
   const changed = differentSet(selected, review?.disciplines || company.proposedDisciplines || []) || differentSet(linkedDocuments, review?.documentIds || []) || note.trim() !== (review?.note || "") || unavailable !== !!review?.unavailable || draftDocuments.length > 0
+  const missingRequirements = [
+    !selected.length ? "Select at least one company trade." : "",
+    !linkedDocuments.length ? "Select a supporting document. If none are on file, add one first." : "",
+    !note.trim() ? "Enter a capability review note." : "",
+  ].filter(Boolean)
   function resetDraft() {
     editSession.current++
     setSelected(review?.disciplines || company.proposedDisciplines || [])
@@ -147,10 +153,13 @@ export default function CompanyCapabilities({
       </div>
       <CompanyTradeMatches trades={selected} verified={!!review?.reviewedAt && !changed} />
       {error && <p role="alert">{error}</p>}
+      {editing && <div id={requirementsId} className="capability-save-requirements" role="status">
+        {missingRequirements.length ? <><strong>To enable Save:</strong><ul>{missingRequirements.map(requirement => <li key={requirement}>{requirement}</li>)}</ul></> : uploading ? "Wait for the document upload to finish." : review && !changed ? "No unsaved changes. Update a trade, linked document, or review note to save a new review." : "Required fields complete. You can save this capability review."}
+      </div>}
       <div className="capability-review-footer">
         <div><strong aria-live="polite">{selected.length} selected · {linkedDocuments.length} document{linkedDocuments.length === 1 ? "" : "s"} linked</strong><p>{!review ? "No capabilities are verified until this review is saved." : "Changes take effect after this review is saved."}</p></div>
         {!editing && <div className="capability-footer-actions"><Button variant="primary" onClick={() => { resetDraft(); setEditing(true) }}>Edit credentials</Button></div>}
-        {editing && <div className="capability-footer-actions"><Button disabled={busy || uploading || !changed} onClick={resetDraft}>Undo changes</Button><Button disabled={busy || uploading} onClick={() => { resetDraft(); setEditing(false); onCancel?.() }}>Cancel</Button><Button variant="primary" disabled={busy || uploading || (!!review && !changed) || !selected.length || !linkedDocuments.length || !note.trim()} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>}
+        {editing && <div className="capability-footer-actions"><Button disabled={busy || uploading || !changed} onClick={resetDraft}>Undo changes</Button><Button disabled={busy || uploading} onClick={() => { resetDraft(); setEditing(false); onCancel?.() }}>Cancel</Button><Button variant="primary" aria-describedby={requirementsId} disabled={busy || uploading || (!!review && !changed) || missingRequirements.length > 0} onClick={() => void save()}>{busy ? "Saving review…" : "Save verified capabilities"}</Button></div>}
       </div>
       <p className="capability-help">Company approval and project acceptance are separate.</p>
     </section>

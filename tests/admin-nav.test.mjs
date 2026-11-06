@@ -17,6 +17,12 @@ const OLD = [
   "Subcon directory",
 ]
 
+test("Archive belongs to Resources alongside retained document records", () => {
+  assert.ok(labels.indexOf("Archive") > labels.indexOf("Directory"))
+  assert.ok(labels.indexOf("Archive") < labels.indexOf("Team"))
+  assert.equal(ADMIN_NAV.find(item=>item.label==="Team").group,"ORGANIZATION")
+})
+
 test("the four RESOURCES items are merged into Documents and Directory", () => {
   for (const old of OLD) assert.ok(!labels.includes(old), old)
   const docs = ADMIN_NAV.find((n) => n.label === "Documents")

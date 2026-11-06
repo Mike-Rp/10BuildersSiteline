@@ -34,5 +34,5 @@ test('Workspace stays visible while other sidebar categories collapse and follow
  assert.equal(document.querySelector('[aria-label="Team"]').getAttribute('aria-current'),'page')
  await React.act(()=>category('Organization').click());assert.equal(headers().filter(b=>b.getAttribute('aria-expanded')==='true').length,0)
  assert.equal(children('Workspace').hidden,false)
- await render('Archive');assert.equal(children('Organization').hidden,false)
+ await render('Archive');assert.equal(children('Resources').hidden,false);assert.equal(children('Organization').hidden,true)
 })

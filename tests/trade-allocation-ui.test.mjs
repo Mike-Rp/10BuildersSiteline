@@ -182,6 +182,8 @@ test("Admin capability verification supports more than three verified discipline
     const company = {
       ...fixture().companies[0],
       capabilityReview: undefined,
+      availability: "committed",
+      activeProjectIds: ["existing-project"],
       documents: [{ id: "proof", name: "Company records.pdf", uploaded: true }],
     }
     let saved
@@ -199,6 +201,9 @@ test("Admin capability verification supports more than three verified discipline
     )
     await click(button("Edit credentials"))
     assert.equal(button("Save verified capabilities").disabled, true)
+    assert.match(document.querySelector('.capability-save-requirements').textContent,/Select at least one company trade/)
+    assert.match(document.querySelector('.capability-save-requirements').textContent,/Select a supporting document/)
+    assert.match(document.querySelector('.capability-save-requirements').textContent,/Enter a capability review note/)
     const checks = [...document.querySelectorAll('input[type="checkbox"]')]
     for (const checkbox of checks.slice(0, 5)) await click(checkbox)
     await click(checks[DISCIPLINES.length])
@@ -210,6 +215,7 @@ test("Admin capability verification supports more than three verified discipline
       ).set.call(note, "Reviewed classification and capability records.")
       note.dispatchEvent(new w.Event("input", { bubbles: true }))
     })
+    assert.equal(button("Save verified capabilities").disabled, false, "An existing commitment must not prevent verification when required fields are complete")
     await click(button("Save verified capabilities"))
     assert.equal(saved.disciplines.length, 5)
     assert.deepEqual(saved.documentIds, ["proof"])

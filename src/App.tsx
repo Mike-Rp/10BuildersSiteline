@@ -5,6 +5,8 @@ import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
 import IntakeRecord from "./IntakeRecord"
 import AdminIntakeCards from "./AdminIntakeCards"
+import ArchiveProjectCards from "./ArchiveProjectCards"
+import InfoPopover from "./InfoPopover"
 import useIdleWarning from "./useIdleWarning"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
@@ -1791,7 +1793,7 @@ function AppInner() {
                             <strong>{c.capabilityReview?.disciplines.length || 0}</strong>
                           </span>
                         </div>
-                        <div className="capability-card-tags">{(c.capabilityReview?.disciplines || []).map(trade=><span key={trade}>{trade}</span>)}</div>
+                        <div className="capability-card-tags">{(c.capabilityReview?.disciplines || []).map(trade=><span key={trade}>{trade}</span>)}{!c.capabilityReview?.disciplines.length && <Badge tone="amber">Capability Review Required</Badge>}</div>
                         {c.foremen?.map((foreman,index)=><p key={index}>{foreman.name} · {foreman.phone}</p>)}
                         <div className="card-bottom">
                           <span>View company details</span>
@@ -1892,7 +1894,7 @@ function AppInner() {
       return (
         <>
           {pageHeading(
-            "Team & accounts",
+            "Team & Accounts",
             <div className="share-login-header-actions">
             <Button onClick={() => setShareLoginLinksOpen(true)}>Share login links</Button>
             <Button
@@ -1907,11 +1909,12 @@ function AppInner() {
           <Panel
             title="Organization accounts"
             subtitle={`${state.accounts.filter((a) => a.status !== "deactivated").length} accounts · Admin-provisioned access`}
+            className="team-accounts-panel"
           >
             {teamAlerts.size > 0 && (
               <div className="notice team-license-notice">
                 <Icon name="alert" />
-                <p><strong>{teamLicenseItems.length} license {teamLicenseItems.length === 1 ? "alert" : "alerts"} across {teamAlerts.size} {teamAlerts.size === 1 ? "account" : "accounts"}.</strong> Review expiring licenses, renewal submissions, or assignments needing cover. This is what the Team badge counts.</p>
+                <p><strong>{teamLicenseItems.length} license {teamLicenseItems.length === 1 ? "alert" : "alerts"} across {teamAlerts.size} {teamAlerts.size === 1 ? "account" : "accounts"}.</strong></p>
                 <Button onClick={() => updateListQuery("admin:team", q => ({ ...q, search: "", filters: { attention: "needs-action" }, page: 1 }))}>View accounts</Button>
               </div>
             )}
@@ -1924,18 +1927,18 @@ function AppInner() {
               <table>
                 <thead>
                   <tr>
-                    <th>PERSON</th>
-                    <th>ROLE</th>
-                    <th>SCOPE / SPECIALIZATION</th>
-                    <th>STATUS</th>
-                    <th>ADDED</th>
-                    <th />
+                    <th scope="col">Person</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Scope / Specialization</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Added</th>
+                    <th scope="col"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {teamList.view.items.map((a) => (
                       <tr key={a.id} className={teamAlerts.has(a.id) ? "team-needs-attention" : undefined}>
-                        <td>
+                        <td data-label="Person">
                           <button
                             className="person-cell clickable"
                             onClick={() =>
@@ -1946,12 +1949,12 @@ function AppInner() {
                             <span>
                               <strong>{a.name}</strong>
                               <small>{a.email}</small>
-                              {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small>{teamLicenseItems.filter(item => item.id === a.id).map(item => <small key={item.key}>{item.detail}</small>)}</span>}
+                              {teamAlerts.has(a.id) && <span className="team-license-alert"><Badge tone="amber">Needs attention · {licenseState(a, state.rules.grace)}</Badge><small>License expiry: {dateLabel(a.expiry)}</small></span>}
                             </span>
                           </button>
                         </td>
-                        <td>{ROLE_NAMES[a.role]}</td>
-                        <td>
+                        <td data-label="Role">{ROLE_NAMES[a.role]}</td>
+                        <td data-label="Scope / Specialization">
                           <div className="tag-list">
                             {(a.role === "client"
                               ? a.scope.map(projectFor)
@@ -1972,11 +1975,11 @@ function AppInner() {
                             <Badge tone="amber">Assignment Hold</Badge>
                           )}
                         </td>
-                        <td>
-                          <Status status={a.status} />
+                        <td data-label="Status">
+                          {a.status === "invited" && a.role === "client" ? <span className="team-status-help"><Badge tone="amber">Pending Setup</Badge><InfoPopover title="Pending client setup" label={`Why is ${a.name} pending setup?`}>This client account has been created. “Invited” is an account status, not an email invitation. Client sign-in also requires approval of a linked project.</InfoPopover></span> : <Status status={a.status} />}
                         </td>
-                        <td>{dateLabel(a.added)}</td>
-                        <td>
+                        <td data-label="Added">{dateLabel(a.added)}</td>
+                        <td data-label="Actions">
                           <Button
                             variant="icon-button"
                             icon="chevron"
@@ -2031,16 +2034,14 @@ function AppInner() {
       const suspendedList = accountArchive("admin:archive-flagged", suspended)
       const deactivatedList = accountArchive("admin:archive-deactivated", deactivated)
       return (
-        <>
+        <div className="admin-archive">
           {pageHeading(
             "Archive",
           )}
           <div className="notice">
             <Icon name="archive" />
             <p>
-              Historical records are read-only. The source does not implement
-              automatic archive transfers; this workspace does not invent
-              project-completion or retention automation.
+              Browse retained project records and offboarded accounts.
             </p>
           </div>
           <Panel title="Historical records">
@@ -2078,9 +2079,10 @@ function AppInner() {
                 </div>
                 <ListSection
                   list={suspendedList}
+                  toolbar={suspended.length > 0}
                   placeholder="Search flagged accounts"
                   noun="account"
-                  empty={null}
+                  empty={<p className="compact-empty">No accounts flagged for review.</p>}
                   render={(items) => (
                 <>
                 {items.map((a) => (
@@ -2131,9 +2133,10 @@ function AppInner() {
                 <h3>Deactivated accounts</h3>
                 <ListSection
                   list={deactivatedList}
+                  toolbar={deactivated.length > 0}
                   placeholder="Search deactivated accounts"
                   noun="account"
-                  empty={null}
+                  empty={<p className="compact-empty">No deactivated accounts.</p>}
                   render={(items) => (
                 <>
                 {items.map((a) => (
@@ -2151,21 +2154,18 @@ function AppInner() {
                 </>
                   )}
                 />
-                {!suspended.length && !deactivated.length && (
-                  <Empty title="No accounts require review" />
-                )}
               </div>
             ) : (
               <ListSection
                 list={archiveList}
                 placeholder="Search archived projects"
                 noun="record"
-                render={(items) => projectTable(items)}
-                empty={projectTable([])}
+                render={(items) => <ArchiveProjectCards projects={items} closedDate={closedDate} onOpen={p => setDialog({ kind: "project", id: p.id })} />}
+                empty={<p className="compact-empty">No records in this archive category.</p>}
               />
             )}
           </Panel>
-        </>
+        </div>
       )
     }
     if (page === "Settings")

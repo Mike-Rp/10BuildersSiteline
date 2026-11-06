@@ -8,8 +8,8 @@ export const ADMIN_NAV = [
   { label: "Project intake", icon: "plus" },
   { label: "Documents", icon: "folder", group: "RESOURCES" },
   { label: "Directory", icon: "users" },
-  { label: "Team", icon: "users", group: "ORGANIZATION" },
   { label: "Archive", icon: "archive" },
+  { label: "Team", icon: "users", group: "ORGANIZATION" },
   { label: "Activity log", icon: "activity" },
   { label: "Settings", icon: "settings" },
 ]

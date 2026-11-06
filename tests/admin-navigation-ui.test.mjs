@@ -124,6 +124,16 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     assert.match(css, /sidebar-collapsed > \.main-shell\s*\{[^}]*margin-left: 0;[^}]*width: 100%/)
     assert.match(css, /\.sidebar-toggle\s*\{[^}]*display: inline-flex/)
     assert.ok(!calls.some(call => ["/accounts", "/workspace"].includes(call.path) && call.method !== "GET"), "navigation never changes account or workspace records")
+    const { default: ArchiveCards } = await server.ssrLoadModule('/src/ArchiveProjectCards.tsx')
+    const records = ['completed','declined','expired'].map((status,index)=>({id:String(index),name:`Retained Project ${index}`,type:'Residential',location:'Test Site',phase:'Closeout',status}))
+    const before = structuredClone(records), opened = []
+    await act(()=>root.render(React.createElement(ArchiveCards,{projects:records,closedDate:()=> '2026-11-07',onOpen:project=>opened.push(project.id)})))
+    assert.equal(document.querySelector('table'),null,'Archive does not require the wide project table')
+    assert.equal(document.querySelectorAll('.archive-project-card').length,3)
+    assert.equal(document.querySelectorAll('input,select,textarea').length,0,'Archived project cards expose no editing controls')
+    await click(document.querySelector('.archive-project-card button'))
+    assert.deepEqual(opened,['0'])
+    assert.deepEqual(records,before,'Opening an archive record preserves the source data')
   } finally {
     await act(() => root.unmount())
     await server.close()
