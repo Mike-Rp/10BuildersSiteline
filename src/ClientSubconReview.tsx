@@ -283,6 +283,7 @@ export function AgreementPreviewModal({
                     rows={4}
                     disabled={saving}
                     value={issue}
+                    placeholder="Enter at least 10 characters describing the incorrect details or agreement discrepancy."
                     onChange={(e) => setIssue(e.target.value)}
                   />
                 </Field>

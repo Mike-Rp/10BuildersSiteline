@@ -48,7 +48,7 @@ test("scope keeps core work for all supported use and feature combinations and n
   }
   for(const invalid of [null,{}, {...scope(),confirmed:false},{...scope(),uses:["office","office"]},{...scope(),uses:["office","unknown"]},{...scope(),basis:""},{...scope(),features:{}},{...scope(),features:{...scope().features,fireSafety:false}}])assert.throws(()=>normalizeMixedUseScope(invalid))
   const state=emptyState()
-  state.accounts=[{id:"civil",role:"spm",name:"Civil",status:"active",expiry:"2099-01-01",scope:["Civil"],projectTypes:[],docs:[]},{id:"electrical",role:"spm",name:"Electrical",status:"active",expiry:"2099-01-01",scope:["Electrical"],projectTypes:[],docs:[]}]
+  state.accounts=[{id:"civil",role:"spm",name:"Civil",status:"active",hasProfessionalCredentials:true,expiry:"2099-01-01",scope:["Civil"],projectTypes:[],docs:[]},{id:"electrical",role:"spm",name:"Electrical",status:"active",hasProfessionalCredentials:true,expiry:"2099-01-01",scope:["Electrical"],projectTypes:[],docs:[]}]
   assert.deepEqual(spmCandidates(state,"Mixed-Use","Office Fit-Out","new",["Interior/Finishes","Acoustic","Electrical"]).map(row=>row.account.id),["electrical"])
 })
 

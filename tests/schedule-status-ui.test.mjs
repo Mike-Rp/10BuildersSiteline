@@ -76,7 +76,7 @@ test("schedule badges, delayed filters, role navigation and view-only notices us
       onDelayedProjects() { openedDelayed++ }, onNavigate() {}, onOpen() {}, onNewIntake() {}, onActivity() {} })
     await click("Delayed projects (10)")
     assert.equal(openedDelayed, 1)
-    assert.ok(document.querySelector('[aria-label="1 attention items"]'))
+    assert.ok(document.querySelector('[aria-label="1 follow-up items"]'))
     assert.doesNotMatch(document.querySelector('.ao-panel').textContent, /Nothing waiting for attention/)
 
     const state = initialState(), office = state.accounts.find(a => a.id === "a2"), site = state.accounts.find(a => a.id === "a6")
@@ -100,11 +100,13 @@ test("schedule badges, delayed filters, role navigation and view-only notices us
     document.head.append(style)
     await render(RoleWorkspace, { ...props, actor: site }, "site")
     const expected = projectScheduleStatus(late, localScheduleDate()).daysOverdue
-    const notice = document.querySelector('.schedule-delay-notice')
+    // The dashboard links to delayed projects; the read-only delay notice is shown on the project card.
+    assert.ok([...document.querySelectorAll('main button')].some(el => el.textContent.trim() === "Delayed projects (1)"))
+    await act(() => [...document.querySelectorAll('.nav-item')].find(el => el.textContent.includes("Active sites")).click())
+    const notice = document.querySelector('.as-card .schedule-delay-notice')
+    assert.ok(notice)
     assert.equal(notice.textContent, `This project passed its target completion date on Feb 1, 2020 (${expected} days overdue).`)
     assert.equal(notice.querySelector('button, input, select, a'), null)
-    await act(() => [...document.querySelectorAll('.nav-item')].find(el => el.textContent.includes("Active sites")).click())
-    assert.ok(document.querySelector('.as-card .schedule-delay-notice'))
     assert.equal(dom.window.getComputedStyle(document.querySelector('.as-details')).minHeight, "48px")
     assert.equal(document.querySelector('.schedule-delay-notice button'), null)
     assert.deepEqual(state, before)

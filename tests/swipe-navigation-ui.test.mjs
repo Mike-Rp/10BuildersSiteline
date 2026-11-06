@@ -43,7 +43,7 @@ test('workspace swipes validate intent, protect edits and never change browser h
       return {move,end}
     }
     const click=async label=>act(()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label).click())
-    await t.test('one action per gesture, right to Dashboard, left to last authorized module, existing sign-out confirmation',async()=>{
+    await t.test('one action per gesture, right to Dashboard, left to last authorized module, never a swipe sign-out',async()=>{
       await render();const history=w.history.length
       const {move}=await swipe()
       assert.equal(move.defaultPrevented,true)
@@ -52,10 +52,9 @@ test('workspace swipes validate intent, protect edits and never change browser h
       assert.equal(document.querySelector('[role=dialog]'),null,'duplicate end cannot request sign-out')
       await swipe('left');assert.equal(page(),'Documents')
       await click('Open Team');await swipe();await swipe('left');assert.equal(page(),'Team')
-      await swipe();await swipe();assert.match(document.querySelector('[role=dialog]').textContent,/Sign out of 10BuildLine/)
-      await swipe();assert.equal(exits,0,'a gesture never confirms sign-out')
-      await click('Cancel');assert.equal(page(),'Dashboard');assert.equal(exits,0)
-      await swipe();await click('Sign out');assert.equal(exits,1)
+      // Swipe-to-sign-out was retired: further right swipes on Dashboard do nothing.
+      await swipe();await swipe();assert.equal(page(),'Dashboard');assert.equal(document.querySelector('[role=dialog]'),null,'a gesture never requests sign-out')
+      assert.equal(exits,0)
       assert.equal(w.history.length,history);assert.equal(w.location.pathname,'/admin')
     })
     await t.test('short, vertical, diagonal, slow, tap-like, cancelled and multi-touch gestures do nothing',async()=>{
@@ -93,7 +92,7 @@ test('workspace swipes validate intent, protect edits and never change browser h
       const backdrop=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:5,deltaX:-180})
       await act(()=>document.body.dispatchEvent(backdrop))
       assert.equal(backdrop.defaultPrevented,true)
-      assert.equal(page(),'Documents');assert.equal(exits,1)
+      assert.equal(page(),'Documents');assert.equal(exits,0)
       const vertical=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:180})
       await act(()=>dialog.dispatchEvent(vertical));assert.equal(vertical.defaultPrevented,false)
       assert.equal(document.documentElement.style.overscrollBehaviorX,'none')
@@ -104,8 +103,7 @@ test('workspace swipes validate intent, protect edits and never change browser h
       const horizontal=new w.WheelEvent('wheel',{bubbles:true,cancelable:true,deltaX:180})
       await act(()=>scroller.dispatchEvent(horizontal));assert.equal(horizontal.defaultPrevented,false,'dialog horizontal list keeps its own scrolling')
       await render();await swipe();assert.equal(page(),'Dashboard')
-      await swipe();assert.match(document.querySelector('[role=dialog]').textContent,/Sign out of 10BuildLine/)
-      await click('Cancel');assert.equal(page(),'Dashboard')
+      await swipe();assert.equal(document.querySelector('[role=dialog]'),null,'Dashboard swipes never open a sign-out dialog')
     })
 
     await t.test('a dialog opening mid-gesture cancels touch and queued trackpad navigation',async()=>{
@@ -154,14 +152,13 @@ test('workspace swipes validate intent, protect edits and never change browser h
       await render({allowed:['Dashboard']},false);await swipe('left');assert.equal(page(),'Dashboard')
       await render({identity:'different-admin'},false);await swipe('left');assert.equal(page(),'Dashboard')
     })
-    await t.test('mobile either-direction swipes go to Dashboard then request sign-out, with desktop restored on resize',async()=>{
+    await t.test('mobile either-direction swipes go to Dashboard and stop there, with desktop restored on resize',async()=>{
       Object.defineProperty(w,'innerWidth',{value:390,configurable:true})
       const before=exits
       for(const first of ['left','right'])for(const second of ['left','right']){
         await render();await swipe(first);assert.equal(page(),'Dashboard');assert.equal(document.querySelector('[role=dialog]'),null)
-        await swipe(second);assert.match(document.querySelector('[role=dialog]').textContent,/Sign out of 10BuildLine/)
-        await swipe('left');assert.equal(exits,before,'swiping inside confirmation cannot sign out')
-        await click('Cancel');assert.equal(page(),'Dashboard');assert.equal(exits,before)
+        await swipe(second);assert.equal(page(),'Dashboard');assert.equal(document.querySelector('[role=dialog]'),null)
+        assert.equal(exits,before,'swiping never signs out')
       }
       await render({overlay:true});await swipe('left');assert.equal(page(),'Documents')
       await render();await swipe('left');assert.equal(page(),'Dashboard')

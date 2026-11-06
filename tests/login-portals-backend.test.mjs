@@ -17,8 +17,10 @@ test("login portals enforce database roles before creating or replacing sessions
   t.after(async()=>{if(child){const closed=new Promise(resolve=>child.once('exit',resolve));child.kill();await closed}if(socket)await socket.stop();await db.close()})
   await db.exec("create role authenticated;create role anon;create role service_role;create schema extensions;create schema auth;create schema storage;")
   await db.exec(fs.readFileSync(here('../supabase/migrations/20261017000002_thesis_backend_schema.sql'),'utf8').replace(/^create extension if not exists pgcrypto.*$/m,''))
-  for(const file of ['001-phase-checklists.sql','002-phase-update-confirmation.sql','003-react-integration.sql','004-verified-activity-progress.sql'])await db.exec(fs.readFileSync(here('../Thesis-Backend/migrations/'+file),'utf8'))
+  for(const file of ['001-phase-checklists.sql','002-phase-update-confirmation.sql','003-react-integration.sql','004-verified-activity-progress.sql','009-engineer-license-workflow.sql'])await db.exec(fs.readFileSync(here('../Thesis-Backend/migrations/'+file),'utf8'))
   await db.exec(fs.readFileSync(here('../supabase/seed/dummy-data.sql'),'utf8'))
+  // The session middleware reads engineer-credential columns (migration 015).
+  await db.exec(fs.readFileSync(here('../Thesis-Backend/migrations/015-engineer-credentials.sql'),'utf8'))
   const dbPort=await port(),apiPort=await port()
   socket=new PGLiteSocketServer({db,port:dbPort,host:'127.0.0.1'});await socket.start()
   child=spawn(process.execPath,['src/index.js'],{cwd:here('../Thesis-Backend/'),env:{...process.env,NODE_ENV:'development',DB_SERVER:'127.0.0.1',DB_PORT:String(dbPort),DB_NAME:'postgres',DB_USER:'postgres',DB_PASSWORD:'x',DB_POOL_MAX:'1',PGSSLMODE:'disable',JWT_SECRET:'isolated-login-portals-test-secret-0123456789',HOST:'127.0.0.1',PORT:String(apiPort),ARCHIVE_MAINTENANCE_ENABLED:'false'},stdio:'ignore'})

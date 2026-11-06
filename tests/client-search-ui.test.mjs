@@ -26,7 +26,6 @@ test("client creation requires a company address, preserves intake details, and 
     await type("Client / company name *", "Sample Client")
     await type("Contact person", "Primary contact")
     await type("Contact number", "09171234567")
-    assert.match(document.body.textContent, /client's @10builders.com account address/)
     assert.match(document.body.textContent, /Project access is not activated/)
     assert.equal(field("Email address *").placeholder, "lastname.firstname@10builders.com")
     for (const email of ["mikahiro@gmail.com", "mikahiro@yahoo.com", "mikahiro@10builders.com.evil", "mikahiro@not10builders.com", "", "mikahiro@@10builders.com"]) {
@@ -58,45 +57,14 @@ test("client creation requires a company address, preserves intake details, and 
     assert.equal(used.id, legacy.id)
     await React.act(() => root.render(React.createElement(AccountForm, { key: "existing", state, account: legacy, onSave() {}, onClose() {} })))
     assert.equal(field("Email address *").getAttribute("pattern"), null)
-    // The main account form's company-email generator also works for Clients.
-    const project = { id: "client-project", name: "Client Project" }
-    state.projects = [project]
-    let finishSave, failSave = true
-    await React.act(() => root.render(React.createElement(AccountForm, { key: "generated", state, onSave: account => {
-      saved.push(account)
-      return new Promise((resolve, reject) => { finishSave = () => failSave ? reject(new Error("Connection interrupted. Please retry.")) : resolve() })
-    }, onClose() {} })))
-    await React.act(() => {
-      const role = field("Account role")
-      Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(role, "client")
-      role.dispatchEvent(new w.Event("change", { bubbles: true }))
-    })
-    await type("First name *", "Vialh")
-    await type("Last name *", "Gonzales")
+    // Clients are created only through project intake: the Team account form offers staff roles only.
+    await React.act(() => root.render(React.createElement(AccountForm, { key: "generated", state, onSave() { throw Error("No save expected") }, onClose() {} })))
+    const roles = [...field("Account role").options].map(option => option.value)
+    assert.ok(!roles.includes("client"), "Team cannot create Client accounts")
+    assert.ok(!roles.includes("admin"), "Team cannot create Administrator accounts")
+    assert.deepEqual(roles.sort(), ["opm", "spm"])
     assert.equal(field("Employee ID *"), null, "the administrator never enters an ID")
-    assert.equal(field("Email address *"), null, "the system generates the email when saving")
-    assert.doesNotMatch(document.body.textContent, /system assigns the next employee ID/)
-    await type("First name *", "Another")
-    await React.act(() => document.querySelector('input[type="checkbox"]').click())
-    await React.act(() => {
-      for (let i = 0; i < 4; i++) document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }))
-    })
-    assert.equal(saved.length, 2)
-    assert.equal(button("Saving account…").disabled, true)
-    assert.equal(document.querySelector('fieldset').disabled, true)
-    assert.equal(document.querySelector('form').getAttribute('aria-busy'), 'true')
-    assert.equal(saved[1].email, "")
-    assert.equal(saved[1].lastName, "Gonzales")
-    assert.equal(saved[1].status, "invited")
-    await React.act(async () => { finishSave(); await Promise.resolve() })
-    assert.match(document.body.textContent, /Connection interrupted/)
-    assert.equal(button("Create account").disabled, false)
-    failSave = false
-    await click("Create account")
-    assert.equal(saved.length, 3, "a failed save can be retried")
-    assert.equal(saved[2].id, saved[1].id, "retry keeps the account creation request identity")
-    await React.act(async () => { finishSave(); await Promise.resolve() })
-    assert.equal(document.querySelector('form').getAttribute('aria-busy'), 'false')
+    assert.equal(field("Email address *"), null, "the system generates staff email addresses when saving")
   } finally {
     await React.act(() => root.unmount()); await server.close(); dom.window.close()
     for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]

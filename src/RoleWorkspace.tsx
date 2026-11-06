@@ -138,7 +138,7 @@ function currentPhaseStatusForProject(project: Project, state: State, today: str
     assignedSitePmActionsPaused: assignedSpm ? Boolean(assignedSpm.assignmentHold || licenseAccessPolicy(assignedSpm.expiry, today).mode === "view_only") : undefined,
     waitingForReassignedEngineerAcceptance: reassignmentAwaitingAcceptance,
     hasOpenBlockingIssue: Boolean(workflowFor(project).pendingRework?.issues.length),
-    hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(project.phase, activities, project.history),
+    hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(project.phase, activities, project.history ?? []),
     today,
   })
 }
@@ -540,7 +540,10 @@ export default function RoleWorkspace({
       ...current, search: "", filters, page: 1,
     }))
     navigate("Active sites")
-    requestAnimationFrame(() => document.getElementById("active-sites-review")?.scrollIntoView({ block: "start" }))
+    // QA/QC evidence is reviewed in the Office PM "Updates & issues" view, inside each project's card.
+    if (isOpm) setActiveSitesView("updates")
+    const target = project ? `active-site-review-${project.id}` : "active-sites-review"
+    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: project ? "center" : "start" }))
   }
   function openUrgentItem(item: UrgentItem) {
     const priority = staffUrgentItems(state, actor, "Dashboard", urgencyNow).find(entry => entry.key === item.key)
@@ -550,6 +553,7 @@ export default function RoleWorkspace({
     if (priority.target === "qa") openChecklistApprovals(project)
     else if (priority.target === "progress" || priority.target === "rework") {
       navigate("Active sites")
+      if (isOpm) setActiveSitesView("updates")
       requestAnimationFrame(() => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center" }))
     } else if (priority.target === "assignment") { navigate("Assignments"); setAssignmentId(project.id) }
     else if (priority.target === "responses") { openSiteResponses(); setDialog({ kind: "project", projectId: project.id }) }

@@ -38,6 +38,9 @@ const freePort = () =>
       s.close(() => resolve(port))
     })
   })
+// Seed projects can carry legacy Office PMs without the project-type qualification new intakes require.
+const qualifiedOpm = (state, type, fallback) =>
+  state.accounts.find((a) => a.role === "opm" && a.status === "active" && a.projectTypes.includes(type))?.id ?? fallback
 const until = async (fn, ms = 30000) => {
   const end = Date.now() + ms
   for (;;) {
@@ -67,6 +70,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   // The demo data deliberately includes expired licenses (see tests/license-workflow.test.mjs). These progress and
   // lifecycle workflows are not about licenses, so every engineer starts with a valid one here.
   await db.exec("update public.user_licenses set license_expiry = current_date + 400 where superseded_at is null")
+  await db.exec("delete from public.license_renewal_requests where file_ref like 'seed/licenses/renewal-%'")
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/008-monthly-report-history.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/010-photo-release.sql"),"utf8"))
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/017-project-photo-review.sql"),"utf8"))
@@ -395,7 +399,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const draft=state.projects.find(p=>p.name.startsWith("Alden Heights"))
     const source=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
     const project={...draft,id:randomUUID(),name:"Integration Test Site",type:source.type,clientId:intakeClient.id,
-      opmId:source.opmId,area:"100",floors:"1",start:"2027-01-15",end:"2027-10-15",docs:[],clientSubcon:"",clientSubconEmail:"",
+      opmId:qualifiedOpm(state,source.type,source.opmId),area:"100",floors:"1",start:"2027-01-15",end:"2027-10-15",docs:[],clientSubcon:"",clientSubconEmail:"",
       team:source.team.map(t=>({...t,status:"pending"}))}
     for(const id of new Set([project.opmId,...project.team.map(t=>t.accountId)])){
       const account=state.accounts.find(a=>a.id===id)
@@ -500,8 +504,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await sendApiWorkflow(session.state,actor,{type:"upload_agreement",projectId:p.id,doc:{id,name:"signed.pdf"}})
     const active=await api("/projects/"+p.id)
     assert.equal(active.lifecycle_status,"active")
-    assert.equal(active.crew_assigned,active.crew_required)
-    assert.ok(active.crew_assigned>0)
+    // Activation records the company commitment only; individual workers are not distributed to the project.
+    assert.equal(active.crew_assigned,0)
+    assert.equal((await db.query("select 1 from project_subcontractor_assignments where project_id=$1 and subcontractor_id=$2",[p.id,company.id])).rowCount,1)
     await assert.rejects(sendApiWorkflow(session.state,actor,{type:"upload_agreement",projectId:p.id,doc:{id,name:"signed.pdf"}}),/Only an intake/)
   })
 
@@ -1246,12 +1251,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const raw=await api("/projects/"+commercial.id);
     await assert.rejects(api("/projects/intake",{method:"POST",json:{
       name:"Incomplete type workflow",project_type:"Commercial",floor_area_sqm:1000,floor_count:2,
-      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:commercial.opmId,
+      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:qualifiedOpm(state,"Commercial",commercial.opmId),
       phase_team:[{stage:"Mobilization",user_id:spm.id,is_lead:true}]
     }}),/every phase/i);
     const created=await api("/projects/intake",{method:"POST",json:{
       name:"Complete type workflow",project_type:"Commercial",floor_area_sqm:1000,floor_count:2,
-      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:commercial.opmId,
+      target_start_date:"2026-12-01",client_name:"Workflow client",suggested_opm_id:qualifiedOpm(state,"Commercial",commercial.opmId),
       phase_team:state.backendPhases.Commercial.map((p,i)=>({stage:p.name,user_id:spm.id,is_lead:i===0}))
     }});
     assert.equal((await api("/projects/"+created.project.id)).phase_team.length,9);
@@ -1267,7 +1272,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const intakeId = randomUUID()
     const body = {
       name: "Idempotent intake", project_type: "Commercial", floor_area_sqm: 1000, floor_count: 2,
-      target_start_date: "2026-12-01", client_name: "Idempotent client", suggested_opm_id: commercial.opmId, intake_id: intakeId,
+      target_start_date: "2026-12-01", client_name: "Idempotent client", suggested_opm_id: qualifiedOpm(state, "Commercial", commercial.opmId), intake_id: intakeId,
       phase_team: state.backendPhases.Commercial.map((p, i) => ({ stage: p.name, user_id: spm.id, is_lead: i === 0 })),
     }
     const results = await Promise.all([1, 2, 3].map(() => api("/projects/intake", { method: "POST", json: body })))

@@ -48,7 +48,7 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     assert.ok(monthly)
     monthly.focus()
     await act(async () => { monthly.click(); await new Promise(resolve => setTimeout(resolve, 0)) })
-    assert.ok(document.querySelector('[role="dialog"][aria-label="Monthly project report"]'))
+    assert.ok(document.querySelector('[role="dialog"][aria-label="Monthly Project Report"]'))
     assert.match(document.querySelector('[role="dialog"]').textContent, /Report connection unavailable/)
     await act(() => document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })))
     assert.equal(document.querySelector('[role="dialog"]'), null)

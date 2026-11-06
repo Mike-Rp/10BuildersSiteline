@@ -25,7 +25,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     if (path === "/auth/login" || path === "/auth/admin/login" || path === "/auth/staff/login") {
       return Response.json({user,token:`test.${Buffer.from(JSON.stringify({sub:user.id,details:{id:user.id,role:user.role}})).toString("base64url")}.test`})
     }
-    if (path === "/auth/logout") return Response.json({ ok: true })
+    if (path === "/auth/logout" || (path === "/auth" && method === "DELETE")) return Response.json({ ok: true })
     if (path === "/accounts") return Response.json([user])
     if (path === `/accounts/${user.id}`) return Response.json(user)
     if (path === "/workspace") return Response.json({ accounts: {}, projects: {}, preferences: {} })
@@ -40,7 +40,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
     const { default: App } = await server.ssrLoadModule("/src/App.tsx")
     const client = await server.ssrLoadModule("/src/api/client.ts")
     const click = async element => { assert.ok(!!element, "Expected a sign-out control"); await act(() => element.click()) }
-    const logoutCalls = () => calls.filter(c => c.path === "/auth/logout").length
+    const logoutCalls = () => calls.filter(c => c.path === "/auth/logout" || (c.path === "/auth" && c.method === "DELETE")).length
     let swipeClock=1000
     const swipe=async direction=>act(()=>{
       const target=document.querySelector('.main-shell h1') || document.querySelector('.main-shell')
@@ -72,15 +72,14 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         await swipe(mobile?'left':'right')
         assert.match(document.querySelector('.sidebar .nav-item.active').textContent,role==='client'?/Overview/:/Dashboard/)
         assert.equal(confirmation(),null)
+        // Swipe-to-sign-out was retired: further swipes on Dashboard never open the sign-out confirmation.
         await swipe('right')
-        assert.ok(confirmation(),role+' second swipe opens the existing confirmation')
-        await click([...confirmation().querySelectorAll('button')].find(el=>el.textContent.trim()==='Cancel'))
-        assert.equal(logoutCalls(),beforeSwipeLogout,'swipe cancellation keeps the session')
+        assert.equal(confirmation(),null,role+' second swipe does not request sign-out')
+        assert.equal(logoutCalls(),beforeSwipeLogout,'swipes keep the session')
         assert.equal(client.getToken(),token)
         await swipe('left')
         if(mobile){
-          assert.ok(confirmation(),role+' left swipe on mobile Dashboard also asks for confirmation')
-          await click([...confirmation().querySelectorAll('button')].find(el=>el.textContent.trim()==='Cancel'))
+          assert.equal(confirmation(),null,role+' left swipe on mobile Dashboard does not request sign-out')
           assert.equal(client.getToken(),token)
         } else {
           assert.match(document.querySelector('.sidebar .nav-item.active').textContent,/Active sites/)
@@ -142,9 +141,12 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.ok(!confirmation())
         assert.equal(client.getToken(), token)
         await requestSignOut()
+        // Backdrop clicks never dismiss modals (they stay open until an explicit choice) and never sign out.
         await act(() => confirmation().parentElement.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true })))
-        assert.ok(!confirmation())
+        assert.ok(confirmation(), "a backdrop click keeps the confirmation open")
         assert.equal(client.getToken(), token)
+        await click([...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Cancel"))
+        assert.ok(!confirmation())
         assert.equal(logoutCalls(), baseline)
         await requestSignOut()
         const confirm = confirmButton()

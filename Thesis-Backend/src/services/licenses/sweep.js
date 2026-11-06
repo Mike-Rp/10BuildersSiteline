@@ -61,10 +61,12 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
     }
     const policy = licenseAccessPolicy(state.expiry, today);
     if (policy.prepareReplacement) {
-      const stage = policy.mode === "view_only" ? "view-only-started" : "preparation-notice";
+      // Access becomes renewal-only 30 days before expiry, so the notice depends on whether the license has actually expired.
+      const expired = policy.daysToExpiry !== null && policy.daysToExpiry < 0;
+      const stage = expired ? "view-only-started" : "preparation-notice";
       const fresh = await db.query("insert into license_reminders_sent(user_id,license_expiry,reminder_key) values($1,$2,$3) on conflict do nothing returning id",[engineer.id,engineer.license_expiry,stage]);
-      if(fresh.rowCount) await notify(db,{title: policy.mode === "view_only" ? "License expired: viewing-only access" : "License replacement preparation notice",recipientIds:[engineer.id,...admins],
-        detail: engineer.full_name + (policy.mode === "view_only"
+      if(fresh.rowCount) await notify(db,{title: expired ? "License expired: viewing-only access" : "License replacement preparation notice",recipientIds:[engineer.id,...admins],
+        detail: engineer.full_name + (expired
           ? ' · License ' + when(state) + '. Submissions and approvals are blocked until the renewal is verified. Submit the renewed license for verification.'
           : ' · Company policy: new assignments are blocked from ' + policy.noticeOn + ' and the Admin starts the replacement. Submit the renewed license for verification, or the Admin will confirm a replacement.')});
     }

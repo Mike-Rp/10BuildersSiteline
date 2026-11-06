@@ -43,6 +43,7 @@ function account(
         ? `PRC Registered Engineer No. 00${id.replace(/\D/g, "")}1234`
         : "",
     expiry: role === "opm" || role === "spm" ? "2027-08-18" : "",
+    ...(role === "opm" || role === "spm" ? { hasProfessionalCredentials: true } : {}),
     docs: [],
   }
 }

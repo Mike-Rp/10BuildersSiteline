@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import React, { act } from "react"
 
-test("all shared PDF fields show 10 MB and reject oversized selections before preview or upload", { timeout: 30000 }, async t => {
+test("all shared PDF fields enforce 10 MB and reject oversized selections before preview or upload", { timeout: 30000 }, async t => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Element: dom.window.Element,
@@ -41,10 +41,9 @@ test("all shared PDF fields show 10 MB and reject oversized selections before pr
     for (const label of ["Client Contract Agreement", "PRC License", "QA/QC evidence", "Signed agreement", "General field evidence"]) {
       await act(() => root.render(React.createElement(Upload, { key: label, label, onSave: doc => saves.push(doc) })))
       const input = document.querySelector('input[type="file"]')
-      const hint = document.getElementById(input.getAttribute("aria-describedby"))
-      assert.match(hint.textContent, /PDF.*Project files share a 10 MB total limit/)
+      // Helper subtexts were removed system-wide; the limit is stated in the validation message instead.
       assert.equal(input.getAttribute("aria-label"), label)
-      assert.equal(document.querySelector('.upload-control button').getAttribute("aria-describedby"), hint.id)
+      assert.equal(input.accept, ".pdf,.jpg,.jpeg,.png")
       await select([file("too-large.pdf", 10 * mb + 1)])
       assert.match(document.querySelector('[role="alert"]').textContent, /10 MB or smaller/)
       assert.equal(document.querySelector('[role="dialog"]'), null)
@@ -55,22 +54,24 @@ test("all shared PDF fields show 10 MB and reject oversized selections before pr
     await select([file("boundary.pdf", 10 * mb)])
     assert.match(document.querySelector('.attachment-row').textContent, /boundary.pdf/)
     assert.equal(document.querySelector('[role="dialog"]'),null, 'selected files appear inline')
-    assert.match(document.querySelector('.upload-limit').textContent, /Project files share a 10 MB total limit/)
     assert.equal(previews.length, 0)
-    // Invalid replacement must not leave the prior valid file confirmable.
+    // An invalid addition is rejected without adding a row; valid files accumulate.
     await select([file("oversized-replacement.pdf", 10 * mb + 1)])
     assert.equal(document.querySelector('[role="dialog"]'), null)
     assert.match(document.querySelector('[role="alert"]').textContent, /10 MB/)
+    assert.doesNotMatch(document.querySelector('.attachment-control').textContent, /oversized-replacement.pdf/)
     assert.equal(revoked.length, 0)
     await select([file("corrected.pdf", 100)])
     assert.equal(document.querySelector('[role="alert"]'), null)
-    assert.match(document.querySelector('.attachment-row').textContent, /corrected.pdf/)
+    const rows = () => [...document.querySelectorAll('.attachment-row')].map(row => row.textContent)
+    assert.ok(rows().some(text => /corrected.pdf/.test(text)))
     await click("Remove attachment corrected.pdf")
+    await click("Remove attachment boundary.pdf")
     assert.equal(document.querySelector(".attachment-row"),null)
     assert.equal(document.querySelector('[role="dialog"]'), null)
 
     await act(() => root.render(React.createElement(Upload, { key: "excel", label: "Manpower list", spreadsheet: true, onSave: doc => saves.push(doc) })))
-    assert.match(document.querySelector('.upload-limit').textContent, /XLSX or XLS.*15 MB per file/)
+    assert.equal(document.querySelector('input[type="file"]').accept, ".xlsx,.xls")
     await select([file("report.pdf", 100)])
     assert.match(document.querySelector('[role="alert"]').textContent, /XLSX, XLS files only/)
     assert.equal(document.querySelector('[role="dialog"]'), null)
@@ -87,7 +88,6 @@ test("all shared PDF fields show 10 MB and reject oversized selections before pr
     const dialog = document.querySelector('[role="dialog"]')
     const input = dialog.querySelector('input[type="file"]')
     assert.equal(input.accept, ".pdf,.jpg,.jpeg,.png")
-    assert.match(document.getElementById(input.getAttribute("aria-describedby")).textContent, /Project files share a 10 MB total limit/)
     const stored = localStorage.getItem("siteline-extension-demo-v1")
     await select([file("valid.pdf", 100), file("over-limit.pdf", 10 * mb + 1)])
     assert.match(dialog.querySelector('[role="alert"]').textContent, /over-limit.pdf.*10 MB or smaller/)

@@ -4,7 +4,7 @@ import { emptyState, opmCandidates, spmCandidates } from "../src/model.ts"
 import { normalizeExperience, experienceYears, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 
 const person = (id, years, role = "spm") => ({ id, name: id === "seven" ? "Z Seven Years" : "A Five Years", email: `${id}@test.example`, phone: "", role,
-  scope: ["Structural"], projectTypes: ["Residential"], status: "active", added: "2026-10-01", license: "TEST", expiry: "2099-01-01", docs: [], experienceByType: { Residential: years } })
+  scope: ["Structural"], projectTypes: ["Residential"], status: "active", added: "2026-10-01", license: "TEST", expiry: "2099-01-01", hasProfessionalCredentials: true, docs: [], experienceByType: { Residential: years } })
 
 test("allocation prioritizes relevant experience over name and lower workload, retaining eligibility gates", () => {
   const state = emptyState(), five = person("five", 5), seven = person("seven", 7)
