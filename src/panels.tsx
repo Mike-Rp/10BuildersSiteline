@@ -123,6 +123,7 @@ export function AttachmentRow({ name, size, onRemove, disabled = false }: {
 export function Upload({
   label,
   onSave,
+  onBusyChange,
   owner = "Administrator",
   disabled = false,
   buttonLabel = "Upload document",
@@ -132,6 +133,7 @@ export function Upload({
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
+  onBusyChange?: (busy: boolean) => void
   owner?: string
   disabled?: boolean
   buttonLabel?: string
@@ -157,6 +159,7 @@ export function Upload({
     if (validation) { setError(validation); return }
     savingRef.current = true
     setSaving(true)
+    onBusyChange?.(true)
     setError("")
     const finishUpload = beginFileUpload()
     try {
@@ -177,6 +180,7 @@ export function Upload({
       finishUpload()
       savingRef.current = false
       setSaving(false)
+      onBusyChange?.(false)
     }
   }
   return (

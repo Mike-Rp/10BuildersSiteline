@@ -197,6 +197,7 @@ test("Admin capability verification supports more than three verified discipline
         }),
       ),
     )
+    await click(button("Edit credentials"))
     assert.equal(button("Save verified capabilities").disabled, true)
     const checks = [...document.querySelectorAll('input[type="checkbox"]')]
     for (const checkbox of checks.slice(0, 5)) await click(checkbox)
@@ -219,6 +220,51 @@ test("Admin capability verification supports more than three verified discipline
     )
   })
 })
+test("Admin Undo and Cancel restore saved attachment links and never save draft edits", async () => {
+  await withUi(async ({ React, root, server, w, button, click }) => {
+    const { default: Review } = await server.ssrLoadModule('/src/CompanyCapabilities.tsx')
+    const company = { ...fixture().companies[0], documents: [{ id: 'proof', name: 'Saved proof.pdf', uploaded: true }] }
+    company.capabilityReview = { ...company.capabilityReview, documentIds: ['proof'], note: 'Saved review note.' }
+    let saves = 0, uploads = 0
+    await React.act(() => root.render(React.createElement(Review, { company, role: 'admin', onSave: async () => { saves++ }, onUpload: async () => { uploads++ } })))
+    const proof = () => document.querySelector('.capability-record input')
+    assert.equal(proof().disabled, true)
+    assert.equal(button('Save verified capabilities'), undefined)
+    await click(button('Edit credentials'))
+    assert.equal(button('Undo changes').disabled, true)
+    assert.equal(button('Save verified capabilities').disabled, true)
+    const previousFetch = globalThis.fetch
+    try {
+      globalThis.fetch = async () => Response.json({ data: { download_url: '/test-draft-file' } })
+      const fileInput = document.querySelector('input[type=file]')
+      Object.defineProperty(fileInput, 'files', { configurable: true, value: [new File(['test proof'], 'Draft proof.pdf', { type: 'application/pdf' })] })
+      await React.act(() => fileInput.dispatchEvent(new w.Event('change', { bubbles: true })))
+      await click(button('Confirm upload'))
+      assert.equal(document.querySelectorAll('.capability-record').length, 2)
+      assert.equal(uploads, 0, 'adding a draft attachment does not link it to the saved company')
+      await click(button('Undo changes'))
+      assert.equal(document.querySelectorAll('.capability-record').length, 1)
+      assert.equal(company.documents.length, 1, 'saved attachments are never deleted by Undo')
+    } finally {
+      globalThis.fetch = previousFetch
+    }
+    await click(proof())
+    assert.equal(proof().checked, false)
+    await click(button('Undo changes'))
+    assert.equal(proof().checked, true)
+    assert.equal(proof().disabled, false)
+    assert.deepEqual(company.capabilityReview.documentIds, ['proof'])
+    await click(proof())
+    await click(button('Cancel'))
+    assert.equal(proof().checked, true)
+    assert.equal(proof().disabled, true)
+    assert.ok(button('Edit credentials'))
+    assert.equal(saves, 0)
+    assert.equal(uploads, 0)
+    assert.equal(company.documents[0].id, 'proof')
+  })
+})
+
 test("Site PM directory shows Admin-managed capabilities without verification controls", async () => {
   await withUi(async ({React,root,server,click,button}) => {
     const {default:Workspace}=await server.ssrLoadModule("/src/RoleWorkspace.tsx")
@@ -257,6 +303,7 @@ test("company profiles explain phase matches and update partial trade coverage w
     assert.match(phase("Commercial", "Envelope / Curtain Wall").textContent, /Facade · Waterproofing2 of 2 required trades/)
     assert.match(phase("Residential", "Envelope").textContent, /2 of 3 required trades/)
     assert.match(connections.textContent, /Verified trades/)
+    await click([...document.querySelectorAll('button')].find(button => button.textContent === "Edit credentials"))
     await click([...document.querySelectorAll('.capability-choice')].find(label => label.textContent === "Waterproofing").querySelector('input'))
     assert.match(phase("Commercial", "Envelope / Curtain Wall").textContent, /Facade1 of 2 required trades/)
     assert.match(connections.textContent, /Admin verification required/)
@@ -286,6 +333,7 @@ test("proposed trades prefill the grouped review and remain unverified until an 
     assert.equal(document.querySelectorAll('.company-trade-picker input:checked').length, 2)
     assert.match(document.body.textContent, /Review required/)
     assert.match(document.body.textContent, /Proposed trades are preselected/)
+    await React.act(() => button("Edit credentials").click())
     assert.equal(button("Save verified capabilities").disabled, true)
     assert.equal(saved, undefined)
     assert.equal(company.capabilityReview, undefined)
@@ -317,6 +365,12 @@ test("Admin saves verified trades without location or service-area fields", asyn
     assert.equal(document.querySelector('.location-fields'), null)
     assert.equal(document.querySelector('[aria-label="Additional service areas"]'), null)
     assert.doesNotMatch(document.body.textContent, /Operating-base coordinates|Operating-base review|Reviewed operating base/)
+    await click(button("Edit credentials"))
+    const note = document.querySelector('textarea')
+    await React.act(() => {
+      Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, 'value').set.call(note, 'Updated company trade review.')
+      note.dispatchEvent(new w.Event('input', { bubbles: true }))
+    })
     await click(button("Save verified capabilities"))
     assert.equal(saved.operatingLocation, undefined)
     assert.equal(saved.serviceAreas, undefined)
