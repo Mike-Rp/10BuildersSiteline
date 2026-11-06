@@ -667,9 +667,8 @@ export function AccountForm({
       <div className="form-grid">
         {!clientOnly && (
           <Field label="Account role" wide>
-            <select
+            {account ? <input readOnly value={ROLE_NAMES[account.role]} /> : <select
               value={draft.role}
-              disabled={!!account}
               onChange={(e) =>
                 patch({
                   role: e.target.value as Account["role"],
@@ -679,12 +678,12 @@ export function AccountForm({
                 })
               }
             >
-              {Object.entries(ROLE_NAMES).filter(([key]) => (key !== "client" || account?.role === "client") && (key !== "admin" || account?.role === "admin")).map(([key, name]) => (
+              {Object.entries(ROLE_NAMES).filter(([key]) => key !== "client" && key !== "admin").map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>
               ))}
-            </select>
+            </select>}
           </Field>
         )}
         {generatedIdentity ? <>
