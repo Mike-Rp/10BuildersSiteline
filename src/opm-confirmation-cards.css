@@ -1,0 +1,49 @@
+#root .role-workspace .panel.opm-confirmation-card { border: 1px solid #cbdbe8; border-radius: 14px; background: #fff; margin-bottom: 16px; min-width: 0; }
+#root .role-workspace .opm-confirmation-card > .panel-header { align-items: flex-start; padding: 18px 18px 10px; min-height: 0; border-bottom: 0; gap: 12px 18px; flex-wrap: wrap; }
+#root .role-workspace .opm-confirmation-card > .panel-header > div:first-child { flex: 1 1 260px; min-width: 0; }
+#root .role-workspace .opm-confirmation-card > .panel-header h2 { font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
+#root .role-workspace .opm-confirmation-card > .panel-header p { font-size: 14px; margin-top: 5px; }
+#root .role-workspace .opm-confirmation-header-status { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px 18px; }
+#root .role-workspace .opm-confirmation-dates { padding-left: 16px; margin: 0; border-left: 1px solid var(--color-line); font-size: 13px; color: var(--color-muted); }
+#root .role-workspace .opm-confirmation-dates > div { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+#root .role-workspace .opm-confirmation-dates dd { margin: 0; color: var(--color-ink); }
+#root .role-workspace .opm-confirmation-card > .role-card-content { padding: 8px 18px 18px; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; margin: 8px 0 18px; padding: 0; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li { display: block; min-width: 0; min-height: 0; padding: 0 5px; text-align: center; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li > span { position: relative; z-index: 1; width: 23px; height: 23px; margin-bottom: 7px; border: 2px solid #a2b5c8; background: #fff; font-size: 0; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li::after { top: 11px; width: auto; height: 2px; left: calc(50% + 12px); right: calc(-50% + 12px); background: #dce6ef; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li.done::after { background: #83a4bf; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li.done > span { background: #193b59; border-color: #193b59; color: #fff; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline li.current > span { background: #fff; border: 5px solid #193b59; box-shadow: none; }
+#root .role-workspace .opm-confirmation-card .role-intake-timeline strong { max-width: none; font-size: 13px; line-height: 1.45; }
+#root .role-workspace .opm-confirmation-next-action { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px 18px; padding: 12px; border-radius: 10px; background: #edf5fc; }
+#root .role-workspace .opm-confirmation-next-copy { min-width: 0; flex: 1 1 320px; }
+#root .role-workspace .opm-confirmation-next-copy p { margin: 6px 0 4px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+#root .role-workspace .opm-confirmation-next-copy small { color: var(--color-muted); font-size: 13px; line-height: 1.5; }
+#root .role-workspace .opm-confirmation-next-action .role-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+#root .role-workspace .opm-confirmation-card .button { min-height: 42px; font-size: 14px; padding: 9px 13px; white-space: normal; }
+#root .role-workspace .opm-confirmation-card .role-project-facts { margin: 12px 0; gap: 8px 20px; font-size: 14px; }
+#root .role-workspace .opm-confirmation-card .role-project-facts > span { font-size: 14px; }
+#root .role-workspace .opm-confirmation-card .opm-confirmation-details { border: 0; padding: 0; margin: 8px 0 0; }
+#root .role-workspace .opm-confirmation-details > summary { display: flex; align-items: center; gap: 10px; padding: 11px 13px; min-height: 46px; list-style: none; background: #edf5fc; border: 1px solid #bdd2e5; border-radius: 9px; color: #193b59; font-weight: 600; font-size: 14px; cursor: pointer; }
+#root .role-workspace .opm-confirmation-details > summary::-webkit-details-marker { display: none; }
+#root .role-workspace .opm-confirmation-details > summary:hover { background: #e1eef9; border-color: #87a6c2; }
+#root .role-workspace .opm-confirmation-details > summary:focus-visible { outline: 3px solid #5285af; outline-offset: 3px; }
+#root .role-workspace .opm-details-chevron { display: inline-flex; margin-left: auto; flex-shrink: 0; transform: rotate(90deg); }
+#root .role-workspace .opm-confirmation-details[open] > summary .opm-details-chevron { transform: rotate(-90deg); }
+#root .role-workspace .opm-confirmation-details[open] > summary { margin-bottom: 10px; }
+#root .role-workspace .opm-details-readonly { font-size: 12px; font-weight: 500; background: #dce9f4; padding: 2px 7px; border-radius: 6px; }
+@media(max-width: 640px) {
+  #root .role-workspace .opm-confirmation-card > .panel-header { padding: 14px 14px 8px; }
+  #root .role-workspace .opm-confirmation-card > .role-card-content { padding: 8px 14px 14px; }
+  #root .role-workspace .opm-confirmation-header-status { width: 100%; }
+  #root .role-workspace .opm-confirmation-dates { padding-left: 0; border: 0; flex-basis: 100%; }
+  #root .role-workspace .opm-confirmation-card .role-intake-timeline { grid-template-columns: minmax(0, 1fr); margin-bottom: 14px; }
+  #root .role-workspace .opm-confirmation-card .role-intake-timeline li { display: flex; align-items: flex-start; gap: 10px; padding: 0 0 12px; text-align: left; }
+  #root .role-workspace .opm-confirmation-card .role-intake-timeline li > span { margin: 0; flex-shrink: 0; }
+  #root .role-workspace .opm-confirmation-card .role-intake-timeline li > strong { margin: 0; }
+  #root .role-workspace .opm-confirmation-card .role-intake-timeline li::after { left: 11px; right: auto; top: 23px; width: 2px; height: calc(100% - 23px); }
+  #root .role-workspace .opm-confirmation-next-action .role-actions { width: 100%; }
+  #root .role-workspace .opm-confirmation-next-action .role-actions .button { flex: 1 1 180px; }
+  #root .role-workspace .opm-confirmation-details > summary { flex-wrap: wrap; }
+}

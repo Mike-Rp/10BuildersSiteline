@@ -33,7 +33,8 @@ import SitePhotoGallery from "./SitePhotoGallery"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import type { LoginGreeting } from "./dashboard-greeting"
 import ReworkReview from "./ReworkReview"
-import IntakeGuidance, { IntakeTabs } from "./IntakeGuidance"
+import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
+import "./opm-confirmation-cards.css"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
@@ -699,10 +700,11 @@ export default function RoleWorkspace({
     return (
       <Panel
         key={p.id}
-        className={guidance?.kind === "action" ? "action-required" : ""}
+        className={`opm-confirmation-card ${guidance?.kind === "action" ? "action-required" : ""}`}
         title={p.name}
         subtitle={`${p.type} · ${p.area} sqm · ${p.floors} floors`}
         actions={
+          <div className="opm-confirmation-header-status">
           <div className="button-group">
             {guidance?.kind === "action" && (
               <Badge tone="amber">Action Required</Badge>
@@ -719,26 +721,21 @@ export default function RoleWorkspace({
               }
             />
           </div>
+          <dl className="opm-confirmation-dates">
+            <div><dt>Estimated Start:</dt><dd>{p.start ? dateLabel(p.start) : "Not recorded"}</dd></div>
+            <div><dt>Estimated End:</dt><dd>{p.end ? dateLabel(p.end) : "Not recorded"}</dd></div>
+          </dl>
+          </div>
         }
       >
         <div className="role-card-content">
-          <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
-          <div className="role-project-facts">
-            <span>
-              <Icon name="users" size={17} />
-              Lead: {actorName(leadId(p))}
-            </span>
-            <span>
-              <Icon name="calendar" size={17} />
-              Target: {dateLabel(p.start)} –{" "}
-              {p.end ? dateLabel(p.end) : "end not set"}
-            </span>
-            <span>
-              <Icon name="doc" size={17} />
-              {registeredCount(p)}/6 documents
-            </span>
-          </div>
+          <div className="opm-confirmation-next-action">
+            {guidance && <div className="opm-confirmation-next-copy" aria-label={`${p.name} intake next step`}>
+              <span className={`intake-stage ${guidance.kind}`}>{stageLabel(guidance, p)}</span>
+              <p><strong>Next Action:</strong> {guidance.next}</p>
+              <small>Responsible: {guidance.who} · {guidance.kind === "action" ? "Needs your action" : "Waiting / prerequisites"}</small>
+            </div>}
           {p.status === "changes_requested" || p.status === "draft" ? (
             <div className="notice">
               <Icon name="clock" />
@@ -801,6 +798,11 @@ export default function RoleWorkspace({
               </div>
             </>
           )}
+          </div>
+          <div className="role-project-facts">
+            <span><Icon name="users" size={17} />Lead: {actorName(leadId(p))}</span>
+            <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>
+          </div>
           {work.deadline && (
             <div className="deadline-inline">
               <Icon name="clock" size={17} />
@@ -810,13 +812,13 @@ export default function RoleWorkspace({
               </span>
             </div>
           )}
-          <details className="role-details">
-            <summary>View Site PM team by phase</summary>
+          <details className="role-details opm-confirmation-details">
+            <summary><Icon name="users" size={18} /><span>View Site PM team by phase</span><span className="opm-details-chevron" aria-hidden="true"><Icon name="chevron" size={18} /></span></summary>
             {assignmentRoster(p, true)}
           </details>
           {p.opmAccepted && p.opmId === actor.id && (
-            <details className="role-details">
-              <summary>View subcontractor allocation (read-only)</summary>
+            <details className="role-details opm-confirmation-details">
+              <summary><Icon name="folder" size={18} /><span>View subcontractor allocation</span><span className="opm-details-readonly">Read-only</span><span className="opm-details-chevron" aria-hidden="true"><Icon name="chevron" size={18} /></span></summary>
               <SubcontractorAllocationReadOnly state={state} project={p} />
             </details>
           )}
