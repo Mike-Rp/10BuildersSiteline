@@ -3,6 +3,7 @@ import EngineerScopeReview from "./EngineerScopeReview"
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
+import AccountSignInDetails, { type CreatedAccountDetails } from "./AccountSignInDetails"
 import IntakeRecord from "./IntakeRecord"
 import AdminIntakeCards from "./AdminIntakeCards"
 import ArchiveProjectCards from "./ArchiveProjectCards"
@@ -337,12 +338,7 @@ function AppInner() {
   const [tab, setTab] = useState("closed")
   const [notifications, setNotifications] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<Event>()
-  const [credentials, setCredentials] = useState<{
-    email: string
-    name: string
-    password: string
-    credentialDecision?: "pending" | "verified"
-  }>()
+  const [credentials, setCredentials] = useState<CreatedAccountDetails>()
   const [confirmation, setConfirmation] = useState<{
     title: string
     message: string
@@ -717,6 +713,7 @@ function AppInner() {
     setLoginPortal(portal)
     clearSession()
     setSelectedNotification(undefined)
+    setCredentials(undefined)
     setWelcomeGreeting(undefined)
     setSignedOut(true)
     setSessionId("")
@@ -750,13 +747,14 @@ function AppInner() {
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
       await reloadWorkspace();setDialog(undefined)
-      if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,credentialDecision:account.credentialDecision})
+      if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:account.role,credentialDecision:account.credentialDecision})
       setToast(exists?"Account updated":"Account created")
     }catch(error){setToast((error as Error).message);throw error}
   }
   async function saveClient(account:Account) {
     const saved=await saveApiAccount(account,false)
     const loaded=await reloadWorkspace()
+    if(saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:"client"})
     return loaded.accounts.find(a=>a.id===saved.id)!
   }
   async function addProject(project:Project) {
@@ -3377,50 +3375,7 @@ function AppInner() {
           </div>
         </Modal>
       )}
-      {credentials && (
-        <Modal
-          title="Account created"
-          subtitle="Copy these temporary credentials now."
-          onClose={() => setCredentials(undefined)}
-        >
-          <div className="success-state">
-            <span>
-              <Icon name="check" size={28} />
-            </span>
-            <h3>{credentials.name}</h3>
-            <p>Work email: <strong>{credentials.email}</strong></p>
-            {credentials.credentialDecision && <p role="status">{credentials.credentialDecision === "pending"
-              ? "Credentials saved · Pending Admin verification. New assignments are blocked until an appropriate credential is verified."
-              : "Credentials verified. Matching assignments still require first-login account activation and existing availability checks."}</p>}
-          </div>
-          <div className="password-display">
-            <code>{credentials.password}</code>
-            <Button
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(credentials.password)
-                  setToast("Temporary password copied")
-                } catch {
-                  setToast(
-                    "Copy is unavailable. Select and copy the displayed password.",
-                  )
-                }
-              }}
-            >
-              Copy
-            </Button>
-          </div>
-          <p>
-            Shown once in this session. Share this temporary password with the
-            account owner. They must choose a new password after signing in.
-          </p>
-          <div className="modal-actions">
-            <Button variant="primary" onClick={() => setCredentials(undefined)}>
-              Done
-            </Button>
-          </div>
-        </Modal>
-      )}
+      {credentials && <AccountSignInDetails details={credentials} onClose={() => setCredentials(undefined)} />}
       {signOut.dialog}
       {idleWarning && !signedOut && (
         <div className="session-warning">

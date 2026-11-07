@@ -1,6 +1,7 @@
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing} from './PhaseEngineerAllocation'
 import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
+import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
@@ -28,7 +29,7 @@ import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
 import { companyRegistrationErrors, normalizeCompanyForemen, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
 import "./company-foremen.css"
-import { EXPERIENCE_PROJECT_TYPES, normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
+import { normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
   accountError,
   clientForEmail,
@@ -572,7 +573,7 @@ export function AccountForm({
   const registeringEngineer = !account && !clientOnly && ["spm", "opm"].includes(draft.role)
   const [credentialDraft, setCredentialDraft] = useState<Partial<Account>>({
     initialCredentials: [{ profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "" }],
-    credentialDecision: "pending",
+    credentialDecision: "verified",
   })
   const [uploadingCredential, setUploadingCredential] = useState(false)
   const [error, setError] = useState("")
@@ -587,8 +588,9 @@ export function AccountForm({
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (savingRef.current || uploadingCredential) return
+    const creationCredentials = { ...credentialDraft, credentialDecision: "verified" as const }
     if (registeringEngineer) {
-      const issue = validateRegistrationCredentials(credentialDraft)
+      const issue = validateRegistrationCredentials(creationCredentials)
       if (issue) { setError(issue); return }
     }
     const invalidClientEmail = requiresClientEmail && !generatedIdentity ? clientEmailError(draft.email) : ""
@@ -596,7 +598,7 @@ export function AccountForm({
     if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
       try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { setError((reason as Error).message); return }
-      if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter years of experience for at least one project type. Use 0 for a new engineer."); return }
+      if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter experience for at least one project type. Use 0 years and 0 months for a new engineer."); return }
     }
     if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim())) { setError("Enter a first and last name."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
@@ -619,7 +621,7 @@ export function AccountForm({
       await onSave(
         {
           ...draft,
-          ...(registeringEngineer ? credentialDraft : {}),
+          ...(registeringEngineer ? creationCredentials : {}),
           name: draft.name.trim(),
           email: requiresClientEmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
           phone: draft.phone.trim(),
@@ -636,12 +638,13 @@ export function AccountForm({
     max: number,
   ) {
     return (
-      <div className="chip-options">
+      <div className="chip-options account-choice-chips">
         {values.map((value) => (
           <button
             key={value}
             type="button"
             className={`chip ${current.includes(value) ? "selected" : ""}`}
+            aria-pressed={current.includes(value)}
             onClick={() => {
               if (!current.includes(value) && current.length >= max) {
                 setError(`Select no more than ${max} tags.`)
@@ -655,7 +658,7 @@ export function AccountForm({
               setError("")
             }}
           >
-            {value}
+            {current.includes(value) && <Icon name="check" size={15} />}{value}
           </button>
         ))}
       </div>
@@ -755,22 +758,7 @@ export function AccountForm({
           )}
         </section>
       )}
-      {!clientOnly && ["opm", "spm"].includes(draft.role) && <section className="form-section">
-        <h3>Project experience</h3>
-        <p>Enter whole years for each project type. Use 0 for no experience; leave blank if not recorded.</p>
-        <div className="form-grid">
-          {EXPERIENCE_PROJECT_TYPES.map(type => <Field key={type} label={`${type} experience (years)`}>
-            <input type="number" inputMode="numeric" min={0} max={80} step={1} placeholder="Not recorded"
-              value={draft.experienceByType?.[type] ?? ""}
-              onChange={event => {
-                const experienceByType = { ...draft.experienceByType }
-                if (event.target.value === "") delete experienceByType[type]
-                else experienceByType[type] = Number(event.target.value)
-                patch({ experienceByType }); setError("")
-              }} />
-          </Field>)}
-        </div>
-      </section>}
+      {!clientOnly && ["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} onChange={experienceByType => { patch({ experienceByType }); setError("") }} />}
       {draft.role === "client" && !clientOnly && (
         <section className="form-section">
           <h3>
@@ -845,7 +833,7 @@ export function AccountForm({
             ? "Save changes"
             : clientOnly
               ? "Save client for project"
-              : registeringEngineer ? credentialDraft.credentialDecision === "verified" ? "Create account & verify credentials" : "Create account — pending verification" : "Create account"}
+              : registeringEngineer ? "Create account & verify credentials" : "Create account"}
         </Button>
       </div>
       </fieldset>

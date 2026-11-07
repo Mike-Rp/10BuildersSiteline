@@ -1,0 +1,13 @@
+#root .project-experience-fields > p { font-size: 14px; line-height: 1.45; margin: 5px 0 8px; color: var(--color-muted); }
+#root .experience-duration-row { display: grid; grid-template-columns: minmax(110px, 1.4fr) repeat(2, minmax(80px, 1fr)); align-items: center; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
+#root .experience-duration-row:last-child { border-bottom: 0; padding-bottom: 0; }
+#root .experience-duration-row h4 { margin: 0; font-size: 15px; font-weight: 600; }
+#root .experience-duration-field { min-width: 0; }
+#root .experience-duration-field label { display: block; color: var(--color-muted); font-size: 13px; line-height: 1.4; margin-bottom: 4px; }
+#root .experience-duration-field input { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; font-size: 14px; }
+#root .experience-duration-error { grid-column: 1 / -1; font-size: 13px; margin: 0; }
+@media(max-width: 480px) {
+  #root .experience-duration-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
+  #root .experience-duration-row h4 { grid-column: 1 / -1; }
+  #root .experience-duration-field input { min-height: 44px; }
+}
