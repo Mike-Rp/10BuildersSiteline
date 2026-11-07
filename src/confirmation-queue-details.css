@@ -1,0 +1,22 @@
+#root .confirmation-queue-details { min-width: 0; }
+#root .confirmation-details-intro { margin: 0 0 14px; color: var(--color-muted); font-size: 14px; }
+#root .confirmation-phase-card { border: 1px solid var(--color-line); border-radius: 12px; padding: 14px; margin-top: 12px; }
+#root .confirmation-phase-card > header, #root .confirmation-engineer > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+#root .confirmation-phase-card h3 { margin: 0; font-size: 16px; }
+#root .confirmation-phase-required, #root .confirmation-coverage-note { margin: 8px 0; font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
+#root .confirmation-engineer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+#root .confirmation-engineer { border: 1px solid var(--color-line); border-radius: 8px; background: #f7fafc; padding: 12px; min-width: 0; overflow-wrap: anywhere; }
+#root .confirmation-engineer strong { font-size: 14px; }
+#root .confirmation-engineer p { margin: 8px 0 0; font-size: 13px; }
+#root .confirmation-assigned-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#root .confirmation-assigned-tags > span { padding: 4px 8px; border: 1px solid #c9d9e7; border-radius: 6px; background: #edf5fc; color: #193b59; font-size: 13px; }
+#root .confirmation-agreement-status { padding: 12px; border: 1px solid var(--color-line); background: #f7fafc; border-radius: 10px; margin-bottom: 14px; }
+#root .confirmation-agreement-status p { margin: 8px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+#root .confirmation-queue-details > .role-card-content { padding: 0; }
+#root .opm-confirmation-card .opm-confirmation-views { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+#root .opm-confirmation-card .opm-confirmation-views .button { background: #edf5fc; border: 1px solid #bdd2e5; color: #193b59; }
+#root .opm-confirmation-card .opm-confirmation-views .button:hover { background: #e1eef9; border-color: #87a6c2; }
+@media (max-width: 640px) {
+  #root .opm-confirmation-card .opm-confirmation-views .button { flex: 1 1 220px; }
+  #root .confirmation-phase-card { padding: 12px; }
+}

@@ -35,6 +35,7 @@ import type { LoginGreeting } from "./dashboard-greeting"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
 import "./opm-confirmation-cards.css"
+import ConfirmationQueueDetails from "./ConfirmationQueueDetails"
 import { intakeGuidance, intakeViewCounts, isIntake, type IntakeView } from "./intake-guidance"
 import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
@@ -266,6 +267,7 @@ export default function RoleWorkspace({
   )
   const [phaseWorkspaceOpen, setPhaseWorkspaceOpen] = useState(false)
   const [dialog, setDialog] = useState<RoleDialog>()
+  const [confirmationView, setConfirmationView] = useState<{ projectId: string; view: "team" | "subcontractors" }>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [repositoryOpen, setRepositoryOpen] = useState(false)
@@ -812,16 +814,10 @@ export default function RoleWorkspace({
               </span>
             </div>
           )}
-          <details className="role-details opm-confirmation-details">
-            <summary><Icon name="users" size={18} /><span>View Site PM team by phase</span><span className="opm-details-chevron" aria-hidden="true"><Icon name="chevron" size={18} /></span></summary>
-            {assignmentRoster(p, true)}
-          </details>
-          {p.opmAccepted && p.opmId === actor.id && (
-            <details className="role-details opm-confirmation-details">
-              <summary><Icon name="folder" size={18} /><span>View subcontractor allocation</span><span className="opm-details-readonly">Read-only</span><span className="opm-details-chevron" aria-hidden="true"><Icon name="chevron" size={18} /></span></summary>
-              <SubcontractorAllocationReadOnly state={state} project={p} />
-            </details>
-          )}
+          <div className="opm-confirmation-views">
+            <Button icon="users" onClick={() => setConfirmationView({ projectId: p.id, view: "team" })}>View Site PM team by phase</Button>
+            {p.opmAccepted && p.opmId === actor.id && <Button icon="folder" onClick={() => setConfirmationView({ projectId: p.id, view: "subcontractors" })}>View subcontractor allocation · Read-only</Button>}
+          </div>
         </div>
       </Panel>
     )
@@ -3818,6 +3814,11 @@ export default function RoleWorkspace({
           </div>
         </main>
       </div>
+      {isOpm && confirmationView && (() => {
+        const project = projects.find(p => p.id === confirmationView.projectId)
+        if (!project || (confirmationView.view === "subcontractors" && (!project.opmAccepted || project.opmId !== actor.id))) return null
+        return <ConfirmationQueueDetails state={state} project={project} view={confirmationView.view} onClose={() => setConfirmationView(undefined)} />
+      })()}
       {acceptedId && (
         <Modal
           title="Project assignment confirmed!"

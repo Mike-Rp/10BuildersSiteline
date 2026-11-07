@@ -561,7 +561,15 @@ export default function PhaseAllocationPanel({
           </h4>
           <p>{open.reason}</p>
           {open.review_note && <p>Admin decision: {open.review_note}</p>}
-          <details>
+          {readOnly && <div className="trade-company-grid">
+            {[...new Set(open.proposal.map(row => row.companyId))].map(id => <article className="trade-company" key={id}>
+              <h4>{company(id)?.name || "Company record unavailable"}</h4>
+              <Badge tone={open.responses[id]?.status === "accepted" ? "green" : "amber"}>{open.responses[id]?.status?.replace(/_/g, " ") || (open.status === "pending_admin" ? "Awaiting Admin approval" : "Not contacted")}</Badge>
+              {open.responses[id]?.note && <p>{open.responses[id].note}</p>}
+              {open.proposal.filter(row => row.companyId === id).map(row => <p key={row.phase}><strong>{row.phase}</strong> · {company(id)?.foremen.find(foreman => foreman.id === row.foremanId)?.name || row.foremanName || "Foreman record unavailable"}</p>)}
+            </article>)}
+          </div>}
+          {!readOnly && <details>
             <summary>View exact proposed phase assignments</summary>
             {open.proposal.map((row) => (
               <p key={row.phase}>
@@ -571,7 +579,7 @@ export default function PhaseAllocationPanel({
                 )?.name || "Contact no longer current — resubmit"}
               </p>
             ))}
-          </details>
+          </details>}
           {data.canEdit && !readOnly && (
             <>
               <Field label="Contact method">
