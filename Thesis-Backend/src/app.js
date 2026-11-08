@@ -130,7 +130,7 @@ app.use((error, req, res, next) => {
     return sendError(res, error.code === 'LIMIT_FILE_SIZE' ? 'File is too large.' : 'Invalid upload.', 400);
   }
   if (Number.isInteger(error?.status) && error.status >= 400 && error.status < 500) {
-    return sendError(res, error.status === 413 ? 'Request body too large.' : error.message, error.status);
+    return sendError(res, error.status === 413 ? 'File too large.' : error.message, error.status);
   }
   return handleError(res, error);
 });
