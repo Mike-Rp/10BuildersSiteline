@@ -113,10 +113,10 @@ export const getCurrentUser = async (req) => {
         throw new HttpError(403, "The seven-day renewal submission window has ended. Visit your Administrator to complete the renewal process.", "LICENSE_ADMIN_REQUIRED");
       const ownCredentials = read && url.endsWith("/licenses/credentials/" + user.id);
       const licenseStatus = read && /\/licenses\/me$/.test(url);
-      const renewalFile = read && /\/licenses\/renewals\/\d+\/file$/.test(url);
+      const renewalFile = read && (/\/licenses\/renewals\/\d+\/file$/.test(url)||/\/licenses\/credentials\/[0-9a-f-]+\/file$/i.test(url));
       let ownStoredFile = false;
       const storedFileId = read && url.match(/\/files\/([0-9a-f-]+)\/content$/i)?.[1];
-      if (storedFileId && renewalOnly) ownStoredFile = (await execute("select 1 from license_renewal_requests where user_id=$1 and file_ref in ($2,$3) limit 1", [user.id,"db:"+storedFileId,"db://"+storedFileId])).rowCount > 0;
+      if (storedFileId && renewalOnly) ownStoredFile = (await execute("select 1 from license_renewal_requests where user_id=$1 and file_ref in ($2,$3) union all select 1 from user_licenses where user_id=$1 and upload_file_ref in ($2,$3) limit 1", [user.id,"db:"+storedFileId,"db://"+storedFileId])).rowCount > 0;
       if (renewalOnly && !accountAction && !renewalAction && !ownCredentials && !licenseStatus && !renewalFile && !ownStoredFile)
         throw new HttpError(403, LICENSE_VIEW_ONLY_MESSAGE, "LICENSE_RENEWAL_ONLY");
     }

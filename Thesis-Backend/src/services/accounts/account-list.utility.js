@@ -1,8 +1,11 @@
 import { HttpError } from "../../common/utilities/access.utility.js";
 
+export const CREDENTIAL_TAG_SUMMARY_SQL = `SELECT e.specialization AS tag FROM engineer_specializations e WHERE e.user_id=u.id
+ UNION SELECT d.code::text FROM user_discipline_scopes s JOIN disciplines d ON d.id=s.discipline_id WHERE s.user_id=u.id
+ UNION SELECT jsonb_array_elements_text(coalesce(nullif(to_jsonb(l)->'specializations','null'::jsonb),'[]'::jsonb)) FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL
+ UNION SELECT jsonb_array_elements_text(coalesce(nullif(to_jsonb(q)->'specializations','null'::jsonb),'[]'::jsonb)) FROM license_renewal_requests q WHERE q.user_id=u.id AND q.status='under_review'`;
 export const ACCOUNT_SCOPE_SQL = `CASE lower(r.code)
-  WHEN 'spm' THEN COALESCE((SELECT array_agg(d.code::text ORDER BY d.code)
-    FROM user_discipline_scopes s JOIN disciplines d ON d.id=s.discipline_id WHERE s.user_id=u.id), '{}'::text[])
+  WHEN 'spm' THEN COALESCE((SELECT array_agg(DISTINCT tag ORDER BY tag) FROM (${CREDENTIAL_TAG_SUMMARY_SQL}) tags), '{}'::text[])
   WHEN 'opm' THEN COALESCE((SELECT array_agg(t.code::text ORDER BY t.code)
     FROM user_project_type_specializations s JOIN project_types t ON t.id=s.project_type_id WHERE s.user_id=u.id), '{}'::text[])
   WHEN 'client' THEN COALESCE((SELECT array_agg(p.name::text ORDER BY p.name)
@@ -61,10 +64,15 @@ export function accountListQuery(query = {}) {
       u.status,u.date_added::text AS date_added,u.created_at,u.last_login_at,scopes.scope,
       CASE WHEN r.code IN ('opm','spm') THEN EXISTS (
         SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL
-      ) ELSE NULL END AS has_professional_credentials,
-      COALESCE((SELECT array_agg(DISTINCT l.profession ORDER BY l.profession)
-        FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL
-          AND l.profession IN ('Civil Engineer','Mechanical Engineer','Electrical Engineer','Sanitary Engineer','Electronics Engineer','Geodetic Engineer')),
+      ) OR EXISTS(SELECT 1 FROM license_renewal_requests q WHERE q.user_id=u.id AND q.status='under_review') ELSE NULL END AS has_professional_credentials,
+      (SELECT count(DISTINCT credential_key)::int FROM (SELECT coalesce(profession,'license:'||id::text) AS credential_key FROM user_licenses WHERE user_id=u.id AND superseded_at IS NULL UNION SELECT coalesce(profession,'submission:'||id::text) FROM license_renewal_requests WHERE user_id=u.id AND status='under_review') c) AS credential_count,
+      EXISTS(SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND to_jsonb(l)->>'specializations' IS NOT NULL UNION ALL SELECT 1 FROM license_renewal_requests q WHERE q.user_id=u.id AND to_jsonb(q)->>'specializations' IS NOT NULL) AS has_credential_specializations,
+      CASE WHEN EXISTS(SELECT 1 FROM license_renewal_requests q WHERE q.user_id=u.id AND q.status='under_review') THEN 'pending'
+       WHEN EXISTS(SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL AND (l.verification_status<>'verified' OR l.verified_by IS NULL OR l.verified_at IS NULL)) THEN 'needs_review'
+       WHEN EXISTS(SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL) THEN 'verified' ELSE 'missing' END AS credential_status,
+      COALESCE((SELECT array_agg(DISTINCT c.profession ORDER BY c.profession)
+        FROM (SELECT profession FROM user_licenses WHERE user_id=u.id AND superseded_at IS NULL UNION SELECT profession FROM license_renewal_requests WHERE user_id=u.id AND status='under_review') c
+        WHERE c.profession IN ('Civil Engineer','Mechanical Engineer','Electrical Engineer','Sanitary Engineer','Electronics Engineer','Geodetic Engineer')),
         '{}'::text[]) AS professional_types,
       (SELECT count(*)::int FROM user_client_project_links l JOIN projects p ON p.id=l.project_id
         WHERE l.user_id=u.id AND COALESCE(p.is_deleted,false)=false) AS linked_projects_count,

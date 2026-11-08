@@ -29,6 +29,7 @@ import { reviewSitePhoto } from "./site-photo-review.utility.js";
 import { assertAssignmentWritable, multiSpmInstalled } from "../progress/assignment.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { credentialSummary } from "../licenses/credentials.controller.js";
+import {specializationSummary} from '../licenses/credential-specializations.utility.js';
 import { claimFields, claimResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
 import { Router } from "express";
 import multer from "multer";
@@ -269,10 +270,16 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     if(accountDetails.length) {
       const credentials=(await db.query("select *,license_expiry::text as license_expiry from user_licenses where user_id=any($1::uuid[]) and superseded_at is null",[accountDetails.map(a=>a.id)])).rows;
       const recorded=(await db.query("select user_id,specialization from engineer_specializations where user_id=any($1::uuid[])",[accountDetails.map(a=>a.id)])).rows;
+      const submissions=(await db.query("select q.* from license_renewal_requests q where q.user_id=any($1::uuid[]) and q.status='under_review'",[accountDetails.map(a=>a.id)])).rows;
       for(const detail of accountDetails) if(['opm','spm'].includes(detail.role)) {
         const own=credentials.filter(c=>c.user_id===detail.id);
-        const tags=recorded.filter(e=>e.user_id===detail.id).map(e=>e.specialization);
-        const qualified=qualifyingSpecializations(own,tags,localDay());
+        const pending=submissions.filter(q=>q.user_id===detail.id);
+        const tags=specializationSummary(own,pending,recorded.filter(e=>e.user_id===detail.id).map(e=>e.specialization));
+        detail.hasCredentialSpecializations=[...own,...pending].some(c=>c.specializations!=null);
+        detail.credentialCount=new Set([...own,...pending].map(c=>c.profession||String(c.id))).size;
+        detail.professionalTypes=[...new Set([...own,...pending].map(c=>c.profession).filter(Boolean))];
+        detail.credentialStatus=pending.length?'pending':own.some(c=>c.verification_status!=='verified'||!c.verified_by||!c.verified_at)?'needs_review':own.length?'verified':'missing';
+        const qualified=qualifyingSpecializations(own,tags,localDay(),30,recorded.filter(e=>e.user_id===detail.id).map(e=>e.specialization));
         detail.specializations=tags;
         detail.qualifiedRequirements=Object.keys(REQUIREMENT_SPECIALIZATIONS).filter(r=>REQUIREMENT_SPECIALIZATIONS[r].some(t=>qualified.includes(t)));
         detail.credentialEligibility=detail.status==='active'&&!accountMeta.find(a=>a.id===detail.id)?.metadata?.assignmentHold&&own.some(c=>credentialEligible(c,localDay()))&&(detail.role!=='spm'||qualified.length>0);

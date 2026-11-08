@@ -106,7 +106,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
       const detail = workspace.accountDetails?.[a.id] || await optional(api<Dto>(`/accounts/${a.id}`), undefined as unknown as Dto)
       const mapped=mapAccount(a,detail,projectIdsByName)
       const metadata=workspace.accounts?.[a.id]||{}
-      return {...mapped,...metadata,status:metadata.status==="deactivated"&&mapped.status==="suspended"?"deactivated":mapped.status} as Account
+      return {...mapped,...metadata,...(mapped.hasCredentialSpecializations?{scope:mapped.scope,hasCredentialSpecializations:true,credentialCount:mapped.credentialCount,credentialStatus:mapped.credentialStatus}:{}),status:metadata.status==="deactivated"&&mapped.status==="suspended"?"deactivated":mapped.status} as Account
     })
   }
   const selfDetail = accounts.some(a=>a.id===me.id)?undefined:await optional(api<Dto>(`/accounts/${me.id}`), undefined as unknown as Dto)

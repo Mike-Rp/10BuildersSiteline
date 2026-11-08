@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { api } from "./api/client"
+import { api,downloadBlob } from "./api/client"
 import {
   submitOwnRenewal,
   openRenewalFile,
@@ -9,12 +9,13 @@ import {
 import {
   PROFESSIONS,
   ENGINEER_SPECIALIZATIONS,
-  SPECIALIZATION_PROFESSIONS,
   licenseNumberError,
 } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { Button, Field } from "./ui"
 import { dateLabel } from "./model"
 type Credential = {
+  specializations?:string[]|null
+  document_url?:string
   id: string
   profession: string | null
   license_number: string
@@ -29,6 +30,7 @@ type Credential = {
   verification_note?: string
 }
 type Submission = {
+  specializations?:string[]|null
   submission_kind?: "initial" | "renewal"
   id: number
   profession: string | null
@@ -41,6 +43,7 @@ type Submission = {
   review_note?: string
 }
 type Summary = {
+  legacySpecializations?:{specialization:string;recorded_by_name?:string;recorded_at?:string}[]
   accountStatus: string
   credentials: Credential[]
   submissions: Submission[]
@@ -52,6 +55,12 @@ type Summary = {
   qualifiedRequirements: string[]
   eligibleForNewAssignment: boolean
   eligibilityNote: string
+}
+function CredentialSpecializations({tags,editable,onSave}:{tags?:string[]|null;editable:boolean;onSave:(tags:string[])=>Promise<unknown>}) {
+ const [selected,setSelected]=useState<string[]>(tags||[])
+ const signature=JSON.stringify(tags)
+ useEffect(()=>setSelected(tags||[]),[signature])
+ return <section className="credential-specializations"><h5>Areas of specialization</h5>{tags==null&&<p>Legacy associations have not been recorded. Existing account-level tags remain unchanged.</p>}{!editable?<p>{tags?.join(', ')||'No credential-specific specializations recorded.'}</p>:<><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${selected.includes(tag)?'selected':''}`} aria-pressed={selected.includes(tag)} disabled={!selected.includes(tag)&&selected.length>=3} onClick={()=>setSelected(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p>{selected.length}/3 selected for this credential</p><Button onClick={()=>void onSave(selected)}>Save this credential's specializations</Button></>}</section>
 }
 export default function EngineerCredentials({
   userId,
@@ -71,15 +80,14 @@ export default function EngineerCredentials({
     [number, setNumber] = useState(""),
     [expiry, setExpiry] = useState(""),
     [file, setFile] = useState<File>()
-  const [specializations, setSpecializations] = useState<string[]>([]),
-    [note, setNote] = useState(""),
+  const [note, setNote] = useState(""),
     [reviewProfession, setReviewProfession] = useState("")
   const [reviewId, setReviewId] = useState<number>()
+  const [newTags,setNewTags]=useState<string[]>([])
   const running = useRef(false)
   async function refresh() {
     const next = await api<Summary>("/licenses/credentials/" + userId)
     setData(next)
-    setSpecializations(next.specializations.map((s) => s.specialization))
   }
   useEffect(() => {
     let live = true
@@ -89,7 +97,6 @@ export default function EngineerCredentials({
       .then((next) => {
         if (live) {
           setData(next)
-          setSpecializations(next.specializations.map((s) => s.specialization))
         }
       })
       .catch((e) => live && setError(e.message))
@@ -157,6 +164,8 @@ export default function EngineerCredentials({
                     {c.license_number} · Expiry: {dateLabel(c.license_expiry)} ·{" "}
                     {c.expiryStatus}
                   </p>
+                  {c.document_url&&<Button onClick={()=>void downloadBlob(c.document_url!.replace(/^\/api\/v1/,'' )).then(blob=>{if(!blob)throw new Error('Document unavailable.');const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000)}).catch(e=>setError(e.message))}>View supporting credential document</Button>}
+                  <CredentialSpecializations tags={c.specializations} editable={admin&&!readOnly&&!busy&&!c.superseded_at} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{credential_id:c.id,specializations:tags}}))}/>
                   <p>
                     {c.superseded_at
                       ? "Superseded"
@@ -208,7 +217,7 @@ export default function EngineerCredentials({
           {!readOnly && <>
           <h4>{admin ? "Save a credential or renewal" : "Submit license renewal"}</h4>
           <p>
-            {admin ? "Saving records the credential as verified with your administrator identity and the save time." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
+            {admin ? "Saving records this credential as Pending Verification. Review its supporting evidence separately before verifying it." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
           </p>
           <form
             className={admin ? "form-grid" : "form-grid license-renewal-form"}
@@ -224,9 +233,11 @@ export default function EngineerCredentials({
                   licenseExpiry: expiry,
                   file,
                   userId: admin ? userId : undefined,
+                  ...(admin?{specializations:newTags,pending:true}:{}),
                 })
                 setNumber("")
                 setExpiry("")
+                setNewTags([])
               })
             }}
           >
@@ -266,6 +277,7 @@ export default function EngineerCredentials({
                 onChange={(e) => setFile(e.target.files?.[0])}
               />
             </Field>
+            {admin&&<fieldset className="credential-specializations"><legend>Areas of specialization for this credential · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${newTags.includes(tag)?'selected':''}`} aria-pressed={newTags.includes(tag)} disabled={!newTags.includes(tag)&&newTags.length>=3} onClick={()=>setNewTags(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div></fieldset>}
             <Button disabled={busy} type="submit" variant="primary">
               {busy ? "Saving…" : admin ? "Save credential" : "Submit license renewal"}
             </Button>
@@ -284,6 +296,7 @@ export default function EngineerCredentials({
                       ? q.review_note === "Replaced by a credential saved directly by an Administrator." ? "Replaced by Admin update" : "Correction required"
                       : "Verified"}
                 </strong>
+                <CredentialSpecializations tags={q.specializations} editable={admin&&!readOnly&&!busy&&q.status==='under_review'} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{submission_id:q.id,specializations:tags}}))}/>
                 <p>
                   {q.license_number} · Expiry: {dateLabel(q.license_expiry)} ·
                   Submitted {dateLabel(q.submitted_at)}
@@ -378,59 +391,19 @@ export default function EngineerCredentials({
             </form>
           )}
           </section>}
-          {(data.specializations.length > 0 || admin && !readOnly) && <section className="credential-subsection">
-          <h4>Recorded specializations</h4>
+          {!!(data.legacySpecializations??data.specializations).length && <section className="credential-subsection">
+          <h4>Legacy account-level specializations</h4>
           <p>
             Separate from company trade capabilities. Recording these does not
             independently certify competence.
           </p>
-          {data.specializations.map((s) => (
+          {(data.legacySpecializations??data.specializations).map((s) => (
             <p key={s.specialization}>
               {s.specialization} · Recorded by {s.recorded_by_name} on{" "}
-              {dateLabel(s.recorded_at)}
+              {dateLabel(s.recorded_at||"")}
             </p>
           ))}
-          {admin && !readOnly && (
-            <>
-              <div className="tag-list">
-                {ENGINEER_SPECIALIZATIONS.map((tag) => (
-                  <label key={tag}>
-                    <input
-                      type="checkbox"
-                      checked={specializations.includes(tag)}
-                      onChange={(e) =>
-                        setSpecializations(
-                          e.target.checked
-                            ? [...specializations, tag]
-                            : specializations.filter((t) => t !== tag),
-                        )
-                      }
-                    />
-                    {tag}
-                    {!SPECIALIZATION_PROFESSIONS[tag]?.length
-                      ? " (mapping pending company validation)"
-                      : ""}
-                  </label>
-                ))}
-              </div>
-              <p>
-                Maximum three specializations under the existing company limit.
-              </p>
-              <Button
-                disabled={busy || specializations.length > 3}
-                onClick={() =>
-                  run(() =>
-                    api(
-                      "/licenses/credentials/" + userId + "/specializations",
-                      { method: "PUT", json: { specializations } },
-                    ),
-                  )
-                }
-              >
-                Save recorded specializations
-              </Button>
-            </>
-          )}
+          <p>These historical tags have no recorded credential association. Review and associate specializations in the credential cards above; each credential allows up to three.</p>
           </section>}
         </>
       )}

@@ -34,6 +34,7 @@ export const DEDICATED_MIGRATIONS = Object.freeze({
   "015-engineer-credentials.sql": "Requires migration 009 and 014; apply after verifying both",
   "024-chunked-file-uploads.sql": "Apply explicitly before enabling chunked uploads",
   "025-independent-spm-workspaces.sql": "Apply explicitly before enabling independent SPM workspaces; requires 020",
+  "026-credential-specializations.sql": "Apply explicitly before per-credential specialization entry; requires 015",
 })
 
 const LEGACY_NAME_ALIASES = Object.freeze({

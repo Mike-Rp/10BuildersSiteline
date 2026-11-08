@@ -135,6 +135,7 @@ test("migration coverage: PostgreSQL prepares backend static SQL including the n
   await db.exec(read("Thesis-Backend/migrations/016-user-id-numbers.sql"))
   await db.exec(read("Thesis-Backend/migrations/018-phase-foreman-allocation.sql"))
   for(const name of ['019-engineer-phase-commitments.sql','020-engineer-phase-responsibilities.sql','021-admin-recovery-codes.sql','022-engineer-experience-months.sql','023-engineer-reassignment-offers.sql','024-chunked-file-uploads.sql','025-independent-spm-workspaces.sql']) await db.exec(read('Thesis-Backend/migrations/'+name))
+  await db.exec(read('Thesis-Backend/migrations/026-credential-specializations.sql'))
   const directory=fileURLToPath(new URL("Thesis-Backend/src/",root))
   let count=0;const failures=[]
   const {migrateNotifications}=await import("../Thesis-Backend/scripts/migrate-notifications.js")

@@ -4,6 +4,7 @@ import { workEmailFromAssignedId, assertWorkEmailAvailable } from "./work-email.
 import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
 import { ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
 import { createRenewalRequest } from "../licenses/renewal.controller.js";
+import {validateSpecializations,requireCredentialTags} from '../licenses/credential-specializations.utility.js';
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
 import { activeClaim } from "./reset-follow-up.utility.js";
@@ -192,7 +193,12 @@ async function insertAccountRecord(client, actor, body) {
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
   if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
-  const scope = normalizeScope(role,body.scope);
+  const associated=Array.isArray(body.initial_credentials)&&body.initial_credentials.some(c=>c?.specializations!==undefined);
+  if (associated) {
+    await requireCredentialTags(client);
+    for(const credential of body.initial_credentials)validateSpecializations(credential?.specializations);
+  }
+  const scope = normalizeScope(role,associated&&role==='spm'?undefined:body.scope);
   const experience = validateEngineerExperience(body.experience_by_type, role);
   await assertWorkEmailAvailable(client, email, null, body.auto_work_email === true ? undefined : body.employee_id);
   const password = body.password ?? makeTempPassword();
@@ -236,8 +242,8 @@ async function insertAccountRecord(client, actor, body) {
         throw new HttpError(400, "Credential documents must be PDF, JPG or PNG.");
       await client.query("update stored_files set user_id=$2,purpose='account' where id=$1", [stored.id, userId]);
       await createRenewalRequest(client, actor, { user_id: userId, profession: credential.profession,
-        license_number: credential.license_number, license_expiry: credential.license_expiry },
-        { path: "db:" + stored.id }, { pending: body.credential_decision === "pending", note });
+        license_number: credential.license_number, license_expiry: credential.license_expiry,...(associated?{specializations:credential.specializations}:{}) },
+        { path: "db:" + stored.id }, { pending: body.credential_decision === "pending",reviewed:body.credential_decision==='verified'&&body.credential_evidence_reviewed===true, note });
     }
   }
   return { ...inserted.rows[0],role,temp_password:password };
@@ -318,7 +324,7 @@ export const getAccount = async (req, res) => {
         project_types: projectTypes.rows.map((r) => r.code),
         projects: projects.rows,
       },
-      ...(["opm","spm"].includes(base.rows[0].role) ? await (async()=>{const summary=await credentialSummary({query:execute},id);return {specializations:summary.specializations.map(s=>s.specialization),qualifiedRequirements:summary.qualifiedRequirements,credentialEligibility:summary.eligibleForNewAssignment}})() : {}),
+      ...(["opm","spm"].includes(base.rows[0].role) ? await (async()=>{const summary=await credentialSummary({query:execute},id);return {specializations:summary.specializations.map(s=>s.specialization),hasCredentialSpecializations:[...summary.credentials,...summary.submissions].some(c=>c.specializations!=null),credentialCount:new Set([...summary.credentials.filter(c=>!c.superseded_at),...summary.submissions.filter(q=>q.status==='under_review')].map(c=>c.profession||String(c.id))).size,qualifiedRequirements:summary.qualifiedRequirements,credentialEligibility:summary.eligibleForNewAssignment}})() : {}),
       license: license.rows[0] ?? null,
       certifications: certs.rows.map((r) => r.code),
     });

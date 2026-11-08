@@ -1741,6 +1741,7 @@ function AppInner() {
                       {a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) && (
                         <Badge tone="amber"><Icon name="alert" size={14} />Professional credentials not on file</Badge>
                       )}
+                      {a.credentialCount!==undefined&&<p>{a.credentialCount} professional {a.credentialCount===1?'credential':'credentials'} · {a.credentialStatus==='verified'?'Verified':a.credentialStatus==='pending'?'Pending verification':'Review required'}</p>}
                       <div className="tag-list">
                         {(a.scope.length && a.role === "spm"
                           ? a.scope

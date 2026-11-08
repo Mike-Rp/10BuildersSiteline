@@ -191,6 +191,8 @@ export type Doc = {
   phase?: string
 }
 export type RegistrationCredential = {
+  clientKey?: string
+  specializations?: string[]
   profession: string
   license_number: string
   license_expiry: string
@@ -226,6 +228,9 @@ export type Account = {
   qualifiedRequirements?: string[]
   eligibleForNewAssignment?: boolean
   hasProfessionalCredentials?: boolean
+  hasCredentialSpecializations?: boolean
+  credentialCount?: number
+  credentialStatus?: string
   professionalTypes?: string[]
   assignmentCandidateProjectIds?: string[]
   assignmentHold?: boolean
@@ -883,10 +888,10 @@ export function accountError(
   if (
     a.role === "spm" &&
     (!a.scope.length ||
-      a.scope.length > 3 ||
+      a.scope.length > (a.initialCredentials || a.hasCredentialSpecializations ? ENGINEER_SPECIALIZATIONS.length : 3) ||
       a.scope.some((t) => !ENGINEER_SPECIALIZATIONS.includes(t)))
   )
-    return "Choose one to three valid discipline tags."
+    return a.initialCredentials||a.hasCredentialSpecializations ? "Choose supported specializations within each professional credential." : "Choose one to three valid discipline tags."
   if (
     a.role === "opm" &&
     (!a.projectTypes.length ||

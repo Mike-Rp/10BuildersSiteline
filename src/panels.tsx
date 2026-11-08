@@ -579,8 +579,8 @@ export function AccountForm({
   const [pass, setPass] = useState(password())
   const registeringEngineer = !account && !clientOnly && ["spm", "opm"].includes(draft.role)
   const [credentialDraft, setCredentialDraft] = useState<Partial<Account>>({
-    initialCredentials: [{ profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "" }],
-    credentialDecision: "verified",
+    initialCredentials: [{ clientKey:uid(),profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "",specializations:[] }],
+    credentialDecision: "pending",
   })
   const [uploadingCredential, setUploadingCredential] = useState(false)
   const [error, setError] = useState("")
@@ -595,7 +595,8 @@ export function AccountForm({
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (savingRef.current || uploadingCredential) return
-    const creationCredentials = { ...credentialDraft, credentialDecision: "verified" as const }
+    const creationCredentials = { ...credentialDraft, credentialDecision: credentialDraft.credentialEvidenceReviewed ? "verified" as const : "pending" as const }
+    const submittedDraft=registeringEngineer&&draft.role==='spm'?{...draft,...creationCredentials,scope:[...new Set((credentialDraft.initialCredentials||[]).flatMap(c=>c.specializations||[]))]}:draft
     if (registeringEngineer) {
       const issue = validateRegistrationCredentials(creationCredentials)
       if (issue) { setError(issue); return }
@@ -620,14 +621,14 @@ export function AccountForm({
             )
           ? "This email is already in use. Select the existing client instead."
           : ""
-      : accountError(requiresClientEmail ? { ...draft, email: draft.email.trim() } : draft, state, generatedIdentity)
+      : accountError(requiresClientEmail ? { ...submittedDraft, email: draft.email.trim() } : submittedDraft, state, generatedIdentity)
     setError(err)
     if (!err) try {
       savingRef.current = true
       setSaving(true)
       await onSave(
         {
-          ...draft,
+          ...submittedDraft,
           ...(registeringEngineer ? creationCredentials : {}),
           name: draft.name.trim(),
           email: requiresClientEmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
@@ -742,7 +743,7 @@ export function AccountForm({
         )}
       </div>
       {registeringEngineer && <RegistrationCredentials value={credentialDraft} onChange={setCredentialDraft} onBusy={setUploadingCredential} onError={setError} />}
-      {!clientOnly && draft.role === "spm" && (
+      {!clientOnly && draft.role === "spm" && !registeringEngineer && !draft.hasCredentialSpecializations && (
         <section className="form-section">
           <h3>
             Areas of specialization <span>Choose 1–3</span>

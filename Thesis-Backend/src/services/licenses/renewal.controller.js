@@ -13,6 +13,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { localDay, loadLicenseState } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
 import { resolveNotifications } from "../notifications/notification.utility.js";
+import {validateSpecializations,requireCredentialTags,credentialTagsInstalled} from './credential-specializations.utility.js';
 
 const UPLOAD_ROOT = path.resolve("uploads");
 const isIsoDate = isoDateValid;
@@ -39,11 +40,18 @@ export const myLicense = async (req, res) => {
 
 /** An engineer submits their own renewal, or an Administrator records one for them. Used by POST /licenses/renewals. */
 export async function createRenewalRequest(db, user, body, file, options = {}) {
-  const verifyNow = user.role === "admin" && options.pending !== true;
+  const verifyNow = user.role === "admin" && options.pending !== true &&
+    (body.specializations === undefined || options.reviewed === true);
   const userId = user.role === "admin" ? (body.user_id ?? body.userId) : user.id;
   if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
   const number = body.license_number ?? body.licenseNumber;
   const profession = body.profession;
+  let tags=body.specializations;
+  if (tags!==undefined) {
+    if (typeof tags==='string') {try {tags=JSON.parse(tags);} catch {throw new HttpError(400,'Specializations must be an array.');}}
+    validateSpecializations(tags);
+    await requireCredentialTags(db);
+  }
   if (!PROFESSIONS.includes(profession)) throw new HttpError(400, "Select the licensed profession. Do not infer it from tags.");
   const numberError = licenseNumberError(number);
   if (numberError) throw new HttpError(400, numberError);
@@ -75,6 +83,7 @@ export async function createRenewalRequest(db, user, body, file, options = {}) {
       `insert into license_renewal_requests(user_id,license_number,license_expiry,file_ref,submitted_by,profession,replaces_license_id)
        values($1,$2,$3,$4,$5,$6,$7) returning id,status,submitted_at`,
       [userId, number, expiry, file.path.replace(/\\/g, "/"), user.id, profession, replaces]);
+    if (tags!==undefined) await db.query('update license_renewal_requests set specializations=$2 where id=$1',[inserted.rows[0].id,tags]);
     if (verifyNow) {
       const verified = await reviewRenewalInTransaction(db, user, inserted.rows[0].id, "verified", { note: options.note || "Saved directly by Administrator." });
       return { ...inserted.rows[0], ...verified };
@@ -106,10 +115,10 @@ export const submitRenewal = async (req, res) => {
       if (!isUuid(targetId)) throw new HttpError(400, "Select the engineer.");
       const fileId = randomUUID();
       await db.query("insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by) values($1,$2,'account',$3,$4,$5,$6,$7)", [fileId,targetId,req.file.originalname,contentType,bytes.length,bytes,user.id]);
-      return createRenewalRequest(db, user, req.body || {}, { path: "db:" + fileId });
+      return createRenewalRequest(db, user, req.body || {}, { path: "db:" + fileId },{pending:req.body?.pending==='true'});
     });
     if (req.file?.path) fs.unlink(req.file.path, () => {});
-    return sendOk(res, user.role === "admin" ? "Credential saved and verified." : "Renewal uploaded. It will be reviewed by an Administrator.", 1, data, 201);
+    return sendOk(res, data.status==='verified' ? "Credential saved and verified." : "Credential saved pending Administrator verification.", 1, data, 201);
   } catch (error) {
     if (req.file?.path) fs.unlink(req.file.path, () => {});
     return handleError(res, error);
@@ -181,6 +190,13 @@ async function reviewRenewalInTransaction(db, user, requestId, decision, body = 
     licenseId = (await db.query(
       `insert into user_licenses(user_id,license_number,license_expiry,upload_file_ref,upload_status,created_by,updated_by,profession,verification_status,verified_by,verified_at,verification_note)
        values($1,$2,$3,$4,'uploaded',$5,$5,$6,'verified',$5,now(),$7) returning id`, [request.user_id, number, expiry, request.file_ref, user.id, profession, note])).rows[0].id;
+    if (await credentialTagsInstalled(db)) {
+      let tags=request.specializations;
+      // Renewals inherit only the prior credential's explicit association.
+      if (tags==null) tags=(await db.query('select specializations from user_licenses where user_id=$1 and profession=$2 and id<>$3 order by created_at desc limit 1',[request.user_id,profession,licenseId])).rows[0]?.specializations??null;
+      if (tags!==null) validateSpecializations(tags);
+      await db.query('update user_licenses set specializations=$2 where id=$1',[licenseId,tags]);
+    }
   }
   if(decision==='verified'&&request.replaces_license_id)await db.query("update user_licenses set superseded_at=now(),updated_by=$3 where id=$1 and user_id=$2 and superseded_at is null",[request.replaces_license_id,request.user_id,user.id]);
   await db.query(

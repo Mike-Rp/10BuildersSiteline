@@ -100,12 +100,15 @@ export function mapAccount(
     license: license?.license_number ?? "",
     expiry: day(license?.license_expiry),
     docs: [],
+    hasCredentialSpecializations:detail?.hasCredentialSpecializations ?? a.has_credential_specializations,
+    credentialCount:detail?.credentialCount ?? a.credential_count,
+    credentialStatus:detail?.credentialStatus ?? a.credential_status,
     eligibleForNewAssignment:["opm","spm"].includes(role)?Boolean(detail?.credentialEligibility):undefined,
     hasProfessionalCredentials:["opm","spm"].includes(role)
-      ? Boolean(a.has_professional_credentials ?? (detail?.license?.license_number || detail?.license?.upload_file_ref))
+      ? Boolean(a.has_professional_credentials ?? (detail?.credentialCount || detail?.license?.license_number || detail?.license?.upload_file_ref))
       : undefined,
     professionalTypes:["opm","spm"].includes(role)
-      ? (a.professional_types as string[] | undefined) ?? (detail?.license?.profession ? [detail.license.profession] : [])
+      ? detail?.professionalTypes ?? (a.professional_types as string[] | undefined) ?? (detail?.license?.profession ? [detail.license.profession] : [])
       : undefined,
   }
   if(detail?.license?.upload_file_ref?.startsWith("db:")){const fileId=detail.license.upload_file_ref.replace(/^db:(\/\/)?/,"");account.docs.push({id:fileId,label:"PRC License",name:"PRC License.pdf",uploaded:true,owner:account.name,date:account.added,clientVisible:false})}

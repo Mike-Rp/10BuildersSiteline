@@ -15,9 +15,11 @@ export const fetchRequests = () => api<ReassignRequest[]>("/licenses/requests")
 export const fetchOverview = () => apiList<OverviewItem>("/licenses/overview")
 export const fetchRenewals = (status = "under_review") => api<RenewalQueueItem[]>("/licenses/renewals?status=" + status)
 
-export const submitOwnRenewal = async (input: { licenseNumber: string; licenseExpiry: string; file: File; profession: string; userId?: string }) => {
+export const submitOwnRenewal = async (input: { licenseNumber: string; licenseExpiry: string; file: File; profession: string; userId?: string;specializations?:string[];pending?:boolean }) => {
   const body = new FormData()
   body.set("profession", input.profession)
+  if(input.specializations)body.set('specializations',JSON.stringify(input.specializations))
+  if(input.pending)body.set('pending','true')
   if(input.userId) body.set("user_id",input.userId)
   body.set("license_number", input.licenseNumber)
   body.set("license_expiry", input.licenseExpiry)

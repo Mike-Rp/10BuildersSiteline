@@ -195,7 +195,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
     }
 }
 function accountPayload(account: Account) {
-    const scope = account.role === "spm" ? { disciplines: account.scope } : account.role === "opm" ?
+    const scope = account.role === "spm" ? account.hasCredentialSpecializations ? undefined : { disciplines: account.scope } : account.role === "opm" ?
         { project_types: account.projectTypes } : account.role === "client" ? { projects: account.scope } : undefined;
     return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope,
       ...(employeeIdFromWorkEmail(account.email) ? { employee_id: employeeIdFromWorkEmail(account.email) } : {}),
@@ -210,7 +210,7 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
         method: existing ? "PATCH" : "POST", json: { ...payload,
           ...(!existing ? { request_id: account.id,
             ...(account.initialCredentials ? {
-              initial_credentials: account.initialCredentials.map(({ fileName, ...credential }) => credential),
+              initial_credentials: account.initialCredentials.map(({ fileName, clientKey, ...credential }) => credential),
               credential_decision: account.credentialDecision,
               credential_review_note: account.credentialReviewNote,
               credential_evidence_reviewed: account.credentialEvidenceReviewed,

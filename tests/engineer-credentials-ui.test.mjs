@@ -95,7 +95,7 @@ test("credential profile separates account access, verification, expiry and revi
     assert.match(document.body.textContent, /0001234/)
     assert.ok([...document.querySelectorAll("button")].some(b => b.textContent === "Save credential"))
     assert.equal([...document.querySelectorAll("button")].some(b => b.textContent === "Submit license renewal"), false)
-    assert.match(document.body.textContent, /Saving records the credential as verified/)
+    assert.match(document.body.textContent, /Saving records this credential as Pending Verification/)
     assert.match(document.body.textContent, /Replaced by Admin update/)
     const review = [...document.querySelectorAll("button")].find(
       (b) => b.textContent === "Review submission",

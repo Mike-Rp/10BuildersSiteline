@@ -82,11 +82,13 @@ export function qualifyingSpecializations(
   specializations,
   today,
   noticeDays = 30,
+  legacySpecializations = specializations,
 ) {
   return specializations.filter((tag) =>
     credentials.some(
       (c) =>
         credentialEligible(c, today, noticeDays) &&
+        (c.specializations == null ? legacySpecializations.includes(tag) : c.specializations.includes(tag)) &&
         (SPECIALIZATION_PROFESSIONS[tag] || []).includes(c.profession),
     ),
   )

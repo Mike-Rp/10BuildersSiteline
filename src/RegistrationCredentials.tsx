@@ -1,8 +1,8 @@
 import { useRef, useState } from "react"
-import { PROFESSIONS, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
+import { PROFESSIONS, ENGINEER_SPECIALIZATIONS, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { uploadFile } from "./api/actions"
 import { DOCUMENT_UPLOAD_LIMIT_MB, type Account, type RegistrationCredential, uid, today } from "./model"
-import { Button, Field, Icon } from "./ui"
+import { Button, Field, Icon, Modal } from "./ui"
 import "./registration-credentials.css"
 
 function CredentialDocumentUpload({ id, name, busy, disabled, onFile }: {
@@ -31,6 +31,8 @@ export function validateRegistrationCredentials(value: Partial<Account>) {
     if (issue) return issue
     if (!isoDateValid(row.license_expiry) || row.license_expiry <= today()) return "Enter a future credential expiry date."
     if (!row.file_id) return "Attach a supporting document for each credential."
+    const tags=row.specializations||[]
+    if(tags.length>3||new Set(tags).size!==tags.length||tags.some(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag)))return "Choose up to three supported specializations per credential."
   }
   if (new Set(rows.map(c => c.profession)).size !== rows.length) return "Enter each profession only once."
   if (value.credentialDecision === "verified" && (!value.credentialEvidenceReviewed || !value.credentialReviewNote?.trim()))
@@ -46,10 +48,13 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
 }) {
   const running = useRef(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
+  const [collapsed,setCollapsed]=useState<string[]>([])
+  const [removeKey,setRemoveKey]=useState<string>()
+  const latest=useRef(value);latest.current=value
   const rows = value.initialCredentials || []
   const patch = (next: Partial<Account>) => onChange({ ...value, ...next })
   const update = (index: number, next: Partial<RegistrationCredential>) =>
-    patch({ initialCredentials: rows.map((row, i) => i === index ? { ...row, ...next } : row) })
+    onChange({...latest.current, initialCredentials: (latest.current.initialCredentials||[]).map((row, i) => i === index ? { ...row, ...next } : row) })
   async function upload(index: number, file?: File) {
     if (!file || running.current) return
     if (!/\.(pdf|jpe?g|png)$/i.test(file.name) || file.size > DOCUMENT_UPLOAD_LIMIT_MB * 1024 * 1024) {
@@ -67,10 +72,13 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
     <section className="form-section registration-credentials">
       <h3>Professional license details</h3>
       <p>Save credentials with this account. Uploading alone does not verify them.</p>
-      {rows.map((row, index) => <section className="credential-record" key={index}>
+      {rows.map((row, index) => {const key=row.clientKey||String(index),open=!collapsed.includes(key),tags=row.specializations||[];return <section className="credential-record" key={key}>
         <header className="registration-credential-heading"><h4>Credential {index + 1}</h4>
-          {rows.length > 1 && <Button className="remove-registration-credential" icon="close" disabled={uploadingIndex !== null} aria-label={`Remove credential ${index + 1}`} onClick={() => patch({ initialCredentials: rows.filter((_, i) => i !== index) })}>Remove Credential</Button>}
+          <Button aria-expanded={open} aria-controls={`credential-${key}`} onClick={()=>setCollapsed(current=>open?[...current,key]:current.filter(k=>k!==key))}>{open?'Collapse':'Expand'} credential {index+1}</Button>
+          {rows.length > 1 && <Button className="remove-registration-credential" icon="close" disabled={uploadingIndex !== null} aria-label={`Remove credential ${index + 1}`} onClick={() => setRemoveKey(key)}>Remove Credential</Button>}
         </header>
+        <p className="role-muted">{row.profession||'Select a profession'} · {tags.length}/3 specializations · Pending verification until reviewed</p>
+        <div id={`credential-${key}`} hidden={!open}>
         <div className="form-grid">
           <Field label="Licensed profession *"><select required value={row.profession} onChange={e => update(index, { profession: e.target.value })}>
             <option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}
@@ -79,10 +87,13 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
           <Field label="Expiry date *"><input required type="date" min={today()} value={row.license_expiry} onChange={e => update(index, { license_expiry: e.target.value })} /></Field>
           <Field label="Supporting credential document *"><CredentialDocumentUpload name={row.fileName} busy={uploadingIndex === index} disabled={uploadingIndex !== null} onFile={file => void upload(index, file)} /></Field>
         </div>
-      </section>)}
-      <Button disabled={uploadingIndex !== null || rows.length >= PROFESSIONS.length} onClick={() => patch({ initialCredentials: [...rows, { profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "" }] })}>Add another professional credential</Button>
+        <fieldset className="credential-specializations"><legend>Areas of specialization · Credential {index+1} · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button type="button" key={tag} className={`chip ${tags.includes(tag)?'selected':''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag)&&tags.length>=3} onClick={()=>update(index,{specializations:tags.includes(tag)?tags.filter(t=>t!==tag):[...tags,tag]})}>{tag}</button>)}</div></fieldset>
+        </div>
+      </section>})}
+      <Button disabled={uploadingIndex !== null || rows.length >= PROFESSIONS.length} onClick={() => patch({ initialCredentials: [...rows, { clientKey:uid(),profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "",specializations:[] }] })}>Add another professional credential</Button>
       <p>Leading zeros are preserved. Format checking does not verify authenticity.</p>
     </section>
+    {removeKey!==undefined&&<Modal title="Remove professional credential?" onClose={()=>setRemoveKey(undefined)}><p>This removes this credential from the unsaved form. Your other credentials and attachments will be retained.</p><div className="modal-actions"><Button onClick={()=>setRemoveKey(undefined)}>Keep credential</Button><Button variant="danger-ghost" onClick={()=>{patch({initialCredentials:rows.filter((row,i)=>(row.clientKey||String(i))!==removeKey)});setRemoveKey(undefined)}}>Remove this credential</Button></div></Modal>}
 
   </>
 }
@@ -92,9 +103,9 @@ export function RegistrationVerification({ value, onChange }: { value: Partial<A
   return (
     <section className="form-section">
       <h3>Admin verification</h3>
-      <p>Credentials will be verified when you create this account. Confirm your evidence review below.</p>
+      <p>Credentials are saved as Pending Verification. Only confirm this review if you have checked the supporting evidence and want to verify them when creating the account.</p>
         <label className="check-row"><input type="checkbox" checked={!!value.credentialEvidenceReviewed} onChange={e => patch({ credentialEvidenceReviewed: e.target.checked })} />I reviewed the supporting evidence for every credential</label>
-        <Field label="Verification note *"><textarea required maxLength={2000} value={value.credentialReviewNote || ""} onChange={e => patch({ credentialReviewNote: e.target.value })} /></Field>
+        {value.credentialEvidenceReviewed&&<Field label="Verification note *"><textarea required maxLength={2000} value={value.credentialReviewNote || ""} onChange={e => patch({ credentialReviewNote: e.target.value })} /></Field>}
       <p className="notice">Your review identity, note and time are recorded. Assignments still require matching scope, account activation and availability.</p>
     </section>
   )

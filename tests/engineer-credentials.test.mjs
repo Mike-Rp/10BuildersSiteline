@@ -564,5 +564,70 @@ test(
       assert.equal((await call("restricted","GET","/workspace")).status,200)
     }
 
+    await t.test('credential-specific specializations preserve legacy records and isolate multiple credentials',async()=>{
+      const legacy=(await db.query('select id,user_id,license_number,verification_status from user_licenses order by id')).rows
+      await db.exec(read('../Thesis-Backend/migrations/026-credential-specializations.sql'))
+      await db.exec(read('../Thesis-Backend/migrations/026-credential-specializations.sql'))
+      assert.deepEqual((await db.query('select id,user_id,license_number,verification_status from user_licenses order by id')).rows,legacy)
+      assert.ok((await db.query('select specializations from user_licenses')).rows.every(c=>c.specializations===null))
+      const sets=[['Civil','Structural','Geotechnical'],['Mechanical','Fire Protection','Acoustic'],['Electrical','Acoustic','Facade']]
+      const uploadOnly=form('Geodetic Engineer');uploadOnly.set('user_id',ids.other);uploadOnly.set('specializations',JSON.stringify(['Surveying']));uploadOnly.set('verification_status','verified');
+      const unreviewed=await call('admin','POST','/licenses/renewals',uploadOnly)
+      assert.equal(unreviewed.status,201,JSON.stringify(unreviewed));assert.equal(unreviewed.data.status,'under_review','credential-specific uploads do not infer a verification decision')
+      const professions=['Civil Engineer','Mechanical Engineer','Electrical Engineer']
+      const create=async(count,decision='pending',custom=sets)=>{
+        const credentials=[]
+        for(let i=0;i<count;i++)credentials.push({profession:professions[i],license_number:'000012'+i,license_expiry:future,file_id:await uploadEvidence(),specializations:custom[i]})
+        const body={full_name:'Credential association QA',email:crypto.randomUUID()+'@example.test',role:'spm',password:'Password@123',scope:{disciplines:custom.slice(0,count).flat()},initial_credentials:credentials,credential_decision:decision,credential_evidence_reviewed:decision==='verified',credential_review_note:decision==='verified'?'Reviewed every credential.':''}
+        return {result:await call('admin','POST','/accounts',body),body}
+      }
+      for(const count of [1,2,3]){
+        const {result}=await create(count);assert.equal(result.status,201,JSON.stringify(result))
+        const profile=(await call('admin','GET','/licenses/credentials/'+result.data.id)).data
+        assert.equal(profile.credentials.length,0,'upload and pending save do not verify licenses')
+        assert.equal(profile.submissions.length,count)
+        for(const q of profile.submissions)assert.deepEqual(q.specializations,sets[professions.indexOf(q.profession)])
+        assert.equal(profile.specializations.length,new Set(sets.slice(0,count).flat()).size)
+        assert.equal(profile.eligibleForNewAssignment,false)
+        const directory=await call('admin','GET','/accounts?page=1&pageSize=100')
+        const row=directory.data.find(a=>a.id===result.data.id)
+        assert.equal(row.credential_count,count);assert.equal(row.credential_status,'pending')
+        assert.equal(row.scope.length,new Set(sets.slice(0,count).flat()).size)
+        if(count===2){
+          const [civil,mechanical]=professions.slice(0,2).map(p=>profile.submissions.find(q=>q.profession===p))
+          const edit=await call('admin','PUT','/licenses/credentials/'+result.data.id+'/specializations',{submission_id:civil.id,specializations:['Civil','Acoustic']})
+          assert.equal(edit.status,200,JSON.stringify(edit))
+          assert.deepEqual((await db.query('select specializations from license_renewal_requests where id=$1',[mechanical.id])).rows[0].specializations,sets[1])
+          assert.equal((await call('other','PUT','/licenses/credentials/'+result.data.id+'/specializations',{submission_id:civil.id,specializations:[]})).status,403)
+          assert.equal((await call('admin','PUT','/licenses/credentials/'+ids.other+'/specializations',{submission_id:civil.id,specializations:[]})).status,404)
+          assert.equal((await call('admin','PUT','/licenses/credentials/'+result.data.id+'/specializations',{submission_id:civil.id,specializations:['Civil','Structural','Geotechnical','Mechanical']})).status,400)
+          for(const q of profile.submissions)assert.equal((await call('admin','POST','/licenses/renewals/'+q.id+'/verify',{note:'Manual evidence review.'})).status,200)
+          const saved=(await call('admin','GET','/licenses/credentials/'+result.data.id)).data
+          assert.equal(saved.credentials.length,2)
+          assert.deepEqual(saved.credentials.find(c=>c.profession==='Civil Engineer').specializations,['Civil','Acoustic'])
+          assert.deepEqual(saved.credentials.find(c=>c.profession==='Mechanical Engineer').specializations,sets[1])
+          assert.ok(saved.credentials.every(c=>c.license_number.startsWith('0000')))
+          const document=await fetch(base+saved.credentials[0].document_url.replace('/api/v1',''),{headers:{Authorization:'Bearer '+tokens.admin}})
+          assert.equal(document.status,200)
+          const credential=saved.credentials[0]
+          assert.equal((await call('admin','PUT','/licenses/credentials/'+ids.other+'/specializations',{credential_id:credential.id,specializations:[]})).status,404)
+          assert.equal((await call('admin','PUT','/licenses/credentials/'+result.data.id+'/specializations',{credential_id:credential.id,specializations:['Acoustic']})).status,200)
+          assert.equal((await db.query('select count(*)::int as n from engineer_specializations where user_id=$1',[result.data.id])).rows[0].n,0,'new associations are not flattened into the legacy account list')
+        }
+      }
+      const invalid=await create(1,'pending',[['Civil','Structural','Geotechnical','Mechanical']]);assert.equal(invalid.result.status,400)
+      const duplicate=await create(1,'pending',[['Civil','Civil']]);assert.equal(duplicate.result.status,400)
+      const mixed=await create(3,'pending',[['Civil'],['Mechanical','Acoustic'],['Electrical','Acoustic','Facade']]);assert.equal(mixed.result.status,201)
+      const cross=await create(2,'verified',[['Mechanical'],['Acoustic']]);assert.equal(cross.result.status,201)
+      const mixedLegacy=await create(1,'pending',[['Structural']]);assert.equal(mixedLegacy.result.status,201)
+      await db.query("insert into user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,profession,verification_status,verified_by,verified_at) values($1,'0000009',$2,'uploaded','legacy-proof','Civil Engineer','verified',$3,now())",[mixedLegacy.result.data.id,future,ids.admin])
+      await db.query("insert into engineer_specializations(user_id,specialization,recorded_by) values($1,'Civil',$2)",[mixedLegacy.result.data.id,ids.admin])
+      const legacyProfile=(await call('admin','GET','/licenses/credentials/'+mixedLegacy.result.data.id)).data
+      assert.ok(legacyProfile.qualifiedRequirements.includes('Civil'))
+      assert.ok(!legacyProfile.qualifiedRequirements.includes('Structural'),'pending credential tags cannot gain verification from a legacy license')
+      assert.equal((await db.query('select count(*)::int as n from engineer_qualified_scopes where user_id=$1',[cross.result.data.id])).rows[0].n,0,'a specialization cannot borrow verification from a different credential')
+      assert.deepEqual(qualifyingSpecializations([{profession:'Civil Engineer',specializations:['Mechanical'],verification_status:'verified',verified_by:'admin',verified_at:'2026-01-01',license_number:'0000001',license_expiry:'2099-01-01',upload_status:'uploaded',upload_file_ref:'proof'},{profession:'Mechanical Engineer',specializations:['Acoustic'],verification_status:'verified',verified_by:'admin',verified_at:'2026-01-01',license_number:'0000002',license_expiry:'2099-01-01',upload_status:'uploaded',upload_file_ref:'proof'}],['Mechanical'],'2026-01-01'),[])
+    })
+
   },
 )
