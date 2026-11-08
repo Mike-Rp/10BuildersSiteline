@@ -32,6 +32,8 @@ export function shareLoginPath(portal: LoginPortal) {
 export function currentLoginPortal(): LoginPortal {
   if (typeof window === "undefined") return "client"
   const domain = currentDomain()
+  if (domain === "client") return "client"
+  if (domain === "staff" && /^\/client(?:\/|$)/i.test(window.location.pathname)) return "staff"
   if (window.location.pathname === "/" && domain !== "staff") return "client"
   if (/^\/login\/?$/i.test(window.location.pathname) || (window.location.pathname === "/" && domain === "staff")) {
     const tab = window.history.state?.loginPortal || new URLSearchParams(window.location.search).get("tab")
@@ -43,11 +45,7 @@ export function currentLoginPortal(): LoginPortal {
 // Legacy paths retain their selected portal without making tab switches navigations.
 export function canonicalizeLoginEntry() {
   const redirect = portalDomainRedirect(window.location)
-  if (redirect) {
-    // Origin-scoped sessions are deliberately not transferred in URLs or cookies.
-    window.location.replace(redirect)
-    return window.location.pathname
-  }
+  if (redirect) return changeRoute(redirect, true)
   const path = window.location.pathname
   if (path !== "/" && isLandingPath(path) && (currentDomain() || /^\/(admin|staff)\/login\/?$/i.test(path))) {
     const portal = currentLoginPortal()

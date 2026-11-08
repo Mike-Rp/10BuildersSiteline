@@ -13,9 +13,10 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
   w.matchMedia = () => ({matches:false,addEventListener(){},removeEventListener(){}})
   w.HTMLElement.prototype.scrollIntoView = () => {}
   w.scrollTo = () => {}
-  let user, authCalls = [], logoutCalls = 0
+  let user, authCalls = [], logoutCalls = 0, requestCalls = 0
   const token = () => `test.${Buffer.from(JSON.stringify({sub:user.id,details:{id:user.id,role:user.role}})).toString('base64url')}.test`
   t.mock.method(globalThis,'fetch',async (url,init) => {
+    requestCalls++
     const path = new URL(String(url),'https://10buildline.site').pathname.replace(/^\/api\/v1/,'')
     if (path === '/auth/me') {
       assert.equal(init.headers.get('Authorization'), `Bearer ${token()}`)
@@ -54,6 +55,48 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
       Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value').set.call(input,value)
       input.dispatchEvent(new w.Event('input',{bubbles:true}))
     })
+    // Typing internal URLs on the public domain must stay at Client login,
+    // even with a saved session or stale Admin tab selection in history.
+    user = {id:'saved-client',role:'client'}
+    for (const savedToken of ['',token()]) {
+      for (const path of ['/admin','/admin/','/admin/dashboard','/admin/login?tab=admin','/staff','/staff/login','/login?tab=admin','/opm/documents','/spm/resources']) {
+        w.history.replaceState({loginPortal:'admin'},'',path)
+        client.setToken(savedToken)
+        await mount()
+        await until(()=>document.querySelector('form.login-form'),'Rejected public-domain internal path')
+        assert.equal(w.location.origin,'https://10buildline.site')
+        assert.equal(w.location.pathname,'/')
+        assert.equal(w.location.search,'')
+        assert.equal(document.querySelector('.login-heading h1').textContent,'Welcome to 10BuildLine')
+        assert.equal(document.querySelector('.login-role-selector'),null)
+        assert.equal(document.querySelector('.sidebar'),null)
+        assert.equal(client.getToken(),savedToken)
+        assert.equal(requestCalls,0,'Rejected entry paths must not restore or start an internal session')
+        await clear()
+      }
+    }
+    // The staff domain applies the same rule to Client entry points.
+    dom.reconfigure({url:'https://staff.10buildline.site/'})
+    user = {id:'saved-staff',role:'opm'}
+    for (const savedToken of ['',token()]) {
+      for (const path of ['/client','/client/','/client/login','/client/login?tab=admin','/client/overview','/client/projects/123/documents?source=link#document']) {
+        w.history.replaceState({loginPortal:'client'},'',path)
+        client.setToken(savedToken)
+        await mount()
+        await until(()=>document.querySelector('form.login-form'),'Rejected staff-domain Client path')
+        assert.equal(w.location.origin,'https://staff.10buildline.site')
+        assert.equal(w.location.pathname,'/')
+        assert.equal(w.location.search,'')
+        assert.equal(w.location.hash,'')
+        assert.equal(document.querySelector('.login-heading h1').textContent,'Staff sign-in')
+        assert.equal(document.querySelectorAll('.login-role-selector a').length,2)
+        assert.equal(document.querySelector('.client-access-badge'),null)
+        assert.equal(document.querySelector('.sidebar'),null)
+        assert.equal(client.getToken(),savedToken)
+        assert.equal(requestCalls,0,'Rejected Client paths must not restore or start a session')
+        await clear()
+      }
+    }
     for (const role of ['client','admin','opm','spm']) {
       const host = role === 'client' ? '10buildline.site' : 'staff.10buildline.site'
       dom.reconfigure({url:`https://${host}/`})

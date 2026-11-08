@@ -15,8 +15,9 @@ export function domainPortal(hostname: string): DomainPortal | undefined {
 export function portalDomainRedirect(location: Pick<Location, "hostname" | "pathname" | "search" | "hash">): string | undefined {
   const current = domainPortal(location.hostname)
   if (!current) return
-  const { pathname, search, hash } = location
+  const { pathname } = location
   const target = /^\/(?:admin|staff|opm|spm)(?:\/|$)/i.test(pathname) || /^\/login\/?$/i.test(pathname)
     ? "staff" : /^\/client(?:\/|$)/i.test(pathname) ? "client" : current
-  if (target !== current) return PORTAL_ORIGINS[target] + pathname + search + hash
+  // A path belonging to the other portal returns to this domain's login.
+  if (target !== current) return "/"
 }

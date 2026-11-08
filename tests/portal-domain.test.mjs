@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { domainPortal, portalDomainRedirect } from "../src/portal-domain.ts"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPath, shareLoginPath } from "../src/login-portal.ts"
 
-test("only the two exact deployment hosts enable domain routing; cross-domain paths preserve deep links", () => {
+test("each domain rejects the other portal's paths while preserving its own role routes", () => {
   assert.equal(domainPortal("10buildline.site"), "client")
   assert.equal(domainPortal("STAFF.10BUILDLINE.SITE"), "staff")
   for (const host of ["localhost", "127.0.0.1", "preview.vercel.app", "staff.10buildline.site.attacker.test", "www.10buildline.site"]) {
@@ -15,12 +15,12 @@ test("only the two exact deployment hosts enable domain routing; cross-domain pa
     assert.equal(portalDomainRedirect(new URL(`https://${host}/`)), undefined)
     assert.equal(portalDomainRedirect(new URL(`https://${host}/api/v1/health`)), undefined)
   }
-  for (const path of ["/login", "/login?tab=admin", "/admin/login", "/staff/login", "/admin/team", "/opm/documents?filter=active#top", "/spm/resources"]) {
-    assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), `https://staff.10buildline.site${path}`)
+  for (const path of ["/login", "/login?tab=admin", "/admin", "/admin/", "/admin/login", "/staff", "/staff/login", "/admin/team", "/opm", "/opm/documents?filter=active#top", "/spm", "/spm/resources"]) {
+    assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), "/")
     assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), undefined)
   }
-  for (const path of ["/client/login", "/client/overview", "/client/projects/123/documents?source=link#document"]) {
-    assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), `https://10buildline.site${path}`)
+  for (const path of ["/client", "/client/", "/client/login", "/client/overview", "/client/projects/123/documents?source=link#document"]) {
+    assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), "/")
     assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), undefined)
   }
 })
@@ -34,11 +34,20 @@ test("domain roots and legacy logins retain the selected portal, query and hash,
       ["10buildline.site", "/", "client", "/"],
       ["10buildline.site", "/?tab=admin", "client", "/?tab=admin"],
       ["10buildline.site", "/client/login?source=link#form", "client", "/?source=link#form"],
+      ["10buildline.site", "/admin", "client", "/"],
+      ["10buildline.site", "/admin/dashboard", "client", "/"],
+      ["10buildline.site", "/admin/login?tab=admin", "client", "/"],
+      ["10buildline.site", "/login?tab=admin", "client", "/"],
+      ["10buildline.site", "/opm/documents", "client", "/"],
+      ["10buildline.site", "/spm/resources", "client", "/"],
       ["staff.10buildline.site", "/", "staff", "/"],
       ["staff.10buildline.site", "/?tab=admin", "admin", "/?tab=admin"],
       ["staff.10buildline.site", "/login?tab=admin", "admin", "/?tab=admin"],
       ["staff.10buildline.site", "/admin/login/?source=link#form", "admin", "/?source=link&tab=admin#form"],
       ["staff.10buildline.site", "/staff/login", "staff", "/"],
+      ["staff.10buildline.site", "/client", "staff", "/"],
+      ["staff.10buildline.site", "/client/login?tab=admin", "staff", "/"],
+      ["staff.10buildline.site", "/client/projects/123/documents?source=link#document", "staff", "/"],
     ]) {
       dom.reconfigure({url:`https://${host}${path}`})
       dom.window.history.replaceState(null, "", path)
