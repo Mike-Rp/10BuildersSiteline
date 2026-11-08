@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { validateUpload } from "../workspace/upload-policy.utility.js";
 import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import { PROFESSIONS, licenseNumberError, isoDateValid } from "../../domain/engineer-credentials.js";
-// Engineer submissions need review. Administrator saves are verified in the same transaction. Documents are personal data and are
+// Uploads need review. Only an explicit, reviewed Admin registration decision can verify in the same transaction. Documents are personal data and are
 // readable only by the license holder and by Administrators.
 import fs from "node:fs";
 import path from "node:path";
@@ -40,8 +40,7 @@ export const myLicense = async (req, res) => {
 
 /** An engineer submits their own renewal, or an Administrator records one for them. Used by POST /licenses/renewals. */
 export async function createRenewalRequest(db, user, body, file, options = {}) {
-  const verifyNow = user.role === "admin" && options.pending !== true &&
-    (body.specializations === undefined || options.reviewed === true);
+  const verifyNow = user.role === "admin" && options.pending !== true && options.reviewed === true;
   const userId = user.role === "admin" ? (body.user_id ?? body.userId) : user.id;
   if (!isUuid(userId)) throw new HttpError(400, "Select the engineer whose license is being renewed.");
   const number = body.license_number ?? body.licenseNumber;

@@ -4,7 +4,7 @@ import { validateFiles } from "./phase-update.utility.js";
 import { assertAssignmentWritable, multiSpmInstalled } from "./assignment.utility.js";
 
 export async function submitChecklist(client, project, user, submission, updateId = null, checklist = null) {
-  await assertAssignmentWritable(client,user,project);
+  const assignment=await assertAssignmentWritable(client,user,project);
   checklist ??= await readChecklist(client, project.id, project.current_stage_id, {userId:user.id});
   const item = checklist.items.find(i => String(i.id) === String(submission.item_id));
   if (!item) throw new HttpError(404, "Checklist item not found in the selected stage.");
@@ -31,6 +31,9 @@ export async function submitChecklist(client, project, user, submission, updateI
      VALUES ($1, $2, $3, $4, $5, $6, $7,$8) RETURNING id, status, submitted_at`,
     [project.id, project.current_stage_id, item.id, fileIds[0] ?? null, user.id,
       submission.submission_note ?? null, updateId,item.rework_request_id||null]);
+  if (assignment.responsibility_id && (await client.query("select to_regclass('public.project_request_receipts') is not null as ready")).rows[0].ready) {
+    await client.query('UPDATE project_phase_evidence SET responsibility_id=$2 WHERE id=$1',[result.rows[0].id,assignment.responsibility_id]);
+  }
   if (fileIds.length && await multiSpmInstalled(client)) await client.query(
     "INSERT INTO project_phase_evidence_files(evidence_id,file_id) SELECT $1,unnest($2::uuid[])",[result.rows[0].id,fileIds]);
   return { ...result.rows[0], checklist_item_id: item.id, file_id: fileIds[0] ?? null, file_ids:fileIds };

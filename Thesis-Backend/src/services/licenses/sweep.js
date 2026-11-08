@@ -85,7 +85,6 @@ export async function sweepLicenses(db, { today = localDay(), now = new Date() }
         detail: "Submissions and approvals are blocked under company policy. Submit your renewed license for Administrator verification." });
       result.graceEnded++;
     } else {
-      const left = state.graceDaysLeft;
       await notify(db, { title: "License renewal reminder", recipientIds: [engineer.id],
         detail: state.restricted
           ? `Your PRC license ${when(state)}. Submissions and approvals are blocked under company policy. Submit your renewed license for Administrator verification.`

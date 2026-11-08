@@ -52,7 +52,7 @@ type Envelope<T> = {
   data: T
 }
 
-function requestErrorMessage(status: number, body?: { error?: { message?: string; code?: string } | string; message?: string; code?: string }): string {
+function requestErrorMessage(status: number, body?: { error?: { message?: string; code?: string } | string; message?: string; code?: string | number }): string {
   const code = typeof body?.error === "object" ? body.error.code : body?.code;
   const message = typeof body?.error === "object" ? body.error.message : typeof body?.error === "string" ? body.error : body?.message;
   if (status === 413 || code === "FUNCTION_PAYLOAD_TOO_LARGE" || message?.includes("FUNCTION_PAYLOAD_TOO_LARGE"))

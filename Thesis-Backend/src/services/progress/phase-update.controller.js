@@ -1,3 +1,4 @@
+import { projectRequest } from './request-receipt.utility.js';
 import { maybeCloseProject } from "../archive/policy.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser, isProjectOpmOrAdmin, isBigintId, paging,
@@ -18,6 +19,8 @@ export const submitPhaseUpdate = async (req, res) => {
     const body = updateBody(req.body);
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
+      return projectRequest(client,p.id,user.id,req.body?.request_id,'phase-update',
+        {body,file:req.file?{name:req.file.originalname,bytes:req.file.buffer?.toString('base64')}:null},async()=>{
       await assertProjectSpm(client, user, p);
       await assertLicenseActive(user, client);
       const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id, p.id);
@@ -55,6 +58,7 @@ export const submitPhaseUpdate = async (req, res) => {
         note: body.note, issue_categories: body.issue_categories, issue_id: issue?.id ?? null,
         file_ids: files, checklist_submissions: submissions,
       };
+      });
     });
     return sendOk(res, "Update submitted to the Office PM for confirmation.", 1, data, 201);
   } catch (error) { return handleError(res, error); }

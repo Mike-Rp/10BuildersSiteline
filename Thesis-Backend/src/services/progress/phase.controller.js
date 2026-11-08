@@ -1,3 +1,5 @@
+import { readEvidenceQueue } from './evidence-queue.utility.js';
+import { projectRequest } from './request-receipt.utility.js';
 import { maybeCloseProject } from "../archive/policy.js";
 import { createHash } from "node:crypto";
 import { readVerifiedProgress } from "./verified.utility.js";
@@ -85,7 +87,7 @@ export const getPhaseOverview = async (req, res) => {
         crew_assigned: p.crew_assigned, crew_required: p.crew_required,
         current_pct: currentChecklist.pct, progress_source: "approved_required_checklist_items",
         last_progress_updated_at: last.rows[0].last_progress_updated_at,
-        checklist, recommended_disciplines: disciplines.rows, issues: issues.rows, files: files.rows,
+        checklist, review_queue:['admin','opm'].includes(user.role)?await readEvidenceQueue(client,[p.id]):[], recommended_disciplines: disciplines.rows, issues: issues.rows, files: files.rows,
       };
     });
     return sendOk(res, "Phase overview retrieved.", 1, data);
@@ -111,6 +113,8 @@ export const uploadEvidence = async (req, res) => {
     rejectProgressInput(req.body);
     const data = await withTransaction(async client => {
       const p = await itemProject(client, req.user, req.params.id, req.params.itemId, req.body);
+      return projectRequest(client,p.id,req.user.id,req.body?.request_id,'evidence-upload:'+req.params.itemId,
+        {stage_id:p.current_stage_id,note:req.body?.submission_note,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},async()=>{
       const checklist = await readChecklist(client, p.id, p.current_stage_id, {userId:req.user.id});
       const item = checklist.items.find(i => String(i.id) === req.params.itemId);
       if (["pending", "approved"].includes(item?.status)) throw new HttpError(409, "Only missing or rejected evidence can be uploaded.");
@@ -118,6 +122,7 @@ export const uploadEvidence = async (req, res) => {
       const submission = await submitChecklist(client, p, req.user,
         { item_id: req.params.itemId, file_id: file.id, submission_note: optionalNote(req.body?.submission_note) }, null, checklist);
       return { ...submission, file };
+      });
     });
     return sendOk(res, "Evidence uploaded for Office PM review.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -134,7 +139,7 @@ export const markChecklistSubmitted = async (req, res) => {
     const data = await withTransaction(async client => {
       await assertLicenseActive(user, client);
       const p = await itemProject(client, user, req.params.id, req.params.itemId, body);
-      return submitChecklist(client, p, user, body.checklist_submissions[0]);
+      return projectRequest(client,p.id,user.id,req.body?.request_id,'checklist:'+req.params.itemId,body,()=>submitChecklist(client, p, user, body.checklist_submissions[0]));
     });
     return sendOk(res, "Checklist item submitted for Office PM verification.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -180,22 +185,18 @@ export const reportProjectIssue = async (req, res) => {
 async function reviewableEvidence(client,user,projectId,evidenceId) {
   const p=await phaseProject(client,user,projectId,{active:true});
   if (!(await isProjectOpmOrAdmin(user,p.id,client))) throw new HttpError(403,"Office PM approval is required.");
-  const found=await client.query(`SELECT e.*, i.required, i.weight, i.title AS activity_title, s.code AS phase_name
+  const found=await client.query(`SELECT e.*, i.required, i.weight, i.title AS activity_title, s.code AS phase_name, submitter.full_name AS submitted_by_name
     FROM project_phase_evidence e
     JOIN project_phase_checklist_items i ON i.id=e.checklist_item_id AND i.project_id=e.project_id AND i.project_stage_id=e.project_stage_id
     JOIN project_stages s ON s.id=e.project_stage_id
+    LEFT JOIN users submitter ON submitter.id=e.submitted_by
     LEFT JOIN project_phase_updates u ON u.id=e.phase_update_id
     WHERE e.id=$1 AND e.project_id=$2 AND (e.phase_update_id IS NULL OR
       (u.project_id=e.project_id AND u.selected_stage_id=e.project_stage_id)) FOR UPDATE OF e`,[evidenceId,p.id]);
   const evidence=found.rows[0];
   if (!evidence) throw new HttpError(404,"Evidence not found.");
-  const latest=await client.query("SELECT id FROM project_phase_evidence WHERE checklist_item_id = $1 AND submitted_by=$2 ORDER BY id DESC LIMIT 1",[evidence.checklist_item_id,evidence.submitted_by]);
-  if(evidence.status!=="pending" || String(latest.rows[0]?.id)!==String(evidence.id)) {
+  if(evidence.status!=="pending") {
     throw new HttpError(409,"Evidence is already reviewed or superseded.");
-  }
-  const checklist=await readChecklist(client,p.id,evidence.project_stage_id);
-  if (!checklist.items.some(item=>String(item.evidence_id)===String(evidence.id))) {
-    throw new HttpError(409,"This evidence is outside the current assignment scope or has been superseded.");
   }
   await assertPhaseUnlocked(client, p, evidence.project_stage_id);
   return {p,evidence};
@@ -205,14 +206,15 @@ async function evidenceReviewPreview(client,p,evidence) {
   const checklist=await readChecklist(client,p.id,evidence.project_stage_id);
   const project=(await readVerifiedProgress(client,[p.id])).get(p.id).project;
   const phase=checklist.verified;
-  const added=evidence.required ? evidence.weight : 0;
+  const credited=checklist.items.filter(item=>String(item.evidence_id)===String(evidence.id)&&item.required).length;
+  const added=credited*evidence.weight;
   const advance=before=>before.percentage===null ? before : {
     earned:before.earned+added,total:before.total,percentage:(before.earned+added)/before.total*100,reason:null,
   };
   const before={phase,project},after={phase:advance(phase),project:advance(project)};
-  const review_token=createHash("sha256").update(JSON.stringify({id:evidence.id,before,weight:evidence.weight,required:evidence.required})).digest("hex");
+  const review_token=createHash("sha256").update(JSON.stringify({id:evidence.id,before,weight:evidence.weight,required:evidence.required,credited})).digest("hex");
   return {evidence_id:String(evidence.id),item_id:String(evidence.checklist_item_id),phase_name:evidence.phase_name,
-    activity:evidence.activity_title,before,after,review_token};
+    activity:evidence.activity_title,submitted_by_name:evidence.submitted_by_name,submitted_at:evidence.submitted_at,submission_note:evidence.submission_note,before,after,review_token};
 }
 
 export const getEvidenceReviewPreview=async(req,res)=>{
@@ -276,7 +278,9 @@ export const uploadPhaseFile = async (req, res) => {
       const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id, p.id);
       await assertPhaseUnlocked(client, p, stage.id);
       await assertAssignmentWritable(client,req.user,p,stage.id);
-      return insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id);
+      return projectRequest(client,p.id,req.user.id,req.body?.request_id,'phase-file',
+        {stage_id:stage.id,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},
+        ()=>insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id));
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -361,4 +365,17 @@ export const configurePhaseTemplate = async (req, res) => {
     });
     return sendOk(res, "Template saved for phases whose checklists have not yet been initialized.", items.length, items);
   } catch (error) { return handleError(res, error); }
+};
+
+export const getEvidenceHistory=async(req,res)=>{
+  try {
+    const user=await requireUser(req,res,['admin','opm']);if(!user)return;
+    const data=await withTransaction(async db=>{
+      const p=await phaseProject(db,user,req.params.id);
+      if(!await isProjectOpmOrAdmin(user,p.id,db))throw new HttpError(403,'Office PM review access is required.');
+      return readEvidenceQueue(db,[p.id],{pendingOnly:false});
+    });
+    res.set('Cache-Control','private, no-store');
+    return sendOk(res,'Evidence history retrieved.',data.length,data);
+  } catch(error){return handleError(res,error);}
 };

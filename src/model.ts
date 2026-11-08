@@ -452,6 +452,7 @@ export type ProjectWorkflow = {
   responses: AssignmentResponse[]
   selections: SubcontractorSelection[]
   checklist: Record<string, ChecklistItem[]>
+  reviewQueue?: ChecklistItem[]
   pendingUpdate?: ProgressSubmission
   pendingUpdates?: ProgressSubmission[]
   pendingRework?: ProgressSubmission
@@ -871,7 +872,7 @@ export function suggestWorkEmail(
 }
 
 export function accountError(
-  a: Pick<Account, "id" | "name" | "email" | "role" | "scope" | "projectTypes">,
+  a: Pick<Account, "id" | "name" | "email" | "role" | "scope" | "projectTypes" | "initialCredentials" | "hasCredentialSpecializations">,
   state: State,
   autoWorkEmail = false,
 ) {

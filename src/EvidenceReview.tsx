@@ -1,15 +1,28 @@
 import { useEffect, useState } from "react"
-import { api, downloadApiFile } from "./api/client"
+import { api, downloadApiFile, downloadBlob } from "./api/client"
 import type { ProgressTotals } from "./project-progress"
 import type { Doc } from "./model"
 import { Button, Field, Icon, Modal } from "./ui"
 
 type Preview = {
+  item_id?: string
+  submitted_by_name?: string
+  submitted_at?: string
+  submission_note?: string
   activity: string
   phase_name: string
   review_token: string
   before: { phase: ProgressTotals; project: ProgressTotals }
   after: { phase: ProgressTotals; project: ProgressTotals }
+}
+type EvidenceVersion = {
+  id: string | number
+  evidence_id: string | number
+  status: string
+  submitted_by_name?: string
+  submitted_at: string
+  review_note?: string
+  files: {id: string; original_name: string}[]
 }
 const measure = (value: ProgressTotals) => value.earned === null || value.total === null
   ? "Unavailable"
@@ -30,6 +43,8 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
   const [note,setNote]=useState("")
   const [busy,setBusy]=useState(false)
   const [reject,setReject]=useState(false)
+  const [history,setHistory]=useState<EvidenceVersion[]>()
+  const [historyError,setHistoryError]=useState("")
   const [fileUrl,setFileUrl]=useState("")
   const [fileLoading,setFileLoading]=useState(!!doc)
   useEffect(()=>{
@@ -61,6 +76,7 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
         : fileUrl
           ? <object data={`${fileUrl}#toolbar=0&navpanes=0`} type="application/pdf" aria-label={doc?.name || "Submitted evidence"}><p>Preview is unavailable in this browser.</p></object>
           : <div className="evidence-review-preview-empty" role="status">{fileLoading ? "Loading submitted evidence…" : "Evidence preview is unavailable. You can still review the submission details."}</div>}
+      {fileUrl && <a href={fileUrl} download={doc?.name}>Download attachment</a>}
     </section>
     <section className="evidence-review-decision">
     <h3>{preview?.activity || doc?.label || "Submitted evidence"}</h3>
@@ -68,6 +84,19 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
     {error && <p role="alert">{error}</p>}
     {preview && <>
       <p>{preview.phase_name} · This decision applies to this activity only.</p>
+      {preview.submitted_by_name && <p>Submitted by {preview.submitted_by_name}{preview.submitted_at ? ` · ${new Date(preview.submitted_at).toLocaleString()}` : ""}</p>}
+      {preview.submission_note && <p>{preview.submission_note}</p>}
+      <Button onClick={()=>void api<EvidenceVersion[]>(`/projects/${projectId}/evidence-history`)
+        .then(rows=>{setHistory(rows.filter(row=>String(row.id)===String(preview.item_id)));setHistoryError("")})
+        .catch(error=>setHistoryError((error as Error).message))}>View submission history</Button>
+      {historyError && <p role="status">History unavailable: {historyError}</p>}
+      {history && <div>{history.map(version=><div key={version.evidence_id}>
+        <p>{version.submitted_by_name || "Original submitter"} · {new Date(version.submitted_at).toLocaleString()} · {version.status}</p>
+        {version.review_note && <p>{version.review_note}</p>}
+        {version.files.map(file=><Button key={file.id} onClick={()=>void downloadBlob(`/projects/${projectId}/phase-files/${file.id}`).then(blob=>{
+          if(!blob)throw new Error("Attachment unavailable.");const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=file.original_name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+        }).catch(error=>setHistoryError((error as Error).message))}>Download {file.original_name}</Button>)}
+      </div>)}</div>}
       {!reject && preview.after.phase.percentage === 100 && <p>The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass.</p>}
       <div className="notice subsection">
         <div>

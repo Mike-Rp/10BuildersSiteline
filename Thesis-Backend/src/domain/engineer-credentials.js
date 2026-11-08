@@ -72,6 +72,8 @@ export function credentialEligible(c, today, noticeDays = 30) {
     PROFESSIONS.includes(c.profession) &&
     !licenseNumberError(c.license_number) &&
     !c.superseded_at &&
+    !c.revoked_at &&
+    !c.correction_required &&
     !!c.upload_file_ref &&
     c.upload_status === "uploaded" &&
     c.license_expiry > threshold

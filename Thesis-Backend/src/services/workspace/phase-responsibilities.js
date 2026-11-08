@@ -1,3 +1,4 @@
+import { assertEvidenceHandoverReady } from '../projects/responsibility-handover.utility.js';
 import {
   HttpError,
   isProjectOpmOrAdmin,
@@ -304,6 +305,7 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             409,
             "That engineer already has responsibilities in this phase.",
           )
+        await assertEvidenceHandoverReady(db,row)
         await db.query(
           "update project_phase_responsibilities set user_id=$2,status='pending',completion_status='unfinished',responded_at=null,completion_note=null,completion_file_id=null,reviewed_by=null,reviewed_at=null,review_note=$3 where id=$1",
           [row.id, newUserId, note.trim()],

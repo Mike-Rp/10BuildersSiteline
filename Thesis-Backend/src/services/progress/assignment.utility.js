@@ -9,14 +9,14 @@ export async function multiSpmInstalled(db) {
 // rows are peers; no additional lead role is introduced.
 export async function participantsSql(db) {
   return await responsibilitiesInstalled(db) ? `
-    SELECT project_id,project_stage_id,user_id,status,completion_status
+    SELECT project_id,project_stage_id,user_id,status,completion_status,id AS responsibility_id
       FROM project_phase_responsibilities WHERE status<>'released'
     UNION ALL
-    SELECT t.project_id,t.project_stage_id,t.spm_user_id,t.status,NULL::text
+    SELECT t.project_id,t.project_stage_id,t.spm_user_id,t.status,NULL::text,NULL::bigint
       FROM project_phase_team t WHERE NOT EXISTS (
         SELECT 1 FROM project_phase_responsibilities r
         WHERE r.project_id=t.project_id AND r.project_stage_id=t.project_stage_id)
-  ` : `SELECT project_id,project_stage_id,spm_user_id AS user_id,status,NULL::text AS completion_status FROM project_phase_team`;
+  ` : `SELECT project_id,project_stage_id,spm_user_id AS user_id,status,NULL::text AS completion_status,NULL::bigint AS responsibility_id FROM project_phase_team`;
 }
 
 export async function phaseAssignments(db, projectId, stageId) {

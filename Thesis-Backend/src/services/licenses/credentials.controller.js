@@ -34,6 +34,24 @@ export const credentialFile=async(req,res)=>{
  } catch(error){return handleError(res,error);}
 };
 
+export const revokeCredential=async(req,res)=>{
+ try {
+  const actor=await requireUser(req,res,['admin']);if(!actor)return;
+  const note=typeof req.body?.note==='string'?req.body.note.trim():'';
+  if(!isUuid(req.params.id)||!note||note.length>2000)throw new HttpError(400,'Select a credential and record a revocation reason (at most 2000 characters).');
+  await withTransaction(async db=>{
+   if(!(await db.query("select to_regclass('public.project_request_receipts') is not null as ready")).rows[0].ready)throw new HttpError(409,'Apply migration 027 before revoking credentials.');
+   const owner=(await db.query('select user_id from user_licenses where id=$1',[req.params.id])).rows[0];
+   if(!owner)throw new HttpError(404,'Credential not found.');
+   await db.query('select id from users where id=$1 for update',[owner.user_id]);
+   await db.query("select set_config('app.current_user_id',$1,true)",[actor.id]);
+   const result=await db.query('update user_licenses set revoked_at=now(),revoked_by=$2,revocation_note=$3 where id=$1 and revoked_at is null returning id',[req.params.id,actor.id,note]);
+   if(!result.rowCount)throw new HttpError(409,'Credential already revoked.');
+  });
+  return sendOk(res,'Credential revoked. Original verification history preserved.',1,{id:req.params.id});
+ } catch(error){return handleError(res,error);}
+};
+
 export async function credentialSummary(db, userId) {
   const account = (
     await db.query(
@@ -44,7 +62,7 @@ export async function credentialSummary(db, userId) {
   if (!account) throw new HttpError(404, "Account not found.")
   const credentials = (
     await db.query(
-      `select l.id,l.profession,l.license_number,l.license_expiry::text,l.upload_status,l.upload_file_ref,l.superseded_at,l.verification_status,l.verified_by,l.verified_at,l.verification_note,to_jsonb(l)->'specializations' as specializations,u.full_name as verified_by_name from user_licenses l left join users u on u.id=l.verified_by where l.user_id=$1 order by l.created_at desc,l.id desc`,
+      `select l.id,l.profession,l.license_number,l.license_expiry::text,l.upload_status,l.upload_file_ref,l.superseded_at,l.verification_status,l.verified_by,l.verified_at,l.verification_note,to_jsonb(l)->'specializations' as specializations,to_jsonb(l)->>'revoked_at' as revoked_at,to_jsonb(l)->>'revocation_note' as revocation_note,coalesce((to_jsonb(l)->>'correction_required')::boolean,false) as correction_required,u.full_name as verified_by_name from user_licenses l left join users u on u.id=l.verified_by where l.user_id=$1 order by l.created_at desc,l.id desc`,
       [userId],
     )
   ).rows
@@ -192,7 +210,7 @@ export const putSpecializations = async (req, res) => {
     return handleError(res, e)
   }
 }
-// An explicit Administrator save verifies the selected legacy evidence and records attribution.
+// Legacy corrections create a pending version; the separate Admin review records verification.
 export const submitLegacyCredential = async (req, res) => {
   try {
     const user = await requireUser(req, res, ["admin"])
@@ -216,7 +234,7 @@ export const submitLegacyCredential = async (req, res) => {
           user_id: old.user_id,
           replaces_license_id: old.id,
           profession: req.body?.profession,
-          license_number: old.license_number,
+          license_number: req.body?.license_number ?? old.license_number,
           license_expiry: String(
             old.license_expiry instanceof Date
               ? old.license_expiry.toISOString()
@@ -226,7 +244,7 @@ export const submitLegacyCredential = async (req, res) => {
         { path: old.upload_file_ref },
       )
     })
-    return sendOk(res, "Legacy credential saved and verified.", 1, result, 201)
+    return sendOk(res, "Legacy credential submitted for Administrator review.", 1, result, 201)
   } catch (e) {
     return handleError(res, e)
   }

@@ -1,3 +1,4 @@
+import { handoverResponsibility } from '../projects/responsibility-handover.utility.js';
 import { saveEngineerScopes } from "../projects/engineer-commitments.utility.js";
 import { validateScopedQualifications } from "../projects/type-phases.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -112,8 +113,9 @@ export const reassignPhase = async (req,res) => {
       const old=found.rows[0];
       if(old.spm_user_id && !["declined","auto_expired"].includes(old.status)) throw new HttpError(409,"Only declined or expired assignments can be reassigned.");
       await assertEligibleManager(db,req.body.new_user_id,"spm");
+      const previous=await handoverResponsibility(db,p,old.project_stage_id,old.spm_user_id,req.body.new_user_id,actor.id,note);
       const scope=(await db.query("select p.project_type_id,s.code from projects p join project_stages s on s.id=$2 where p.id=$1",[p.id,old.project_stage_id])).rows[0];
-      const scopedTeam=[{stage:scope.code,user_id:req.body.new_user_id}];
+      const scopedTeam=[{stage:scope.code,user_id:req.body.new_user_id,...(previous?{assigned_disciplines:previous.assigned_disciplines}:{})}];
       await validateScopedQualifications(db,scope.project_type_id,scopedTeam,{projectId:p.id});
       const clock=await db.query("SELECT now() AS now");
       const deadline=businessDeadline(clock.rows[0].now);

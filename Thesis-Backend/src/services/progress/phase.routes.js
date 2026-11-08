@@ -1,3 +1,4 @@
+import { getEvidenceHistory } from './phase.controller.js';
 import { Router } from "express";
 import { phaseUpload, optionalPhaseUpload } from "./phase-upload.utility.js";
 import {
@@ -11,6 +12,7 @@ import {
 
 const router = Router();
 router.get("/projects/:id/phase-overview", getPhaseOverview);
+router.get("/projects/:id/evidence-history", getEvidenceHistory);
 router.get("/projects/:id/stages", getProjectStages);
 router.get("/phase-updates/pending", getPendingPhaseUpdates);
 router.get("/projects/:id/phase-updates", getPhaseUpdates);

@@ -103,7 +103,9 @@ export async function readChecklistItems(client, projectIds, {stageId = null, us
        LEFT JOIN users au ON au.id=a.user_id
        LEFT JOIN LATERAL (
          SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id
-           AND (a.completion_status IS NULL OR submitted_by=a.user_id) ORDER BY id DESC LIMIT 1
+           AND (a.completion_status IS NULL OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id')::bigint=a.responsibility_id OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id' IS NULL AND submitted_by=a.user_id)) ORDER BY id DESC LIMIT 1
        ) e ON true
        LEFT JOIN pending_rework_requests r ON r.id=e.rework_request_id
        LEFT JOIN project_phase_files f ON f.id=e.file_id

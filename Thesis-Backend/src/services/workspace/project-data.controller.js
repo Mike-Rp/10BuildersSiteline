@@ -1,3 +1,4 @@
+import { readEvidenceQueue } from '../progress/evidence-queue.utility.js';
 
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
@@ -123,6 +124,8 @@ export async function getProjectData(req,res) {
      row_number() over(partition by n.project_id order by n.noted_at desc) as position
     from project_notes n left join users u on u.id=n.author_id where n.project_id=any($1::uuid[])
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
+   const reviewQueue=['admin','opm'].includes(user.role)?await readEvidenceQueue(db,ids):[];
+   const reviewGroups=group(reviewQueue);
    const checklist=staff?await readChecklistItems(db,ids,{userId:user.role==='spm'?user.id:null,currentOnly:user.role!=='spm'}):[];
    const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage,
     coalesce((select jsonb_agg(jsonb_build_object('id',f.id,'name',f.original_name,'content_type',f.content_type,'byte_size',f.byte_size) order by f.uploaded_at,f.id)
@@ -156,7 +159,7 @@ export async function getProjectData(req,res) {
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
-     overview:staff?{checklist:{items},pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
+     overview:staff?{checklist:{items},review_queue:reviewGroups.get(p.id)||[],pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
      assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{overallProgress:verified.get(p.id)?.project.percentage ?? null})};
    });
   });

@@ -44,7 +44,9 @@ export async function readVerifiedProgress(db, projectIds) {
     LEFT JOIN (${await participantsSql(db)}) a ON a.project_id=ph.project_id AND a.project_stage_id=ph.project_stage_id
     LEFT JOIN LATERAL(SELECT status,reviewed_by,reviewed_at FROM project_phase_evidence
       WHERE checklist_item_id=i.id AND project_id=i.project_id AND project_stage_id=i.project_stage_id
-        AND (a.completion_status IS NULL OR submitted_by=a.user_id)
+        AND (a.completion_status IS NULL OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id')::bigint=a.responsibility_id OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id' IS NULL AND submitted_by=a.user_id))
       ORDER BY id DESC LIMIT 1)e ON true
     ORDER BY ph.project_id,COALESCE(w.sort_order,s.sort_order),s.id,i.sort_order,i.id`, [projectIds]);
   const grouped = new Map(projectIds.map(id => [id, new Map()]));

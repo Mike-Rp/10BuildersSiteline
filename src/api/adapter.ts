@@ -233,9 +233,7 @@ export function mapProject(parts: ProjectParts): Project {
 
   const checklist: ProjectWorkflow["checklist"] = {}
   const items: Dto[] = parts.overview?.checklist?.items || []
-  for (const phase of new Set(items.map(i=>i.stage_code || list.current_stage)))
-    checklist[phase] = items.filter(i=>(i.stage_code || list.current_stage)===phase).map(
-      (i): ChecklistItem => ({
+  const mapChecklistItem = (i: Dto): ChecklistItem => ({
         id: i.workspace_user_id && items.some(other=>String(other.id)===String(i.id)&&other.workspace_user_id!==i.workspace_user_id) ? i.id+':'+i.workspace_user_id : String(i.id),
         workspaceUserId:i.workspace_user_id,
         attachments:(i.files||[]).map((f:Dto)=>{register(f.id,'/api/v1/projects/'+id+'/phase-files/'+f.id);return {id:f.id,label:i.title,name:f.original_name,uploaded:true,clientVisible:false,owner:i.workspace_name||'Site PM',date:day(f.uploaded_at),mime:f.content_type}}),
@@ -258,8 +256,12 @@ export function mapProject(parts: ProjectParts): Project {
         submittedBy: i.submitted_by || undefined,
         submittedByName: i.submitted_by_name || undefined,
         doc:i.file_id?(register(i.file_id,"/api/v1/projects/"+id+"/phase-files/"+i.file_id),{id:i.file_id,label:i.title,name:i.original_name||"Checklist evidence.pdf",uploaded:true,clientVisible:false,owner:"Site PM",date:day(i.submitted_at),mime:i.content_type}):undefined,
-      }),
-    )
+      })
+  for (const phase of new Set(items.map(i=>i.stage_code || list.current_stage)))
+    checklist[phase] = items.filter(i=>(i.stage_code || list.current_stage)===phase).map(mapChecklistItem)
+  const reviewQueue: ChecklistItem[] = (parts.overview?.review_queue || []).map((i: Dto) => ({
+    ...mapChecklistItem(i), id:'review:'+i.evidence_id, label:i.title+' · '+i.stage_code,
+  }))
 
   const workflow: ProjectWorkflow = {
     version: 1,
@@ -269,6 +271,7 @@ export function mapProject(parts: ProjectParts): Project {
       status: a.status === "released" ? "archived" : "accepted",
     })),
     checklist,
+    reviewQueue,
     notes: parts.notes.map((n) => ({
       id: n.id,
       authorId: n.author_id || "",

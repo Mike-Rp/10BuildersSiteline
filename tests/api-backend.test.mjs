@@ -76,6 +76,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await db.exec(fs.readFileSync(here("../Thesis-Backend/migrations/017-project-photo-review.sql"),"utf8"))
 
   await installCredentialFixture(db)
+  // This suite deliberately covers legacy single-SPM workflows. Install the
+  // exact additive receipt schema, without switching it to multi-engineer
+  // business rules. Full 025/026/027 coverage lives in multi-spm-workspaces and workflow-reliability-db.
+  const reliability=fs.readFileSync(here('../Thesis-Backend/migrations/027-workflow-reliability.sql'),'utf8')
+  const receiptSchema=reliability.match(/CREATE TABLE IF NOT EXISTS project_request_receipts[\s\S]*?END \$\$;/)?.[0]
+  assert.ok(receiptSchema);await db.exec(receiptSchema)
 
 
   const dbPort = await freePort()
@@ -135,7 +141,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(rosaria.workflow.checklist.Structure.filter((i) => i.status === "approved").length, 3)
     const karlo = state.accounts.find((a) => a.name === "Karlo M. Espiritu")
     assert.ok(karlo.scope.includes("Civil")); assert.ok(!karlo.scope.includes("Waterproofing"))
-    assert.match(karlo.license, /PRC Registered Engineer/)
+    assert.equal(karlo.license, "0000001", "reviewed workflow fixtures use the canonical license format")
     const maria = state.accounts.find((a) => a.name === "Maria L. Santos")
     assert.equal(maria.scope.length, 3, "a client is linked to their projects")
     assert.equal(state.projects.every((p) => p.clientAccounts.length
@@ -1126,9 +1132,11 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const evidence=async(item,status,reviewer=opmId)=>db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,status,submitted_by,reviewed_by,reviewed_at) values($1,$2,$3,$4,$5,$6,$7) returning id",[id,item.project_stage_id,item.id,status,spmId,reviewer,reviewer?new Date().toISOString():null])
     for(const item of items)await evidence(item,"approved")
     const stage=async()=>(await db.query("select current_stage_id,lifecycle_status from projects where id=$1",[id])).rows[0]
-    await evidence(first,"pending",null)
+    const firstPending=await evidence(first,"pending",null)
     await asUser(opmEmail)
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===409)
+    const firstPendingPreview=await api(base+'/evidence/'+firstPending.rows[0].id+'/review-preview')
+    await api(base+'/evidence/'+firstPending.rows[0].id+'/reject',{method:'POST',json:{expected_review_token:firstPendingPreview.review_token,review_note:'Prior evidence explicitly resolved before a new version.'}})
     await evidence(first,"approved")
     await evidence(first,"rejected")
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),error=>error.status===422)
@@ -1201,10 +1209,12 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       return api(base+"/phase-updates/"+note.id+"/approve",{method:"POST",json:{}})
     }
     await db.query("update project_phase_checklist_items set required=false where id=$1",[first.id])
-    await evidence(first,"pending",null)
+    const oldPhasePending=await evidence(first,"pending",null)
     await db.query("update project_phase_checklist_items set required=true where id=$1",[first.id])
     await assert.rejects(api("/archive/projects/"+id+"/close",{method:"POST",json:{}}),error=>error.status===422)
     assert.equal((await resolveNote()).project_archived,false,"Closeout cannot compensate for withdrawn earlier credit")
+    const oldPreview=await api(base+"/evidence/"+oldPhasePending.rows[0].id+"/review-preview")
+    await api(base+"/evidence/"+oldPhasePending.rows[0].id+"/reject",{method:"POST",json:{expected_review_token:oldPreview.review_token,review_note:"Historical pending evidence explicitly resolved."}})
     await evidence(first,"approved")
     await db.query("update project_phase_team set status='pending' where project_id=$1 and project_stage_id=$2",[id,stages[0].id])
     assert.equal((await resolveNote()).project_archived,false,"all phase assignments remain required")

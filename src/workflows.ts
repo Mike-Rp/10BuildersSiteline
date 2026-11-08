@@ -105,6 +105,7 @@ export function projectStageFloor(p: Project, phase = p.phase) {
 }
 export const REVIEW_MS = 3 * 86400000
 export type WorkflowCommand = {
+  submissionRequestId?: string
   type: "accept_opm" | "request_changes" | "upload_registered" | "accept_assignment" | "decline_assignment" | "reassign_phase" | "select_company" | "replace_company" | "archive_company" | "contact_company" | "respond_company" | "upload_agreement" | "submit_progress" | "request_update" | "approve_update" | "reject_update" | "approve_rework" | "decline_rework" | "submit_checklist" | "approve_checklist" | "reject_checklist" | "add_note" | "add_photo" | "request_company" | "archive_company_request" | "view_document" | "activate_project" | "acknowledge_client_subcon" | "report_client_subcon_issue"
     | "release_photo" | "reject_photo" | "remove_note"
     | "save_allocation_plan" | "auto_allocate_company" | "release_allocation_company" | "set_allocation_location"
@@ -464,6 +465,13 @@ export function assignmentBlock(p: Project, actorId: string) {
   )
     return "This assignment is no longer open."
   return ""
+}
+// Review identities follow submissions, not the current assignment/checklist.
+export function pendingChecklistFor(p?: Project): ChecklistItem[] {
+  if(!p)return []
+  const rows = [...(p.workflow?.reviewQueue || []), ...checklistFor(p).filter(i=>i.status==='submitted')]
+  const seen = new Set<string>()
+  return rows.filter(item=>{const key=item.evidenceId || item.id;if(seen.has(key))return false;seen.add(key);return true})
 }
 export function checklistFor(p: Project, phase = p.phase): ChecklistItem[] {
   const sequence = projectPhaseNames(p)

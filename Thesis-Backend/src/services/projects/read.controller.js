@@ -59,7 +59,9 @@ export async function projectListFrom(db) {
     `LEFT JOIN (${await participantsSql(db)}) a ON a.project_id=p.id AND a.project_stage_id=p.current_stage_id
       LEFT JOIN LATERAL (SELECT status FROM project_phase_evidence`)
     .replace("WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1)",
-      "WHERE checklist_item_id = i.id AND (a.completion_status IS NULL OR submitted_by=a.user_id) ORDER BY id DESC LIMIT 1)");
+      `WHERE checklist_item_id = i.id AND (a.completion_status IS NULL OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id')::bigint=a.responsibility_id OR
+             (to_jsonb(project_phase_evidence)->>'responsibility_id' IS NULL AND submitted_by=a.user_id)) ORDER BY id DESC LIMIT 1)`);
 }
  
 export const stripInternal = (row) => {

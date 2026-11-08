@@ -1,3 +1,4 @@
+import { handoverResponsibility } from '../projects/responsibility-handover.utility.js';
 import { commitmentsInstalled, prepareEngineerAssignments, saveEngineerScopes } from "../projects/engineer-commitments.utility.js";
 import { needsLicenseReplacement } from "../../common/utilities/license-status.utility.js";
 // Admin-managed replacement from 30 days before expiry. Office signing and Admin approval finalize the switch.
@@ -7,7 +8,6 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertEligibleManager, LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 import { loadLicenseState, loadLicenseStates, localDay } from "../../common/utilities/license-status.utility.js";
 import { adminIds, notify } from "../../common/utilities/notify.utility.js";
-import { resolveNotifications } from "../notifications/notification.utility.js";
 import { readChecklist } from "../progress/phase.utility.js";
 import { closeOpenHistory, ensureOpenHistory, openTookOver } from "./history.js";
 
@@ -283,7 +283,8 @@ async function applyAdminHandover(db, o, project, actorId) {
  let scopedTeam=[];
  if(o.role_code==='spm') {
   const scope=(await db.query('select p.project_type_id,s.code from projects p join project_stages s on s.id=$2 where p.id=$1',[o.project_id,o.project_stage_id])).rows[0];
-  scopedTeam=[{stage:scope.code,user_id:o.to_user_id}];
+  const previous=await handoverResponsibility(db,{...project,id:o.project_id,project_type_id:scope.project_type_id},o.project_stage_id,o.from_user_id,o.to_user_id,actorId,'Office-signed license handover.',{confirmed:true});
+  scopedTeam=[{stage:scope.code,user_id:o.to_user_id,...(previous?{assigned_disciplines:previous.assigned_disciplines}:{})}];
   await prepareEngineerAssignments(db,scope.project_type_id,scopedTeam,{projectId:o.project_id});
  }
  const lockedHolder = o.role_code === "spm" ? (await db.query("select * from project_phase_team where project_id=$1 and project_stage_id=$2 for update", [o.project_id,o.project_stage_id])).rows[0] : null;

@@ -335,7 +335,7 @@ test(
       null,
       "unknown legacy record retained",
     )
-    await assertEligibleManager(db, ids.engineer, "spm")
+    await assert.rejects(assertEligibleManager(db, ids.engineer, "spm"),{status:422})
     assert.equal(
       (
         await call(
@@ -347,6 +347,7 @@ test(
       ).status,
       200,
     )
+    await assertEligibleManager(db, ids.engineer, "spm")
     const types = (
       await db.query(
         "select distinct project_type_id from project_stage_discipline_links where discipline_id=(select id from disciplines where code='Electrical')",
@@ -479,16 +480,20 @@ test(
     const list = await call("admin", "GET", "/licenses/renewals")
     assert.equal(list.status, 200, JSON.stringify(list))
     assert.ok(list.data.some((q) => q.reviewed_by_name))
-    // Administrator uploads save and verify in one transaction, including updates
-    // while the engineer has an older submission pending for that profession.
+    // Administrator uploads are pending too; they never discard another pending submission.
     const pendingCivil = await submit("Civil Engineer")
     const remindersBefore=(await db.query("select count(*)::int as n from activity_log where title='License renewal to review'")).rows[0].n
     const electricalBefore=(await db.query("select id from user_licenses where user_id=$1 and profession='Electrical Engineer' and superseded_at is null",[ids.engineer])).rows[0].id
     const adminForm=form("Civil Engineer","0000456")
     adminForm.set("user_id",ids.engineer)
+    const blockedUpload=await call("admin","POST","/licenses/renewals",adminForm)
+    assert.equal(blockedUpload.status,409,JSON.stringify(blockedUpload))
+    assert.equal((await db.query("select status from license_renewal_requests where id=$1",[pendingCivil.id])).rows[0].status,"under_review")
+    assert.equal((await call("admin","POST","/licenses/renewals/"+pendingCivil.id+"/reject",{note:"Superseded evidence: submitting corrected document."})).status,200)
     const direct=await call("admin","POST","/licenses/renewals",adminForm)
     assert.equal(direct.status,201,JSON.stringify(direct))
-    assert.equal(direct.data.status,"verified")
+    assert.equal(direct.data.status,"under_review")
+    assert.equal((await call("admin","POST","/licenses/renewals/"+direct.data.id+"/verify",{note:"Supporting document manually checked."})).status,200)
     const directRequest=(await db.query("select * from license_renewal_requests where id=$1",[direct.data.id])).rows[0]
     submitted.push(directRequest.file_ref)
     assert.equal(directRequest.reviewed_by,ids.admin)
@@ -500,13 +505,14 @@ test(
     assert.ok(directLicense.verified_at)
     assert.equal((await db.query("select status from license_renewal_requests where id=$1",[pendingCivil.id])).rows[0].status,"rejected")
     assert.equal((await db.query("select count(*)::int as n from license_renewal_requests where user_id=$1 and profession='Civil Engineer' and status='under_review'",[ids.engineer])).rows[0].n,0)
-    assert.equal((await db.query("select count(*)::int as n from activity_log where title='License renewal to review'")).rows[0].n,remindersBefore)
+    assert.equal((await db.query("select count(*)::int as n from activity_log where title='License renewal to review'")).rows[0].n,remindersBefore+1)
     assert.equal((await db.query("select id from user_licenses where user_id=$1 and profession='Electrical Engineer' and superseded_at is null",[ids.engineer])).rows[0].id,electricalBefore)
     const updateForm=form("Civil Engineer","0000789")
     updateForm.set("user_id",ids.engineer)
     const updated=await call("admin","POST","/licenses/renewals",updateForm)
     assert.equal(updated.status,201,JSON.stringify(updated))
-    assert.equal(updated.data.status,"verified")
+    assert.equal(updated.data.status,"under_review")
+    assert.equal((await call("admin","POST","/licenses/renewals/"+updated.data.id+"/verify",{note:"Corrected supporting document manually checked."})).status,200)
     submitted.push((await db.query("select file_ref from license_renewal_requests where id=$1",[updated.data.id])).rows[0].file_ref)
     assert.ok((await db.query("select superseded_at from user_licenses where id=$1",[directLicense.id])).rows[0].superseded_at)
     assert.equal((await db.query("select count(*)::int as n from user_licenses where user_id=$1 and profession='Civil Engineer' and superseded_at is null",[ids.engineer])).rows[0].n,1)
@@ -627,6 +633,42 @@ test(
       assert.ok(!legacyProfile.qualifiedRequirements.includes('Structural'),'pending credential tags cannot gain verification from a legacy license')
       assert.equal((await db.query('select count(*)::int as n from engineer_qualified_scopes where user_id=$1',[cross.result.data.id])).rows[0].n,0,'a specialization cannot borrow verification from a different credential')
       assert.deepEqual(qualifyingSpecializations([{profession:'Civil Engineer',specializations:['Mechanical'],verification_status:'verified',verified_by:'admin',verified_at:'2026-01-01',license_number:'0000001',license_expiry:'2099-01-01',upload_status:'uploaded',upload_file_ref:'proof'},{profession:'Mechanical Engineer',specializations:['Acoustic'],verification_status:'verified',verified_by:'admin',verified_at:'2026-01-01',license_number:'0000002',license_expiry:'2099-01-01',upload_status:'uploaded',upload_file_ref:'proof'}],['Mechanical'],'2026-01-01'),[])
+    })
+
+    await t.test('consistent upload lifecycle, concurrent verification, audited revocation and corrected legacy versions',async()=>{
+      for(const name of ['019-engineer-phase-commitments.sql','020-engineer-phase-responsibilities.sql','025-independent-spm-workspaces.sql','027-workflow-reliability.sql'])await db.exec(read('../Thesis-Backend/migrations/'+name))
+      const account=(await db.query("select id from users where email='spmverified@10builders.com'")).rows[0].id
+      for(const tags of [undefined,['Civil'],['Civil','Structural','Geotechnical']]){
+        const f=form('Civil Engineer','0007654');f.set('user_id',account);if(tags)f.set('specializations',JSON.stringify(tags))
+        const upload=await call('admin','POST','/licenses/renewals',f)
+        assert.equal(upload.status,201,JSON.stringify(upload));assert.equal(upload.data.status,'under_review')
+        const unauthorized=await call('engineer','POST','/licenses/renewals/'+upload.data.id+'/verify',{note:'Forged review'});assert.equal(unauthorized.status,403)
+        const results=await Promise.all([0,1].map(()=>call('admin','POST','/licenses/renewals/'+upload.data.id+'/verify',{note:'Explicit credential evidence review.'})))
+        assert.deepEqual(results.map(r=>r.status).sort(),[200,409])
+        const summary=(await call('admin','GET','/licenses/credentials/'+account)).data
+        assert.equal(summary.credentials.filter(c=>!c.superseded_at).length,1)
+        assert.equal(summary.credentials.find(c=>!c.superseded_at).verification_status,'verified')
+      }
+      const current=(await db.query('select * from user_licenses where user_id=$1 and superseded_at is null',[account])).rows[0]
+      assert.equal((await call('engineer','POST','/licenses/credentials/'+current.id+'/revoke',{note:'Unauthorized'})).status,403)
+      assert.equal((await call('admin','POST','/licenses/credentials/'+current.id+'/revoke',{note:''})).status,400)
+      assert.equal((await call('admin','POST','/licenses/credentials/'+current.id+'/revoke',{note:'Supporting license revoked by issuing body.'})).status,200)
+      const profile=(await call('admin','GET','/licenses/credentials/'+account)).data
+      assert.equal(profile.eligibleForNewAssignment,false);assert.equal(profile.credentials.find(c=>c.id===current.id).verified_by,current.verified_by)
+      await assert.rejects(assertEligibleManager(db,account,'spm'),{status:422})
+      assert.equal((await db.query('select count(*)::int as n from engineer_qualified_scopes where user_id=$1',[account])).rows[0].n,0)
+      await db.query("update user_licenses set license_number='LEGACY-ABC' where id=$1",[current.id])
+      const legacy=(await db.query('select * from user_licenses where id=$1',[current.id])).rows[0]
+      assert.equal(legacy.verification_status,'needs_review');assert.equal(legacy.license_number,'LEGACY-ABC')
+      const corrected=form('Civil Engineer','0000099');corrected.set('user_id',account);corrected.set('replaces_license_id',current.id);corrected.set('specializations',JSON.stringify(['Civil']))
+      const pending=await call('admin','POST','/licenses/renewals',corrected);assert.equal(pending.status,201,JSON.stringify(pending))
+      assert.equal((await call('admin','POST','/licenses/renewals/'+pending.data.id+'/verify',{note:'Corrected number verified against retained evidence.'})).status,200)
+      assert.equal((await db.query('select license_number from user_licenses where id=$1',[current.id])).rows[0].license_number,'LEGACY-ABC')
+      await assertEligibleManager(db,account,'spm')
+      const newer=(await db.query('select * from user_licenses where user_id=$1 and superseded_at is null',[account])).rows[0]
+      await db.query("update user_licenses set upload_file_ref='replacement-without-review' where id=$1",[newer.id])
+      assert.equal((await db.query('select verification_status from user_licenses where id=$1',[newer.id])).rows[0].verification_status,'needs_review')
+      await assert.rejects(assertEligibleManager(db,account,'spm'),{status:422})
     })
 
   },

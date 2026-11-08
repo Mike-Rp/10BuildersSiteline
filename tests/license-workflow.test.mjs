@@ -266,7 +266,8 @@ test("Admin-confirmed engineer replacement and company license access policy", {
   await t.test('late renewal never takes transferred projects back from the replacement', async () => {
     const submitted=await call('admin','POST','/licenses/renewals',undefined,renewalForm(400,'diego'))
     assert.equal(submitted.status,201,submitted.text)
-    assert.equal(submitted.data.status,'verified')
+    assert.equal(submitted.data.status,'under_review')
+    assert.equal((await call('admin','POST','/licenses/renewals/'+submitted.data.id+'/verify',{note:'Late renewal explicitly reviewed.'})).status,200)
     assert.equal((await holder()).spm_user_id,idOf('karlo'))
   })
 

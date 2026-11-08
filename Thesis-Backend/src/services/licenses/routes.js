@@ -1,4 +1,4 @@
-import { getCredentials,putSpecializations,submitLegacyCredential,credentialFile } from "./credentials.controller.js";
+import { revokeCredential,getCredentials,putSpecializations,submitLegacyCredential,credentialFile } from "./credentials.controller.js";
 import { Router } from "express";
 import { requireRoles } from "../../common/utilities/access.utility.js";
 import multer from "multer";
@@ -15,6 +15,7 @@ router.get('/credentials/:userId',getCredentials);
 router.get('/credentials/:id/file',credentialFile);
 router.put('/credentials/:userId/specializations',putSpecializations);
 router.post('/credentials/:id/submit-for-review',submitLegacyCredential);
+router.post('/credentials/:id/revoke',revokeCredential);
 // Engineer
 router.get("/me", myLicense);
 router.get("/requests", myRequests);

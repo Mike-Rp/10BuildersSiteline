@@ -14,6 +14,9 @@ import {
 import { Button, Field } from "./ui"
 import { dateLabel } from "./model"
 type Credential = {
+  revoked_at?: string
+  revocation_note?: string
+  correction_required?: boolean
   specializations?:string[]|null
   document_url?:string
   id: string
@@ -83,6 +86,8 @@ export default function EngineerCredentials({
   const [note, setNote] = useState(""),
     [reviewProfession, setReviewProfession] = useState("")
   const [reviewId, setReviewId] = useState<number>()
+  const [revokeId,setRevokeId]=useState<string>()
+  const [revocationNote,setRevocationNote]=useState("")
   const [newTags,setNewTags]=useState<string[]>([])
   const running = useRef(false)
   async function refresh() {
@@ -169,7 +174,7 @@ export default function EngineerCredentials({
                   <p>
                     {c.superseded_at
                       ? "Superseded"
-                      : c.verification_status === "verified"
+                      : c.revoked_at ? "Revoked" : c.correction_required ? "Requires correction" : c.verification_status === "verified"
                         ? "Verified"
                         : "Needs review"}{" "}
                     ·{" "}
@@ -177,6 +182,9 @@ export default function EngineerCredentials({
                       ? "Outside license notice restriction"
                       : "Does not satisfy new-assignment credential requirements"}
                   </p>
+                  {c.revocation_note && <p>Revocation reason: {c.revocation_note}</p>}
+                  {admin&&!readOnly&&!c.revoked_at&&!c.superseded_at&&<Button disabled={busy} onClick={()=>{setRevokeId(c.id);setRevocationNote("")}}>Revoke credential</Button>}
+                  {revokeId===c.id&&<div><Field label="Revocation reason"><textarea value={revocationNote} maxLength={2000} onChange={e=>setRevocationNote(e.target.value)}/></Field><Button disabled={busy||!revocationNote.trim()} onClick={()=>run(async()=>{await api("/licenses/credentials/"+c.id+"/revoke",{method:"POST",json:{note:revocationNote}});setRevokeId(undefined)})}>Confirm revocation</Button><Button onClick={()=>setRevokeId(undefined)}>Cancel</Button></div>}
                   {c.needsReview && (
                     <p>
                       Review the profession, number and supporting evidence;
@@ -204,7 +212,7 @@ export default function EngineerCredentials({
                         )
                       }
                     >
-                      Save legacy credential as verified
+                      Submit legacy credential for review
                     </Button>
                   )}
                 </div>

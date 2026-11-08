@@ -50,6 +50,7 @@ async function phaseFile(projectId: string, doc: Doc) {
         throw new Error("The uploaded evidence file is unavailable.");
     const form = new FormData();
     form.set("file", blob, doc.name);
+    form.set("request_id", doc.id);
     const saved = await api<Dto>("/projects/" + projectId + "/phase-files", { method: "POST", body: form });
     return saved.file?.id || saved.id;
 }
@@ -63,6 +64,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
     if (!project)
         throw new Error("Project not found.");
     const base = "/projects/" + id;
+    const retryKey = () => command.submissionRequestId ||= crypto.randomUUID();
     switch (command.type) {
         case "view_document": {
             if (!command.doc || !await downloadApiFile(command.doc.id))
@@ -116,7 +118,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
                     issue_categories:command.issues.map(v=>issueCodes[v]||v),affected_activity_ids:command.affectedActivityIds||[],file_ids});
                 return;
             }
-            await post(base + "/phase-updates", { stage: command.phase || project.phase, note: command.note,
+            await post(base + "/phase-updates", { request_id:retryKey(), stage: command.phase || project.phase, note: command.note,
                 issue_categories: (command.issues || []).map(v => issueCodes[v] || v), file_ids });
             return;
         }
@@ -126,7 +128,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
                 throw new Error("Choose checklist evidence.");
             const file_ids=[];
             for(const doc of docs)file_ids.push(await phaseFile(id,doc));
-            await post(base + "/checklist-items/" + command.itemId + "/submit", { file_ids, submission_note: command.note });
+            await post(base + "/checklist-items/" + command.itemId?.split(":")[0] + "/submit", { request_id:retryKey(), file_ids, submission_note: command.note });
             return;
         }
         case "approve_checklist":

@@ -24,6 +24,7 @@ export async function installCredentialFixture(db) {
     "update user_licenses set profession=coalesce(profession,'Civil Engineer'),verification_status='verified',verified_by=$1,verified_at=coalesce(verified_at,now())",
     [admin],
   )
+  await db.exec("update user_licenses set license_number='0000001' where license_number is null or license_number !~ '^[0-9]{7}$'")
   // Fixture records deliberately have reviewed credentials supporting their declared test specializations.
   const aliases = {
     Civil: ["Civil", "Civil Engineer"],
@@ -69,4 +70,7 @@ export async function installCredentialFixture(db) {
       [user.id, admin],
     )
   }
+  // Re-verify synthetic evidence after essential fixture fields have been set.
+  await db.query("update user_licenses set verification_status='verified',verified_by=$1,verified_at=coalesce(verified_at,now())",[admin])
+
 }

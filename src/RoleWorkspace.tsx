@@ -120,6 +120,7 @@ import {
   activeSubcontractors,
   assignmentBlock,
   checklistFor,
+  pendingChecklistFor,
   ISSUES,
   isAssigned,
   leadConfirmed,
@@ -408,7 +409,7 @@ export default function RoleWorkspace({
   const pendingRework = allActive.filter((p) => workflowFor(p).pendingRework)
   const qaCount = allActive.reduce(
     (n, p) =>
-      n + checklistFor(p).filter((i) => i.status === "submitted").length,
+      n + pendingChecklistFor(p).length,
     0,
   )
   const actorName = (id: string) =>
@@ -516,6 +517,7 @@ export default function RoleWorkspace({
       ...dateFilters<WorkspaceEvent>((e) => e.date, "Date"),
     ],
   })
+  const pendingSubmissionRetries = useRef(new Map<string,string>())
   async function act(command: WorkflowCommand, success?: string) {
     if (licenseAccessPolicy(actor.expiry).mode !== "normal" && command.type !== "view_document") { setError(LICENSE_VIEW_ONLY_MESSAGE); return false }
     // Guard synchronously: a second click can arrive before React renders disabled controls.
@@ -524,12 +526,19 @@ export default function RoleWorkspace({
     setSaving(true)
     setError("")
     setMessage("")
+    const submissionSignature = ["submit_checklist","submit_progress"].includes(command.type)
+      ? JSON.stringify({...command,submissionRequestId:undefined}) : undefined
+    if(submissionSignature){
+      command.submissionRequestId ||= pendingSubmissionRetries.current.get(submissionSignature) || crypto.randomUUID()
+      pendingSubmissionRetries.current.set(submissionSignature,command.submissionRequestId)
+    }
     try {
       const result = await onCommand(command)
       if (!result.ok) {
         setError(result.error || "This action could not be saved. Review your entries and try again.")
         return false
       }
+      if(submissionSignature)pendingSubmissionRetries.current.delete(submissionSignature)
       setMessage(result.message || success || "Workspace updated.")
       return true
     } catch (reason) {
@@ -2134,7 +2143,7 @@ export default function RoleWorkspace({
             const project = allActive.find(site => site.id === id)
             if (!project) return null
             const work = workflowFor(project)
-            const pendingQa = checklistFor(project).filter(item => item.status === "submitted")
+            const pendingQa = pendingChecklistFor(project)
             const reminders: { label: string; detail: string; due?: number; action: () => void }[] = []
             if (work.deadline) reminders.push({
               label: "Assignment response",
@@ -2191,7 +2200,7 @@ export default function RoleWorkspace({
           }} />}
         {isOpm && !extensionDemo && activeSitesView === "updates" && <div id="active-sites-review" className="active-site-review-queue">
           <Panel title={`Updates and issues needing review (${pendingUpdates.length + pendingRework.length + qaCount})`} subtitle="Review each item in its project card. Your decision updates that site immediately.">
-            {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || checklistFor(project).some(item => item.status === "submitted")).map(project => {
+            {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || (pendingChecklistFor(project).length > 0)).map(project => {
               const work = workflowFor(project)
               const update = work.pendingUpdate
               const rework = work.pendingRework
@@ -2215,9 +2224,9 @@ export default function RoleWorkspace({
                   <p className="role-muted">Review the affected activities and progress impact before confirming targeted rework.</p>
                   <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework impact</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
                 </div>}
-                {checklistFor(project).some(item => item.status === "submitted") && <div className="active-site-review-item">
-                  <div className="active-site-review-heading"><strong>QA/QC evidence</strong><Status value={`${checklistFor(project).filter(item => item.status === "submitted").length} awaiting review`} /></div>
-                  {checklistFor(project).filter(item => item.status === "submitted").map(item => <div className="active-site-qa-item" key={item.id}><div><strong>{item.label}</strong><p className="role-muted">{item.submittedByName || (item.submittedBy ? actorName(item.submittedBy) : "Evidence submitted")} · {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "Date unavailable"}</p>{item.doc && <Button icon="doc" onClick={() => showDoc(project, item.doc!)}>View {item.doc.name}</Button>}</div><Button variant="primary" icon="doc" disabled={saving} onClick={() => setEvidenceReview({ type: "approve_checklist", projectId: project.id, phase: project.phase, itemId: item.id, evidenceId: item.evidenceId, expectedVersion: item.version })}>Review evidence</Button></div>)}
+                {(pendingChecklistFor(project).length > 0) && <div className="active-site-review-item">
+                  <div className="active-site-review-heading"><strong>QA/QC evidence</strong><Status value={`${pendingChecklistFor(project).length} awaiting review`} /></div>
+                  {pendingChecklistFor(project).map(item => <div className="active-site-qa-item" key={item.id}><div><strong>{item.label}</strong><p className="role-muted">{item.submittedByName || (item.submittedBy ? actorName(item.submittedBy) : "Evidence submitted")} · {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "Date unavailable"}</p>{item.doc && <Button icon="doc" onClick={() => showDoc(project, item.doc!)}>View {item.doc.name}</Button>}</div><Button variant="primary" icon="doc" disabled={saving} onClick={() => setEvidenceReview({ type: "approve_checklist", projectId: project.id, phase: project.phase, itemId: item.id, evidenceId: item.evidenceId, expectedVersion: item.version })}>Review evidence</Button></div>)}
                 </div>}
                 <Button variant="text-button" onClick={() => setDialog({ kind: "project", projectId: project.id })}>View project details <Icon name="arrow" size={15} /></Button>
               </section>
@@ -2236,7 +2245,7 @@ export default function RoleWorkspace({
       0,
     )
     const qaItems = allActive.filter((p) =>
-      checklistFor(p).some((i) => i.status === "submitted"),
+      (pendingChecklistFor(p).length > 0),
     )
     const qaList = runList(`${actor.role}:review-qa`, qaItems, {
       searchText: projectText,
@@ -2333,8 +2342,7 @@ export default function RoleWorkspace({
                   subtitle={`${p.phase} · Every required item needs human approval`}
                 >
                   <div className="role-card-content">
-                    {checklistFor(p)
-                      .filter((i) => i.status === "submitted")
+                    {pendingChecklistFor(p)
                       .map((item) => (
                         <div className="review-evidence-card" key={item.id}>
                           <div className="section-title">
@@ -2679,7 +2687,7 @@ export default function RoleWorkspace({
           </button>,
           ),
         )
-      if (isOpm && checklistFor(p).some((i) => i.status === "submitted"))
+      if (isOpm && (pendingChecklistFor(p).length > 0))
         rows.push(
           entry(p, "qa", qaDue(p),
           <button
@@ -2691,7 +2699,7 @@ export default function RoleWorkspace({
             <div>
               <strong>QA/QC review — {p.name}</strong>
               <p>
-                {checklistFor(p).filter((i) => i.status === "submitted").length}{" "}
+                {pendingChecklistFor(p).length}{" "}
                 evidence items pending · escalate after three days, never
                 auto-approve.
               </p>
@@ -4060,8 +4068,8 @@ export default function RoleWorkspace({
       {evidenceReview && (
         <EvidenceReview key={`${evidenceReview.projectId}-${evidenceReview.evidenceId}-${evidenceReview.type}`}
           projectId={evidenceReview.projectId!} evidenceId={evidenceReview.evidenceId || ""}
-          doc={projects.find(project=>project.id===evidenceReview.projectId)?.workflow?.checklist?.[evidenceReview.phase || ""]?.find(item=>item.id===evidenceReview.itemId)?.doc}
-          docs={projects.find(project=>project.id===evidenceReview.projectId)?.workflow?.checklist?.[evidenceReview.phase || ""]?.find(item=>item.id===evidenceReview.itemId)?.attachments}
+          doc={pendingChecklistFor(projects.find(project=>project.id===evidenceReview.projectId)!).find(item=>item.evidenceId===evidenceReview.evidenceId)?.doc}
+          docs={pendingChecklistFor(projects.find(project=>project.id===evidenceReview.projectId)!).find(item=>item.evidenceId===evidenceReview.evidenceId)?.attachments}
           onClose={()=>setEvidenceReview(undefined)}
           onConfirm={(expectedReviewToken,note,reject)=>act({...evidenceReview,type:reject?"reject_checklist":"approve_checklist",expectedReviewToken,note},
             reject ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />

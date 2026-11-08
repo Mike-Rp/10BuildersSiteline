@@ -11,7 +11,7 @@ import {PGLiteSocketServer} from '@electric-sql/pglite-socket'
 import {installCredentialFixture} from './helpers/credential-fixture.mjs'
 import {readChecklist} from '../Thesis-Backend/src/services/progress/phase.utility.js'
 import {readVerifiedProgress} from '../Thesis-Backend/src/services/progress/verified.utility.js'
-import {canWorkPhase} from '../src/workflows.ts'
+import {pendingChecklistFor,canWorkPhase} from '../src/workflows.ts'
 import {mapProject} from '../src/api/adapter.ts'
 
 const read=p=>fs.readFileSync(new URL(p,import.meta.url),'utf8')
@@ -22,7 +22,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
  const db={exec:sql=>pg.exec(sql),query:async(sql,args)=>{const r=await pg.query(sql,args);return {...r,rowCount:r.rows.length||r.affectedRows||0}}}
  let server,socket
  t.after(async()=>{
-  if(server){server.kill();await new Promise(resolve=>server.once('exit',resolve))}
+  if(server&&server.exitCode===null){const exited=new Promise(resolve=>server.once('exit',resolve));server.kill();await exited}
   if(socket)await socket.stop()
   await pg.close()
  })
@@ -40,6 +40,10 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
  await pg.exec(migration);await pg.exec(migration)
  assert.equal((await pg.query('select count(*)::int as n from project_phase_evidence')).rows[0].n,before)
  await pg.exec('update user_licenses set license_expiry=current_date+400 where superseded_at is null')
+ await pg.exec(read('../Thesis-Backend/migrations/026-credential-specializations.sql'))
+ const preserved=(await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows
+ await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'));await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'))
+ assert.deepEqual((await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows,preserved)
  const users=(await pg.query("select u.id,u.email,r.code as role from users u join roles r on r.id=u.role_id where u.status='active' order by u.id")).rows
  const [a,b,c]=users.filter(u=>u.role==='spm'), admin=users.find(u=>u.role==='admin')
  const source=(await pg.query("select * from projects where lifecycle_status='active' limit 1")).rows[0]
@@ -106,9 +110,9 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   assert.equal((await call(opm,root+'/phase-overview')).checklist.items.length,itemIds.length*2)
   await call(a,root+'/checklist-items/'+itemIds[0]+'/submit',{method:'POST',json:{file_ids:[a2.id]},status:409})
  })
- const reports=[]
+ const reports=[],reportRequestId=randomUUID()
  await t.test('concurrent reports do not block the other workspace',async()=>{
-  reports.push(...await Promise.all([a,b].map(user=>call(user,root+'/phase-updates',{method:'POST',json:{note:'Independent field report'},status:201}))))
+  reports.push(...await Promise.all([a,b].map(user=>call(user,root+'/phase-updates',{method:'POST',json:{request_id:reportRequestId,note:'Independent field report'},status:201}))))
   assert.equal(reports.length,2)
   const parts=(await call(opm,'/workspace/project-data')).find(p=>p.list.id===projectId)
   assert.equal(mapProject({...parts,clientId:'',register:()=>{}}).workflow.pendingUpdates.length,2)
@@ -207,4 +211,103 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   assert.equal(file.status,200)
   await call(b,root+'/notes',{method:'POST',json:{note_text:'Archived'},status:422})
  })
+ await t.test('replacement preserves approved and pending versions, original attachments, independent review queue and phase gates',async()=>{
+  await db.query("update projects set lifecycle_status='active',archived_at=null where id=$1",[projectId])
+  await db.query('update project_engineers set unassigned_at=null where project_id=$1',[projectId])
+  await db.query("update project_phase_team set status='declined' where project_id<>$1 and spm_user_id in ($2,$3)",[projectId,b.id,c.id])
+  await db.query("update project_phase_responsibilities set status='released' where project_id<>$1 and user_id in ($2,$3)",[projectId,b.id,c.id])
+  const tag=(await db.query('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id join project_stage_discipline_links l on l.discipline_id=d.id where q.user_id=$1 and l.project_type_id=$2 and l.project_stage_id=$3 limit 1',[b.id,source.project_type_id,stages[1].id])).rows[0].code
+  const slot=(await db.query('update project_phase_responsibilities set assigned_disciplines=array[$3] where project_id=$1 and project_stage_id=$2 and user_id=$4 returning id',[projectId,stages[1].id,tag,c.id])).rows[0]
+  const replace=async(from,to)=>{
+   await call(admin,root+'/engineer-responsibilities/'+slot.id,{method:'POST',json:{action:'replace',newUserId:to.id,note:'Audited replacement test from '+from.id}})
+   await call(to,root+'/engineer-responsibilities/'+slot.id,{method:'POST',json:{action:'accept'}})
+  }
+  await replace(c,b);await replace(b,c) // Empty workspace and repeated replacements.
+  const files=[await upload(c,stages[1]),await upload(c,stages[1])]
+  const items=[...new Set((await call(c,root+'/phase-overview')).checklist.items.map(i=>String(i.id)))]
+  const evidence=[]
+  for(const id of items)evidence.push(await call(c,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:files.map(f=>f.id)},status:201}))
+  await approve(evidence[0])
+  const pending=evidence[1]
+  const stale=await call(opm,root+'/evidence/'+pending.id+'/review-preview')
+  await replace(c,b)
+  await db.query("update users set status='suspended' where id=$1",[c.id])
+  const overview=await call(b,root+'/phase-overview')
+  assert.equal(overview.checklist.items[0].status,'approved')
+  assert.equal(overview.checklist.items[1].status,'pending')
+  assert.equal(overview.checklist.items[1].submitted_by,c.id)
+  assert.equal(overview.checklist.items[1].files.length,2)
+  await call(b,root+'/checklist-items/'+items[0]+'/submit',{method:'POST',json:{file_ids:[]},status:409})
+  await call(b,root+'/checklist-items/'+items[1]+'/submit',{method:'POST',json:{file_ids:[]},status:409})
+  const managed=(await call(opm,'/workspace/project-data')).find(p=>p.list.id===projectId)
+  const mapped=mapProject({...managed,clientId:'',register:()=>{}})
+  assert.ok(pendingChecklistFor(mapped).some(i=>i.evidenceId===String(pending.id)&&i.submittedBy===c.id))
+  await call(opm,root+'/advance-phase',{method:'POST',json:{},status:409})
+  const preview=await call(opm,root+'/evidence/'+pending.id+'/review-preview')
+  assert.ok(preview.after.phase.percentage<=100)
+  // A stale token may remain valid when contribution is unchanged; either way the next review is explicit.
+  assert.equal(preview.review_token,stale.review_token)
+  const result=await Promise.all([0,1].map(()=>fetch(base+root+'/evidence/'+pending.id+'/approve',{method:'POST',headers:{Authorization:'Bearer '+opm.token,'Content-Type':'application/json'},body:JSON.stringify({expected_review_token:preview.review_token})})))
+  assert.deepEqual(result.map(r=>r.status).sort(),[200,409])
+  const history=await call(opm,root+'/evidence-history')
+  assert.ok(history.some(e=>String(e.evidence_id)===String(pending.id)&&e.submitted_by===c.id&&e.status==='approved'&&e.files.length===2))
+  const download=await fetch(base+root+'/phase-files/'+files[0].id,{headers:{Authorization:'Bearer '+opm.token}});assert.equal(download.status,200)
+  assert.equal((await db.query('select spm_user_id from project_phase_team where project_id=$1 and is_lead',[projectId])).rows[0].spm_user_id,a.id)
+  await db.query("update users set status='active' where id=$1",[c.id])
+ })
+ await t.test('upload and report retry receipts replay one committed result and reject key reuse',async()=>{
+  const key=randomUUID(),fileKey=randomUUID()
+  const form=()=>{const f=new FormData();f.set('request_id',fileKey);f.set('file',new Blob(['%PDF-retry']),'retry.pdf');return f}
+  const first=await call(a,root+'/phase-files',{method:'POST',body:form(),status:201})
+  const again=await call(a,root+'/phase-files',{method:'POST',body:form(),status:201});assert.equal(first.id,again.id)
+  const body={request_id:key,note:'Retry-safe field report',file_ids:[first.id]}
+  const [one,two]=await Promise.all([0,1].map(()=>call(a,root+'/phase-updates',{method:'POST',json:body,status:201})))
+  assert.equal(one.id,two.id)
+  await call(opm,root+'/phase-updates/'+one.id+'/approve',{method:'POST',json:{}})
+  assert.equal((await call(a,root+'/phase-updates',{method:'POST',json:body,status:201})).id,one.id)
+  await call(a,root+'/phase-updates',{method:'POST',json:{...body,note:'Changed'},status:409})
+  assert.equal((await db.query('select count(*)::int as n from project_phase_updates where id=$1',[one.id])).rows[0].n,1)
+ })
+
+ await t.test('transaction failures leave no report or retry receipt, and 100 percent never bypasses orphan review',async()=>{
+  const failedKey=randomUUID()
+  const count=async()=>(await db.query('select count(*)::int as n from project_phase_updates where project_id=$1',[projectId])).rows[0].n
+  const before=await count()
+  await call(a,root+'/phase-updates',{method:'POST',json:{request_id:failedKey,note:'Should roll back',checklist_submissions:[{item_id:itemIds[0]}]},status:404})
+  assert.equal(await count(),before)
+  assert.equal((await db.query('select count(*)::int as n from project_request_receipts where request_id=$1',[failedKey])).rows[0].n,0)
+  const files={}
+  for(const user of [a,b])files[user.id]=await upload(user,stages[1])
+  const slots=(await db.query('select * from project_phase_responsibilities where project_id=$1 and project_stage_id=$2',[projectId,stages[1].id])).rows
+  const items=(await db.query('select * from project_phase_checklist_items where project_id=$1 and project_stage_id=$2 and required',[projectId,stages[1].id])).rows
+  for(const slot of slots)for(const item of items)await db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,file_id,submitted_by,status,reviewed_by,reviewed_at,responsibility_id) values($1,$2,$3,$4,$5,'approved',$6,now(),$7)",[projectId,stages[1].id,item.id,files[slot.user_id].id,slot.user_id,opm.id,slot.id])
+  await db.query("update project_phase_responsibilities set completion_status='approved',reviewed_by=$3,reviewed_at=now() where project_id=$1 and project_stage_id=$2",[projectId,stages[1].id,opm.id])
+  const originalFile=(await db.query('select id from project_phase_files where project_id=$1 and project_stage_id=$2 and uploaded_by=$3 limit 1',[projectId,stages[1].id,c.id])).rows[0].id
+  const orphan=(await db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,file_id,submitted_by) values($1,$2,$3,$4,$5) returning id",[projectId,stages[1].id,items[0].id,originalFile,c.id])).rows[0]
+  assert.equal((await call(opm,root+'/phase-overview')).checklist.pct,100)
+  await call(opm,root+'/advance-phase',{method:'POST',json:{},status:409})
+  const preview=await call(opm,root+'/evidence/'+orphan.id+'/review-preview')
+  assert.equal(preview.before.phase.percentage,100);assert.equal(preview.after.phase.percentage,100)
+  assert.equal(preview.before.project.earned,preview.after.project.earned)
+  await approve(orphan)
+  const stable=(await db.query('select submitted_by,file_id from project_phase_evidence where id=$1',[orphan.id])).rows[0]
+  assert.deepEqual(stable,{submitted_by:c.id,file_id:originalFile})
+  await call(b,root+'/evidence-history',{status:403})
+  await assert.rejects(db.query('update project_phase_evidence set submitted_by=$2 where id=$1',[orphan.id,b.id]),e=>e.code==='23514')
+  await assert.rejects(db.query('insert into project_phase_evidence_files values($1,$2)',[orphan.id,files[a.id].id]),e=>e.code==='23514')
+ })
+
+ await t.test('legacy declined-assignment reassignment moves the same responsibility and preserves evidence provenance',async()=>{
+  const stage=stages[2]
+  const tag=(await db.query('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id join project_stage_discipline_links l on l.discipline_id=d.id where q.user_id=$1 and l.project_type_id=$2 and l.project_stage_id=$3 limit 1',[c.id,source.project_type_id,stage.id])).rows[0].code
+  const slot=(await db.query('update project_phase_responsibilities set assigned_disciplines=array[$4] where project_id=$1 and project_stage_id=$2 and user_id=$3 returning *',[projectId,stage.id,a.id,tag])).rows[0]
+  const team=(await db.query("update project_phase_team set status='declined' where project_id=$1 and project_stage_id=$2 returning id",[projectId,stage.id])).rows[0]
+  await call(admin,'/archive/phase-assignments/'+team.id+'/reassign',{method:'POST',json:{new_user_id:c.id,note:'Reviewed legacy reassignment with responsibility synchronization.'}})
+  const changed=(await db.query('select * from project_phase_responsibilities where id=$1',[slot.id])).rows[0]
+  assert.equal(changed.user_id,c.id);assert.equal(changed.status,'pending')
+  assert.deepEqual(changed.assigned_disciplines,slot.assigned_disciplines)
+  assert.equal((await db.query('select spm_user_id from project_phase_team where id=$1',[team.id])).rows[0].spm_user_id,c.id)
+  assert.ok((await db.query("select 1 from audit_log where table_name='project_phase_responsibilities' and record_id=$1 and new_values->>'_archive_event'='replace' and new_values->'previous'->>'user_id'=$2",[String(slot.id),a.id])).rows.length)
+ })
+
 })
