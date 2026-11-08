@@ -29,6 +29,7 @@ import { LicenseAssignmentWarning } from "./LicenseWorkflow"
 import { newUploadedDoc } from "./uploadDocument"
 import { companyRegistrationErrors, normalizeCompanyForemen, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
 import "./company-foremen.css"
+import "./company-availability-display.css"
 import { normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
   accountError,
@@ -1881,9 +1882,12 @@ export function CompanyForm({
         <p>Select the trades supported by company records. Pending companies cannot be allocated to projects.</p>
       </section>}
       <div className="form-grid">
-        <Field label="Company availability" hint="Not assigned to a project. Company approval does not assign a project.">
+        {role === "admin" ? <div className="field wide company-availability-display" role="group" aria-label="Company availability">
+          <div className="company-availability-heading"><span>Company availability</span><Badge tone="green">Available</Badge><small>Set automatically</small></div>
+          <p>No project commitment yet. Company approval does not assign a project.</p>
+        </div> : <Field label="Company availability" hint="Not assigned to a project. Company approval does not assign a project.">
           <input readOnly value="Available" />
-        </Field>
+        </Field>}
         <Field label="Company notes" wide>
           <textarea
             value={draft.note}
