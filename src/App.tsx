@@ -1,5 +1,4 @@
 import { requiresRenewalOnlyAccess } from "./renewal-only";
-import EngineerScopeReview from "./EngineerScopeReview"
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
@@ -2356,7 +2355,6 @@ function AppInner() {
           <>
             <ProjectScheduleDetails project={p} today={scheduleToday} />
             {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
-            {actor.role==='admin' && <EngineerScopeReview project={p} state={state} onReload={reloadWorkspace} />}
             {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
             {p.status !== "active" && p.status !== "completed" && (
@@ -3142,7 +3140,6 @@ function AppInner() {
         {!isIntakeHistory(selectedProject) && <>
           {projectAssignments(selectedProject)}
           {state.multiEngineerAllocationAvailable && <EngineerResponsibilities project={selectedProject} actor={actor} onReload={reloadWorkspace} />}
-          <EngineerScopeReview project={selectedProject} state={state} onReload={reloadWorkspace} />
         </>}
       </Modal>}
       {(dialog?.kind === "project" || dialog?.kind === "project-docs") &&

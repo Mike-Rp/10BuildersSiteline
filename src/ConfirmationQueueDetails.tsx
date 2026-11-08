@@ -14,25 +14,18 @@ export default function ConfirmationQueueDetails({ state, project, view, onClose
   return <Modal title={view === "team" ? "Site PM Team by Phase" : "Subcontractor Allocation"} subtitle={`${project.name} · Read-only`} onClose={onClose} wide>
     <div className="confirmation-queue-details">
       {view === "team" ? <>
-        <p className="confirmation-details-intro">Assigned responsibilities and confirmation statuses for each phase. Coverage reflects recorded assignments; confirmation is shown separately.</p>
+        <p className="confirmation-details-intro">Assigned responsibilities and each engineer’s acceptance status for every phase.</p>
         {[...new Set([...requiredPhaseNames(project), ...project.team.map(row => row.phase)])].map(phase => {
           const rows = project.team.filter(row => row.phase === phase)
           const required = rows.find(row => row.requiredDisciplines?.length)?.requiredDisciplines || projectPhaseDisciplines(project, phase)
           const engineers = rows.flatMap(row => row.engineers?.length ? row.engineers : row.accountId ? [{ accountId: row.accountId, assignedDisciplines: row.assignedDisciplines || [], status: row.status }] : [])
-          const active = engineers.filter(engineer => engineer.status !== "declined")
-          const missing = required.filter(tag => !active.some(engineer => engineer.assignedDisciplines.includes(tag)))
-          const duplicate = required.filter(tag => active.filter(engineer => engineer.assignedDisciplines.includes(tag)).length > 1)
-          const unrecorded = active.some(engineer => !engineer.assignedDisciplines.length)
-          const covered = engineers.length > 0 && required.length > 0 && !missing.length && !duplicate.length && !unrecorded
           return <section className="confirmation-phase-card" key={phase}>
-            <header><h3>{phase}</h3><Badge tone={covered ? "green" : "amber"}>{covered ? "Coverage complete" : "Coverage needs review"}</Badge></header>
+            <header><h3>{phase}</h3></header>
             <p className="confirmation-phase-required">Required: {required.join(", ") || "No specialization requirements recorded"}</p>
             {engineers.length ? <div className="confirmation-engineer-grid">{engineers.map((engineer, index) => <article className="confirmation-engineer" key={`${engineer.accountId}-${index}`}>
               <header><strong>{state.accounts.find(account => account.id === engineer.accountId)?.name || "Engineer record unavailable"}</strong><Badge tone={engineer.status === "confirmed" ? "green" : "amber"}>{engineer.status === "confirmed" ? "Confirmed" : engineer.status === "declined" ? "Declined" : "Awaiting acceptance"}</Badge></header>
-              {engineer.assignedDisciplines.length ? <div className="confirmation-assigned-tags">{engineer.assignedDisciplines.map(tag => <span key={tag}>{tag}</span>)}</div> : <p>Assigned specializations not recorded — review required.</p>}
+              {engineer.assignedDisciplines.length ? <div className="confirmation-assigned-tags">{engineer.assignedDisciplines.map(tag => <span key={tag}>{tag}</span>)}</div> : <p>No specialization details recorded.</p>}
             </article>)}</div> : <p>No engineers assigned to this phase.</p>}
-            {missing.length > 0 && <p className="confirmation-coverage-note">Uncovered areas: {missing.join(", ")}</p>}
-            {duplicate.length > 0 && <p className="confirmation-coverage-note">Duplicate responsibility: {duplicate.join(", ")}</p>}
           </section>
         })}
       </> : <>

@@ -3,7 +3,7 @@
 #root .confirmation-phase-card { border: 1px solid var(--color-line); border-radius: 12px; padding: 14px; margin-top: 12px; }
 #root .confirmation-phase-card > header, #root .confirmation-engineer > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
 #root .confirmation-phase-card h3 { margin: 0; font-size: 16px; }
-#root .confirmation-phase-required, #root .confirmation-coverage-note { margin: 8px 0; font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
+#root .confirmation-phase-required { margin: 8px 0; font-size: 13px; color: var(--color-muted); overflow-wrap: anywhere; }
 #root .confirmation-engineer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
 #root .confirmation-engineer { border: 1px solid var(--color-line); border-radius: 8px; background: #f7fafc; padding: 12px; min-width: 0; overflow-wrap: anywhere; }
 #root .confirmation-engineer strong { font-size: 14px; }

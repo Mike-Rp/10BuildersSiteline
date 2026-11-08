@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import { initialState } from "./fixtures/demo-state.ts"
 
-test("Confirmation Queue opens read-only team and subcontractor popups with per-engineer coverage", { timeout: 60000 }, async () => {
+test("Confirmation Queue opens read-only popups with engineer acceptance statuses and no manual scope review badges", { timeout: 60000 }, async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Element: dom.window.Element, Node: dom.window.Node, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -44,7 +44,8 @@ test("Confirmation Queue opens read-only team and subcontractor popups with per-
     assert.equal(dialog.getAttribute("aria-label"), "Site PM Team by Phase")
     assert.equal(dialog.querySelectorAll(".confirmation-engineer").length, 3)
     for (const person of people) assert.ok(dialog.textContent.includes(person.name))
-    assert.match(dialog.textContent, /Coverage complete/)
+    assert.doesNotMatch(dialog.textContent, /Coverage complete|Coverage needs review/)
+    assert.match(dialog.textContent, /Confirmed/)
     assert.match(dialog.textContent, /Awaiting acceptance/)
     assert.equal(dialog.querySelectorAll("input,select,textarea").length, 0)
     await act(() => document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })))
@@ -61,12 +62,12 @@ test("Confirmation Queue opens read-only team and subcontractor popups with per-
 
     project.team[0].engineers[1].assignedDisciplines = ["Civil"]
     await act(() => root.render(React.createElement(Details, { state, project, view: "team", onClose() {} })))
-    assert.match(document.querySelector('[role="dialog"]').textContent, /Uncovered areas: Electrical/)
-    assert.match(document.querySelector('[role="dialog"]').textContent, /Duplicate responsibility: Civil/)
+    assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent, /Uncovered areas|Duplicate responsibility|Coverage needs review/)
     delete project.team[0].engineers
     await act(() => root.render(React.createElement(Details, { state, project, view: "team", onClose() {} })))
-    assert.match(document.querySelector('[role="dialog"]').textContent, /Assigned specializations not recorded/)
-    assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent, /Coverage complete/)
+    assert.match(document.querySelector('[role="dialog"]').textContent, /No specialization details recorded/)
+    assert.match(document.querySelector('[role="dialog"]').textContent, /Confirmed/)
+    assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent, /Coverage|review required|Uncovered areas/)
 
     const { DOC_LABELS } = await server.ssrLoadModule("/src/model.ts")
     project.docs = [{ id: "agreement", label: DOC_LABELS[6], name: "signed-agreement.pdf", uploaded: true }]
