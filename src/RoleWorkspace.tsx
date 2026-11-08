@@ -35,7 +35,7 @@ import type { LoginGreeting } from "./dashboard-greeting"
 import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
 import "./opm-confirmation-cards.css"
-import "./opm-dashboard.css"
+import "./staff-dashboard.css"
 import "./spm-progress-history.css"
 import ProgressHistoryPages from "./ProgressHistoryPages"
 import ConfirmationQueueDetails from "./ConfirmationQueueDetails"
@@ -62,7 +62,7 @@ import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
 import { checklistFeedback } from "./checklistFeedback"
 import ReportRejectDialog from "./ReportRejectDialog"
 import NoteRemovalDialog from "./NoteRemovalDialog"
-import { LicenseBanner, ReassignRequests, WorkRecord } from "./LicenseWorkflow"
+import { LicenseBanner, ReassignRequests } from "./LicenseWorkflow"
 import { AttachmentRow, DocumentList, downloadDoc, Preview, Upload } from "./panels"
 import {
   CompactPager,
@@ -606,7 +606,7 @@ export default function RoleWorkspace({
         <PageTitlePanel title={title}>
           {action}
         </PageTitlePanel>
-        {isOpm && page === "Dashboard" && <div className="opm-priority-summary"><span>Priority Items ({staffUrgentItems(state, actor, page, urgencyNow).length})</span></div>}
+        {page === "Dashboard" && <div className="staff-priority-summary"><span>Priority Items ({staffUrgentItems(state, actor, page, urgencyNow).length})</span></div>}
         {urgentBanner()}
         <LicenseBanner license={state.license?.self} />
         {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
@@ -850,13 +850,13 @@ export default function RoleWorkspace({
     const reviewCount = isOpm ? pendingUpdates.length + pendingRework.length + qaCount
       : projects.filter(p => workflowFor(p).pendingRework?.authorId === actor.id).length
     return (
-      <div className={isOpm ? "opm-overview" : undefined}>
+      <div className="staff-overview">
         {header(
           "Dashboard",
           <Button icon="doc" onClick={() => setMonthlySummaryOpen(true)}>Monthly report</Button>,
         )}
         <ExecutiveSummary
-          description={isOpm ? `${active.length} managed active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your confirmation; ${reviewCount} reviews need attention.` : ""}
+          description={isOpm ? `${active.length} managed active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your confirmation; ${reviewCount} reviews need attention.` : `${active.length} current active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your response; ${reviewCount} rework flags await Office PM review.`}
           metrics={[
             { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("sites") } },
             { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
@@ -864,12 +864,8 @@ export default function RoleWorkspace({
             { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
           ]}
         />
-        {!isOpm && delayedProjects(allActive, scheduleToday).length > 0 && <Panel title="Needs your attention">
-          <DelayedProjectsRow count={delayedProjects(allActive, scheduleToday).length} onOpen={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }} />
-        </Panel>}
-        {isOpm ? <>
-          <div className="opm-dashboard-content">
-            <Panel title="All Follow-Up Items" subtitle="Upcoming deadlines and reviews across your assigned projects." className="opm-follow-up-panel">
+          <div className="staff-dashboard-content">
+            <Panel title="All Follow-Up Items" subtitle={isOpm ? "Upcoming deadlines and reviews across your assigned projects." : "Upcoming deadlines and responses across your assigned projects."} className="staff-follow-up-panel">
               {delayedProjects(allActive, scheduleToday).length > 0 && <DelayedProjectsRow count={delayedProjects(allActive, scheduleToday).length} onOpen={() => { navigate("Active sites"); setActiveSitesScheduleFilter("delayed") }} />}
               {deadlineList(true)}
             </Panel>
@@ -878,22 +874,6 @@ export default function RoleWorkspace({
               <CompactPager list={dashActivity} />
             </Panel>
           </div>
-          <div className="opm-dashboard-work-record"><details><summary>Work Record</summary><WorkRecord userId={actor.id} /></details></div>
-        </> : <div className="dashboard-secondary">
-          <details>
-            <summary>Upcoming deadlines</summary>
-            {deadlineList(true)}
-          </details>
-          <details>
-            <summary>Recent activity</summary>
-            {activityList(dashActivity.view.items)}
-            <CompactPager list={dashActivity} />
-          </details>
-          <details>
-            <summary><span>Work record</span></summary>
-            <WorkRecord userId={actor.id} />
-          </details>
-        </div>}
       </div>
     )
   }
@@ -3723,7 +3703,7 @@ export default function RoleWorkspace({
     }
   }
   return (
-    <div className={`app-shell role-workspace ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}${isOpm ? page === "Dashboard" ? " opm-dashboard-page" : "" : " schedule-mobile-workspace"}`}>
+    <div className={`app-shell role-workspace ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}${page === "Dashboard" ? " staff-dashboard-page" : ""}${!isOpm ? " schedule-mobile-workspace" : ""}`}>
       <aside id="role-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label={`${ROLE_NAMES[actor.role]} navigation`} aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>
@@ -3840,7 +3820,7 @@ export default function RoleWorkspace({
             {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
             <span>
               <Icon name="calendar" size={15} />
-              {isOpm && page === "Dashboard" ? new Date(`${today()}T12:00:00`).toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : dateLabel(today())}
+              {page === "Dashboard" ? new Date(`${today()}T12:00:00`).toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : dateLabel(today())}
             </span>
           </div>
           {renderPage()}

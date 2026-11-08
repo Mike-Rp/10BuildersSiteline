@@ -46,17 +46,27 @@ test("Office and Site PM navigation alternates controls across every module on d
           assert.equal(document.querySelectorAll('main h1').length,1,`${role} ${label}: each module has one main heading`)
           assert.ok(document.querySelector('main .page-title-panel h1'),`${role} ${label}: the module uses the shared title panel`)
           if(role === "opm" && label === "Dashboard") {
-            assert.ok(document.querySelector('.opm-dashboard-page'))
-            assert.equal(document.querySelectorAll('.opm-dashboard-content > .panel').length,2)
-            assert.ok(document.querySelector('.opm-follow-up-panel').textContent.includes('All Follow-Up Items'))
-            assert.equal(document.querySelectorAll('.opm-dashboard-content > details').length,0,'Primary dashboard panels stay visible')
+            assert.ok(document.querySelector('.staff-dashboard-page'))
+            assert.equal(document.querySelectorAll('.staff-dashboard-content > .panel').length,2)
+            assert.ok(document.querySelector('.staff-follow-up-panel').textContent.includes('All Follow-Up Items'))
+            assert.equal(document.querySelectorAll('.staff-dashboard-content > details').length,0,'Primary dashboard panels stay visible')
             assert.equal(document.querySelectorAll('.executive-metric').length,4,'Existing OPM metrics are retained')
             assert.ok(document.querySelector('.workspace-meta').textContent.match(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/),'Dashboard uses the full date format')
-            assert.ok(document.querySelector('.opm-dashboard-work-record summary'))
+            assert.equal(document.querySelector('.staff-dashboard-work-record'),null,'Office PM dashboard omits the optional work record')
           }
           if(role === "spm" && label === "Dashboard") {
-            assert.equal(document.querySelector('.opm-overview'),null,'OPM styling does not change Site PM dashboard')
-            assert.equal(document.querySelectorAll('.dashboard-secondary > details').length,3)
+            assert.ok(document.querySelector('.staff-dashboard-page'))
+            assert.equal(document.querySelectorAll('.staff-dashboard-content > .panel').length,2,'Site PM uses the same visible panel layout as Office PM')
+            assert.equal(document.querySelectorAll('.dashboard-secondary > details').length,0)
+            assert.equal(document.querySelectorAll('.executive-metric').length,4)
+            const metrics=document.querySelector('.executive-summary').textContent
+            assert.match(metrics,/Current active sites/)
+            assert.match(metrics,/Awaiting your response/)
+            assert.match(metrics,/Rework flags submitted/)
+            assert.doesNotMatch(metrics,/Pending reviews/,'Office PM review actions are not added to the Site PM dashboard')
+            assert.ok(document.querySelector('.staff-priority-summary'))
+            assert.equal(document.querySelector('.staff-dashboard-work-record'),null,'Site PM dashboard omits the optional work record')
+            assert.match(document.querySelector('.workspace-meta').textContent,/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/)
           }
           assert.equal(menu.hidden,!compact,`${role} ${label}: desktop stays open and mobile navigation closes after selection`)
           if(!menu.hidden){
