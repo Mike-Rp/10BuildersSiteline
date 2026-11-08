@@ -291,7 +291,7 @@ test("Admin registration exposes the company trade catalog",async()=>{
   await React.act(()=>root.render(React.createElement(CompanyForm,{owner:"Admin",role:"admin",onClose(){},onSave(){}})))
   assert.ok(document.querySelector(".company-trade-picker"))
   assert.match(document.body.textContent,/Offered company trades/)
-  assert.match(document.body.textContent,/Save pending verification/)
+  assert.match(document.body.textContent,/Register & verify company/)
  })
 })
 
