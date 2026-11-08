@@ -31,6 +31,7 @@ import { credentialSummary } from "../licenses/credentials.controller.js";
 import { claimFields, claimResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
 import { Router } from "express";
 import multer from "multer";
+import { GENERAL_UPLOAD_LIMIT_BYTES, DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB } from "../../domain/upload-limits.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, requireLogin, hasProjectAccess, isProjectOpmOrAdmin, HttpError, handleError, sendOk, isUuid, paging } from "../../common/utilities/access.utility.js";
 import { login, staffLogin, adminLogin, logout, reset } from "../auth/controller.js";
@@ -46,13 +47,13 @@ router.get("/projects/:id/monthly-report", monthlyReport);
 router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
 router.get("/reports/monthly-summary", monthlySummary);
 router.post("/reports/monthly-summary/export", exportMonthlySummary);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: GENERAL_UPLOAD_LIMIT_BYTES, files: 1 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
     "save_allocation_plan", "auto_allocate_company", "release_allocation_company", "set_allocation_location",
     "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
-    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "The file must be 15 MB or smaller. Documents have a 10 MB limit." : error.message));
+    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? `The file must be ${MANPOWER_UPLOAD_LIMIT_MB} MB or smaller. Documents have a ${DOCUMENT_UPLOAD_LIMIT_MB} MB limit.` : error.message));
     return next();
 });
 const codes = ["notice_to_proceed", "building_permit", "owner_contract", "registered_plans", "environmental_certificate", "budget_boq", "subcontractor_agreement"];

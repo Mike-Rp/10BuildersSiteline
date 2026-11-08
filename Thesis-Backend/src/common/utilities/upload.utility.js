@@ -4,11 +4,11 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { execute } from './query.utility.js';
 import { HttpError, isUuid } from './access.utility.js';
+import { GENERAL_UPLOAD_LIMIT_BYTES } from '../../domain/upload-limits.js';
 
 const md5 = data => crypto.createHash('md5').update(data).digest('hex');
 
 const UPLOAD_ROOT = './uploads';
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 const DOC_TYPE_PATTERN = /^[a-z0-9_-]{1,40}$/;
 
@@ -37,7 +37,7 @@ const storage = multer.diskStorage({
 
 export const upload = multer({
   storage,
-  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  limits: { fileSize: GENERAL_UPLOAD_LIMIT_BYTES, files: 1 },
   fileFilter: (req, file, cb) => {
     if (!ALLOWED_EXTENSIONS.has(path.extname(file.originalname).toLowerCase())) {
       return cb(new HttpError(400, 'Only PDF, JPG and PNG files are accepted.'));

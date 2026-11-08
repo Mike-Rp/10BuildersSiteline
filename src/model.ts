@@ -2,6 +2,7 @@ import { workEmailFor } from "../Thesis-Backend/src/domain/work-email.js";
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import type { LicenseData } from "./licenseTypes.ts"
 import { experienceYears, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
+import { DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB } from "../Thesis-Backend/src/domain/upload-limits.js"
 export const PHASES = [
   "Mobilization",
   "Design",
@@ -637,8 +638,7 @@ export function projectDocs(uploaded = false): Doc[] {
     date: uploaded ? "2026-07-24" : "",
   }))
 }
-export const DOCUMENT_UPLOAD_LIMIT_MB = 10
-export const MANPOWER_UPLOAD_LIMIT_MB = 15
+export { DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB }
 export function uploadRequirements(spreadsheet = false) {
   return spreadsheet
     ? `XLSX or XLS · Maximum ${MANPOWER_UPLOAD_LIMIT_MB} MB per file`
