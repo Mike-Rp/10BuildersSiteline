@@ -25,6 +25,18 @@ test("completion calendar starts with the start-date year, stays blank until sel
     await React.act(() => root.render(React.createElement(Modal, { title: "New project intake", onClose: () => closed++ }, React.createElement(IntakeForm, { state: emptyState(), onSubmit() {}, onClient: account => account, onClose() {} }))))
     assert.equal(start().value, localToday())
     assert.equal(end().value, "")
+    const controls = [...document.querySelectorAll('.estimated-completion-control')]
+    assert.equal(controls.length, 2, "both dates use the same control layout")
+    assert.equal(controls[0].querySelector('button').innerHTML, controls[1].querySelector('button').innerHTML, "calendar icons match")
+    await click("Choose estimated start date")
+    assert.match(document.querySelector('.estimated-completion-date .modal-header h2').textContent, /Estimated start date/)
+    assert.equal(button(dateLabel(localToday())).disabled, false, "today is valid for start")
+    assert.equal(button("Previous month").disabled, true)
+    for (const day of document.querySelectorAll('.completion-calendar-days button')) {
+      if (Number(day.textContent) < Number(localToday().slice(8))) assert.equal(day.disabled, true, "past start dates are disabled")
+    }
+    await click(dateLabel(localToday()))
+    assert.equal(start().value, localToday())
     await click("Choose estimated completion date")
     assert.equal(document.querySelector('.completion-calendar-selectors label:last-child select').value, localToday().slice(0, 4))
     assert.equal(end().value, "", "opening the calendar does not choose a date")
@@ -46,7 +58,14 @@ test("completion calendar starts with the start-date year, stays blank until sel
     await click("Cancel")
     assert.equal(document.querySelector('.completion-calendar'), null)
     assert.equal(end().value, `${year}-01-16`, "cancel preserves the confirmed date")
-    await type(start(), `${year}-12-31`)
+    await click("Choose estimated start date")
+    const startSelectors = document.querySelectorAll('.completion-calendar-selectors select')
+    await React.act(() => {
+      startSelectors[0].value = "11"
+      startSelectors[0].dispatchEvent(new w.Event("change", { bubbles: true }))
+    })
+    await click(`Dec 31, ${year}`)
+    assert.equal(start().value, `${year}-12-31`, "start can be selected after the current completion")
     assert.equal(end().value, "", "a later start clears an invalid existing completion")
     await click("Choose estimated completion date")
     assert.equal(document.querySelector('.completion-calendar-heading strong').textContent, `December ${year}`)

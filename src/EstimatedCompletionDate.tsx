@@ -4,6 +4,7 @@ import { Button, Modal } from "./ui"
 import "./estimated-completion-date.css"
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | "min" | "max"> & {
+  kind?: "start" | "completion"
   value: string
   min: string
   max: string
@@ -18,7 +19,7 @@ const dateParts = (iso: string) => {
 }
 const isoDate = (year: number, month: number, day: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 
-export default function EstimatedCompletionDate({ value, min, max, start, onValueChange, disabled, ...inputProps }: Props) {
+export default function EstimatedCompletionDate({ kind = "completion", value, min, max, start, onValueChange, disabled, ...inputProps }: Props) {
   const [view, setView] = useState<{ year: number; month: number }>()
   function openCalendar() {
     const anchor = dateParts(value) || dateParts(start) || dateParts(localToday())!
@@ -42,9 +43,9 @@ export default function EstimatedCompletionDate({ value, min, max, start, onValu
         onKeyDown={event => {
           if (event.key === "ArrowDown" && event.altKey) { event.preventDefault(); openCalendar() }
         }} />
-      <Button icon="calendar" disabled={disabled} aria-label="Choose estimated completion date" aria-haspopup="dialog" aria-expanded={!!view} onClick={openCalendar} />
+      <Button icon="calendar" disabled={disabled} aria-label={`Choose estimated ${kind} date`} aria-haspopup="dialog" aria-expanded={!!view} onClick={openCalendar} />
     </div>
-    {view && <Modal title="Estimated completion date" subtitle="Choose a date after the estimated start date." onClose={() => setView(undefined)}>
+    {view && <Modal title={`Estimated ${kind} date`} subtitle={kind === "start" ? "Choose an estimated start date." : "Choose a date after the estimated start date."} onClose={() => setView(undefined)}>
       <div className="completion-calendar">
         <div className="completion-calendar-heading">
           <Button aria-label="Previous month" disabled={monthKey <= min.slice(0, 7)} onClick={() => moveMonth(-1)}>‹</Button>
@@ -68,7 +69,7 @@ export default function EstimatedCompletionDate({ value, min, max, start, onValu
               className={iso === value ? "completion-selected" : ""} onClick={() => { onValueChange(iso); setView(undefined) }}>{index + 1}</Button>
           })}
         </div>
-        <p className="completion-calendar-note">{value ? `Selected: ${dateLabel(value)}` : "No completion date selected."}</p>
+        <p className="completion-calendar-note">{value ? `Selected: ${dateLabel(value)}` : `No ${kind} date selected.`}</p>
         <div className="modal-actions"><Button onClick={() => setView(undefined)}>Cancel</Button></div>
       </div>
     </Modal>}

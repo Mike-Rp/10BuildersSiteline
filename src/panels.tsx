@@ -1117,9 +1117,8 @@ export function IntakeForm({
       : todayIso,
     1,
   )
-  function changeStart(e: ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    setBadDate((b) => ({ ...b, start: e.target.validity.badInput }))
+  function changeStart(value: string, badInput = false) {
+    setBadDate((b) => ({ ...b, start: badInput }))
     const nextErr = projectDateErrors(value, draft.end || "")
     if (draft.end && !!value && nextErr.end === DATE_ERRORS.endNotAfter) {
       patch({ start: value, end: "" })
@@ -1318,13 +1317,14 @@ export function IntakeForm({
               label="Estimated start date *"
               error={startError ? `⚠ ${startError}` : undefined}
             >
-              <input
-                type="date"
+              <EstimatedCompletionDate
+                kind="start"
                 required
                 value={draft.start}
-                min={project ? undefined : todayIso}
-                max={project ? undefined : maxIso}
-                onChange={changeStart}
+                start={draft.start}
+                min={todayIso}
+                max={maxIso}
+                onValueChange={changeStart}
                 onBlur={markBad("start")}
                 aria-invalid={!!startError}
                 disabled={!!project}
