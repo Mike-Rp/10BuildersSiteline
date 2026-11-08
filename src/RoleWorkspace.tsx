@@ -36,6 +36,7 @@ import ReworkReview from "./ReworkReview"
 import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
 import "./opm-confirmation-cards.css"
 import "./opm-dashboard.css"
+import "./spm-progress-history.css"
 import ConfirmationQueueDetails from "./ConfirmationQueueDetails"
 import SitePmContactDetails from "./SitePmContactDetails"
 import SuggestedReassignment from "./SuggestedReassignment"
@@ -3328,7 +3329,7 @@ export default function RoleWorkspace({
           {/* Once every Site PM has accepted, the Lead picks and contacts companies here too, not only on the Assignments page. */}
           {actor.id === leadId(p) && (p.status === "active" || (allocationReady(p) && p.status !== "completed")) ? subcontractorAllocation(p) : <SubcontractorAllocationReadOnly state={state} project={p} />}
         </section>}
-        <section className="detail-section">
+        <section className={`detail-section${!isOpm ? " spm-progress-history" : ""}`}>
           {isOpm ? (
             <details className="opm-progress-history">
               <summary>
@@ -3341,8 +3342,11 @@ export default function RoleWorkspace({
             </details>
           ) : (
             <>
-              <h3>Progress history</h3>
-              {historyRows}
+              <header className="spm-history-heading">
+                <h3>Progress history</h3>
+                <small>{p.history.length} {p.history.length === 1 ? "record" : "records"}</small>
+              </header>
+              <div className="spm-history-rows">{historyRows}</div>
             </>
           )}
         </section>
