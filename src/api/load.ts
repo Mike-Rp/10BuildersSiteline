@@ -133,8 +133,8 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   )
   for(const project of projects) {
     if(workspace.multiEngineerAllocationAvailable)for(const row of project.team) {
-      const people=(workspace.engineerResponsibilities||[]).filter((r:Dto)=>r.project_id===project.id&&r.phase===row.phase)
-      if(people.length)row.engineers=people.map((r:Dto)=>({accountId:r.user_id,assignedDisciplines:r.assigned_disciplines,status:r.status==='confirmed'?'confirmed':r.status==='pending'?'pending':'declined',completionStatus:r.completion_status,responsibilityId:String(r.id)}))
+      const people=(workspace.engineerResponsibilities||[]).filter((r:Dto)=>r.project_id===project.id&&r.phase===row.phase&&r.status!=='released')
+      if(people.length)row.engineers=people.map((r:Dto)=>({accountId:r.user_id,assignedDisciplines:r.assigned_disciplines,status:r.status==='confirmed'?'confirmed':r.status==='pending'?'pending':'declined',completionStatus:r.completion_status,responsibilityId:String(r.id),responseDeadline:r.offer_deadline_at||undefined}))
     }
     const handoff=handoffs.find(item=>item.project_id===project.id && !item.advanced && item.from===project.phase)
     if(handoff?.reason)project.handoffBlocker=handoff.reason

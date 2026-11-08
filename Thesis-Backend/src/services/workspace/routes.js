@@ -14,6 +14,7 @@ import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllo
 import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
 import {recoverySummary,generateRecoveryCodes,verifyRecoveryCode,resetWithRecoveryCode,changeAdminPassword} from '../auth/admin-security.controller.js';
 import {registerResponsibilityRoutes} from './phase-responsibilities.js';
+import {registerEngineerReassignmentRoutes} from './engineer-reassignment.js';
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 import { updateNotificationPreferences } from "./notification-preferences.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "../accounts/experience.utility.js";
@@ -297,6 +298,7 @@ router.post('/projects/:id/engineer-scope', endpoint(['admin'],async(db,user,req
 }));
 registerPhaseAllocationRoutes(router,{endpoint,project,event});
 registerResponsibilityRoutes(router,{endpoint,project});
+registerEngineerReassignmentRoutes(router,{endpoint,project,event});
 router.post("/workspace/preferences", endpoint(null, async (db, user, req) => {
     if (!Array.isArray(req.body.muted) || req.body.muted.length > 4 || req.body.muted.some(t => !["request", "approval", "progress", "notice"].includes(t)))
         throw new HttpError(400, "Invalid notification preferences.");

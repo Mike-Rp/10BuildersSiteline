@@ -18,6 +18,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
   "020-engineer-phase-responsibilities.sql",
   "021-admin-recovery-codes.sql",
   "022-engineer-experience-months.sql",
+  "023-engineer-reassignment-offers.sql",
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({
@@ -61,6 +62,7 @@ export function migrationPlan(files, appliedNames) {
       throw new Error("Migration 019 requires 015-engineer-credentials.sql to be recorded as applied.")
     }
     if(name === "020-engineer-phase-responsibilities.sql" && !wasApplied("019-engineer-phase-commitments.sql")) throw new Error('Migration 020 requires migration 019.');
+    if(name === "023-engineer-reassignment-offers.sql" && !wasApplied("020-engineer-phase-responsibilities.sql")) throw new Error('Migration 023 requires migration 020.');
     entries.push({ name, action: "runner" })
     applied.add(name)
   }

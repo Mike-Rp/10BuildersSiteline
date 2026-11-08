@@ -148,8 +148,8 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             "This responsibility has already received a response.",
           )
         if (
-          coordinator?.response_deadline_at &&
-          new Date(coordinator.response_deadline_at) < new Date()
+          (row.offer_deadline_at || coordinator?.response_deadline_at) &&
+          new Date(row.offer_deadline_at || coordinator.response_deadline_at) <= new Date()
         )
           throw new HttpError(
             409,

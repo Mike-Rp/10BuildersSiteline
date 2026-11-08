@@ -745,5 +745,73 @@ test(
       assert.equal((await api(`/projects/${id}`)).lifecycle_status,'active','the overall project can remain ongoing')
       assert.ok((await db.query("select id from audit_log where table_name='project_phase_responsibilities' and new_values->>'_archive_event'='approve_completion'")).rowCount)
     })
+    await t.test('suggested reassignment rechecks eligibility, closes old offers and preserves peer deadlines', async()=>{
+      await db.exec(read('../Thesis-Backend/migrations/023-engineer-reassignment-offers.sql'))
+      await db.exec(read('../Thesis-Backend/migrations/023-engineer-reassignment-offers.sql'))
+      await admin()
+      const id=await createProject()
+      const reviewer=(await db.query("select u.id from users u join roles r on r.id=u.role_id where r.code='admin' limit 1")).rows[0].id
+      const people=(await db.query("select u.id,u.email from users u join roles r on r.id=u.role_id where r.code='spm' and u.status='active' order by u.email limit 4")).rows
+      assert.equal(people.length,4)
+      const [old,replacement,peer,held]=people
+      for(const person of people) {
+        await db.query("update project_phase_team set status='declined' where spm_user_id=$1 and project_id<>$2",[person.id,id])
+        await db.query("update project_phase_responsibilities set status='released' where user_id=$1 and project_id<>$2 and completion_status<>'approved'",[person.id,id])
+        await db.query("insert into engineer_specializations(user_id,specialization,recorded_by) values($1,'Civil',$2) on conflict do nothing",[person.id,reviewer])
+        await db.query("insert into user_licenses(user_id,license_number,license_expiry,upload_status,upload_file_ref,created_by,profession,verification_status,verified_by,verified_at) select $1,'REASSIGN-TEST',current_date+400,'uploaded','seed/licenses/test-proof.pdf',$2,'Civil Engineer','verified',$2,now() where not exists(select 1 from user_licenses where user_id=$1 and profession='Civil Engineer' and verification_status='verified' and superseded_at is null)",[person.id,reviewer])
+      }
+      const stage=(await db.query("select t.project_stage_id,s.code from project_phase_team t join project_stages s on s.id=t.project_stage_id join project_stage_discipline_links l on l.project_stage_id=s.id and l.project_type_id=$2 join disciplines d on d.id=l.discipline_id where t.project_id=$1 and d.code='Civil' limit 1",[id,source.project_type_id])).rows[0]
+      await db.query("update project_phase_team set spm_user_id=$3,status='pending',assigned_disciplines=array['Civil'],response_deadline_at=now()-interval '1 hour' where project_id=$1 and project_stage_id=$2",[id,stage.project_stage_id,old.id])
+      const target=(await db.query("insert into project_phase_responsibilities(project_id,project_stage_id,user_id,assigned_disciplines,is_coordinator,created_by) values($1,$2,$3,array['Civil'],true,$4) returning id",[id,stage.project_stage_id,old.id,reviewer])).rows[0]
+      const other=(await db.query("insert into project_phase_responsibilities(project_id,project_stage_id,user_id,assigned_disciplines,created_by) values($1,$2,$3,array['Structural'],$4) returning id",[id,stage.project_stage_id,peer.id,reviewer])).rows[0]
+      await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,'{\"assignmentHold\":true}') on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata",[held.id])
+      const path=`/projects/${id}/reassignment-options?phase=${encodeURIComponent(stage.code)}&userId=${old.id}`
+      let options=await api(path)
+      assert.equal(options.canReassign,true)
+      assert.ok(options.candidates.some(person=>person.id===replacement.id),JSON.stringify(options))
+      assert.ok(!options.candidates.some(person=>[old.id,peer.id,held.id].includes(person.id)))
+      const request=()=>api(`/projects/${id}/reassign-offer`,{method:'POST',json:{phase:stage.code,userId:old.id,newUserId:replacement.id,version:options.version,note:'No response after the deadline; contact attempt recorded.'}})
+      await db.query("update project_phase_team set response_deadline_at=now()+interval '1 day' where project_id=$1 and project_stage_id=$2",[id,stage.project_stage_id])
+      await assert.rejects(request(),error=>error.status===409,'stale suggestions are rejected')
+      options=await api(path)
+      assert.equal(options.canReassign,false)
+      await assert.rejects(request(),error=>error.status===409,'pending offers cannot be replaced before the deadline')
+      await db.query("update project_phase_team set response_deadline_at=now()-interval '1 hour' where project_id=$1 and project_stage_id=$2",[id,stage.project_stage_id])
+      options=await api(path)
+      await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,'{\"assignmentHold\":true}') on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||excluded.metadata",[replacement.id])
+      await assert.rejects(request(),error=>error.status===422,'eligibility is rechecked at confirmation')
+      await db.query("update workspace_account_metadata set metadata=metadata||'{\"assignmentHold\":false}' where user_id=$1",[replacement.id])
+      await request()
+      const saved=(await db.query('select * from project_phase_responsibilities where id=$1',[target.id])).rows[0]
+      assert.equal(saved.user_id,replacement.id);assert.equal(saved.status,'pending')
+      assert.deepEqual(saved.assigned_disciplines,['Civil'])
+      assert.equal(new Date(saved.offer_deadline_at)-new Date(saved.offer_started_at),3*86400000)
+      assert.equal((await db.query('select response_deadline_at from project_phase_team where project_id=$1 and project_stage_id=$2',[id,stage.project_stage_id])).rows[0].response_deadline_at,null,'multi-engineer responses use independent windows instead of the legacy shared timer')
+      assert.ok(new Date((await db.query('select offer_deadline_at from project_phase_responsibilities where id=$1',[other.id])).rows[0].offer_deadline_at)<new Date(),'peer deadline was not extended')
+      assert.ok((await db.query("select id from audit_log where new_values->>'_archive_event'='offer_reassigned' and new_values->>'replacement'=$1",[replacement.id])).rowCount)
+      assert.ok((await db.query("select n.recipient_user_id from notification_recipients n join activity_log a on a.id=n.activity_log_id where a.related_project_id=$1 and a.title='Site PM responsibility reassigned' and n.recipient_user_id=$2",[id,replacement.id])).rowCount)
+      await assert.rejects(request(),error=>error.status===409,'a repeated request cannot replace a different offer')
+      setToken('');await login(old.email,'Password@123',true,'staff')
+      await assert.rejects(api(`/projects/${id}/engineer-responsibilities/${target.id}`,{method:'POST',json:{action:'accept'}}),error=>error.status===403,'previous engineer cannot accept the replaced offer')
+      await assert.rejects(api(path),error=>error.status===403,'SPMs cannot request management replacement suggestions')
+      setToken('');await login(replacement.email,'Password@123',true,'staff')
+      await api(`/projects/${id}/engineer-responsibilities/${target.id}`,{method:'POST',json:{action:'accept'}})
+      assert.equal((await db.query('select status from project_phase_responsibilities where id=$1',[target.id])).rows[0].status,'confirmed')
+      await admin()
+      const legacyId=await createProject()
+      await db.query("update project_phase_team set status='declined' where project_id=$1",[legacyId])
+      await db.query("update project_phase_team set spm_user_id=$3,assigned_disciplines=array['Civil'],response_deadline_at=now()+interval '1 day' where project_id=$1 and project_stage_id=$2",[legacyId,stage.project_stage_id,old.id])
+      await db.query("update workspace_account_metadata set metadata=metadata||'{\"assignmentHold\":false}' where user_id=$1",[held.id])
+      // The cloned fixture can also assign this person to other phases in the earlier project.
+      // Formally release those disposable assignments before expecting cross-project eligibility.
+      await db.query("update project_phase_team set status='declined' where spm_user_id=$1 and project_id<>$2",[held.id,legacyId])
+      const legacyOptions=await api(`/projects/${legacyId}/reassignment-options?phase=${encodeURIComponent(stage.code)}&userId=${old.id}`)
+      assert.equal(legacyOptions.canReassign,true,'a decline allows immediate reassignment before the deadline')
+      assert.ok(legacyOptions.candidates.some(person=>person.id===held.id),JSON.stringify(legacyOptions))
+      await api(`/projects/${legacyId}/reassign-offer`,{method:'POST',json:{phase:stage.code,userId:old.id,newUserId:held.id,version:legacyOptions.version,note:'Engineer declined the original responsibility.'}})
+      const legacySaved=(await db.query('select * from project_phase_team where project_id=$1 and project_stage_id=$2',[legacyId,stage.project_stage_id])).rows[0]
+      assert.equal(legacySaved.spm_user_id,held.id);assert.equal(legacySaved.status,'pending');assert.deepEqual(legacySaved.assigned_disciplines,['Civil'])
+      assert.ok(new Date(legacySaved.response_deadline_at)>new Date())
+    })
   },
 )

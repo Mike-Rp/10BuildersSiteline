@@ -1,0 +1,20 @@
+#root .suggested-reassignment { min-width: 0; }
+#root .suggested-reassignment > h3 { margin: 16px 0 6px; font-size: 17px; }
+#root .suggested-reassignment > p { font-size: 14px; color: var(--color-muted); }
+#root .reassignment-current { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; background: #f7fafc; }
+#root .reassignment-current h3 { margin: 10px 0 6px; font-size: 16px; }
+#root .reassignment-current p { margin: 5px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+#root .reassignment-candidates { border: 0; padding: 0; margin: 12px 0; min-width: 0; display: grid; gap: 10px; }
+#root .reassignment-candidates legend { font-size: 13px; color: var(--color-muted); margin-bottom: 8px; }
+#root .reassignment-candidates > label { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #c9d9e7; border-radius: 9px; padding: 12px; cursor: pointer; min-width: 0; }
+#root .reassignment-candidates > label.selected { background: #edf5fc; border-color: #315f85; }
+#root .reassignment-candidates input { flex-shrink: 0; width: 18px; height: 18px; min-height: 0; margin: 3px 0 0; accent-color: #193b59; }
+#root .reassignment-candidates label > span:not(.badge) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#root .reassignment-candidates small { display: block; color: var(--color-muted); font-size: 12px; margin-top: 6px; }
+#root .reassignment-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+#root .reassignment-tags > span { background: #e5eef7; border-radius: 5px; padding: 3px 7px; font-size: 13px; }
+#root .reassignment-next { background: #edf5fc; border-radius: 9px; padding: 12px; margin-top: 12px; font-size: 13px; }
+#root .reassignment-next ul { padding-left: 18px; margin: 8px 0 0; line-height: 1.6; }
+@media (max-width: 540px) {
+  #root .reassignment-candidates > label { flex-wrap: wrap; }
+}

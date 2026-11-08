@@ -34,7 +34,7 @@ export async function engineerCommitments(db, userIds) {
     from project_phase_responsibilities r join projects p on p.id=r.project_id join project_stages s on s.id=r.project_stage_id
     where r.user_id=any($1::uuid[]) and r.status in ('pending','confirmed') and r.completion_status<>'approved'
     and p.lifecycle_status not in ('draft','suggested_allocation','confirmed','archived','completed','cancelled') and not coalesce(p.is_deleted,false)
-    and exists(select 1 from project_phase_team t where t.project_id=r.project_id and t.project_stage_id=r.project_stage_id and (t.status='confirmed' or t.response_deadline_at is null or t.response_deadline_at>now()))`
+    and (r.status='confirmed' or exists(select 1 from project_phase_team t where t.project_id=r.project_id and t.project_stage_id=r.project_stage_id and (coalesce((to_jsonb(r)->>'offer_deadline_at')::timestamptz,t.response_deadline_at) is null or coalesce((to_jsonb(r)->>'offer_deadline_at')::timestamptz,t.response_deadline_at)>now())))`
        : ""
    }`,
       [userIds],

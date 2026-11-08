@@ -1,0 +1,16 @@
+#root .site-pm-roster-contacts { display: grid; gap: 10px; min-width: 0; }
+#root .site-pm-roster-contact { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+#root .site-pm-roster-contact > span { flex: 1 1 140px; overflow-wrap: anywhere; font-size: 14px; }
+#root .site-pm-roster-contact .button { min-height: 40px; font-size: 13px; padding: 8px 11px; }
+#root .site-pm-contact-details { min-width: 0; }
+#root .site-pm-contact-details > h3 { margin: 0; overflow-wrap: anywhere; }
+#root .site-pm-contact-details > p { margin: 6px 0 14px; color: var(--color-muted); }
+#root .site-pm-contact-fields { display: grid; gap: 12px; margin: 16px 0; }
+#root .site-pm-contact-fields input { min-width: 0; width: 100%; }
+#root .site-pm-contact-details h4 { margin: 16px 0 4px; }
+#root .site-pm-contact-assignment { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
+#root .site-pm-contact-assignment > div { min-width: 0; overflow-wrap: anywhere; }
+#root .site-pm-contact-assignment p { margin: 4px 0 0; font-size: 13px; color: var(--color-muted); }
+@media (max-width: 640px) {
+  #root .role-roster > div > .site-pm-roster-contacts { flex-basis: 100%; min-width: 0; }
+}

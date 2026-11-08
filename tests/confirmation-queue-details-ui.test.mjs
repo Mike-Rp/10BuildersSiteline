@@ -31,7 +31,7 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     state.phaseAllocationAvailable = false
     state.tradeAllocationAvailable = false
     let writes = 0
-    const click = async element => { assert.ok(element); await act(() => { element.focus(); element.click() }) }
+    const click = async element => { assert.ok(element); await act(async () => { element.focus(); element.click(); await new Promise(resolve => setTimeout(resolve, 0)) }) }
     const button = (scope, text) => [...scope.querySelectorAll("button")].find(item => item.textContent.includes(text))
     await act(() => root.render(React.createElement(Workspace, { state, actor, onCommand: async () => { writes++; return { ok: true } }, onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
     await click(document.querySelector('nav [aria-label="Confirmation queue"]'))
@@ -60,6 +60,30 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     assert.equal(document.querySelector('[role="dialog"]'), null)
     assert.equal(writes, 0)
 
+    await click(button(card, "Track Site PM responses"))
+    assert.equal(document.querySelectorAll('.site-pm-roster-contact').length, 3, "Every engineer in the phase has a contact button")
+    assert.equal([...document.querySelectorAll('.site-pm-roster-contact button')].filter(item=>item.textContent==='Review Reassignment').length,1,'A pending supporting engineer stays actionable even after the coordinator confirms')
+    const contactButton = document.querySelector(`button[aria-label="View contact details for ${people[2].name} in Design"]`)
+    await click(contactButton)
+    dialog = document.querySelector('[role="dialog"]')
+    assert.equal(dialog.getAttribute('aria-label'), 'Site PM Contact Details')
+    assert.equal(dialog.querySelector('[aria-label="Site PM work email"]').value, people[2].email)
+    assert.equal(dialog.querySelector('[aria-label="Site PM work email"]').readOnly, true)
+    assert.equal(dialog.querySelector('[aria-label="Site PM contact number"]').value, people[2].phone || 'Not recorded')
+    assert.match(dialog.textContent, /Awaiting acceptance/)
+    let copied = ''
+    Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { copied = value } } })
+    await click(button(dialog, 'Copy Contact Details'))
+    assert.ok(copied.includes(people[2].email))
+    assert.match(dialog.textContent, /Contact details copied/)
+    Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Clipboard unavailable') } } })
+    await click(button(dialog, 'Copy Contact Details'))
+    assert.match(dialog.textContent, /Select and copy/)
+    await click(button(dialog, 'Close'))
+    assert.ok(document.activeElement === contactButton)
+    assert.equal(writes, 0, 'Viewing and copying contact information does not modify assignments or send messages')
+
+    project.team[0].status = "confirmed"
     project.team[0].engineers[1].assignedDisciplines = ["Civil"]
     await act(() => root.render(React.createElement(Details, { state, project, view: "team", onClose() {} })))
     assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent, /Uncovered areas|Duplicate responsibility|Coverage needs review/)
