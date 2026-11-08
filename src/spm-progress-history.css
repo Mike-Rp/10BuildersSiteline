@@ -11,6 +11,9 @@
 #root .role-workspace .spm-history-rows .history-row p { margin: 5px 0 0; color: var(--color-muted); font-size: 13px; line-height: 1.5; }
 #root .role-workspace .spm-history-rows .history-row > b { display: inline-flex; align-items: center; justify-content: center; min-width: 52px; padding: 5px 9px; border: 1px solid #d8e5f0; border-radius: 7px; background: #edf5fc; color: #193b59; font-size: 14px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
 #root .role-workspace .spm-history-rows .history-row .button { margin-top: 7px; min-height: 40px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+#root .role-workspace .spm-history-pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+#root .role-workspace .spm-history-pagination > span { font-size: 13px; color: var(--color-muted); }
+#root .role-workspace .spm-history-pagination .button { min-height: 40px; font-size: 13px; padding: 8px 12px; }
 @media (max-width: 540px) {
   #root .role-workspace .spm-history-rows .history-row { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; }
   #root .role-workspace .spm-history-rows .history-row > svg { width: 30px; height: 30px; padding: 6px; }

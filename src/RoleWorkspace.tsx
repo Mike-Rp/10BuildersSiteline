@@ -37,6 +37,7 @@ import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
 import "./opm-confirmation-cards.css"
 import "./opm-dashboard.css"
 import "./spm-progress-history.css"
+import SpmProgressHistoryPages from "./SpmProgressHistoryPages"
 import ConfirmationQueueDetails from "./ConfirmationQueueDetails"
 import SitePmContactDetails from "./SitePmContactDetails"
 import SuggestedReassignment from "./SuggestedReassignment"
@@ -3346,7 +3347,7 @@ export default function RoleWorkspace({
                 <h3>Progress history</h3>
                 <small>{p.history.length} {p.history.length === 1 ? "record" : "records"}</small>
               </header>
-              <div className="spm-history-rows">{historyRows}</div>
+              <SpmProgressHistoryPages key={p.id} rows={historyRows} />
             </>
           )}
         </section>
