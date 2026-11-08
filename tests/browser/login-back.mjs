@@ -42,22 +42,24 @@ test('native Chrome Back confirmation: all roles, desktop/mobile viewports, canc
   server.listen(0,'127.0.0.1');await once(server,'listening')
   const port=server.address().port
   const browser=await launchChrome([
-    '--host-resolver-rules=MAP 10buildline.site 127.0.0.1, MAP staff.10buildline.site 127.0.0.1',
-    `--unsafely-treat-insecure-origin-as-secure=http://10buildline.site:${port},http://staff.10buildline.site:${port}`,
+    '--host-resolver-rules=MAP 10buildline.site 127.0.0.1, MAP www.10buildline.site 127.0.0.1, MAP staff.10buildline.site 127.0.0.1',
+    `--unsafely-treat-insecure-origin-as-secure=http://10buildline.site:${port},http://www.10buildline.site:${port},http://staff.10buildline.site:${port}`,
   ])
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve))})
-  for(const mobile of [false,true])for(const role of ['client','admin','opm','spm']) {
-    await t.test(`${role}, ${mobile?'mobile viewport':'desktop'}`,async subtest=>{
+  const portals=[{role:'client',host:'10buildline.site'},{role:'client',host:'www.10buildline.site'},...['admin','opm','spm'].map(role=>({role,host:'staff.10buildline.site'}))]
+  for(const mobile of [false,true])for(const {role,host} of portals) {
+    await t.test(`${role}, ${host}, ${mobile?'mobile viewport':'desktop'}`,async subtest=>{
       user={id:`browser-${role}`,role,full_name:`Browser ${role}`,email:`${role}@example.test`,status:'active',date_added:'2026-01-01',temp_password_issued:false}
       revoked=false
       const page=await browser.page()
       subtest.after(()=>page.call('Page.close').catch(()=>{}))
       await page.call('Emulation.setDeviceMetricsOverride',{width:mobile?390:1366,height:mobile?844:900,deviceScaleFactor:1,mobile})
-      const host=role==='client'?'10buildline.site':'staff.10buildline.site'
       const origin=`http://${host}:${port}`
       const dashboard=`/${role}/${role==='client'?'overview':'dashboard'}`
-      await page.call('Page.navigate',{url:origin+'/'})
+      await page.call('Page.navigate',{url:origin+(host==='www.10buildline.site'?'/login':'/')})
       await page.wait('!!document.querySelector("form.login-form")')
+      assert.equal(await page.evaluate('location.href'),origin+'/','Login aliases preserve the hostname and display the correct root login')
+      assert.equal(await page.evaluate('!!document.querySelector(".login-role-selector")'),role!=='client')
       const olderHistory=await page.call('Page.getNavigationHistory')
       const olderLoginId=olderHistory.entries[olderHistory.currentIndex].id
       await page.call('Page.navigate',{url:origin+'/?login=again'})

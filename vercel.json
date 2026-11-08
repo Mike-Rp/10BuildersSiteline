@@ -55,31 +55,31 @@
   "redirects": [
     {
       "source": "/login/:path*",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },
     {
       "source": "/admin/:path*",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },
     {
       "source": "/staff/:path*",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },
     {
       "source": "/opm/:path*",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },
     {
       "source": "/spm/:path*",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },
@@ -91,7 +91,7 @@
     },
     {
       "source": "/client/login",
-      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "has": [{ "type": "host", "value": "^(?:www\\.)?10buildline\\.site$" }],
       "destination": "/",
       "permanent": false
     },

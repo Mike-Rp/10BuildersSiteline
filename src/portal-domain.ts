@@ -9,7 +9,7 @@ export const PORTAL_ORIGINS = {
 } as const
 
 export function domainPortal(hostname: string): DomainPortal | undefined {
-  if (hostname.toLowerCase() === "10buildline.site") return "client"
+  if (["10buildline.site", "www.10buildline.site"].includes(hostname.toLowerCase())) return "client"
   if (hostname.toLowerCase() === "staff.10buildline.site") return "staff"
 }
 

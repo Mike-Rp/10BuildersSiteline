@@ -59,19 +59,20 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
     })
     // Signed-out visitors stay at the correct login, even with stale tab state.
     user = {id:'saved-client',role:'client'}
-    for (const savedToken of ['']) {
+    for (const host of ['10buildline.site','www.10buildline.site']) {
+      dom.reconfigure({url:`https://${host}/`})
       for (const path of ['/admin','/admin/','/admin/dashboard','/admin/login?tab=admin','/staff','/staff/login','/login?tab=admin','/opm/documents','/spm/resources','/unknown','/client/unknown']) {
         w.history.replaceState({loginPortal:'admin'},'',path)
-        client.setToken(savedToken)
+        client.setToken('')
         await mount()
         await until(()=>document.querySelector('form.login-form'),'Rejected public-domain internal path')
-        assert.equal(w.location.origin,'https://10buildline.site')
+        assert.equal(w.location.origin,`https://${host}`)
         assert.equal(w.location.pathname,'/')
         assert.equal(w.location.search,'')
         assert.equal(document.querySelector('.login-heading h1').textContent,'Welcome to 10BuildLine')
         assert.equal(document.querySelector('.login-role-selector'),null)
         assert.equal(document.querySelector('.sidebar'),null)
-        assert.equal(client.getToken(),savedToken)
+        assert.equal(client.getToken(),'')
         assert.equal(requestCalls,0,'Rejected entry paths must not restore or start an internal session')
         await clear()
       }

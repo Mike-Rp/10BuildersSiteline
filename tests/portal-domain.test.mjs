@@ -6,22 +6,25 @@ import { canonicalizeLoginEntry, currentLoginPortal, loginPath, shareLoginPath, 
 
 test("each domain rejects the other portal's paths while preserving its own role routes", () => {
   assert.equal(domainPortal("10buildline.site"), "client")
+  assert.equal(domainPortal("WWW.10BUILDLINE.SITE"), "client")
   assert.equal(domainPortal("STAFF.10BUILDLINE.SITE"), "staff")
-  for (const host of ["localhost", "127.0.0.1", "preview.vercel.app", "staff.10buildline.site.attacker.test", "www.10buildline.site"]) {
+  for (const host of ["localhost", "127.0.0.1", "preview.vercel.app", "staff.10buildline.site.attacker.test", "www.10buildline.site.attacker.test"]) {
     assert.equal(domainPortal(host), undefined)
     assert.equal(portalDomainRedirect(new URL(`https://${host}/admin/team`)), undefined)
   }
-  for (const host of ["10buildline.site", "staff.10buildline.site"]) {
+  for (const host of ["10buildline.site", "www.10buildline.site", "staff.10buildline.site"]) {
     assert.equal(portalDomainRedirect(new URL(`https://${host}/`)), undefined)
     assert.equal(portalDomainRedirect(new URL(`https://${host}/api/v1/health`)), undefined)
   }
   for (const path of ["/login", "/login?tab=admin", "/admin", "/admin/", "/admin/login", "/staff", "/staff/login", "/admin/team", "/opm", "/opm/documents?filter=active#top", "/spm", "/spm/resources"]) {
     assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), "/")
+    assert.equal(portalDomainRedirect(new URL(`https://www.10buildline.site${path}`)), "/")
     assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), path === '/staff' ? '/' : undefined)
   }
   for (const path of ["/client", "/client/", "/client/login", "/client/overview", "/client/projects/123/documents?source=link#document"]) {
     assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), "/")
     assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), undefined)
+    assert.equal(portalDomainRedirect(new URL(`https://www.10buildline.site${path}`)), undefined)
   }
 })
 
@@ -30,7 +33,7 @@ test("unknown routes return to the same root and role checks never navigate acro
   const dom = new JSDOM('',{url:'https://10buildline.site/'})
   Object.defineProperty(globalThis,'window',{value:dom.window,configurable:true})
   try {
-    for (const host of ['10buildline.site','staff.10buildline.site']) {
+    for (const host of ['10buildline.site','www.10buildline.site','staff.10buildline.site']) {
       for (const path of ['/unknown','/client/unknown','/admin/unknown','/opm/team','/login/extra','/client/projects/%broken/documents']) {
         dom.reconfigure({url:`https://${host}${path}?tab=admin#invalid`})
         dom.window.history.replaceState(null,'',path+'?tab=admin#invalid')
@@ -42,7 +45,7 @@ test("unknown routes return to the same root and role checks never navigate acro
         assert.equal(dom.window.history.length,length,'The root does not redirect again')
       }
       for (const role of ['client','admin','opm','spm']) {
-        const allowed = host === '10buildline.site' ? role === 'client' : role !== 'client'
+        const allowed = host !== 'staff.10buildline.site' ? role === 'client' : role !== 'client'
         assert.equal(roleAllowedOnHost(role,host),allowed)
         dom.window.history.replaceState(null,'','/')
         if (!allowed) {
@@ -73,6 +76,9 @@ test("domain roots and legacy logins retain the selected portal, query and hash,
       ["10buildline.site", "/login?tab=admin", "client", "/"],
       ["10buildline.site", "/opm/documents", "client", "/"],
       ["10buildline.site", "/spm/resources", "client", "/"],
+      ["www.10buildline.site", "/login", "client", "/"],
+      ["www.10buildline.site", "/admin/login?tab=admin", "client", "/"],
+      ["www.10buildline.site", "/client/login", "client", "/"],
       ["staff.10buildline.site", "/", "staff", "/"],
       ["staff.10buildline.site", "/?tab=admin", "admin", "/?tab=admin"],
       ["staff.10buildline.site", "/login?tab=admin", "admin", "/?tab=admin"],

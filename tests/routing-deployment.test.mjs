@@ -22,22 +22,23 @@ test("Vercel redirects preserve portal selection and keep API routing before the
 test("host-specific redirects keep disallowed portal paths on the same domain before legacy login redirects", () => {
   const config = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
   const match = (host, path) => config.redirects.find(rule => {
-    if (rule.has && !rule.has.every(condition => condition.type === 'host' && condition.value === host)) return false
+    if (rule.has && !rule.has.every(condition => condition.type === 'host' && new RegExp('^(?:'+condition.value+')$','i').test(host))) return false
     const prefix = rule.source.replace(/\/:path\*$/, '')
     return rule.source.endsWith('/:path*') ? path === prefix || path.startsWith(prefix + '/') : path === rule.source
   })
-  for (const path of ['/login','/login/','/admin','/admin/','/admin/login','/admin/login/','/admin/dashboard','/staff','/staff/login','/opm/documents','/spm/resources']) {
-    const rule = match('10buildline.site',path)
+  for (const host of ['10buildline.site','www.10buildline.site']) for (const path of ['/login','/login/','/admin','/admin/','/admin/login','/admin/login/','/admin/dashboard','/staff','/staff/login','/opm/documents','/spm/resources']) {
+    const rule = match(host,path)
     assert.ok(rule,path)
     assert.equal(rule.destination,'/',path)
     assert.equal(rule.permanent,false,path)
-    assert.equal(new URL(rule.destination,'https://10buildline.site').hostname,'10buildline.site')
+    assert.equal(new URL(rule.destination,'https://'+host).hostname,host)
   }
   for (const path of ['/client','/client/','/client/login','/client/projects/123/documents']) {
     assert.equal(match('staff.10buildline.site',path)?.destination,'/',path)
     assert.equal(match('10buildline.site',path)?.destination,path === '/client/login' ? '/' : undefined,path)
+    assert.equal(match('www.10buildline.site',path)?.destination,path === '/client/login' ? '/' : undefined,path)
   }
-  for (const host of ['10buildline.site','staff.10buildline.site','preview.vercel.app','localhost']) {
+  for (const host of ['10buildline.site','www.10buildline.site','staff.10buildline.site','preview.vercel.app','localhost']) {
     for (const path of ['/','/api/v1/auth/login','/api/v1/auth/admin/login','/api/v1/auth/me','/assets/app.js']) assert.equal(match(host,path),undefined,host+path)
   }
   for (const path of ['/admin','/admin/dashboard','/opm/documents','/spm/resources']) assert.equal(match('staff.10buildline.site',path),undefined,path)
@@ -45,6 +46,8 @@ test("host-specific redirects keep disallowed portal paths on the same domain be
   assert.equal(match('staff.10buildline.site','/staff/login').destination,'/?tab=staff')
   assert.equal(match('staff.10buildline.site','/login').destination,'/')
   assert.equal(match('preview.vercel.app','/admin'),undefined)
+  assert.equal(match('www.10buildline.site.attacker.test','/admin'),undefined)
+  assert.equal(match('wwwX10buildlineYsite','/admin'),undefined)
 })
 
 test("the production build serves every deep route and dynamic route through the SPA shell", {timeout:30000}, async t => {
