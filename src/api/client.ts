@@ -52,6 +52,14 @@ type Envelope<T> = {
   data: T
 }
 
+function requestErrorMessage(status: number, body?: { error?: { message?: string; code?: string } | string; message?: string; code?: string }): string {
+  const code = typeof body?.error === "object" ? body.error.code : body?.code;
+  const message = typeof body?.error === "object" ? body.error.message : typeof body?.error === "string" ? body.error : body?.message;
+  if (status === 413 || code === "FUNCTION_PAYLOAD_TOO_LARGE" || message?.includes("FUNCTION_PAYLOAD_TOO_LARGE"))
+    return "File too large. Choose a smaller file and try again.";
+  return message || `Request failed (${status}).`;
+}
+
 async function request<T>(
   path: string,
   init: RequestInit,
@@ -126,9 +134,7 @@ export async function api<T = unknown>(
     }
     if (!response.ok)
       throw new ApiError(
-        response.status === 413 ? "File too large." : body?.error?.message ||
-          body?.message ||
-          `Request failed (${response.status}).`,
+        requestErrorMessage(response.status, body),
         response.status,
         body?.error?.code,
       )
@@ -151,7 +157,7 @@ export async function apiEnvelope(
     }
     if (!response.ok)
       throw new ApiError(
-        response.status === 413 ? "File too large." : body?.error?.message || body?.message || `Request failed (${response.status}).`,
+        requestErrorMessage(response.status, body),
         response.status,
         body?.error?.code,
       )

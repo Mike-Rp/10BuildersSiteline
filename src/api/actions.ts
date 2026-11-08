@@ -1,4 +1,4 @@
-import { api, apiList, downloadApiFile, registerFileUrl } from "./client.ts";
+import { api, apiList, ApiError, downloadApiFile, registerFileUrl } from "./client.ts";
 import { employeeIdFromWorkEmail } from "../../Thesis-Backend/src/domain/work-email.js";
 import { headcount, projectPhaseDisciplines, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
 import type { WorkflowCommand } from "../workflows.ts";
@@ -11,7 +11,7 @@ const issueCodes: Record<string, string> = {
     "Subcontractor manpower shortage": "manpower_shortage", "Safety incident": "safety_incident", "Other": "other",
 };
 export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document") {
-    if (file.size > DIRECT_UPLOAD_LIMIT_BYTES) {
+    const uploadInChunks = async () => {
         const total = Math.ceil(file.size / UPLOAD_CHUNK_BYTES);
         for (let index = 0; index < total; index++) {
             const body = new FormData();
@@ -22,15 +22,25 @@ export async function uploadFile(id: string, file: File, purpose: "document" | "
             body.set("chunk", file.slice(index * UPLOAD_CHUNK_BYTES, Math.min(file.size, (index + 1) * UPLOAD_CHUNK_BYTES), file.type), file.name);
             await api<Dto>("/files/chunks", { method: "POST", body });
         }
-        const saved = await api<Dto>(`/files/${id}/complete`, { method: "POST", json: { purpose } });
-        registerFileUrl(id, saved.download_url);
-        return saved;
+        return await api<Dto>(`/files/${id}/complete`, { method: "POST", json: { purpose } });
+    };
+    let saved: Dto;
+    if (file.size > DIRECT_UPLOAD_LIMIT_BYTES) {
+        saved = await uploadInChunks();
+    } else {
+        const body = new FormData();
+        body.set("id", id);
+        body.set("file", file);
+        body.set("purpose", purpose);
+        try {
+            saved = await api<Dto>("/files", { method: "POST", body });
+        } catch (error) {
+            // Some hosting layers reject multipart requests below the app's
+            // configured direct-upload ceiling. Retry through smaller requests.
+            if (!(error instanceof ApiError) || error.status !== 413) throw error;
+            saved = await uploadInChunks();
+        }
     }
-    const body = new FormData();
-    body.set("id", id);
-    body.set("file", file);
-    body.set("purpose", purpose);
-    const saved = await api<Dto>("/files", { method: "POST", body });
     registerFileUrl(id, saved.download_url);
     return saved;
 }
