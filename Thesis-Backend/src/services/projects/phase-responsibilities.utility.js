@@ -2,6 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js"
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js"
 import { prepareEngineerAssignments } from "./engineer-commitments.utility.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
+import { phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
 
 export async function responsibilitiesInstalled(db) {
   return (
@@ -35,6 +36,8 @@ export async function preparePhaseResponsibilities(
         [typeId, phase.stage],
       )
     ).rows.map((r) => r.code)
+    if (required.length >= 5 && phase.engineers.length > 3)
+      throw new HttpError(422, `Assign no more than three engineers to ${phase.stage}.`)
     const used = new Set(),
       people = new Set()
     for (const engineer of phase.engineers) {
@@ -59,11 +62,12 @@ export async function preparePhaseResponsibilities(
       for (const tag of tags) used.add(tag)
       flat.push({ ...engineer, stage: phase.stage })
     }
-    const missing = required.filter((tag) => !used.has(tag))
-    if (missing.length)
+    const covered = required.filter((tag) => used.has(tag)).length
+    const quota = phaseCoverageQuota(required)
+    if (covered < quota)
       throw new HttpError(
         422,
-        `Uncovered specializations in ${phase.stage}: ${missing.join(", ")}.`,
+        `The specialization coverage for ${phase.stage} is below the required minimum of ${quota} of ${required.length}.`,
       )
   }
   // Lock the complete team in a consistent order before individual credential checks.

@@ -1,5 +1,5 @@
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
-import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing} from './PhaseEngineerAllocation'
+import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,phaseCoverageMeetsQuota} from './PhaseEngineerAllocation'
 import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
 import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
@@ -1195,7 +1195,7 @@ export function IntakeForm({
     )
       err =
         "Every phase needs an eligible Site PM. Review team capacity and qualifications."
-    if(state.multiEngineerAllocationAvailable&&draft.team.some(row=>phaseCoverageMissing(row,row.requiredDisciplines||[]).length||!row.engineers?.length||row.engineers.some(e=>!e.accountId||!e.assignedDisciplines.length)))err='Cover every required specialization with qualified engineers before sending assignment requests.'
+    if(state.multiEngineerAllocationAvailable&&draft.team.some(row=>!phaseCoverageMeetsQuota(row,row.requiredDisciplines||[])||!row.engineers?.length||row.engineers.length>3||row.engineers.some(e=>!e.accountId||!e.assignedDisciplines.length)))err='Cover every required specialization, or at least half for a 5–6 specialization phase, with up to three qualified engineers before sending assignment requests.'
     setError(err)
     if (!err) try {
       submitGuard.current = true
@@ -1521,7 +1521,7 @@ export function IntakeForm({
               <div>
                 <h3>Site PM team by construction phase</h3>
                 <p>
-                  {state.multiEngineerAllocationAvailable?'Assign enough qualified engineers to cover every specialization. The same engineer may handle succeeding phases within this project.':'One qualified Site PM owns each phase. The same Site PM may own multiple phases when eligible and available.'}
+                  {state.multiEngineerAllocationAvailable?'Cover every specialization. For phases with 5–6 specializations, the system tries two engineers, then three, and falls back to at least half coverage if needed. The same engineer may handle succeeding phases within this project.':'One qualified Site PM owns each phase. The same Site PM may own multiple phases when eligible and available.'}
                 </p>
               </div>
               <span>

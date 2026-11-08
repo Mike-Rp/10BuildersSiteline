@@ -14,9 +14,10 @@ The Express backend is included directly in this repository under `Thesis-Backen
 4. Apply the additive integration migration to the database selected in the backend environment:
    `npm --prefix Thesis-Backend run db:integrate`.
    This creates workspace settings and metadata, subcontractor selections, file storage if missing, and optional project fields. It preserves users, projects, companies and workers, enables RLS on its tables, and can be rerun.
-5. Apply `Thesis-Backend/migrations/024-chunked-file-uploads.sql` in the Supabase SQL Editor before deploying the chunked upload backend. It creates a private temporary-chunk table; completed files remain in `stored_files`, and unfinished chunks older than 24 hours are cleaned on later chunk uploads.
-6. Run `npm run dev`. Open **http://localhost:8443**. Express runs at **http://localhost:3000/api/v1**. The launcher restarts the API when `Thesis-Backend/.env` changes; run the integration migration again after switching to a different database.
-7. The frontend defaults to `http://localhost:3000/api/v1`. Override it with `VITE_API_URL` in `.env.local` if needed, then restart Vite.
+5. Apply `Thesis-Backend/migrations/021-admin-recovery-codes.sql` in the Supabase SQL Editor before deploying the admin recovery-code feature. It adds private tables for hashed, one-time recovery codes, short-lived reset challenges and rate limiting. Recovery-code values are only returned once when generated; the database never stores the plaintext codes.
+6. Apply `Thesis-Backend/migrations/024-chunked-file-uploads.sql` in the Supabase SQL Editor before deploying the chunked upload backend. It creates a private temporary-chunk table; completed files remain in `stored_files`, and unfinished chunks older than 24 hours are cleaned on later chunk uploads.
+7. Run `npm run dev`. Open **http://localhost:8443**. Express runs at **http://localhost:3000/api/v1**. The launcher restarts the API when `Thesis-Backend/.env` changes; run the integration migration again after switching to a different database.
+8. The frontend defaults to `http://localhost:3000/api/v1`. Override it with `VITE_API_URL` in `.env.local` if needed, then restart Vite.
 
 Run the processes separately with `npm run dev:web` and `npm run dev:api`. Check the database connection at `http://localhost:3000/api/v1/health`.
 
