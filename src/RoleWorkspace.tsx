@@ -127,6 +127,7 @@ import {
   leadId,
   ownedProjects,
   phaseOwner,
+  canWorkPhase,
   registeredComplete,
   registeredCount,
   REVIEW_MS,
@@ -351,7 +352,7 @@ export default function RoleWorkspace({
   const [reviewAction, setReviewAction] = useState<WorkflowCommand>()
   const [noteRemoval, setNoteRemoval] = useState<{ projectId: string; noteId: string; text: string }>()
   // Ordinary progress report being rejected (separate from checklist evidence and rework decisions).
-  const [reportReject, setReportReject] = useState<{ projectId: string; projectName: string; expectedVersion: number }>()
+  const [reportReject, setReportReject] = useState<{ projectId: string; projectName: string; expectedVersion: number; updateId?:string }>()
   const [activityFilter, setActivityFilter] = useState("all")
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
@@ -379,8 +380,8 @@ export default function RoleWorkspace({
       p.team.some(t=>t.engineers?.some(e=>e.accountId===actor.id&&e.status==='confirmed')) ||
       p.team.some(
         (t) =>
-          t.accountId === actor.id &&
-          projectPhaseNames(p).indexOf(t.phase) <
+          (t.accountId === actor.id || t.engineers?.some(e=>e.accountId===actor.id)) &&
+          projectPhaseNames(p).indexOf(t.phase) <=
             projectPhaseNames(p).indexOf(p.phase),
       ),
   )
@@ -1478,7 +1479,7 @@ export default function RoleWorkspace({
             >
               <span style={{ width: `${p.progress}%` }} />
             </div>
-            <strong>{p.progress}%</strong>
+            <strong>{Math.round(checklistFor(p).filter(i=>i.status==="approved").length / Math.max(1,checklistFor(p).length) * 100)}%</strong>
           </div>
         )}
         {(actionNotes.length > 0 || info.deadline) && (
@@ -1717,14 +1718,12 @@ export default function RoleWorkspace({
   }
   function progressForm(p: Project) {
     const work = workflowFor(p)
-    const currentOwner =
-      phaseOwner(p) === actor.id &&
-      p.team.find((t) => t.phase === p.phase)?.status === "confirmed"
+    const currentOwner = canWorkPhase(p,actor.id)
     if (!currentOwner) {
       const past = p.team.filter(
         (t) =>
-          t.accountId === actor.id &&
-          projectPhaseNames(p).indexOf(t.phase) <
+          (t.accountId === actor.id || t.engineers?.some(e=>e.accountId===actor.id)) &&
+          projectPhaseNames(p).indexOf(t.phase) <=
             projectPhaseNames(p).indexOf(p.phase),
       )
       return (
@@ -1733,8 +1732,8 @@ export default function RoleWorkspace({
             <Icon name="shield" />
             <p>
               {past.length
-                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is now read-only. ${actorName(phaseOwner(p))} owns ${p.phase}.`
-                : `${actorName(phaseOwner(p))} currently owns ${p.phase}. Your future phase is not yet active.`}
+                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is now read-only. Other assigned SPMs may continue their work.`
+                : `Your workspace remains locked until your assigned phase becomes active.`}
             </p>
           </div>
           {past.map((t) => (
@@ -1742,12 +1741,14 @@ export default function RoleWorkspace({
               <summary>{t.phase} — completed phase record</summary>
               {checklistFor(p, t.phase).map((item) => (
                 <div key={item.id} className="repository-check">
-                  <span>{item.label}</span>
+                  <span>{item.label}{(item.attachments?.length ? item.attachments : item.doc ? [item.doc] : []).map(doc=><button key={doc.id} className="inline-link" onClick={()=>showDoc(p,doc)}>{doc.name}</button>)}</span>
                   <Status value={item.status.replace(/_/g," ")} />
                 </div>
               ))}
             </details>
           ))}
+          <section className="detail-section"><h3>Site diary — read-only</h3>{work.notes.filter(n=>n.authorId===actor.id).map(n=><p key={n.id}>{n.text} · {dateLabel(n.date)}</p>)}</section>
+          <section className="detail-section"><h3>Site photo gallery — read-only</h3>{work.photos.filter(doc=>doc.photoUploaderId===actor.id).map(doc=><Button key={doc.id} onClick={()=>showDoc(p,doc)}>{doc.name}</Button>)}</section>
         </div>
       )
     }
@@ -1830,6 +1831,7 @@ export default function RoleWorkspace({
                     {checklistFeedback(item).submission && (
                       <p className="role-muted">Your submission note: {checklistFeedback(item).submission}</p>
                     )}
+                    {item.attachments?.filter(doc=>doc.id!==item.doc?.id).map(doc=><button key={doc.id} className="inline-link" onClick={()=>showDoc(p,doc)}>{doc.name}</button>)}
                     {item.doc && (
                       <button
                         className="inline-link"
@@ -1853,7 +1855,8 @@ export default function RoleWorkspace({
                       buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
                       disabled={saving}
-                      onSave={async (doc) =>
+                      onSave={() => {}}
+                      onSaveMany={async (docs) =>
                         await act(
                           {
                             type: "submit_checklist",
@@ -1861,7 +1864,7 @@ export default function RoleWorkspace({
                             phase: p.phase,
                             itemId: item.id,
                             expectedVersion: item.version,
-                            doc,
+                            docs,
                           },
                           "Evidence submitted to Office PM for QA/QC.",
                         )
@@ -1998,6 +2001,7 @@ export default function RoleWorkspace({
             </Button>
           </div>
           {work.notes
+            .filter(n=>n.authorId===actor.id&&(!n.phase||n.phase===p.phase))
             .slice()
             .reverse()
             .map((n) => (
@@ -2037,7 +2041,7 @@ export default function RoleWorkspace({
             </p>
           </div>
           <div className="site-photo-list">
-            {work.photos.map((doc) => (
+            {work.photos.filter(doc=>doc.photoUploaderId===actor.id&&(!doc.phase||doc.phase===p.phase)).map((doc) => (
               <button key={doc.id} onClick={() => showDoc(p, doc)}>
                 <Icon name="doc" />
                 <span>
@@ -2193,6 +2197,7 @@ export default function RoleWorkspace({
               const rework = work.pendingRework
               return <section id={`active-site-review-${project.id}`} className="active-site-review-card" key={project.id} aria-label={`${project.name} review items`}>
                 <header><div><span className="eyebrow">{project.type} · {project.phase}</span><h3>{project.name}</h3></div><Badge tone="amber">{Number(!!update) + Number(!!rework)} awaiting review</Badge></header>
+                {work.pendingUpdates?.filter(report=>report.id!==update?.id).map(report=><div className="active-site-review-item" key={report.id}><strong>Progress update · {actorName(report.authorId)}</strong><p>{report.note}</p>{submissionDocs(report).map(doc=><Button key={doc.id} onClick={()=>showDoc(project,doc)}>{doc.name}</Button>)}<Button disabled={saving} onClick={()=>void act({type:"approve_update",projectId:project.id,updateId:report.id},"Progress note approved.")}>Approve progress note</Button><Button disabled={saving} onClick={()=>setReportReject({projectId:project.id,projectName:project.name,expectedVersion:report.version,updateId:report.id})}>Reject report</Button></div>)}
                 {update && <div className="active-site-review-item">
                   <div className="active-site-review-heading"><strong>Progress update</strong><Status value={update.escalated ? "escalated — review required" : "pending review"} /></div>
                   <div className="submission-meta"><span>Submitted by {actorName(update.authorId)}</span><span>{new Date(update.submittedAt).toLocaleString()}</span></div>
@@ -3427,7 +3432,7 @@ export default function RoleWorkspace({
               Request Site PM update
             </Button>
           )}
-          {!isOpm && p.status === "active" && phaseOwner(p) === actor.id && (
+          {!isOpm && p.status === "active" && canWorkPhase(p,actor.id) && (
             <Button
               variant="primary"
               onClick={() => {
@@ -3913,12 +3918,13 @@ export default function RoleWorkspace({
       {phaseWorkspaceOpen && !extensionDemo && !isOpm && phaseWorkspaceProject && (
         <Modal
           title={`My phase workspace · ${phaseWorkspaceProject.name}`}
-          subtitle={`Current phase: ${phaseWorkspaceProject.phase} · ${actorName(phaseOwner(phaseWorkspaceProject))} owns this phase`}
+          subtitle={`Current phase: ${phaseWorkspaceProject.phase} · Independent SPM workspace`}
           onClose={() => setPhaseWorkspaceOpen(false)}
           wide
         >
           <DelayedProjectNotice project={phaseWorkspaceProject} today={scheduleToday} />
           {progressForm(phaseWorkspaceProject)}
+          {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={phaseWorkspaceProject} actor={actor} onReload={onReload}/>}
         </Modal>
       )}
       {dialog?.kind === "changes" && detail && (
@@ -4055,6 +4061,7 @@ export default function RoleWorkspace({
         <EvidenceReview key={`${evidenceReview.projectId}-${evidenceReview.evidenceId}-${evidenceReview.type}`}
           projectId={evidenceReview.projectId!} evidenceId={evidenceReview.evidenceId || ""}
           doc={projects.find(project=>project.id===evidenceReview.projectId)?.workflow?.checklist?.[evidenceReview.phase || ""]?.find(item=>item.id===evidenceReview.itemId)?.doc}
+          docs={projects.find(project=>project.id===evidenceReview.projectId)?.workflow?.checklist?.[evidenceReview.phase || ""]?.find(item=>item.id===evidenceReview.itemId)?.attachments}
           onClose={()=>setEvidenceReview(undefined)}
           onConfirm={(expectedReviewToken,note,reject)=>act({...evidenceReview,type:reject?"reject_checklist":"approve_checklist",expectedReviewToken,note},
             reject ? "Activity evidence rejected. Site PM can resubmit corrections." : "Activity approved; verified progress recalculated.")} />
@@ -4067,6 +4074,7 @@ export default function RoleWorkspace({
               onCommand({
                 type: "reject_update",
                 projectId: reportReject.projectId,
+                updateId: reportReject.updateId,
                 expectedVersion: reportReject.expectedVersion,
                 note: reason,
               }),

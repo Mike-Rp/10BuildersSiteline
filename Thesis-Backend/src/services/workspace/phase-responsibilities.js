@@ -12,7 +12,10 @@ import {
   assertEligibleManager,
   LICENSE_ELIGIBILITY_SQL,
 } from "../../common/utilities/license-eligibility.utility.js"
-import { assertPhaseUnlocked } from "../progress/phase.utility.js"
+import { assertPhaseUnlocked, readChecklist } from "../progress/phase.utility.js"
+import { assertAssignmentWritable } from "../progress/assignment.utility.js"
+import { transitionPhase } from "../progress/handoff.utility.js"
+import { maybeCloseProject } from "../archive/policy.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
 
 export function registerResponsibilityRoutes(router, { endpoint, project }) {
@@ -29,8 +32,14 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
         )
       ).rows
       const canReview = await isProjectOpmOrAdmin(user, p.id, db)
-      for (const row of rows)
+      for (const row of rows) {
         row.complete = row.completion_status === "approved"
+        const checklist=await readChecklist(db,p.id,row.project_stage_id,{userId:row.user_id});
+        row.progress=checklist.pct;
+        row.requirements=checklist.required_count;
+        row.approved=checklist.approved_count;
+        row.missing=checklist.items.filter(item=>item.required&&item.status!=="approved").map(item=>({title:item.title,status:item.status}));
+      }
       if (canReview && rows.length) {
         const eligible = (
           await db.query(
@@ -191,6 +200,9 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             "Accept the assignment and finish the current review first.",
           )
         await assertPhaseUnlocked(db, p, row.project_stage_id)
+        await assertAssignmentWritable(db,user,p,row.project_stage_id)
+        const checklist=await readChecklist(db,p.id,row.project_stage_id,{userId:row.user_id});
+        if (!checklist.construction.complete) throw new HttpError(409,"All your required checklist submissions must be approved before completion.")
         if (
           p.lifecycle_status !== "active" ||
           typeof note !== "string" ||
@@ -226,6 +238,12 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             "There is no submitted completion to review.",
           )
         await assertPhaseUnlocked(db, p, row.project_stage_id)
+        if (action==="approve_completion") {
+          const checklist=await readChecklist(db,p.id,row.project_stage_id,{userId:row.user_id});
+          if (p.lifecycle_status!=="active" || Number(p.current_stage_id)!==Number(row.project_stage_id) || !checklist.construction.complete) throw new HttpError(409,"The active assignment's required checklist must be fully approved.")
+          if ((await db.query(`select 1 from project_phase_updates where project_id=$1 and selected_stage_id=$2 and submitted_by=$3 and status='pending'
+            union all select 1 from pending_rework_requests where project_id=$1 and project_stage_id=$2 and submitted_by=$3 and status='pending' limit 1`,[p.id,row.project_stage_id,row.user_id])).rowCount) throw new HttpError(409,"Resolve this SPM's pending reports and issues before approving completion.")
+        }
         if (
           action === "return_completion" &&
           (typeof note !== "string" || !note.trim())
@@ -299,6 +317,10 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
           `insert into project_engineers(project_id,user_id,project_role_label,created_by,updated_by) select $1,$2,'Site PM',$3,$3 where not exists(select 1 from project_engineers where project_id=$1 and user_id=$2 and unassigned_at is null)`,
           [p.id, newUserId, user.id],
         )
+      }
+      if (action==="approve_completion") {
+        const current={...p,current_stage:(await db.query("select code from project_stages where id=$1",[p.current_stage_id])).rows[0]?.code};
+        if (!await maybeCloseProject(db,current,user.id)) await transitionPhase(db,current,user.id);
       }
       await recordArchiveEvent(
         db,

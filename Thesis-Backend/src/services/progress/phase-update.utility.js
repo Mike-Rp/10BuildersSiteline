@@ -59,6 +59,13 @@ export function updateBody(body = {}) {
     ? arrayField(body.checklist_submissions, "checklist_submissions")
     : arrayField(body.submitted_item_ids, "submitted_item_ids").map(item_id => ({ item_id }));
   submissions.forEach(rejectProgressInput);
+  for (const item of submissions) {
+    if (!item || typeof item !== "object") continue;
+    const ids=arrayField(item.file_ids,"checklist file_ids");
+    if (ids.length>20 || ids.some(id=>!isUuid(id)) || new Set(ids).size!==ids.length ||
+      (item.file_id && ids.length && item.file_id!==ids[0])) throw new HttpError(400,"Choose up to 20 distinct checklist attachment UUIDs.");
+    if (item.file_ids!==undefined) { item.file_ids=ids; item.file_id=ids[0]??null; }
+  }
   if (submissions.length > 100 || submissions.some(i => !i || !isBigintId(i.item_id) || BigInt(i.item_id) <= 0n ||
       (i.file_id != null && !isUuid(i.file_id))) ||
       new Set(submissions.map(i => String(i.item_id))).size !== submissions.length) {
@@ -69,7 +76,7 @@ export function updateBody(body = {}) {
     affected_activity_ids:affected.map(String),
     issue_categories: [...new Set(categories)], file_ids: [...new Set(files)],
     checklist_submissions: submissions.map(i => ({
-      item_id: String(i.item_id), file_id: i.file_id ?? null, submission_note: optionalNote(i.submission_note, "submission_note"),
+      item_id: String(i.item_id), file_id: i.file_id ?? null, ...(i.file_ids===undefined?{}:{file_ids:i.file_ids}), submission_note: optionalNote(i.submission_note, "submission_note"),
     })),
   };
 }

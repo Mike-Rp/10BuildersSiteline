@@ -71,6 +71,7 @@ test("an unresolvable workflow fails safely, whatever the saved rows say", async
 // Mock database: the resolved workflow, the number of phase names it should hold, and the saved rows.
 const coverageDb = (resolved, expected, rows, sqls = []) => ({ async query(sql, params) {
   sqls.push(sql.replace(/\s+/g, " "));
+  if(sql.includes('to_regclass'))return {rows:[{ready:false}]};
   assert.deepEqual(params, ["p1"]);
   if (sql.includes("jsonb_array_length")) return { rows: [{ n: expected }] };
   if (sql.includes("FROM project_phase_team t")) return { rows };

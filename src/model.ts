@@ -188,6 +188,7 @@ export type Doc = {
   photoReviewStatus?: "pending" | "released" | "rejected"
   photoReviewNote?: string
   photoUploaderId?: string
+  phase?: string
 }
 export type RegistrationCredential = {
   profession: string
@@ -366,6 +367,8 @@ export type ChecklistItem = {
   reworkReason?: string
   version: number
   doc?: Doc
+  attachments?: Doc[]
+  workspaceUserId?: string
   // The Site PM's note when uploading the evidence.
   submissionNote?: string
   // The Office PM's reason when rejecting it. Kept apart from the submission note.
@@ -445,6 +448,7 @@ export type ProjectWorkflow = {
   selections: SubcontractorSelection[]
   checklist: Record<string, ChecklistItem[]>
   pendingUpdate?: ProgressSubmission
+  pendingUpdates?: ProgressSubmission[]
   pendingRework?: ProgressSubmission
   updateRequested?: {
     by: string
@@ -465,6 +469,7 @@ export type ProjectWorkflow = {
     authorId: string
     text: string
     date: string
+    phase?: string
   }[]
   photos: Doc[]
   documentArchive?: Doc[]

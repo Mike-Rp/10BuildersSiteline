@@ -126,6 +126,7 @@ export function AttachmentRow({ name, size, onRemove, disabled = false }: {
 export function Upload({
   label,
   onSave,
+  onSaveMany,
   onBusyChange,
   owner = "Administrator",
   disabled = false,
@@ -136,6 +137,7 @@ export function Upload({
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
+  onSaveMany?: (docs: Doc[]) => void | boolean | Promise<void | boolean>
   onBusyChange?: (busy: boolean) => void
   owner?: string
   disabled?: boolean
@@ -166,14 +168,18 @@ export function Upload({
     setError("")
     const finishUpload = beginFileUpload()
     try {
+      if (onSaveMany && files.length > 20) throw new Error("Choose at most 20 attachments per submission.")
+      const docs: Doc[] = []
       for (const file of files) {
         const id = uid()
         const uploaded = await saveFile(id, file, spreadsheet)
         const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
         if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
-        const saved=await onSave(doc)
+        docs.push(doc)
+        const saved=onSaveMany ? true : await onSave(doc)
         if(saved===false)throw new Error("We couldn’t save your upload. Your files are still selected—please try again.")
       }
+      if (onSaveMany && await onSaveMany(docs) === false) throw new Error("We couldn’t save your submission. Please try again.")
       showActionResult(`${files.length === 1 ? label : `${files.length} ${label} files`} uploaded and saved successfully.`)
       clear()
     } catch (e) {

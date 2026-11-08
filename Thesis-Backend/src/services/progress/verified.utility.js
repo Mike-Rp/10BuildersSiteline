@@ -2,6 +2,7 @@ import { phaseProgress, projectProgress } from "../../domain/verified-progress.j
 import { ensureChecklist } from "./phase.utility.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
+import { participantsSql } from "./assignment.utility.js";
 
 // Called at activation, under the existing project transaction/lock. Existing snapshots
 // are never replaced; all newly activated phases are frozen before template edits.
@@ -27,7 +28,7 @@ export async function readVerifiedProgress(db, projectIds) {
     UNION SELECT id,current_stage_id FROM projects WHERE id=ANY($1::uuid[]) AND current_stage_id IS NOT NULL
   ) SELECT ph.project_id,s.id::text AS phase_id,s.code AS name,
     w.project_stage_id IS NOT NULL AS expected,
-    c.project_id IS NOT NULL AS configured,i.id::text AS activity_id,i.code,i.required,i.weight,
+    c.project_id IS NOT NULL AS configured,i.id::text || ':' || coalesce(a.user_id::text,'') AS activity_id,i.code,i.required,i.weight,a.user_id AS workspace_user_id,
     w.position::int,w.phase_count::int,
     (SELECT position FROM workflow WHERE project_id=p.id AND project_stage_id=p.current_stage_id)::int AS current_position,
     COALESCE((to_jsonb(c)->>'on_hold')::boolean,false) AS on_hold,
@@ -40,8 +41,10 @@ export async function readVerifiedProgress(db, projectIds) {
     LEFT JOIN workflow w ON w.project_id=p.id AND w.project_stage_id=ph.project_stage_id
     LEFT JOIN project_phase_checklists c ON c.project_id=ph.project_id AND c.project_stage_id=ph.project_stage_id
     LEFT JOIN project_phase_checklist_items i ON i.project_id=ph.project_id AND i.project_stage_id=ph.project_stage_id
+    LEFT JOIN (${await participantsSql(db)}) a ON a.project_id=ph.project_id AND a.project_stage_id=ph.project_stage_id
     LEFT JOIN LATERAL(SELECT status,reviewed_by,reviewed_at FROM project_phase_evidence
       WHERE checklist_item_id=i.id AND project_id=i.project_id AND project_stage_id=i.project_stage_id
+        AND (a.completion_status IS NULL OR submitted_by=a.user_id)
       ORDER BY id DESC LIMIT 1)e ON true
     ORDER BY ph.project_id,COALESCE(w.sort_order,s.sort_order),s.id,i.sort_order,i.id`, [projectIds]);
   const grouped = new Map(projectIds.map(id => [id, new Map()]));
@@ -53,7 +56,7 @@ export async function readVerifiedProgress(db, projectIds) {
       currentPosition: row.current_position,
     });
     if (row.activity_id) phases.get(row.phase_id).activities.push({
-      id: row.activity_id, code: row.code, required: row.required, weight: row.weight,
+      id: row.activity_id, code: row.code, required: row.required, weight: row.weight, workspaceUserId:row.workspace_user_id,
       status: row.status, approvalValid: row.approval_valid === true,
     });
   }

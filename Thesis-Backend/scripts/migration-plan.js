@@ -32,6 +32,8 @@ export const DEDICATED_MIGRATIONS = Object.freeze({
   "011-independent-notifications.sql": "Dry run first: scripts/migrate-notifications.js",
   "014-mixed-use-project-scope.sql": "Dry run first: scripts/migrate-mixed-use-scope.js",
   "015-engineer-credentials.sql": "Requires migration 009 and 014; apply after verifying both",
+  "024-chunked-file-uploads.sql": "Apply explicitly before enabling chunked uploads",
+  "025-independent-spm-workspaces.sql": "Apply explicitly before enabling independent SPM workspaces; requires 020",
 })
 
 const LEGACY_NAME_ALIASES = Object.freeze({

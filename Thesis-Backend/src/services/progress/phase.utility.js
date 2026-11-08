@@ -7,6 +7,7 @@ import { markPhaseCompleted } from "../licenses/history.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
+import { participantsSql, multiSpmInstalled, assertAssignmentWritable } from "./assignment.utility.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -46,7 +47,7 @@ export async function assertProjectSpm(client, user, project) {
 // Compatibility for older callers: authorization is now at project level.
 export async function assertPhaseOwner(client, user, project, requestedStage = project.current_stage_id) {
   if (!isSmallintId(requestedStage)) throw new HttpError(400, "Invalid stage_id.");
-  await assertProjectSpm(client, user, project);
+  await assertAssignmentWritable(client, user, project, requestedStage);
 }
 
 export async function assertPhaseUnlocked(client, project, stageId) {
@@ -85,21 +86,37 @@ export async function ensureChecklist(client, projectId, stageId, { reconcile = 
        FROM added HAVING count(*)>0`, [projectId, stageId]);
 }
 
-export async function readChecklist(client, projectId, stageId, { initialize = true } = {}) {
-  if (initialize) await ensureChecklist(client, projectId, stageId, { reconcile: true });
+export async function readChecklistItems(client, projectIds, {stageId = null, userId = null, currentOnly = false} = {}) {
+  const participants = await participantsSql(client);
+  const attachments = await multiSpmInstalled(client);
   const result = await client.query(
-    `SELECT i.id, i.code, i.title, i.required, i.sort_order, i.weight,
+    `SELECT i.id, i.project_id, i.project_stage_id, s.code AS stage_code, i.code, i.title, i.required, i.sort_order, i.weight,
+            a.user_id AS workspace_user_id, au.full_name AS workspace_name,
             CASE WHEN e.status='rejected' AND e.rework_request_id IS NOT NULL THEN 'rework_required' ELSE COALESCE(e.status,'missing') END AS status,
             e.id AS evidence_id, e.file_id, e.submitted_at, e.reviewed_at, e.review_note, e.reviewed_by,
-            e.submitted_by, su.full_name AS submitted_by_name, e.submission_note, e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason, f.original_name, f.content_type
+            e.submitted_by, su.full_name AS submitted_by_name, e.submission_note, e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason, f.original_name, f.content_type,
+            ${attachments ? `(SELECT coalesce(jsonb_agg(jsonb_build_object('id',af.id,'original_name',af.original_name,'content_type',af.content_type,'uploaded_by',af.uploaded_by,'uploaded_at',af.uploaded_at) ORDER BY af.uploaded_at,af.id),'[]'::jsonb)
+              FROM project_phase_evidence_files ef JOIN project_phase_files af ON af.id=ef.file_id WHERE ef.evidence_id=e.id)` : "'[]'::jsonb"} AS files
        FROM project_phase_checklist_items i
+       JOIN project_stages s ON s.id=i.project_stage_id
+       LEFT JOIN (${participants}) a ON a.project_id=i.project_id AND a.project_stage_id=i.project_stage_id
+       LEFT JOIN users au ON au.id=a.user_id
        LEFT JOIN LATERAL (
-         SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1
+         SELECT * FROM project_phase_evidence WHERE checklist_item_id = i.id
+           AND (a.completion_status IS NULL OR submitted_by=a.user_id) ORDER BY id DESC LIMIT 1
        ) e ON true
        LEFT JOIN pending_rework_requests r ON r.id=e.rework_request_id
        LEFT JOIN project_phase_files f ON f.id=e.file_id
        LEFT JOIN users su ON su.id=e.submitted_by
-      WHERE i.project_id = $1 AND i.project_stage_id = $2 ORDER BY i.sort_order, i.id`, [projectId, stageId]);
+      WHERE i.project_id = ANY($1::uuid[]) AND ($2::smallint IS NULL OR i.project_stage_id = $2) AND ($3::uuid IS NULL OR a.user_id=$3)
+        AND (NOT $4::boolean OR i.project_stage_id=(SELECT current_stage_id FROM projects WHERE id=i.project_id))
+      ORDER BY i.project_id,i.project_stage_id,a.user_id,i.sort_order, i.id`, [projectIds, stageId,userId,currentOnly]);
+  return result.rows;
+}
+
+export async function readChecklist(client, projectId, stageId, { initialize = true, userId = null } = {}) {
+  if (initialize) await ensureChecklist(client, projectId, stageId, { reconcile: true });
+  const result = {rows:await readChecklistItems(client,[projectId],{stageId,userId})};
   const required = result.rows.filter(i => i.required);
   const approved = required.filter(i => i.status === "approved" && i.reviewed_by && i.reviewed_at).length;
   const scope = await client.query(`SELECT w.project_stage_id,
@@ -109,12 +126,12 @@ export async function readChecklist(client, projectId, stageId, { initialize = t
     WHERE p.id=$1 ORDER BY w.sort_order`, [projectId]);
   const position = scope.rows.findIndex(row => Number(row.project_stage_id) === Number(stageId));
   const construction = constructionPhaseProgress(position, scope.rows.length,
-    result.rows.map(item => ({ ...item, approvalValid: !!item.reviewed_by && !!item.reviewed_at })),
+    result.rows.map(item => ({ ...item, workspaceUserId: item.workspace_user_id, approvalValid: !!item.reviewed_by && !!item.reviewed_at })),
     { onHold: scope.rows[position]?.on_hold === true });
   return { configured: required.length > 0, approved_count: approved, required_count: required.length,
     construction,
     verified: { ...phaseProgress({ id: String(stageId), configured: required.length > 0,
-      activities: result.rows.map(item => ({ id: String(item.id), required: item.required, weight: item.weight,
+      activities: result.rows.map(item => ({ id: `${item.id}:${item.workspace_user_id || ''}`, required: item.required, weight: item.weight,
         status: item.status, approvalValid: !!item.reviewed_by && !!item.reviewed_at })) }), complete: construction.complete },
     pct: checklistPct(approved, required.length), items: result.rows };
 }

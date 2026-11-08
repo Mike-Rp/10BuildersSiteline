@@ -26,6 +26,7 @@ import { readManpowerFile, registerCompany, withdrawCompanyRequest } from "./man
 import { assertPhaseCoverage } from "../projects/phase-coverage.utility.js";
 import { companyRemovalReadiness, removeCompany } from "./company-removal.utility.js";
 import { reviewSitePhoto } from "./site-photo-review.utility.js";
+import { assertAssignmentWritable, multiSpmInstalled } from "../progress/assignment.utility.js";
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js";
 import { credentialSummary } from "../licenses/credentials.controller.js";
 import { claimFields, claimResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
@@ -252,7 +253,7 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     await sweepLicensesThrottled(db);
     const allowed = (await db.query(`select p.id from projects p where not coalesce(p.is_deleted,false) and
  ($1='admin' or p.suggested_opm_id=$2 or exists(select 1 from project_phase_team t where t.project_id=p.id and t.spm_user_id=$2)
- or exists(select 1 from project_engineers e where e.project_id=p.id and e.user_id=$2 and e.unassigned_at is null)
+ or exists(select 1 from project_engineers e where e.project_id=p.id and e.user_id=$2 and (e.unassigned_at is null or ($1='spm' and p.lifecycle_status='archived')))
  or exists(select 1 from engineer_assignment_history h where h.project_id=p.id and h.user_id=$2 and h.ended_at is not null)
  or exists(select 1 from user_client_project_links l where l.project_id=p.id and l.user_id=$2))`, [user.role, user.id])).rows.map(r => r.id);
     const projectMeta = user.role === "client" ? [] : (await db.query("select project_id as id,metadata from workspace_project_metadata where project_id=any($1::uuid[])", [allowed])).rows;
@@ -763,11 +764,13 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         case "add_photo": {
             if (user.role !== "spm")
                 throw new HttpError(403, "Only Site PMs can add photos.");
+            await assertAssignmentWritable(db,user,p);
             const f = await file(db, user, c.doc?.id);
             if (!/image\/(png|jpeg)/.test(f.content_type))
                 throw new HttpError(400, "Choose a JPG or PNG.");
             await linkProjectFile(db, p.id, f.id, "photo");
-            await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5)", [p.id, "db://" + f.id, c.note || "", user.id, false]); // internal until the Office PM or Administrator releases it
+            const photo=await db.query("insert into project_photos(project_id,file_ref,caption,taken_date,uploaded_by,is_client_visible) values($1,$2,$3,current_date,$4,$5) returning id", [p.id, "db://" + f.id, c.note || "", user.id, false]); // internal until the Office PM or Administrator releases it
+            if(await multiSpmInstalled(db))await db.query("update project_photos set project_stage_id=$2 where id=$1",[photo.rows[0].id,p.current_stage_id]);
             break;
         }
         case "release_photo":

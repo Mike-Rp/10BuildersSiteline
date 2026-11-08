@@ -121,10 +121,12 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             return;
         }
         case "submit_checklist": {
-            if (!command.doc)
+            const docs=command.docs || (command.doc ? [command.doc] : []);
+            if (!docs.length)
                 throw new Error("Choose checklist evidence.");
-            const file_id = await phaseFile(id, command.doc);
-            await post(base + "/checklist-items/" + command.itemId + "/submit", { file_id, submission_note: command.note });
+            const file_ids=[];
+            for(const doc of docs)file_ids.push(await phaseFile(id,doc));
+            await post(base + "/checklist-items/" + command.itemId + "/submit", { file_ids, submission_note: command.note });
             return;
         }
         case "approve_checklist":
@@ -146,7 +148,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
                 await post(base + "/notes", { note_text: command.note || "Office PM requested a progress update." });
                 return;
             }
-            const pending = project.workflow?.pendingUpdate;
+            const pending = command.updateId ? project.workflow?.pendingUpdates?.find(u=>u.id===command.updateId) : project.workflow?.pendingUpdate;
             if (!pending)
                 throw new Error("No pending phase update was found.");
             await post(base + "/phase-updates/" + pending.id + "/approve", { resolution_note: command.note || "Reviewed." });
@@ -154,7 +156,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
         }
         case "reject_update": {
             // Only the report is rejected: no checklist credit changes and no phase advances.
-            const pending = project.workflow?.pendingUpdate;
+            const pending = command.updateId ? project.workflow?.pendingUpdates?.find(u=>u.id===command.updateId) : project.workflow?.pendingUpdate;
             if (!pending)
                 throw new Error("No pending phase update was found.");
             const reason = command.note?.trim();

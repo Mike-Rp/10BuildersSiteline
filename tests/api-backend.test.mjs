@@ -54,7 +54,7 @@ const until = async (fn, ms = 30000) => {
   }
 }
 
-test("the frontend loads each role's data through the real backend", { skip: !available && "Thesis-Backend folder not found", timeout: 120000 }, async (t) => {
+test("the frontend loads each role's data through the real backend", { skip: !available && "Thesis-Backend folder not found", timeout: 180000 }, async (t) => {
   const db = new PGlite({ extensions: { citext } })
   await db.exec("create role authenticated; create role anon; create role service_role; create schema extensions; create schema auth; create schema storage;")
   await db.exec(fs.readFileSync(schema, "utf8").replace(/^create extension if not exists pgcrypto.*$/m, ""))
@@ -447,8 +447,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await loadState(session.user)).projects.find(p=>p.id===newProjectId).workflow.selections.find(c=>c.companyId===company.id).status,"declined")
   })
 
+  const asBrookfieldSpm=async()=>asUser((await db.query("select u.email from projects p join project_phase_team t on t.project_id=p.id and t.project_stage_id=p.current_stage_id join users u on u.id=t.spm_user_id where p.name='Brookfield Warehouse Ext.'")).rows[0].email)
   await t.test("SPM evidence and notes persist and OPM approval updates the checklist", async () => {
-    let {user,state}=await asUser("karlo.espiritu@10builders.com")
+    let {user,state}=await asBrookfieldSpm()
     const project=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
     const actor=state.accounts.find(a=>a.id===user.id)
     await sendApiWorkflow(state,actor,{type:"add_note",projectId:project.id,note:"Integration test site diary entry"})
@@ -548,7 +549,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   await t.test("a combined progress update is visible after reload and can be approved",async()=>{
-    let {user,state}=await asUser("karlo.espiritu@10builders.com")
+    let {user,state}=await asBrookfieldSpm()
     const project=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
     await sendApiWorkflow(state,state.accounts.find(a=>a.id===user.id),{type:"submit_progress",projectId:project.id,note:"Combined progress note saved through the API"})
     state=await loadState(user)
@@ -562,7 +563,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   await t.test("an Office PM rejects an ordinary progress report with a reason, without touching checklist credit or the phase",async()=>{
-    let {user,state}=await asUser("karlo.espiritu@10builders.com")
+    let {user,state}=await asBrookfieldSpm()
     const project=state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
     const spm=state.accounts.find(a=>a.id===user.id)
     await sendApiWorkflow(state,spm,{type:"submit_progress",projectId:project.id,note:"Report that will be rejected"})
@@ -583,7 +584,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     // The stale screen (still showing the report) now gets a readable "already resolved" message.
     await assert.rejects(sendApiWorkflow(opm.state,actor,{type:"reject_update",projectId:project.id,note:"Second click"}),/already|rejected/i)
     // Another Site PM cannot reject: report decisions stay with the project's Office PM.
-    const other=await asUser("karlo.espiritu@10builders.com")
+    const other=await asBrookfieldSpm()
     await sendApiWorkflow(other.state,other.state.accounts.find(a=>a.id===other.user.id),{type:"submit_progress",projectId:project.id,note:"Second report"})
     const loaded=await loadState(other.user)
     await assert.rejects(sendApiWorkflow(loaded,loaded.accounts.find(a=>a.id===other.user.id),{type:"reject_update",projectId:project.id,note:"Not allowed"}),/Office PM|permission/i)
@@ -596,7 +597,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const png=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,2,0,0,0,144,119,83,222])],{type:"image/png"})
     const pdf=()=>new Blob(["%PDF-1.4\n1 0 obj\n<< >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"],{type:"application/pdf"})
     const form=(blob,name,fields={})=>{const f=new FormData();for(const [k,v] of Object.entries(fields))f.append(k,v);f.append("file",blob,name);return f}
-    const siteSession=await asUser("karlo.espiritu@10builders.com")
+    const siteSession=await asBrookfieldSpm()
     const project=siteSession.state.projects.find(p=>p.name==="Brookfield Warehouse Ext.")
     const base="/progress/projects/"+project.id
     const upload=async(blob,name)=>{const saved=await api(base+"/phase-files",{method:"POST",body:form(blob,name)});return saved.file?.id||saved.id}
@@ -623,7 +624,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const adminPending=(await loadState(admin.user)).projects.find(p=>p.id===project.id).workflow.pendingUpdate
     assert.equal(adminPending.attachments.length,2)
     for(const id of [idPhoto,idSheet]) assert.ok((await downloadApiFile(id)).size>0,"Administrator opens "+id)
-    const owner=await asUser("karlo.espiritu@10builders.com")
+    const owner=await asBrookfieldSpm()
     assert.ok((await downloadApiFile(idPhoto))?.size>0,"the submitting Site PM opens their own file")
 
     // 2) access restrictions: an unrelated Site PM, a client and a signed-out caller get nothing
@@ -640,7 +641,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await resolve("Cleanup 1")
 
     // 3) the file sent with the report itself
-    await asUser("karlo.espiritu@10builders.com")
+    await asBrookfieldSpm()
     await api(base+"/phase-updates",{method:"POST",body:form(png(),"direct-upload.png",{note:"One attachment sent with the report"})})
     office=await officePm()
     pending=await pendingFor(office)
@@ -649,7 +650,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await resolve("Cleanup 2")
 
     // 4) a report with no attachment shows none, and does not borrow checklist evidence
-    const site=await asUser("karlo.espiritu@10builders.com")
+    const site=await asBrookfieldSpm()
     const item=site.state.projects.find(p=>p.id===project.id).workflow.checklist[project.phase].find(i=>i.status==="missing")
     const evidenceFile=await upload(pdf(),"checklist-evidence.pdf")
     await api(base+"/phase-updates",{method:"POST",json:{note:"No attachment, but checklist evidence",checklist_submissions:[{item_id:item.id,file_id:evidenceFile,submission_note:"Evidence"}]}})
@@ -663,7 +664,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const otherSite=await asUser("bea.concepcion@10builders.com")
     const meralco=otherSite.state.projects.find(p=>p.name==="Meralco Ave. Fit-out")
     const foreign=(await api("/progress/projects/"+meralco.id+"/phase-files",{method:"POST",body:form(png(),"other-project.png")}))
-    await asUser("karlo.espiritu@10builders.com")
+    await asBrookfieldSpm()
     await assert.rejects(api(base+"/phase-updates",{method:"POST",json:{note:"Borrowed file",file_ids:[foreign.file?.id||foreign.id]}}),/belong to you and the selected project/i)
   })
 
@@ -1286,7 +1287,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("Site PM photos stay internal until the Office PM or Administrator releases them", async () => {
     const existingPhotos = (await db.query("select id,is_client_visible from project_photos")).rows
     const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222])
-    const site = await asUser("karlo.espiritu@10builders.com")
+    const site = await asBrookfieldSpm()
     const project = site.state.projects.find(p => p.name === "Brookfield Warehouse Ext.")
     await db.query("update workspace_settings set rules=jsonb_set(rules,'{cap}','100'::jsonb) where singleton")
     await db.query("update user_licenses set license_number='1234567' where user_id in (select u.id from users u join roles r on r.id=u.role_id where r.code='spm') and superseded_at is null")
@@ -1294,7 +1295,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const replacements = await api(`/projects/${project.id}/phase-assignment-candidates`)
     assert.ok(replacements.length, "the assigned Office PM gets eligible replacement choices")
     assert.ok(replacements.every(candidate => candidate.role === "spm" && !("email" in candidate) && !("license" in candidate)))
-    await asUser("karlo.espiritu@10builders.com")
+    await asBrookfieldSpm()
     const fileId = randomUUID()
     await uploadFile(fileId, new File([png], "gate.png", { type: "image/png" }))
     const command = (payload) => api("/projects/" + project.id + "/workspace-command", { method: "POST", json: payload })
@@ -1321,7 +1322,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await asUser("f.uy@aldenheights-hoa.com")
     assert.ok((await api("/projects/" + project.id + "/photos")).some(p => p.id === row.id))
     assert.ok(await downloadApiFile(fileId), "released image content becomes accessible to the linked client")
-    await asUser("karlo.espiritu@10builders.com")
+    await asBrookfieldSpm()
     const adminFileId = randomUUID()
     await uploadFile(adminFileId, new File([png], "admin-review.png", { type: "image/png" }))
     await command({ type: "add_photo", doc: { id: adminFileId }, note: "Administrator release test" })

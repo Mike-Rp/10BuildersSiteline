@@ -97,6 +97,16 @@ test("all shared PDF fields enforce 10 MB and reject oversized selections before
     assert.match(dialog.querySelector('.extension-evidence').textContent, /accepted.pdf/)
     assert.equal(dialog.querySelector('[role="alert"]'), null)
     assert.deepEqual(requests, [])
+    // Checklist submissions save every attachment first, then submit once.
+    const batches=[]
+    t.mock.method(globalThis,"fetch",async (_url,options)=>Response.json({data:{id:options.body.get('id')}}))
+    await act(()=>root.render(React.createElement(Upload,{key:'checklist-batch',label:'Checklist evidence',onSave:()=>assert.fail('A checklist batch must not submit one file at a time'),onSaveMany:docs=>batches.push(docs)})))
+    await select([new File(['%PDF-test'],'inspection.pdf',{type:'application/pdf'}),new File(['%PDF-test'],'test-results.pdf',{type:'application/pdf'})])
+    await click('Confirm upload')
+    for(let i=0;i<20&&!batches.length;i++)await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10))})
+    assert.equal(batches.length,1)
+    assert.deepEqual(batches[0].map(doc=>doc.name),['inspection.pdf','test-results.pdf'])
+    assert.equal(document.querySelector('.attachment-row'),null)
   } finally {
     await act(() => root.unmount())
     await server.close()

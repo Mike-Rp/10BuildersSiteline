@@ -16,6 +16,7 @@ function setup(options={}) {
 const rows=values=>({rows:values,rowCount:values.length});
 async function query(sql,args=[]) {
  sql=sql.replace(/\s+/g," ").trim();state.queries.push({sql,args});
+ if(sql.startsWith('select to_regclass'))return rows([{ready:false}]);
  if(sql==="SELECT now() AS now") return rows([{now:state.now}]);
  if(sql.startsWith("SELECT p.*")) return rows(state.projects ?? [structuredClone(state.project)]);
  if(sql.startsWith("SELECT id FROM project_stages")) return rows([{id:7}]);

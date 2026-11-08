@@ -1,11 +1,11 @@
 
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
-import { LIST_SELECT, LIST_FROM, stripInternal } from "../projects/read.controller.js";
+import { LIST_SELECT, projectListFrom, stripInternal } from "../projects/read.controller.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
 import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
-import { ensureChecklist } from "../progress/phase.utility.js";
+import { ensureChecklist, readChecklistItems } from "../progress/phase.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
@@ -15,7 +15,7 @@ const scope = `p.id in (
  or ($1='opm' and (scoped.suggested_opm_id=$2 or exists(
    select 1 from project_engineers e where e.project_id=scoped.id and e.user_id=$2 and e.unassigned_at is null)))
  or ($1='spm' and (exists(select 1 from project_phase_team t where t.project_id=scoped.id and t.spm_user_id=$2)
-   or exists(select 1 from project_engineers e where e.project_id=scoped.id and e.user_id=$2 and e.unassigned_at is null)))
+   or exists(select 1 from project_engineers e where e.project_id=scoped.id and e.user_id=$2 and (e.unassigned_at is null or scoped.lifecycle_status='archived'))))
  or ($1 in ('opm','spm') and exists(select 1 from engineer_assignment_history h where h.project_id=scoped.id and h.user_id=$2 and h.ended_at is not null))
  or ($1='client' and scoped.lifecycle_status in ('active','archived') and exists(
    select 1 from user_client_project_links l where l.project_id=scoped.id and l.user_id=$2)))
@@ -76,7 +76,7 @@ export async function getProjectData(req,res) {
   const user=await requireUser(req,res,["admin","opm","spm","client"]);if(!user)return;
   const data=await withTransaction(async db=>{
    await db.query("select set_config('app.current_user_id',$1,true)",[user.id]);
-   const projects=(await db.query(`select ${LIST_SELECT} ${LIST_FROM}
+   const projects=(await db.query(`select ${LIST_SELECT} ${await projectListFrom(db)}
     where not coalesce(p.is_deleted,false) and ${scope} order by p.name,p.id`,[user.role,user.id])).rows;
    const ids=projects.map(p=>p.id);
    if(!ids.length)return [];
@@ -119,19 +119,11 @@ export async function getProjectData(req,res) {
     left join stored_files f on ph.file_ref='db://'||f.id or ph.file_ref='db:'||f.id
     where ph.project_id=any($1::uuid[]) and ($2<>'client' or ph.is_client_visible) order by ph.created_at`,[ids,user.role])).rows.map(r=>download({...r,client_visible:r.is_client_visible}));
    const notes=staff?(await db.query(`select * from(
-    select n.project_id,n.id,n.author_id,u.full_name as author,n.note_text,n.noted_at,
+    select n.project_id,n.id,n.author_id,u.full_name as author,n.note_text,n.noted_at,to_jsonb(n)->>'project_stage_id' AS project_stage_id,
      row_number() over(partition by n.project_id order by n.noted_at desc) as position
     from project_notes n left join users u on u.id=n.author_id where n.project_id=any($1::uuid[])
    ) recent where position<=50 order by noted_at desc`,[ids])).rows:[];
-   const checklist=staff?(await db.query(`select i.project_id,i.id,i.code,i.title,i.required,i.sort_order,i.weight,
-    case when e.status='rejected' and e.rework_request_id is not null then 'rework_required' else coalesce(e.status,'missing') end as status,e.id as evidence_id,e.file_id,e.submitted_at,e.reviewed_at,
-    e.review_note,e.submitted_by,su.full_name as submitted_by_name,e.submission_note,e.phase_update_id,e.rework_request_id,r.resolution_note AS rework_reason,f.original_name,f.content_type
-    from project_phase_checklist_items i join projects p on p.id=i.project_id and p.current_stage_id=i.project_stage_id
-    left join lateral(select * from project_phase_evidence where checklist_item_id=i.id order by id desc limit 1)e on true
-    left join pending_rework_requests r on r.id=e.rework_request_id
-    left join project_phase_files f on f.id=e.file_id
-    left join users su on su.id=e.submitted_by
-    where i.project_id=any($1::uuid[]) order by i.sort_order,i.id`,[ids])).rows:[];
+   const checklist=staff?await readChecklistItems(db,ids,{userId:user.role==='spm'?user.id:null,currentOnly:user.role!=='spm'}):[];
    const updates=staff?(await db.query(`select u.*,selected.code as requested_stage,prior.code as prior_stage,
     coalesce((select jsonb_agg(jsonb_build_object('id',f.id,'name',f.original_name,'content_type',f.content_type,'byte_size',f.byte_size) order by f.uploaded_at,f.id)
       from project_phase_submission_files sf join project_phase_files f on f.id=sf.file_id and f.project_id=u.project_id
@@ -164,7 +156,7 @@ export async function getProjectData(req,res) {
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
     return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
-     overview:staff?{checklist:{items},pending_update:pending[0]||null,issues:issueRows}:undefined,
+     overview:staff?{checklist:{items},pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
      assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{overallProgress:verified.get(p.id)?.project.percentage ?? null})};
    });
   });

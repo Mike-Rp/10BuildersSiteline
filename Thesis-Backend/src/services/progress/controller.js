@@ -6,6 +6,8 @@ import {
 } from "../../common/utilities/access.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
+import { phaseProject } from "./phase.utility.js";
+import { assertAssignmentWritable, multiSpmInstalled } from "./assignment.utility.js";
  
 import { submitPhaseUpdate } from "./phase.controller.js";
 import { reportProjectIssue } from "./phase.controller.js";
@@ -120,12 +122,20 @@ export const addProjectNote = async (req, res) => {
     if (!note_text || !String(note_text).trim()) return sendError(res, "note_text is required.", 400);
     if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
  
-    const result = await execute(
+    const result = await withTransaction(async db => {
+      const p=await phaseProject(db,user,id,{active:user.role==="spm"});
+      if (user.role==="spm") await assertAssignmentWritable(db,user,p);
+      const scoped=await multiSpmInstalled(db);
+      return db.query(
       `INSERT INTO project_notes (id, project_id, author_id, note_text, noted_at, created_by, updated_by)
        VALUES ($1, $2, $3, $4, now(), $3, $3)
        RETURNING id, note_text, noted_at`,
       [uuidv4(), id, user.id, String(note_text).trim()]
-    );
+      ).then(async result=>{
+        if(scoped)await db.query("UPDATE project_notes SET project_stage_id=$2 WHERE id=$1",[result.rows[0].id,p.current_stage_id]);
+        return result;
+      });
+    });
     return sendOk(res, "Note added.", 1, result.rows[0], 201);
   } catch (error) {
     return handleError(res, error);

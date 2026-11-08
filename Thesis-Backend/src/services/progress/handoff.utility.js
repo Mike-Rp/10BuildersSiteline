@@ -10,7 +10,7 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   if (project.lifecycle_status !== "active") return { state: "inactive", advanced: false };
   const checklist = await readChecklist(db, project.id, project.current_stage_id, { initialize });
   if (checklist.construction?.onHold) return blocked("The current phase is explicitly on hold.", "phase_on_hold");
-  if(await responsibilitiesInstalled(db) && (await db.query("select 1 from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and (status<>'confirmed' or completion_status<>'approved') limit 1",[project.id,project.current_stage_id])).rowCount)return blocked('Every engineer must have their responsibilities approved as completed before phase handoff.','engineer_responsibilities',409);
+  if(await responsibilitiesInstalled(db) && (await db.query("select 1 from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and status<>'released' and (status<>'confirmed' or completion_status<>'approved') limit 1",[project.id,project.current_stage_id])).rowCount)return blocked('Every engineer must have their responsibilities approved as completed before phase handoff.','engineer_responsibilities',409);
   if (!verifiedComplete(checklist.verified)) return { state: checklist.verified.percentage === null ? "unknown" : "incomplete", advanced: false,
     reason: "All required checklist items must be approved before advancing.", code: 422 };
   const next = await db.query(
@@ -26,7 +26,7 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   const owner = await db.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2 AND status='confirmed' AND spm_user_id IS NOT NULL", [project.id, project.current_stage_id]);
   if (!owner.rowCount) return blocked("The current phase SPM must confirm their assignment before handoff.", "current_assignment");
   const phase = next.rows[0];
-  if(await responsibilitiesInstalled(db) && (await db.query("select 1 from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and status<>'confirmed' limit 1",[project.id,phase.project_stage_id])).rowCount)return blocked('All engineers in the next phase must accept their responsibilities.','next_responsibilities');
+  if(await responsibilitiesInstalled(db) && (await db.query("select 1 from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and status not in ('confirmed','released') limit 1",[project.id,phase.project_stage_id])).rowCount)return blocked('All engineers in the next phase must accept their responsibilities.','next_responsibilities');
   if (phase.status !== "confirmed" || !phase.spm_user_id) return blocked("The next phase SPM must confirm their assignment.", "next_assignment");
   const upcoming = await readChecklist(db, project.id, phase.project_stage_id, { initialize });
   if (upcoming.construction?.onHold) return blocked("The next phase is explicitly on hold.", "phase_on_hold");

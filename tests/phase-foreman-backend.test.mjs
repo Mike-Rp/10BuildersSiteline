@@ -690,8 +690,8 @@ test(
       const project={...template,id:randomUUID(),name:'Multi-engineer walkthrough',clientId:client.id,area:'100',floors:'1',start:'2027-01-15',end:'2027-10-15',docs:[],clientSubcon:'',clientSubconEmail:'',clientSubconCompany:undefined,
         team:suggested.phase_team.map(row=>({phase:row.stage,accountId:row.user_id,status:'pending',requiredDisciplines:phaseRequirements.find(p=>p.phase===row.stage).tags,
           assignedDisciplines:row.engineers[0].assigned_disciplines,engineers:row.engineers.map(e=>({accountId:e.user_id,assignedDisciplines:e.assigned_disciplines,status:'pending'}))}))}
-      const incomplete=structuredClone(project);incomplete.id=randomUUID();const design=incomplete.team.find(row=>row.phase==='Design');design.engineers=design.engineers.slice(0,1)
-      await assert.rejects(saveApiProject(incomplete,false),/Uncovered|cover every/,'a partial phase cannot be submitted')
+      const incomplete=structuredClone(project);incomplete.id=randomUUID();const design=incomplete.team.find(row=>row.phase==='Design');design.engineers=design.engineers.slice(0,1);design.engineers[0].assignedDisciplines=design.engineers[0].assignedDisciplines.slice(0,1)
+      await assert.rejects(saveApiProject(incomplete,false),/Uncovered|cover every|minimum/,'a partial phase cannot be submitted')
       const id=await saveApiProject(project,false)
       let data=await api(`/projects/${id}/engineer-responsibilities`)
       assert.ok(data.rows.every(row=>row.status==='pending'&&row.assigned_disciplines.length<=3))
@@ -732,6 +732,16 @@ test(
       const file=new FormData();file.set('file',new File(['%PDF-1.4\nMy completed responsibilities'],'completion.pdf',{type:'application/pdf'}));file.set('stage','Mobilization')
       const proof=await api(`/projects/${id}/phase-files`,{method:'POST',body:file})
       const respond=(action,body={})=>api(`/projects/${id}/engineer-responsibilities/${first.id}`,{method:'POST',json:{action,...body}})
+      await assert.rejects(respond('submit_completion',{note:'Checklist still incomplete',fileId:proof.id}),/checklist/)
+      const own=(await api('/projects/'+id+'/phase-overview')).checklist.items.filter(item=>item.required)
+      const evidence=[]
+      for(const item of own) evidence.push(await api('/projects/'+id+'/checklist-items/'+item.id+'/submit',{method:'POST',json:{file_id:proof.id}}))
+      await admin()
+      for(const item of evidence) {
+       const preview=await api('/projects/'+id+'/evidence/'+item.id+'/review-preview')
+       await api('/projects/'+id+'/evidence/'+item.id+'/approve',{method:'POST',json:{expected_review_token:preview.review_token}})
+      }
+      session=await as('karlo.espiritu@10builders.com')
       await respond('submit_completion',{note:'Civil and Geotechnical responsibilities completed.',fileId:proof.id})
       await assert.rejects(respond('approve_completion'),/Only Admin|Office PM/,'engineers cannot approve their own completion')
       await admin();await respond('approve_completion')

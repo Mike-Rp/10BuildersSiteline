@@ -107,7 +107,9 @@ test("4-3-4 snapshots and explicit existing-scope revision preserve approval IDs
   assert.deepEqual(items.filter(i=>i.required).map(i=>i.code),STANDARD_PHASE_ACTIVITIES.map(i=>i.code))
   assert.equal(items.find(i=>i.code==='work_inspection').id,approved,"matching activity ID and approval retained")
   assert.equal(items.find(i=>i.id===extra).required,false,"extra item retained as historical")
-  await assert.rejects(submitChecklist(db,{id,current_stage_id:stage},{id:reviewer},{item_id:extra}),/historical/)
+  const owner=(await db.query("select u.id from users u join roles r on r.id=u.role_id where r.code='spm' order by u.id limit 1")).rows[0].id
+  await db.query("insert into project_phase_team(project_id,project_stage_id,spm_user_id,status) values($1,$2,$3,'confirmed')",[id,stage,owner])
+  await assert.rejects(submitChecklist(db,{id,current_stage_id:stage},{id:owner,role:'spm'},{item_id:extra}),/historical/)
   assert.equal((await db.query("select current_pct from projects where id=$1",[id])).rows[0].current_pct,33)
   assert.equal(await blockingReviews(db,id),false,"retired pending evidence does not block handoff")
   assert.deepEqual((await db.query("select * from project_phase_checklist_items where project_id=$1 and project_stage_id=$2 order by id",[id,first])).rows,previousPhase)

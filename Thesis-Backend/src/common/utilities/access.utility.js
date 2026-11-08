@@ -192,7 +192,8 @@ export const hasProjectAccess = async (user, projectId, db = null, { includeForm
       sql = `SELECT 1 FROM project_phase_team WHERE project_id = $1 AND spm_user_id = $2
              UNION ALL
              SELECT 1 FROM project_engineers
-              WHERE project_id = $1 AND user_id = $2 AND unassigned_at IS NULL`;
+              WHERE project_id = $1 AND user_id = $2 AND (unassigned_at IS NULL OR EXISTS (
+                SELECT 1 FROM projects p WHERE p.id=$1 AND p.lifecycle_status='archived'))`;
       if (includeFormer) sql += ` UNION ALL SELECT 1 FROM engineer_assignment_history WHERE project_id = $1 AND user_id = $2`;
       break;
     case "client":

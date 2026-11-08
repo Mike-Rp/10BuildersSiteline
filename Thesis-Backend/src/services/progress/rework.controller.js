@@ -18,7 +18,7 @@ async function loadReview(db,user,id){
   if(!request||request.status!=="pending")throw new HttpError(409,"Rework request is already resolved.");
   if(Number(request.project_stage_id)!==Number(project.current_stage_id))throw new HttpError(409,"This request is outside the current phase. Cross-phase rollback is not supported.");
   const linked=await db.query("SELECT checklist_item_id::text AS id FROM project_rework_activities WHERE request_id=$1 ORDER BY checklist_item_id",[id]);
-  const checklist=await readChecklist(db,project.id,project.current_stage_id);
+  const checklist=await readChecklist(db,project.id,project.current_stage_id,{userId:request.submitted_by});
   return {project,request,checklist,linked:linked.rows.map(row=>row.id)};
 }
 
@@ -38,13 +38,15 @@ async function preview(db,review,body){
   const overall=(await readVerifiedProgress(db,[project.id])).get(project.id).project;
   const withdrawn=impact.before.earned-impact.after.earned;
   const after=overall.percentage===null ? overall : {...overall,earned:overall.earned-withdrawn,percentage:(overall.earned-withdrawn)/overall.total*100};
-  const before={phase:impact.before,project:overall},next={phase:impact.after,project:after};
+  const aggregate=(await readChecklist(db,project.id,project.current_stage_id)).verified;
+  const phaseAfter=aggregate.percentage===null ? aggregate : {...aggregate,earned:aggregate.earned-withdrawn,percentage:(aggregate.earned-withdrawn)/aggregate.total*100};
+  const before={phase:aggregate,project:overall},next={phase:phaseAfter,project:after};
   const activities=checklist.items.filter(item=>linked.includes(String(item.id))).map(item=>({
     id:String(item.id),label:item.title,status:item.status,evidence_id:item.evidence_id==null?null:String(item.evidence_id),required:item.required,weight:item.weight,
   }));
   const review_token=createHash("sha256").update(JSON.stringify({id:request.id,selected:ids.slice().sort(),activities,before})).digest("hex");
   return {request_id:request.id,reason:request.reason,activities,selected:ids,before,after:next,
-    loss:{phase:impact.loss,project:overall.total===null?null:withdrawn/overall.total*100},review_token};
+    loss:{phase:aggregate.total===null?null:withdrawn/aggregate.total*100,project:overall.total===null?null:withdrawn/overall.total*100},review_token};
 }
 
 export async function getReworkPreview(req,res){

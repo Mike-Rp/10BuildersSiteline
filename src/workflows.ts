@@ -115,6 +115,7 @@ export type WorkflowCommand = {
   projectId?: string
   phase?: string
   doc?: Doc
+  docs?: Doc[]
   docIndex?: number
   note?: string
   noteId?: string
@@ -128,6 +129,7 @@ export type WorkflowCommand = {
   evidenceId?: string
   expectedReviewToken?: string
   requestId?: string
+  updateId?: string
   affectedActivityIds?: string[]
   selectedActivityIds?: string[]
   expectedVersion?: number
@@ -160,6 +162,12 @@ export function leadId(p: Project) {
 }
 export function phaseOwner(p: Project, phase = p.phase) {
   return p.team.find((t) => t.phase === phase)?.accountId || ""
+}
+export function canWorkPhase(p: Project, accountId: string, phase = p.phase) {
+  if (p.status!=="active" || phase!==p.phase) return false
+  const team=p.team.find(t=>t.phase===phase)
+  if (team?.engineers?.length) return team.engineers.some(e=>e.accountId===accountId && e.status==="confirmed" && e.completionStatus!=="approved")
+  return team?.accountId===accountId && team.status==="confirmed"
 }
 export function isAssigned(p: Project, id: string) {
   return p.team.some((t) => t.accountId === id || t.engineers?.some(e=>e.accountId===id))
@@ -694,8 +702,7 @@ function assertCurrentOwner(p: Project, actor: Account) {
     "Only the assigned Site PM can submit on an active site.",
   )
   assert(
-    phaseOwner(p) === actor.id &&
-      p.team.find((t) => t.phase === p.phase)?.status === "confirmed",
+    canWorkPhase(p,actor.id),
     "Only the confirmed owner of the current phase may submit this work.",
   )
 }

@@ -3,6 +3,14 @@ import { standardActivities } from "./standard-phase-checklist.js";
 // Checklist identity, never a reported count or percentage, establishes credit.
 // Additional legacy mandatory documents remain completion gates.
 export function constructionPhaseProgress(position, count, items = [], { onHold = false, started = false } = {}) {
+  const owners = [...new Set(items.map(item => item.workspaceUserId).filter(Boolean))];
+  if (owners.length > 1) {
+    const groups = owners.map(owner => constructionPhaseProgress(position,count,
+      items.filter(item => item.workspaceUserId === owner),{onHold,started}));
+    const complete = groups.every(group => group.complete);
+    return { required: groups.reduce((n,g)=>n+g.required,0), approved: groups.reduce((n,g)=>n+g.approved,0),
+      complete, onHold, status: onHold ? "On Hold" : complete ? "Completed" : groups.every(g=>["Completed","Pending Approval"].includes(g.status)) ? "Pending Approval" : groups.some(g=>g.status!=="Not Started") ? "Ongoing" : "Not Started" };
+  }
   const standards = standardActivities(position, count);
   const validApproval = item => item.status === "approved" && item.approvalValid === true;
   const requiredItems = items.filter(item => item.required === true);

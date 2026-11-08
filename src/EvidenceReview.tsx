@@ -15,13 +15,16 @@ const measure = (value: ProgressTotals) => value.earned === null || value.total 
   ? "Unavailable"
   : `${value.earned} / ${value.total} points`
 
-export default function EvidenceReview({projectId,evidenceId,doc,onClose,onConfirm}: {
+export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs,onClose,onConfirm}: {
   projectId: string
   evidenceId: string
   doc?: Doc
+  docs?: Doc[]
   onClose: () => void
   onConfirm: (token: string, note: string, reject: boolean) => Promise<boolean>
 }) {
+  const [selectedId,setSelectedId]=useState("")
+  const doc=docs?.find(file=>file.id===selectedId) || primaryDoc || docs?.[0]
   const [preview,setPreview]=useState<Preview>()
   const [error,setError]=useState("")
   const [note,setNote]=useState("")
@@ -51,6 +54,7 @@ export default function EvidenceReview({projectId,evidenceId,doc,onClose,onConfi
   return <Modal wide title="Review activity evidence" subtitle={doc?.name} onClose={()=>{if(!busy)onClose()}}>
     <div className="evidence-review-layout">
     <section className="evidence-review-preview" aria-label="Submitted evidence preview">
+      {!!docs?.length && <div className="attachment-actions">{docs.map(file=><Button key={file.id} onClick={()=>setSelectedId(file.id)}>{file.name}</Button>)}</div>}
       <div className="evidence-review-preview-heading"><Icon name="doc"/><strong>{doc?.label || "Submitted evidence"}</strong></div>
       {fileUrl && doc?.name && /\.(png|jpe?g|gif|webp)$/i.test(doc.name)
         ? <img src={fileUrl} alt={doc.label} />

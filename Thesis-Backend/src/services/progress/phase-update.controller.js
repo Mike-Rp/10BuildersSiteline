@@ -7,6 +7,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
 import { phaseProject, assertProjectSpm, readChecklist, recordPhaseHistory, assertPhaseUnlocked } from "./phase.utility.js";
 import { insertFile } from "./phase-upload.utility.js";
+import { assertAssignmentWritable } from "./assignment.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
 import { updateBody, optionalNote, resolveStage, validateFiles, insertIssue, issueReason, rejectProgressInput } from "./phase-update.utility.js";
 
@@ -21,10 +22,11 @@ export const submitPhaseUpdate = async (req, res) => {
       await assertLicenseActive(user, client);
       const stage = await resolveStage(client, body, p.current_stage_id, p.project_type_id, p.id);
       await assertPhaseUnlocked(client, p, stage.id);
+      await assertAssignmentWritable(client,user,p,stage.id);
       const selected = { ...p, current_stage_id: stage.id, current_stage: stage.code };
       const existing = await client.query(
-        "SELECT id FROM project_phase_updates WHERE project_id = $1 AND status = 'pending'", [p.id]);
-      if (existing.rowCount) throw new HttpError(409, "This project already has an update awaiting OPM confirmation.");
+        "SELECT id FROM project_phase_updates WHERE project_id = $1 AND selected_stage_id=$2 AND submitted_by=$3 AND status = 'pending'", [p.id,stage.id,user.id]);
+      if (existing.rowCount) throw new HttpError(409, "Your workspace already has an update awaiting OPM confirmation.");
       await validateFiles(client, selected, user.id, body.file_ids);
       const update = await client.query(
         `INSERT INTO project_phase_updates
@@ -39,7 +41,7 @@ export const submitPhaseUpdate = async (req, res) => {
         await client.query(
           "INSERT INTO project_phase_submission_files (update_id, file_id) SELECT $1, unnest($2::uuid[])", [id, files]);
       }
-      const checklist = await readChecklist(client, p.id, stage.id);
+      const checklist = await readChecklist(client, p.id, stage.id, {userId:user.id});
       const submissions = [];
       for (const item of body.checklist_submissions) {
         submissions.push(await submitChecklist(client, selected, user, item, id, checklist));
@@ -129,8 +131,8 @@ export const getPhaseUpdates = async (req, res) => {
              'status', e.status, 'file_id', e.file_id, 'submission_note', e.submission_note)), '[]'::jsonb)
             FROM project_phase_evidence e WHERE e.phase_update_id = u.id) AS checklist_submissions
          FROM project_phase_updates u JOIN project_stages s ON s.id = u.selected_stage_id
-         WHERE u.project_id = $1 ORDER BY u.id DESC LIMIT $2 OFFSET $3`,
-        [p.id, paging(req).limit, paging(req).offset]);
+         WHERE u.project_id = $1 AND ($4::uuid IS NULL OR u.submitted_by=$4) ORDER BY u.id DESC LIMIT $2 OFFSET $3`,
+        [p.id, paging(req).limit, paging(req).offset,user.role==="spm"?user.id:null]);
       return result.rows;
     });
     return sendOk(res, "Project phase updates retrieved.", data.length, data);

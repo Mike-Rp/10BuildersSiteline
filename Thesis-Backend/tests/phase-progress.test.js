@@ -60,6 +60,10 @@ function setup(options = {}) {
       sql = sql.replace(/\s+/g, " ").trim();
       state.queries.push({ sql, params });
       const result = rows => ({ rows, rowCount: rows.length });
+      if (sql.startsWith("select to_regclass")) return result([{ready:false}]);
+      if (sql.startsWith("SELECT current_stage_id,lifecycle_status")) return result([state.p]);
+      if (sql.startsWith("SELECT a.*")) return result([{user_id:state.phaseOwner,status:'confirmed',completion_status:null}]);
+      if (sql.startsWith("SELECT COALESCE((to_jsonb(c)")) return result([{on_hold:false}]);
       if (sql.startsWith("SELECT p.*")) return result([state.p]);
       if (sql.startsWith("select id from projects where id=$1 for update")) return result([{ id: projectId }]);
       if (sql.startsWith("select coalesce((select sum(byte_size) from stored_files")) return result([{ used: 0 }]);
@@ -250,7 +254,7 @@ test("rejected evidence requires a reason and contributes no progress", async ()
 });
 
 test("reviewing a previous stage does not overwrite the current stage percentage", async () => {
-  const state = setup();
+  const state = setup({extraStageItems:{3:[{id:"1",required:true,status:"pending"}]}});
   state.evidence.project_stage_id = 3;
   const res = response();
   await approveWithPreview(request(opm), res);
@@ -409,7 +413,12 @@ function confirmationClient(queries, teamRows) {
     sql = sql.replace(/\s+/g, " ").trim();
     queries.push({ sql, params });
     const result = rows => ({ rows, rowCount: rows.length });
-    if (sql.startsWith("SELECT id, lifecycle_status FROM projects")) return result([{ id: projectId, lifecycle_status: "spm_review" }]);
+    if (sql.startsWith("SELECT id, project_type_id, lifecycle_status FROM projects")) return result([{ id: projectId, lifecycle_status: "spm_review" }]);
+    if (sql.startsWith("select to_regclass")) return result([{ready:false}]);
+    if (sql.startsWith("SELECT 1 FROM engineer_qualified_scopes")) return result([{}]);
+    if (sql.startsWith("select exists(select 1 from information_schema.columns")) return result([{ready:false}]);
+    if (sql.startsWith("select code from project_stages")) return result([{code:'Structure'}]);
+    if (sql.startsWith("SELECT s.id,s.code")) return result([{id:4,code:'Structure'}]);
     if (sql.startsWith("SELECT id, status, response_deadline_at")) return result([{ id: "1", status: "pending", response_deadline_at: null }]);
     if (sql.startsWith("UPDATE project_phase_team")) return result([{ stage_id: 4, status: "confirmed" }]);
     if (sql.startsWith("SELECT 1 FROM project_phase_team")) return result([]);
@@ -525,13 +534,13 @@ test("the next SPM must confirm before their phase is activated", async () => {
   assert.equal(state.p.current_stage_id, 4);
 });
 
-test("current and previous dropdown stages accept reports while future stages remain locked", async () => {
+test("only the active dropdown stage accepts reports; completed and future stages are read-only", async () => {
   for (const [index, stage] of updateUtility.STAGES.entries()) {
     const state = setup();
     const res = response();
     await controller.submitPhaseUpdate(request(spm, { stage }), res);
-    assert.equal(res.statusCode, index < 4 ? 201 : 422, stage);
-    assert.equal(state.update?.selected_stage_id ?? null, index < 4 ? index + 1 : null);
+    assert.equal(res.statusCode, index === 3 ? 201 : index < 3 ? 409 : 422, stage);
+    assert.equal(state.update?.selected_stage_id ?? null, index === 3 ? index + 1 : null);
     assert.equal(state.p.current_stage_id, 4);
   }
 });
@@ -574,8 +583,9 @@ test("OPM confirmation records the report without approving its activities", asy
 });
 
 test("confirming a report from another stage cannot change workflow position", async () => {
-  const state = setup();
-  await controller.submitPhaseUpdate(request(spm, { stage: "Foundation" }), response());
+  // Historical reports remain reviewable, even though new writes to completed
+  // workspaces are no longer accepted.
+  const state = setup({update:{id:"42",project_id:projectId,selected_stage_id:3,prior_stage_id:4,status:"pending",submitted_by:spm.id,issue_categories:[],issue_reason:null,note:"Historical report"}});
   assert.equal(state.p.current_stage_id, 4);
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
@@ -627,7 +637,7 @@ test("an update with a stale prior stage cannot be confirmed", async () => {
   assert.equal(state.history.length, 0);
 });
 
-test("only one update per project may await OPM confirmation", async () => {
+test("only one update per SPM phase workspace may await OPM confirmation", async () => {
   const state = setup();
   await controller.submitPhaseUpdate(request(), response());
   const res = response();

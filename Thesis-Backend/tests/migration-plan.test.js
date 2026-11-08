@@ -4,7 +4,7 @@ import { DEDICATED_MIGRATIONS, RUNNER_MIGRATIONS, migrationPlan } from "../scrip
 
 test("general migration plan is explicit, ordered, and keeps recovery/data-review scripts separate", () => {
   const files = [...RUNNER_MIGRATIONS, ...Object.keys(DEDICATED_MIGRATIONS)];
-  const plan = migrationPlan(files, []);
+  const plan = migrationPlan(files, ["015-engineer-credentials.sql"]);
   const runner = plan.filter(step => step.action === "runner").map(step => step.name);
 
   assert.deepEqual(runner, RUNNER_MIGRATIONS);
@@ -16,14 +16,14 @@ test("general migration plan is explicit, ordered, and keeps recovery/data-revie
 
 test("migration plan excludes applied files and rejects migrations absent from the reviewed manifest", () => {
   const files = [...RUNNER_MIGRATIONS, ...Object.keys(DEDICATED_MIGRATIONS)];
-  const plan = migrationPlan(files, ["001-phase-checklists.sql", "002-phase-update-confirmation.sql"]);
+  const plan = migrationPlan(files, ["015-engineer-credentials.sql", "001-phase-checklists.sql", "002-phase-update-confirmation.sql"]);
   assert.equal(plan.some(step => step.name === "001-phase-checklists.sql"), false);
   assert.throws(() => migrationPlan([...files, "018-new-change.sql"], []), /manifest needs review/);
 });
 
 test("migration plan recognizes historical ledger names from the original Supabase schema", () => {
   const files = [...RUNNER_MIGRATIONS, ...Object.keys(DEDICATED_MIGRATIONS)];
-  const plan = migrationPlan(files, ["003-integration-foundation.sql", "004-project-type-workflows"]);
+  const plan = migrationPlan(files, ["015-engineer-credentials.sql", "003-integration-foundation.sql", "004-project-type-workflows"]);
   assert.equal(plan.some(step => step.name === "003-react-integration.sql"), false);
   assert.equal(plan.some(step => step.name === "004-project-type-workflows.sql"), false);
 });

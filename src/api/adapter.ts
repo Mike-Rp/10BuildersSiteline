@@ -230,13 +230,15 @@ export function mapProject(parts: ProjectParts): Project {
 
   const checklist: ProjectWorkflow["checklist"] = {}
   const items: Dto[] = parts.overview?.checklist?.items || []
-  if (items.length && list.current_stage)
-    checklist[list.current_stage] = items.map(
+  for (const phase of new Set(items.map(i=>i.stage_code || list.current_stage)))
+    checklist[phase] = items.filter(i=>(i.stage_code || list.current_stage)===phase).map(
       (i): ChecklistItem => ({
-        id: String(i.id),
+        id: i.workspace_user_id && items.some(other=>String(other.id)===String(i.id)&&other.workspace_user_id!==i.workspace_user_id) ? i.id+':'+i.workspace_user_id : String(i.id),
+        workspaceUserId:i.workspace_user_id,
+        attachments:(i.files||[]).map((f:Dto)=>{register(f.id,'/api/v1/projects/'+id+'/phase-files/'+f.id);return {id:f.id,label:i.title,name:f.original_name,uploaded:true,clientVisible:false,owner:i.workspace_name||'Site PM',date:day(f.uploaded_at),mime:f.content_type}}),
         evidenceId: i.evidence_id == null ? undefined : String(i.evidence_id),
         reworkReason:i.rework_reason||undefined,
-        label: i.title,
+        label: i.workspace_name && items.some(other=>String(other.id)===String(i.id)&&other.workspace_user_id!==i.workspace_user_id) ? i.title+" · "+i.workspace_name : i.title,
         required: i.required,
         weight: i.weight,
         status:
@@ -268,12 +270,16 @@ export function mapProject(parts: ProjectParts): Project {
       id: n.id,
       authorId: n.author_id || "",
       text: n.note_text,
+      phase: detail.phase_team?.find((t:Dto)=>String(t.stage_id)===String(n.project_stage_id))?.stage,
       date: iso(n.noted_at),
     })),
-    photos: parts.photos.map((p) => mapPhoto(p, register)),
+    photos: parts.photos.map((p) => ({...mapPhoto(p, register),phase:detail.phase_team?.find((t:Dto)=>String(t.stage_id)===String(p.project_stage_id))?.stage})),
   }
   for(const item of items)if(item.file_id)register(item.file_id,"/api/v1/projects/"+id+"/phase-files/"+item.file_id+"")
-  const pending = parts.overview && "pending_update" in parts.overview ? parts.overview.pending_update : parts.pending
+  const selectedPending = parts.overview && "pending_update" in parts.overview ? parts.overview.pending_update : parts.pending
+  const pendingRows:Dto[]=Array.isArray(parts.overview?.pending_updates) ? parts.overview.pending_updates : selectedPending ? [selectedPending] : []
+  workflow.pendingUpdates=[]
+  for(const pending of pendingRows) {
   // Every file attached to the report, from the report's own attachment list (never checklist evidence). Each is
   // downloaded through the authorised project file route, the same one used for checklist files.
   const attachments: Doc[] = (Array.isArray(pending?.files) ? pending.files : []).map((f: Dto): Doc => {
@@ -291,7 +297,7 @@ export function mapProject(parts: ProjectParts): Project {
     }
   })
   if (pending?.id)
-    workflow.pendingUpdate = {
+    workflow.pendingUpdates.push({
       id: String(pending.id),
       version: 1,
       authorId: pending.submitted_by || "",
@@ -303,7 +309,9 @@ export function mapProject(parts: ProjectParts): Project {
       requestedPhase: pending.requested_stage || parts.overview?.stages?.find((s:Dto)=>s.id===pending.selected_stage_id)?.code || list.current_stage,
       requestedProgress: Number(pending.requested_pct ?? 0),
       ...(attachments.length ? { attachments, evidence: attachments[0] } : {}),
-    }
+    })
+  }
+  workflow.pendingUpdate=workflow.pendingUpdates[0]
 
   const rework=parts.overview?.issues?.find((i:Dto)=>i.status==="pending")
   if(rework)workflow.pendingRework={id:rework.id,version:1,authorId:rework.submitted_by||"",submittedAt:iso(rework.submitted_at),

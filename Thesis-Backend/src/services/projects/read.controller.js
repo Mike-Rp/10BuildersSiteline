@@ -1,5 +1,6 @@
 import execute from "../../common/utilities/query.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
+import { participantsSql, phaseAssignments } from "../progress/assignment.utility.js";
 import {
   handleError, sendOk, sendError, requireUser, hasProjectAccess, isUuid, paging,
 } from "../../common/utilities/access.utility.js";
@@ -49,6 +50,17 @@ export const LIST_FROM = `
         WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1) evidence ON true
     ) counts
   ) phase_progress ON true`;
+
+// Preserve legacy single-SPM queries while expanding each shared requirement
+// over the existing responsibility rows when that schema is installed.
+export async function projectListFrom(db) {
+  return LIST_FROM.replace(
+    "LEFT JOIN LATERAL (SELECT status FROM project_phase_evidence",
+    `LEFT JOIN (${await participantsSql(db)}) a ON a.project_id=p.id AND a.project_stage_id=p.current_stage_id
+      LEFT JOIN LATERAL (SELECT status FROM project_phase_evidence`)
+    .replace("WHERE checklist_item_id = i.id ORDER BY id DESC LIMIT 1)",
+      "WHERE checklist_item_id = i.id AND (a.completion_status IS NULL OR submitted_by=a.user_id) ORDER BY id DESC LIMIT 1)");
+}
  
 export const stripInternal = (row) => {
   const { suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
@@ -74,7 +86,7 @@ export const getProjects = async (req, res) => {
       where.push(`(EXISTS (SELECT 1 FROM project_phase_team t
                             WHERE t.project_id = p.id AND t.spm_user_id = $${params.length})
         OR EXISTS (SELECT 1 FROM project_engineers pe
-                    WHERE pe.project_id = p.id AND pe.user_id = $${params.length} AND pe.unassigned_at IS NULL))`);
+                    WHERE pe.project_id = p.id AND pe.user_id = $${params.length} AND (pe.unassigned_at IS NULL OR p.lifecycle_status='archived')))`);
     } else if (user.role === "client") {
       params.push(user.id);
       where.push(`EXISTS (SELECT 1 FROM user_client_project_links c
@@ -95,18 +107,19 @@ export const getProjects = async (req, res) => {
     const sortColumn = SORTS[req.query.sortBy] || "p.created_at";
     const { limit, offset } = paging(req);
     const whereClause = `WHERE ${where.join(" AND ")}`;
+    const from=await projectListFrom({query:execute});
  
-    const total = await execute(`SELECT count(*)::int AS total ${LIST_FROM} ${whereClause}`, params);
+    const total = await execute(`SELECT count(*)::int AS total ${from} ${whereClause}`, params);
     const rows = await execute(
-      `SELECT ${LIST_SELECT} ${LIST_FROM} ${whereClause}
+      `SELECT ${LIST_SELECT} ${from} ${whereClause}
         ORDER BY ${sortColumn} ${sortOrder}, p.id ASC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
     );
  
-    const mapped = rows.rows.map(row => ({ ...row,
+    const mapped = await Promise.all(rows.rows.map(async row => ({ ...row,
       your_phase_is_active: user.role === "spm" && row.lifecycle_status === "active" &&
-        row.phase_owner_status === "confirmed" && row.phase_owner_id === user.id }));
+        (await phaseAssignments({query:execute},row.id,row.current_stage_id)).some(a=>a.user_id===user.id&&a.status==='confirmed'&&a.completion_status!=='approved') })));
     const data = user.role === "client" ? mapped.map(stripInternal) : mapped;
     return sendOk(res, "Resources retrieved successfully.", total.rows[0].total, data);
   } catch (error) {
@@ -122,9 +135,10 @@ export const getProjectById = async (req, res) => {
     if (!isUuid(id)) return sendError(res, "Invalid project id.", 400);
  
     if (!(await hasProjectAccess(user, id))) return sendError(res, "Project not found.", 404);
+    const from=await projectListFrom({query:execute});
  
     const project = await execute(
-      `SELECT ${LIST_SELECT} ${LIST_FROM}
+      `SELECT ${LIST_SELECT} ${from}
         WHERE p.id = $1 AND COALESCE(p.is_deleted, false) = false`,
       [id]
     );
