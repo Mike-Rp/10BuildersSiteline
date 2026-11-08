@@ -6,6 +6,7 @@ import "./index.css"
 import "./construction-daylight.css"
 import "./workspace-theme.css"
 import "./admin-ui-refinements.css"
+import "./admin-navigation.css"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
