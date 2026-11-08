@@ -1,0 +1,12 @@
+#root .site-pm-appointment-agreements { min-width: 0; }
+#root .site-pm-appointment-agreements > .section-description { margin: 0 0 12px; }
+#root .appointment-agreement-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--color-line); }
+#root .appointment-agreement-person { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+#root .appointment-agreement-person small { display: block; color: var(--color-muted); font-size: 13px; margin-top: 4px; }
+#root .appointment-agreement-person p { color: var(--color-muted); font-size: 13px; margin: 6px 0 0; }
+#root .appointment-agreement-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#root .appointment-agreement-actions .button { min-height: 40px; padding: 8px 12px; font-size: 13px; }
+@media (max-width: 540px) {
+  #root .appointment-agreement-actions { flex-basis: 100%; }
+  #root .appointment-agreement-row > .upload-control { width: 100%; }
+}

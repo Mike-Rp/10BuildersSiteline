@@ -1,0 +1,17 @@
+#root .admin-project-document-folder { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; border: 1px solid #c7d9e8; border-radius: 12px; background: #f6faff; color: #193b59; text-align: left; cursor: pointer; }
+#root .admin-project-document-folder:hover { border-color: #7d9fbd; background: #edf5fc; }
+#root .admin-project-document-folder:focus-visible { outline: 3px solid #5285af; outline-offset: 3px; }
+#root .admin-project-document-folder > svg { flex-shrink: 0; }
+#root .admin-project-document-folder > span:first-of-type { flex: 1; min-width: 0; }
+#root .admin-project-document-folder strong { display: block; font-size: 16px; line-height: 1.4; }
+#root .admin-project-document-folder small { display: block; margin-top: 4px; font-size: 13px; color: var(--color-muted); }
+#root .admin-project-document-folder .folder-open-label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+#root .admin-project-document-popup { min-width: 0; }
+#root .admin-project-document-popup .section-title { flex-wrap: wrap; gap: 10px; }
+#root .admin-project-document-popup .section-description { margin: 10px 0 14px; font-size: 14px; }
+#root .admin-project-document-popup .document-info { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 540px) {
+  #root .admin-project-document-folder { padding: 14px; flex-wrap: wrap; }
+  #root .admin-project-document-folder .folder-open-label { margin-left: 44px; }
+  #root .admin-project-document-popup .document-row { flex-wrap: wrap; gap: 8px; }
+}

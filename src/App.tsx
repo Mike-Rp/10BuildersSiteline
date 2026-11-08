@@ -1,5 +1,7 @@
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerResponsibilities from './EngineerResponsibilities'
+import AdminProjectDocuments from "./AdminProjectDocuments"
+import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
 import AccountSignInDetails, { type CreatedAccountDetails } from "./AccountSignInDetails"
@@ -325,6 +327,9 @@ function AppInner() {
   const [securityTab,setSecurityTab]=useState<'password'|'codes'>('codes')
   const [projectHistoryPage, setProjectHistoryPage] = useState(1)
   const [preview, setPreview] = useState<Doc>()
+  const [documentFolderProjectId, setDocumentFolderProjectId] = useState("")
+  const [appointmentFolderProjectId, setAppointmentFolderProjectId] = useState("")
+  useEffect(() => { setDocumentFolderProjectId(""); setAppointmentFolderProjectId("") }, [dialog?.kind, dialog?.id])
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [toast, setToast] = useState("")
@@ -2435,6 +2440,11 @@ function AppInner() {
           onResolve={(issueId, text) => resolveSubconIssue(p.id, issueId, text)}
         />
         <section className="detail-section">
+          {!docsOnly && p.status === "active" ? <button type="button" className="admin-project-document-folder" aria-haspopup="dialog" onClick={() => setDocumentFolderProjectId(p.id)}>
+            <Icon name="folder" size={30} />
+            <span><strong>Project Documents</strong><small>{p.docs.filter(doc => doc.uploaded).length} of {p.docs.length} documents on file · View registered files and agreements</small></span>
+            <span className="folder-open-label">Open Folder<Icon name="chevron" size={16} /></span>
+          </button> : <>
           <div className="section-title">
             <h3>Project document repository</h3>
             {p.docs.some((d) => d.uploaded) && (
@@ -2457,8 +2467,14 @@ function AppInner() {
             Administrator can view and download, not upload on their behalf.
           </p>
           <DocumentList docs={p.docs} onPreview={previewDoc} />
+          </>}
         </section>
         <section className="detail-section">
+          {!docsOnly && p.status === "active" ? <button type="button" className="admin-project-document-folder" aria-haspopup="dialog" onClick={() => setAppointmentFolderProjectId(p.id)}>
+            <Icon name="folder" size={30} />
+            <span><strong>Site PM Appointment Agreements</strong><small>{appointmentStaff(p, state.accounts).filter(account => appointmentFor(p, account)).length} of {appointmentStaff(p, state.accounts).length} agreements on file · Project-specific Site PM appointments</small></span>
+            <span className="folder-open-label">Open Folder<Icon name="chevron" size={16} /></span>
+          </button> : <>
           <h3>Site PM appointment agreements</h3>
           <p className="section-description">
             Project-specific appointments for assigned Site PMs.
@@ -2488,6 +2504,7 @@ function AppInner() {
                 )}
               </div>
             ))}
+          </>}
         </section>
         <div className="modal-actions">
           <Button onClick={() => setDialog(undefined)}>Close</Button>
@@ -3349,6 +3366,8 @@ function AppInner() {
       )}
       {monthlySummaryOpen && <MonthlySummaryDialog onClose={() => setMonthlySummaryOpen(false)} />}
       {reportProjectId && <MonthlyReport projects={state.projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}
+      {actor.role === "admin" && dialog?.kind === "project" && selectedProject?.id === documentFolderProjectId && <AdminProjectDocuments key={selectedProject.id} project={selectedProject} onPreview={previewDoc} onClose={() => setDocumentFolderProjectId("")} onDownloadsRequested={() => setToast("Document downloads requested. Your browser may ask to allow multiple downloads.")} />}
+      {actor.role === "admin" && dialog?.kind === "project" && selectedProject?.id === appointmentFolderProjectId && <SitePmAppointmentAgreements key={selectedProject.id} project={selectedProject} accounts={state.accounts} onPreview={previewDoc} onUpload={(account, doc) => addEngagement(selectedProject, account, doc)} onClose={() => setAppointmentFolderProjectId("")} />}
       {preview && (
         <Preview doc={preview} onClose={() => setPreview(undefined)} />
       )}
