@@ -204,13 +204,16 @@ export async function login(email: string, password: string, replaceSession = fa
 export async function logout() {
   const token = getToken()
   setToken("")
-  if (!token) return
+  if (!token) return true
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 5000)
   try {
     await api("/auth", { method: "DELETE", headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
-  } catch {
-    /* The session is cleared locally either way. */
+    return true
+  } catch (error) {
+    // A rejected/expired token already has no server access. Other failures
+    // still clear this device, but the caller must disclose unconfirmed revocation.
+    return error instanceof ApiError && error.status === 401
   } finally {
     clearTimeout(timeout)
   }

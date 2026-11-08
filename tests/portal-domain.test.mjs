@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { JSDOM } from "jsdom"
-import { domainPortal, portalDomainRedirect } from "../src/portal-domain.ts"
-import { canonicalizeLoginEntry, currentLoginPortal, loginPath, shareLoginPath } from "../src/login-portal.ts"
+import { domainPortal, portalDomainRedirect, roleAllowedOnHost } from "../src/portal-domain.ts"
+import { canonicalizeLoginEntry, currentLoginPortal, loginPath, shareLoginPath, navigateToWorkspace } from "../src/login-portal.ts"
 
 test("each domain rejects the other portal's paths while preserving its own role routes", () => {
   assert.equal(domainPortal("10buildline.site"), "client")
@@ -17,11 +17,44 @@ test("each domain rejects the other portal's paths while preserving its own role
   }
   for (const path of ["/login", "/login?tab=admin", "/admin", "/admin/", "/admin/login", "/staff", "/staff/login", "/admin/team", "/opm", "/opm/documents?filter=active#top", "/spm", "/spm/resources"]) {
     assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), "/")
-    assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), undefined)
+    assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), path === '/staff' ? '/' : undefined)
   }
   for (const path of ["/client", "/client/", "/client/login", "/client/overview", "/client/projects/123/documents?source=link#document"]) {
     assert.equal(portalDomainRedirect(new URL(`https://staff.10buildline.site${path}`)), "/")
     assert.equal(portalDomainRedirect(new URL(`https://10buildline.site${path}`)), undefined)
+  }
+})
+
+test("unknown routes return to the same root and role checks never navigate across domains", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis,'window')
+  const dom = new JSDOM('',{url:'https://10buildline.site/'})
+  Object.defineProperty(globalThis,'window',{value:dom.window,configurable:true})
+  try {
+    for (const host of ['10buildline.site','staff.10buildline.site']) {
+      for (const path of ['/unknown','/client/unknown','/admin/unknown','/opm/team','/login/extra','/client/projects/%broken/documents']) {
+        dom.reconfigure({url:`https://${host}${path}?tab=admin#invalid`})
+        dom.window.history.replaceState(null,'',path+'?tab=admin#invalid')
+        assert.equal(portalDomainRedirect(dom.window.location),'/')
+        canonicalizeLoginEntry()
+        assert.equal(dom.window.location.href,`https://${host}/`)
+        const length = dom.window.history.length
+        canonicalizeLoginEntry()
+        assert.equal(dom.window.history.length,length,'The root does not redirect again')
+      }
+      for (const role of ['client','admin','opm','spm']) {
+        const allowed = host === '10buildline.site' ? role === 'client' : role !== 'client'
+        assert.equal(roleAllowedOnHost(role,host),allowed)
+        dom.window.history.replaceState(null,'','/')
+        if (!allowed) {
+          assert.equal(navigateToWorkspace(role,true),'/')
+          assert.equal(dom.window.location.hostname,host)
+          assert.equal(loginPath(role === 'client' ? 'client' : 'staff'),'/')
+        }
+      }
+    }
+  } finally {
+    dom.window.close()
+    previous ? Object.defineProperty(globalThis,'window',previous) : delete globalThis.window
   }
 })
 

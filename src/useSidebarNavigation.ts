@@ -13,7 +13,7 @@ export default function useSidebarNavigation(enabled = true) {
 
   useEffect(() => {
     // Move focus after React has hidden or revealed the menu button.
-    if (enabled && previousExpanded.current !== expanded) {
+    if (enabled && previousExpanded.current !== expanded && !document.querySelector('[aria-modal="true"]')) {
       if (expanded) sidebarRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href],[tabindex="0"]')?.focus()
       else toggleRef.current?.focus()
     }
@@ -40,7 +40,7 @@ export default function useSidebarNavigation(enabled = true) {
     const overflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     const controls = () => Array.from(sidebarRef.current?.querySelectorAll<HTMLElement>('a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]') || [])
-    controls()[0]?.focus()
+    if (!document.querySelector('[aria-modal="true"]')) controls()[0]?.focus()
     const keyboard = (event: KeyboardEvent) => {
       // A subsequently opened dialog owns its own keyboard interaction.
       if (document.querySelector('[aria-modal="true"]')) return
@@ -58,7 +58,7 @@ export default function useSidebarNavigation(enabled = true) {
     return () => {
       document.body.style.overflow = overflow
       document.removeEventListener("keydown", keyboard)
-      toggleRef.current?.focus()
+      if (!document.querySelector('[aria-modal="true"]')) toggleRef.current?.focus()
     }
   }, [enabled, compact, mobileOpen])
 

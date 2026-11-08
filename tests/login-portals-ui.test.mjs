@@ -10,7 +10,7 @@ test("admin, staff, and client paths select their own login portals", () => {
   for (const path of ["/", "/client/login", "/administrator", "/staffing", "/projects/admin"]) assert.equal(loginPortalForPath(path), "client")
 })
 
-test("explicit sign-in pages wait for credentials even when this tab has a saved session", {timeout:30000}, async () => {
+test("login pages verify saved sessions and show retry on outages instead of exposing a login form", {timeout:30000}, async () => {
   const dom = new JSDOM('<div id="root"></div>', {url:"http://localhost/admin/login",pretendToBeVisual:true})
   const w=dom.window, previous=new Map()
   for(const [key,value] of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Node:w.Node,sessionStorage:w.sessionStorage,IS_REACT_ACT_ENVIRONMENT:true})) {
@@ -30,13 +30,14 @@ test("explicit sign-in pages wait for credentials even when this tab has a saved
       for(const path of ["/", "/client/login", "/login","/admin/login","/staff/login","/staff/login/?source=switch","/admin/login/?source=switch", "/login?tab=admin"]) {
         w.history.replaceState(null,"",path)
         client.setToken(token)
+        const before = requests.length
         await act(()=>root.render(React.createElement(App,{key:role+path})))
-        assert.equal(requests.length,0,"Visiting a sign-in page must not fetch or restore a cached account")
-        assert.ok(document.querySelector('form.login-form'),`Expected a form at ${path} for saved ${role}`)
-        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/') || path.includes('tab=admin')?'Administrator sign-in':path.startsWith('/staff/') || path.startsWith('/login')?'Staff sign-in':'Welcome to 10BuildLine')
+        assert.equal(requests.length,before+1,"A saved session must be verified by the server")
+        assert.ok(requests.at(-1).endsWith('/auth/me'))
+        assert.equal(document.querySelector('form.login-form'),null,`No login form at ${path} for saved ${role}`)
+        assert.ok(document.querySelector('.session-restore [role=alert]'))
         assert.equal(w.location.pathname,path === '/' ? '/' : path === '/client/login' ? '/client/login' : '/login')
-        for(const input of document.querySelectorAll('form.login-form input')) assert.equal(input.value,"")
-        assert.equal(client.getToken(),token,"Opening a login form must not revoke an existing session")
+        assert.equal(client.getToken(),token,"Visiting login or a server outage must not revoke an existing session")
         await act(()=>root.render(null))
       }
     }

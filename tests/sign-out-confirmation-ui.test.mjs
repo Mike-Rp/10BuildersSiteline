@@ -51,8 +51,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
       event('touchstart',start,swipeClock);event('touchmove',end,swipeClock+60);event('touchend',end,swipeClock+140);swipeClock+=300
     })
 
-    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Sign out of 10BuildLine?"]')
-    const confirmButton = () => [...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Sign out")
+    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Log out of your account?"]')
+    const confirmButton = () => [...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Log Out")
     for (const role of ["admin", "opm", "spm", "client"]) {
       for (const mobile of [false, true]) {
         compact = mobile
@@ -86,8 +86,8 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           assert.match(document.querySelector('.sidebar .nav-item.active').textContent,/Active sites/)
           await swipe('right')
         }
-        // A fresh login adds the role workspace after 10BuildLine's landing page.
-        // Exercise real browser traversal against the mounted application.
+        // Simulate an older login history entry. Back preserves the session
+        // and replaces that entry with an authorized workspace, without a trap.
         w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")
         w.history.pushState(null, "", home)
         const traverse = direction => act(async () => {
@@ -96,23 +96,10 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           await moved
         })
         await traverse("back")
-        assert.ok(document.querySelector("form.login-form"), "Back must display 10BuildLine's landing page")
+        assert.equal(w.location.pathname,home,"Back to an old login entry redirects to the authorized dashboard")
+        assert.equal(document.querySelector("form.login-form"),null,"Authenticated users never see the login form")
         assert.equal(client.getToken(), token, "Back is navigation, not sign out")
-        const type = async (input, value) => act(() => {
-          Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(input, value)
-          input.dispatchEvent(new w.Event("input", {bubbles:true}))
-        })
-        await type(document.querySelector('input[type="email"], input[name="email"], input[autocomplete="username"]'), user.email)
-        await type(document.querySelector('input[type="password"]'), "test-password")
-        await act(async () => {
-          document.querySelector('form.login-form').dispatchEvent(new w.Event("submit", {bubbles:true,cancelable:true}))
-          await new Promise(resolve => setTimeout(resolve, 30))
-        })
-        for (let n = 0; n < 100 && document.querySelector('form.login-form'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
-        assert.equal(w.location.pathname, home, "successful credentials push the role route")
-        assert.ok(!document.querySelector('form.login-form'))
-        await traverse("back")
-        assert.ok(document.querySelector('form.login-form'), "fresh login preserves the landing entry")
+        assert.equal(confirmation(),null,'Back uses safe routing rather than a cancellable-history modal')
         await traverse("forward")
         assert.ok(document.querySelector('.sidebar [aria-label="Sign out"]'), "Forward restores the authorized workspace")
         assert.equal(w.location.pathname, home)
@@ -124,7 +111,16 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           await click(document.querySelector('.sidebar [aria-label="Sign out"]'))
           assert.ok(!!confirmation(), `Missing confirmation for ${role}, mobile=${mobile}`)
           assert.ok(!confirmation().closest(".sidebar"), "dialog must remain visible when the sidebar closes")
-          assert.match(confirmation().textContent, /Are you sure you want to sign out/)
+          assert.match(confirmation().textContent, /Are you sure you want to log out\? You will need to sign in again to access your account\./)
+          assert.ok(document.activeElement === confirmation(),'The dialog receives focus')
+          const buttons = [...confirmation().querySelectorAll('button')]
+          await act(()=>{
+            buttons.at(-1).focus()
+            document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}))
+          })
+          assert.ok(document.activeElement === buttons[0],'Tab wraps within the dialog')
+          await act(()=>document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true})))
+          assert.ok(document.activeElement === buttons.at(-1),'Shift+Tab stays within the dialog')
           assert.equal(client.getToken(), token)
           assert.equal(logoutCalls(), baseline, "opening confirmation must not send logout")
           assert.ok(!document.querySelector("form.login-form"))

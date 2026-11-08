@@ -53,6 +53,66 @@
     }
   ],
   "redirects": [
+    {
+      "source": "/login/:path*",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/admin/:path*",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/staff/:path*",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/opm/:path*",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/spm/:path*",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/client/:path*",
+      "has": [{ "type": "host", "value": "staff.10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/client/login",
+      "has": [{ "type": "host", "value": "10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "has": [{ "type": "host", "value": "staff.10buildline.site" }],
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/staff/login",
+      "has": [{ "type": "host", "value": "staff.10buildline.site" }],
+      "destination": "/?tab=staff",
+      "permanent": false
+    },
+    {
+      "source": "/admin/login",
+      "has": [{ "type": "host", "value": "staff.10buildline.site" }],
+      "destination": "/?tab=admin",
+      "permanent": false
+    },
     { "source": "/staff/login", "destination": "/login?tab=staff", "permanent": false },
     { "source": "/admin/login", "destination": "/login?tab=admin", "permanent": false }
   ],

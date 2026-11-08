@@ -20,8 +20,7 @@ export function loginPortalForRole(role: Role): LoginPortal {
 
 const currentDomain = () => typeof window === "undefined" ? undefined : domainPortal(window.location.hostname)
 export function loginPath(portal: LoginPortal) {
-  const target = portal === "client" ? "client" : "staff"
-  if (currentDomain() === target) return "/"
+  if (currentDomain()) return "/"
   return portal === "client" ? "/client/login" : "/login"
 }
 export function shareLoginPath(portal: LoginPortal) {
@@ -33,7 +32,7 @@ export function currentLoginPortal(): LoginPortal {
   if (typeof window === "undefined") return "client"
   const domain = currentDomain()
   if (domain === "client") return "client"
-  if (domain === "staff" && /^\/client(?:\/|$)/i.test(window.location.pathname)) return "staff"
+  if (domain === "staff" && portalDomainRedirect(window.location)) return "staff"
   if (window.location.pathname === "/" && domain !== "staff") return "client"
   if (/^\/login\/?$/i.test(window.location.pathname) || (window.location.pathname === "/" && domain === "staff")) {
     const tab = window.history.state?.loginPortal || new URLSearchParams(window.location.search).get("tab")
@@ -65,12 +64,11 @@ export function navigateToWorkspace(role: Role, freshLogin = false) {
   const domain = currentDomain()
   const target = role === "client" ? "client" : "staff"
   if (domain && domain !== target) {
-    window.location.replace(PORTAL_ORIGINS[target] + path)
-    return current
+    return changeRoute("/", true)
   }
-  if (freshLogin) {
-    if (!isLandingPath(current)) changeRoute(loginPath(loginPortalForRole(role)), true)
-    changeRoute(path)
-  } else if (current !== path) changeRoute(path, true)
+  if (domain && !freshLogin && portalDomainRedirect(window.location)) return changeRoute("/", true)
+  // Replace sign-in rather than leaving it immediately behind the workspace.
+  // Older login entries are handled by the authenticated route guard.
+  if (freshLogin || current !== path) changeRoute(path, true)
   return path
 }

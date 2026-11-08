@@ -6,8 +6,8 @@ export default function useSignOutConfirmation(onConfirm: () => void) {
   const confirmed = useRef(false)
   return {
     request: () => { confirmed.current = false; setOpen(true) },
-    dialog: open ? <Modal title="Sign out of 10BuildLine?" onClose={() => setOpen(false)}>
-      <p>Are you sure you want to sign out? You will need to sign in again to continue.</p>
+    dialog: open ? <Modal title="Log out of your account?" onClose={() => setOpen(false)}>
+      <p>Are you sure you want to log out? You will need to sign in again to access your account.</p>
       <div className="modal-actions">
         <Button onClick={() => setOpen(false)}>Cancel</Button>
         <Button variant="primary" icon="logout" onClick={() => {
@@ -15,7 +15,7 @@ export default function useSignOutConfirmation(onConfirm: () => void) {
           confirmed.current = true
           setOpen(false)
           onConfirm()
-        }}>Sign out</Button>
+        }}>Log Out</Button>
       </div>
     </Modal> : null,
   }

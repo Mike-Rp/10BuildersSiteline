@@ -63,6 +63,7 @@ import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
+import { roleAllowedOnHost } from "./portal-domain"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -70,6 +71,7 @@ import {
   api,
   ApiError,
   getToken,
+  setToken,
   SESSION_REPLACED_EVENT,
   LICENSE_RENEWAL_ONLY_EVENT,
   login as apiLogin,
@@ -387,7 +389,7 @@ function AppInner() {
   }, [loginPortal])
   const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin")
   useEffect(() => {
-    if (signedOut || isLandingPath(routePath)) return
+    if (signedOut) return
     const portal = loginPortalForRole(actor.role)
     setRoutePath(navigateToWorkspace(actor.role))
     setLoginPortal(portal)
@@ -432,8 +434,8 @@ function AppInner() {
   const selectedAccount = state.accounts.find((a) => a.id === dialog?.id)
   const selectedCompany = state.companies.find((c) => c.id === dialog?.id)
 
-  // Explicit sign-in pages wait for credentials; workspace refreshes can restore
-  // the signed-in session. Only a rejected token or an
+  // Saved sessions are verified even at login, so authenticated users never see
+  // the login form. Only a rejected token or an
   // account that may no longer sign in ends the session; a server or network
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
@@ -448,8 +450,17 @@ function AppInner() {
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate})
   useEffect(() => {
-    const signInPage = isLandingPath(window.location.pathname)
-    if (signInPage || !tokenUser()) {
+    const storedUser = tokenUser()
+    if (!storedUser) {
+      if (getToken()) setToken("")
+      setCheckingSession(false)
+      return
+    }
+    // A decoded role may reject a session early; /auth/me still verifies every
+    // session that is restored. Never load another portal's workspace here.
+    if (!roleAllowedOnHost(storedUser.role, window.location.hostname)) {
+      setToken("")
+      changeRoute("/", true)
       setCheckingSession(false)
       return
     }
@@ -651,6 +662,11 @@ function AppInner() {
     full_name?: string
     email?: string
   }, freshLogin = false): Promise<Account> {
+    if (!roleAllowedOnHost(user.role, window.location.hostname)) {
+      setToken("")
+      changeRoute("/", true)
+      throw new ApiError("This account cannot access this portal. Sign in with an account for this portal.", 403)
+    }
     const requestToken = getToken()
     const version = ++sessionLoadVersion.current
     setLoadingWorkspaceRole(user.role)
@@ -665,6 +681,7 @@ function AppInner() {
       try {
         if (!account) throw new Error(ACCOUNT_UNAVAILABLE_MESSAGE)
         assertCanSignIn(loaded, account)
+        if (!roleAllowedOnHost(account.role, window.location.hostname)) throw new ApiError("This account cannot access this portal.", 403)
       } catch (error) {
         await apiLogout()
         throw error
@@ -742,7 +759,8 @@ function AppInner() {
     const empty = emptyState()
     stateRef.current = empty
     setState(empty)
-    await revocation
+    const serverConfirmed = await revocation
+    if (!serverConfirmed) setSessionMessage("You are signed out on this device, but the server could not confirm logout. Your server session may remain active until it expires.")
     signOutInFlight.current = false
     setSigningOut(false)
   }
@@ -2869,8 +2887,10 @@ function AppInner() {
   const globalPeople = state.accounts.filter((a) =>
     a.name.toLowerCase().includes(globalQuery.toLowerCase()),
   )
-  if (signingOut) return <WorkspaceSkeleton role={loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)} />
-  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)} />
+  const pendingRole = loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)
+  const loadingRole = pendingRole && roleAllowedOnHost(pendingRole, window.location.hostname) ? pendingRole : undefined
+  if (signingOut) return <WorkspaceSkeleton role={loadingRole} />
+  if (signedOut && checkingSession) return <WorkspaceSkeleton role={loadingRole} />
   if (signedOut && restoreError)
     return (
       <main className="session-restore" aria-busy={checkingSession}>
@@ -2888,7 +2908,7 @@ function AppInner() {
         )}
       </main>
     )
-  if (signedOut || !actor.id || isLandingPath(routePath))
+  if (signedOut || !actor.id)
     return <LoginPage key={loginPortal} portal={loginPortal} onPortalChange={portal => {
       window.history.replaceState({ ...window.history.state, loginPortal: portal }, "")
       setLoginPortal(portal)
