@@ -45,6 +45,19 @@ test("Office and Site PM navigation alternates controls across every module on d
           assert.equal(document.querySelector('.breadcrumb strong').textContent,label)
           assert.equal(document.querySelectorAll('main h1').length,1,`${role} ${label}: each module has one main heading`)
           assert.ok(document.querySelector('main .page-title-panel h1'),`${role} ${label}: the module uses the shared title panel`)
+          if(role === "opm" && label === "Dashboard") {
+            assert.ok(document.querySelector('.opm-dashboard-page'))
+            assert.equal(document.querySelectorAll('.opm-dashboard-content > .panel').length,2)
+            assert.ok(document.querySelector('.opm-follow-up-panel').textContent.includes('All Follow-Up Items'))
+            assert.equal(document.querySelectorAll('.opm-dashboard-content > details').length,0,'Primary dashboard panels stay visible')
+            assert.equal(document.querySelectorAll('.executive-metric').length,4,'Existing OPM metrics are retained')
+            assert.ok(document.querySelector('.workspace-meta').textContent.match(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/),'Dashboard uses the full date format')
+            assert.ok(document.querySelector('.opm-dashboard-work-record summary'))
+          }
+          if(role === "spm" && label === "Dashboard") {
+            assert.equal(document.querySelector('.opm-overview'),null,'OPM styling does not change Site PM dashboard')
+            assert.equal(document.querySelectorAll('.dashboard-secondary > details').length,3)
+          }
           assert.equal(menu.hidden,!compact,`${role} ${label}: desktop stays open and mobile navigation closes after selection`)
           if(!menu.hidden){
             await click(menu)
