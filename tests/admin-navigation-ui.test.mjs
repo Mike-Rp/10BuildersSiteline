@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
 test("Admin navigation toggles on desktop and mobile, handles resizing, closes on navigation and restores keyboard focus", { timeout: 30000 }, async t => {
-  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/", pretendToBeVisual: true })
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/admin/dashboard", pretendToBeVisual: true })
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, Node: w.Node,
     sessionStorage: w.sessionStorage, localStorage: w.localStorage, IS_REACT_ACT_ENVIRONMENT: true })) {

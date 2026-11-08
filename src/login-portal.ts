@@ -1,43 +1,78 @@
 import type { Role } from "./model"
+import { changeRoute, pagePath, resolveWorkspaceRoute } from "./workspace-routing.ts"
+import { domainPortal, PORTAL_ORIGINS, portalDomainRedirect } from "./portal-domain.ts"
 
 export type LoginPortal = "admin" | "staff" | "client"
-
-export function workspacePath(role: "admin" | "opm" | "spm" | "client") {
-  return `/${role}`
-}
+export const workspacePath = (role: Role) => pagePath(role)
 
 export function isLandingPath(pathname: string) {
-  return /^\/(?:login\/?|(?:admin|staff)\/login\/?)?$/i.test(pathname)
-}
-
-// Keep the sign-in page behind a fresh login. Restoring a session only
-// canonicalizes its current entry, so refreshes do not grow browser history.
-export function navigateToWorkspace(role: "admin" | "opm" | "spm" | "client", freshLogin = false) {
-  const path = workspacePath(role)
-  if (freshLogin) {
-    const landing = role === "client" ? "/" : loginPath(loginPortalForRole(role))
-    if (!isLandingPath(window.location.pathname)) window.history.replaceState(null, "", landing)
-    window.history.pushState(null, "", path)
-  } else if (window.location.pathname !== path) {
-    window.history.replaceState(null, "", path)
-  }
-  return path
+  return /^\/(?:login\/?|(?:admin|staff|client)\/login\/?)?$/i.test(pathname)
 }
 
 export function loginPortalForPath(pathname: string): LoginPortal {
   if (/^\/admin(?:\/|$)/i.test(pathname)) return "admin"
-  return /^\/(?:staff|opm|spm)(?:\/|$)/i.test(pathname) ? "staff" : "client"
+  return /^\/(?:login\/?$|(?:staff|opm|spm)(?:\/|$))/i.test(pathname) ? "staff" : "client"
 }
 
 export function loginPortalForRole(role: Role): LoginPortal {
   return role === "admin" ? "admin" : role === "client" ? "client" : "staff"
 }
 
-export function loginPath(portal: LoginPortal): string {
-  return portal === "client" ? "/login" : `/${portal}/login`
+const currentDomain = () => typeof window === "undefined" ? undefined : domainPortal(window.location.hostname)
+export function loginPath(portal: LoginPortal) {
+  const target = portal === "client" ? "client" : "staff"
+  if (currentDomain() === target) return "/"
+  return portal === "client" ? "/client/login" : "/login"
+}
+export function shareLoginPath(portal: LoginPortal) {
+  if (currentDomain()) return PORTAL_ORIGINS[portal === "client" ? "client" : "staff"] + (portal === "admin" ? "/?tab=admin" : "/")
+  return portal === "admin" ? "/login?tab=admin" : loginPath(portal)
 }
 
-
 export function currentLoginPortal(): LoginPortal {
-  return typeof window === "undefined" ? "client" : loginPortalForPath(window.location.pathname)
+  if (typeof window === "undefined") return "client"
+  const domain = currentDomain()
+  if (window.location.pathname === "/" && domain !== "staff") return "client"
+  if (/^\/login\/?$/i.test(window.location.pathname) || (window.location.pathname === "/" && domain === "staff")) {
+    const tab = window.history.state?.loginPortal || new URLSearchParams(window.location.search).get("tab")
+    return tab === "admin" ? "admin" : "staff"
+  }
+  return loginPortalForPath(window.location.pathname)
+}
+
+// Legacy paths retain their selected portal without making tab switches navigations.
+export function canonicalizeLoginEntry() {
+  const redirect = portalDomainRedirect(window.location)
+  if (redirect) {
+    // Origin-scoped sessions are deliberately not transferred in URLs or cookies.
+    window.location.replace(redirect)
+    return window.location.pathname
+  }
+  const path = window.location.pathname
+  if (path !== "/" && isLandingPath(path) && (currentDomain() || /^\/(admin|staff)\/login\/?$/i.test(path))) {
+    const portal = currentLoginPortal()
+    const query = new URLSearchParams(window.location.search)
+    if (portal === "admin") query.set("tab", "admin")
+    const search = query.size ? `?${query}` : ""
+    changeRoute(loginPath(portal) + search + window.location.hash, true, { ...window.history.state, loginPortal: portal })
+  }
+  return window.location.pathname
+}
+
+export function navigateToWorkspace(role: Role, freshLogin = false) {
+  const current = window.location.pathname
+  const requested = freshLogin ? window.history.state?.returnTo : current
+  const valid = typeof requested === "string" && resolveWorkspaceRoute(role, requested)
+  const path = valid ? pagePath(role, valid.page, valid.projectId) : workspacePath(role)
+  const domain = currentDomain()
+  const target = role === "client" ? "client" : "staff"
+  if (domain && domain !== target) {
+    window.location.replace(PORTAL_ORIGINS[target] + path)
+    return current
+  }
+  if (freshLogin) {
+    if (!isLandingPath(current)) changeRoute(loginPath(loginPortalForRole(role)), true)
+    changeRoute(path)
+  } else if (current !== path) changeRoute(path, true)
+  return path
 }

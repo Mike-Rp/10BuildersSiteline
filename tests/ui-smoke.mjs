@@ -35,8 +35,8 @@ const runs = [
   ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Archive", "Activity log", "Preferences"],
   ["karlo.espiritu@10builders.com", "Dashboard", "Active sites", "Resources", "Archive", "Activity log", "Preferences"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Active sites", "Resources", "Archive", "Activity log", "Preferences"],
-  ["f.uy@aldenheights-hoa.com", "Active sites", "Project Overview", "Project Documents", "Progress History", "Site"],
-  ["maria.santos@rosariabiz.ph", "Active sites", "Project Overview", "Project Documents", "Progress History"],
+  ["f.uy@aldenheights-hoa.com", "Active sites", "Project Overview", "Project Documents", "Progress History", "Site Photographs", "Preferences"],
+  ["maria.santos@rosariabiz.ph", "Active sites", "Project Overview", "Project Documents", "Progress History", "Site Photographs", "Preferences"],
 ]
 const loginPath = (email) => email === "patricia.domingo@10builders.com" ? "/admin/login" : email.endsWith("@10builders.com") ? "/staff/login" : "/"
 let failed = false
@@ -53,7 +53,7 @@ for (const [email, ...labels] of runs.filter(([e]) => !process.argv[2] || e.star
   const r = JSON.parse(line.slice(7))
   const bad = Object.entries(r.pages).filter(([, v]) => v !== "ok")
   if (r.problems.length || bad.length) failed = true
-  console.log(`\n${email}\n  signed in: ${r.signedIn}  banner: ${r.banner}\n  home: ${r.home}\n  pages: ${JSON.stringify(r.pages)}\n  problems: ${r.problems.length ? "\n    " + r.problems.join("\n    ") : "none"}`)
+  console.log(`\n${email}\n  signed in: ${r.signedIn}  banner: ${r.banner}\n  home: ${r.home}\n  pages: ${JSON.stringify(r.pages)}\n  security: ${r.routeSecurity}\n  problems: ${r.problems.length ? "\n    " + r.problems.join("\n    ") : "none"}`)
 }
 server.kill()
 await pg.stop()

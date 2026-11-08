@@ -46,6 +46,8 @@ import NavigationCount from "./NavigationCount"
 import { navigationAttention } from "./navigation-attention"
 import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
+import useWorkspacePage from "./useWorkspacePage"
+import { ROUTE_CHANGE } from "./workspace-routing"
 import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
@@ -263,7 +265,8 @@ export default function RoleWorkspace({
   const nav = extensionDemo ? roleNav.filter(([label]) => ["Active sites", "Deadlines"].includes(label)) : roleNav
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
-  const [page, setPage] = useState(extensionDemo ? isOpm ? "Deadlines" : "Active sites" : "Dashboard")
+  const { page: routePage, navigate: setPage } = useWorkspacePage(actor.role, !extensionDemo)
+  const page = extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -304,6 +307,34 @@ export default function RoleWorkspace({
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const navigation = useSidebarNavigation(!paused)
+  useEffect(() => {
+    const changed = () => {
+      setDialog(undefined)
+      setPreview(undefined)
+      setBell(false)
+      setSelectedNotification(undefined)
+      setProfileOpen(false)
+      setConfirmationView(undefined)
+      setSitePmContact(undefined)
+      setSuggestedReassignment(undefined)
+      setReportProjectId("")
+      setMonthlySummaryOpen(false)
+      setPhaseWorkspaceOpen(false)
+      setAcceptedId("")
+      setCompletedProjectId("")
+      setEvidenceReview(undefined)
+      setReportReject(undefined)
+      setNoteRemoval(undefined)
+      setReviewAction(undefined)
+      navigation.closeMobile()
+    }
+    window.addEventListener("popstate", changed)
+    window.addEventListener(ROUTE_CHANGE, changed)
+    return () => {
+      window.removeEventListener("popstate", changed)
+      window.removeEventListener(ROUTE_CHANGE, changed)
+    }
+  }, [])
   const [bell, setBell] = useState(false)
   const [acceptedId, setAcceptedId] = useState("")
   const [note, setNote] = useState("")
@@ -509,7 +540,7 @@ export default function RoleWorkspace({
     }
   }
   function navigate(next: string) {
-    if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
+    if (next === "Reports") { setMonthlySummaryOpen(true); return }
     let nextActiveSitesView: typeof activeSitesView | undefined
     if (!isOpm && next === "Document repository") {
       setResourcesTab("documents")
@@ -3728,6 +3759,7 @@ export default function RoleWorkspace({
                 </div>
               )}
               <button
+                aria-current={page === label ? "page" : undefined}
                 className={`nav-item ${page === label ? "active" : ""}`}
                 aria-label={label}
                 aria-description={navigationCounts[label]?.count ? `${navigationCounts[label].count} ${navigationCounts[label].description}` : undefined}

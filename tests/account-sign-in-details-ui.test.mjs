@@ -20,7 +20,7 @@ test("new account details use the role login, copy individual or combined values
     const button = text => [...document.querySelectorAll('button')].find(element=>element.textContent===text)
     const click = async text => act(async()=>{assert.ok(button(text),text);button(text).click()})
     const details={name:'Sample Account',email:'sample@company.test',password:'DEMO-ONLY-123'}
-    for(const [role,path] of [['admin','/admin/login'],['opm','/staff/login'],['spm','/staff/login'],['client','/login']]) {
+    for(const [role,path] of [['admin','/login?tab=admin'],['opm','/login'],['spm','/login'],['client','/client/login']]) {
       await act(()=>root.render(React.createElement(Details,{key:role,details:{...details,role},onClose:()=>closed++})))
       const values=[...document.querySelectorAll('input')].map(input=>input.value)
       assert.deepEqual(values,[`https://site.example${path}`,details.email,details.password])

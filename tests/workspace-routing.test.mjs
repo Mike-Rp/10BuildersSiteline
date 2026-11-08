@@ -2,6 +2,24 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { JSDOM } from "jsdom"
 import { isLandingPath, navigateToWorkspace } from "../src/login-portal.ts"
+import { pagePath, resolveWorkspaceRoute, WORKSPACE_ROUTES } from "../src/workspace-routing.ts"
+
+test("every sidebar page has a unique, role-scoped route; unknown and cross-role routes are rejected", () => {
+  const paths = new Set()
+  for (const [role, pages] of Object.entries(WORKSPACE_ROUTES)) {
+    for (const page of Object.keys(pages)) {
+      const path = pagePath(role, page)
+      assert.ok(!paths.has(path), path)
+      paths.add(path)
+      assert.deepEqual(resolveWorkspaceRoute(role, path), {page})
+      for (const other of Object.keys(WORKSPACE_ROUTES).filter(value => value !== role)) assert.equal(resolveWorkspaceRoute(other, path), undefined)
+    }
+    assert.equal(resolveWorkspaceRoute(role, `/${role}/unknown`), undefined)
+    assert.equal(resolveWorkspaceRoute(role, `/${role}/dashboard/extra`), undefined)
+  }
+  assert.deepEqual(resolveWorkspaceRoute("client", "/client/projects/project-123/documents"), {page:"Project Documents",projectId:"project-123"})
+  assert.equal(resolveWorkspaceRoute("client", "/client/projects/%broken/documents"), undefined)
+})
 
 test("fresh logins retain a 10BuildLine landing entry; session restores do not add entries", async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "window")
@@ -15,10 +33,10 @@ test("fresh logins retain a 10BuildLine landing entry; session restores do not a
   }
   try {
     for (const role of ["admin","opm","spm","client"]) {
-      const landing = role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login"
+      const landing = role === "client" ? "/client/login" : "/login"
       w.history.replaceState(null,"",landing)
       const count = w.history.length
-      assert.equal(navigateToWorkspace(role,true),`/${role}`)
+      assert.equal(navigateToWorkspace(role,true),pagePath(role))
       // A previous forward entry may be replaced by a fresh login.
       assert.ok(w.history.length <= count + 1)
       const afterLogin = w.history.length
@@ -28,11 +46,18 @@ test("fresh logins retain a 10BuildLine landing entry; session restores do not a
       assert.equal(w.location.pathname,landing)
       assert.equal(isLandingPath(w.location.pathname),true)
       await traverse("forward")
-      assert.equal(w.location.pathname,`/${role}`)
+      assert.equal(w.location.pathname,pagePath(role))
     }
     w.history.replaceState(null,"","/spm")
     navigateToWorkspace("opm")
-    assert.equal(w.location.pathname,"/opm","the verified account determines the route")
+    assert.equal(w.location.pathname,"/opm/dashboard","the verified account determines the route")
+    w.history.replaceState(null,"","/opm/documents")
+    const count = w.history.length
+    navigateToWorkspace("opm")
+    assert.equal(w.location.pathname,"/opm/documents","restore preserves a deep link")
+    assert.equal(w.history.length,count)
+    w.history.replaceState({returnTo:"/admin/team"},"","/login")
+    assert.equal(navigateToWorkspace("spm",true),"/spm/dashboard","return paths cannot bypass role checks")
   } finally {
     dom.window.close()
     if(previous)Object.defineProperty(globalThis,"window",previous)

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { loginPath, type LoginPortal } from "./login-portal"
+import { shareLoginPath, type LoginPortal } from "./login-portal"
 import { Button, Modal } from "./ui"
 import "./share-login-links.css"
 
@@ -12,7 +12,7 @@ const portals: { portal: LoginPortal; title: string; description: string }[] = [
 function LoginLink({ portal, title, description }: typeof portals[number]) {
   const input = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState("")
-  const url = new URL(loginPath(portal), window.location.origin).href
+  const url = new URL(shareLoginPath(portal), window.location.origin).href
   async function copy() {
     try {
       await window.navigator.clipboard.writeText(url)

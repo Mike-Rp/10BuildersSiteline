@@ -6,8 +6,8 @@ import { loginPortalForPath } from "../src/login-portal.ts"
 
 test("admin, staff, and client paths select their own login portals", () => {
   for (const path of ["/admin", "/admin/", "/admin/login"]) assert.equal(loginPortalForPath(path), "admin")
-  for (const path of ["/staff", "/staff/", "/staff/login"]) assert.equal(loginPortalForPath(path), "staff")
-  for (const path of ["/", "/login", "/administrator", "/staffing", "/projects/admin"]) assert.equal(loginPortalForPath(path), "client")
+  for (const path of ["/staff", "/staff/", "/staff/login", "/login"]) assert.equal(loginPortalForPath(path), "staff")
+  for (const path of ["/", "/client/login", "/administrator", "/staffing", "/projects/admin"]) assert.equal(loginPortalForPath(path), "client")
 })
 
 test("explicit sign-in pages wait for credentials even when this tab has a saved session", {timeout:30000}, async () => {
@@ -27,14 +27,14 @@ test("explicit sign-in pages wait for credentials even when this tab has a saved
     const client=await server.ssrLoadModule("/src/api/client.ts")
     for(const role of ["admin","opm","spm","client"]) {
       const token=`test.${Buffer.from(JSON.stringify({sub:`saved-${role}`,details:{id:`saved-${role}`,role}})).toString("base64url")}.test`
-      for(const path of ["/login","/admin/login","/staff/login","/staff/login/?source=switch","/admin/login/?source=switch"]) {
+      for(const path of ["/", "/client/login", "/login","/admin/login","/staff/login","/staff/login/?source=switch","/admin/login/?source=switch", "/login?tab=admin"]) {
         w.history.replaceState(null,"",path)
         client.setToken(token)
         await act(()=>root.render(React.createElement(App,{key:role+path})))
         assert.equal(requests.length,0,"Visiting a sign-in page must not fetch or restore a cached account")
         assert.ok(document.querySelector('form.login-form'),`Expected a form at ${path} for saved ${role}`)
-        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/')?'Administrator sign-in':path.startsWith('/staff/')?'Staff sign-in':'Welcome to 10BuildLine')
-        assert.equal(w.location.pathname,new URL(path,w.location.origin).pathname)
+        assert.equal(document.querySelector('.login-heading h1').textContent,path.startsWith('/admin/') || path.includes('tab=admin')?'Administrator sign-in':path.startsWith('/staff/') || path.startsWith('/login')?'Staff sign-in':'Welcome to 10BuildLine')
+        assert.equal(w.location.pathname,path === '/' ? '/' : path === '/client/login' ? '/client/login' : '/login')
         for(const input of document.querySelectorAll('form.login-form input')) assert.equal(input.value,"")
         assert.equal(client.getToken(),token,"Opening a login form must not revoke an existing session")
         await act(()=>root.render(null))
@@ -55,7 +55,7 @@ test("all three login pages use the approved branding, switches, and their own s
   }
   w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
   const originalFetch=globalThis.fetch, requests=[]
-  globalThis.fetch=async(url,init)=>{requests.push({url:String(url),body:JSON.parse(init.body)});return Response.json({message:"Use the correct sign-in page.",error:{code:"LOGIN_PORTAL_MISMATCH"}},{status:403})}
+  globalThis.fetch=async(url,init)=>{requests.push({url:String(url),body:JSON.parse(init.body)});return Response.json({error:{message:"Use the correct sign-in page.",code:"LOGIN_PORTAL_MISMATCH"}},{status:403})}
   const server=await createServer({server:{middlewareMode:true,hmr:false,watch:null},appType:"custom",logLevel:"silent",optimizeDeps:{noDiscovery:true,include:[]}})
   const {default:React,act}=await import("react"),{createRoot}=await import("react-dom/client")
   const root=createRoot(document.getElementById("root"))
@@ -65,7 +65,7 @@ test("all three login pages use the approved branding, switches, and their own s
     const type=async(input,value)=>act(()=>{Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,"value").set.call(input,value);input.dispatchEvent(new w.Event("input",{bubbles:true}))})
     for(const portal of ['client','staff','admin']) {
       const admin=portal==='admin', staff=portal==='staff', internal=admin||staff
-      w.history.replaceState(null,"",admin?"/admin/login":staff?"/staff/login":"/login")
+      w.history.replaceState(null,"",admin?"/admin/login":staff?"/staff/login":"/client/login")
       client.setToken("")
       await act(()=>root.render(React.createElement(App,{key:portal})))
       assert.match(document.title,admin?/10BuildLine Admin/:staff?/10BuildLine Staff/:/10BuildLine \| 10 Builders/)
@@ -92,10 +92,18 @@ test("all three login pages use the approved branding, switches, and their own s
       const selector=document.querySelector('.login-role-selector')
       assert.equal(!!selector,internal)
       if(internal){
-        assert.deepEqual([...selector.querySelectorAll('a')].map(a=>[a.textContent,a.getAttribute('href')]),[['Staff','/staff/login'],['Admin','/admin/login']])
+        assert.deepEqual([...selector.querySelectorAll('a')].map(a=>[a.textContent,a.getAttribute('href')]),[['Staff','/login'],['Admin','/login']])
         assert.equal(selector.querySelectorAll('[aria-current="page"]').length,1)
-        assert.equal(selector.querySelector('[aria-current="page"]').getAttribute('href'),admin?'/admin/login':'/staff/login')
+        assert.equal(selector.querySelector('[aria-current="page"]').getAttribute('href'),'/login')
         assert.equal(selector.closest('form'),null,'Switching login pages must not submit credentials')
+        const url = w.location.href, history = w.history.length
+        await act(() => selector.querySelector(`[aria-label="${admin ? 'Staff' : 'Administrator'} sign-in"]`).click())
+        assert.equal(w.location.href,url,'Switching portal tabs keeps the URL')
+        assert.equal(w.history.length,history,'Portal tabs do not add history entries')
+        assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Staff sign-in':'Administrator sign-in')
+        await act(() => document.querySelector(`.login-role-selector [aria-label="${admin ? 'Administrator' : 'Staff'} sign-in"]`).click())
+        assert.equal(w.location.href,url)
+        assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Administrator sign-in':'Staff sign-in')
       }
       if(!internal){
         assert.match(document.querySelector('.client-access-badge').textContent,/Client access/)

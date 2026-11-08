@@ -21,6 +21,8 @@ import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
+import useWorkspacePage from "./useWorkspacePage"
+import { changeRoute, ROUTE_CHANGE } from "./workspace-routing"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
@@ -60,7 +62,7 @@ import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
-import { currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, workspacePath, type LoginPortal } from "./login-portal"
+import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -319,7 +321,7 @@ function AppInner() {
   const actor =
     state.accounts.find((a) => a.id === sessionId) ||
     stubAccount("", "", "client")
-  const [page, setPage] = useState("Dashboard")
+  const { page, navigate: setPage } = useWorkspacePage("admin")
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [intakeLogTab, setIntakeLogTab] = useState<"current" | "history">("current")
   const [dialog, setDialog] = useState<Dialog>()
@@ -355,21 +357,30 @@ function AppInner() {
   const [signingOut, setSigningOut] = useState(false)
   const signOutInFlight = useRef(false)
   const [loginPortal, setLoginPortal] = useState<LoginPortal>(currentLoginPortal)
-  const [routePath, setRoutePath] = useState(() => window.location.pathname)
+  const [routePath, setRoutePath] = useState(canonicalizeLoginEntry)
   useEffect(() => {
     const changed = () => {
-      if (!getToken() && /^\/(admin|staff|opm|spm|client)\/?$/i.test(window.location.pathname)) {
-        window.history.replaceState(null, "", loginPath(currentLoginPortal()))
-      }
+      canonicalizeLoginEntry()
       setRoutePath(window.location.pathname)
       setLoginPortal(currentLoginPortal())
       setDialog(undefined)
       setPreview(undefined)
       setConfirmation(undefined)
       setNotifications(false)
+      setSelectedNotification(undefined)
+      setSecurityOpen(false)
+      setShareLoginLinksOpen(false)
+      setMonthlySummaryOpen(false)
+      setReportProjectId("")
+      setOverrideTarget(undefined)
+      setRenewalsOpen(false)
     }
     window.addEventListener("popstate", changed)
-    return () => window.removeEventListener("popstate", changed)
+    window.addEventListener(ROUTE_CHANGE, changed)
+    return () => {
+      window.removeEventListener("popstate", changed)
+      window.removeEventListener(ROUTE_CHANGE, changed)
+    }
   }, [])
   useEffect(() => {
     document.title = loginPortal === "admin" ? "10BuildLine Admin | 10 Builders" : loginPortal === "staff" ? "10BuildLine Staff | 10 Builders" : "10BuildLine | 10 Builders"
@@ -378,10 +389,8 @@ function AppInner() {
   useEffect(() => {
     if (signedOut || isLandingPath(routePath)) return
     const portal = loginPortalForRole(actor.role)
-    if (routePath !== workspacePath(actor.role)) {
-      setRoutePath(navigateToWorkspace(actor.role))
-      setLoginPortal(portal)
-    }
+    setRoutePath(navigateToWorkspace(actor.role))
+    setLoginPortal(portal)
   }, [signedOut, actor.role, loginPortal, routePath])
   const notificationSettings = useNotificationSettings(actor.id, stateRef, setState, signedOut)
   const [resetRequestFocus,setResetRequestFocus]=useState(0)
@@ -428,13 +437,18 @@ function AppInner() {
   // account that may no longer sign in ends the session; a server or network
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
+  useEffect(() => {
+    if (!signedOut || checkingSession || restoreError || isLandingPath(routePath)) return
+    const portal = currentLoginPortal()
+    changeRoute(loginPath(portal), true, { loginPortal: portal, returnTo: routePath })
+  }, [signedOut, checkingSession, restoreError, routePath])
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
   const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate})
   useEffect(() => {
-    const signInPage = /^\/(?:(?:admin|staff)\/)?login\/?$/i.test(window.location.pathname)
+    const signInPage = isLandingPath(window.location.pathname)
     if (signInPage || !tokenUser()) {
       setCheckingSession(false)
       return
@@ -589,7 +603,7 @@ function AppInner() {
   }
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
-    if (next === "Reports") { setMonthlySummaryOpen(true); next = "Dashboard" }
+    if (next === "Reports") { setMonthlySummaryOpen(true); return }
     setActiveSitesScheduleFilter("")
     const target = resolveAdminTarget(next)
     setPage(target ? target.page : normalizeWorkspacePage(next))
@@ -703,7 +717,6 @@ function AppInner() {
     setSessionMessage("")
     setWelcomeGreeting(account.role === "client" ? undefined : sessionDashboardGreeting(account.id, account.name, { fresh: true }))
     setSignedOut(false)
-    setPage("Dashboard")
     try {
       sessionStorage.setItem(SESSION_KEY, account.id)
     } catch {
@@ -715,7 +728,7 @@ function AppInner() {
     signOutInFlight.current = true
     setSigningOut(true)
     const portal = currentLoginPortal()
-    window.history.replaceState(null, "", loginPath(portal))
+    changeRoute(loginPath(portal), true, { loginPortal: portal })
     setRoutePath(window.location.pathname)
     setLoginPortal(portal)
     clearSession()
@@ -2876,7 +2889,10 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id || isLandingPath(routePath))
-    return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
+    return <LoginPage key={loginPortal} portal={loginPortal} onPortalChange={portal => {
+      window.history.replaceState({ ...window.history.state, loginPortal: portal }, "")
+      setLoginPortal(portal)
+    }} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)

@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
 test("Company creation shows a persistent directory notice only after a successful save", {timeout:60000}, async t=>{
-  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:8443/',pretendToBeVisual:true}),w=dom.window,previous=new Map()
+  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost:8443/admin/directory',pretendToBeVisual:true}),w=dom.window,previous=new Map()
   for(const [key,value]of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Element:w.Element,Node:w.Node,sessionStorage:w.sessionStorage,localStorage:w.localStorage,IS_REACT_ACT_ENVIRONMENT:true})){
     previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})
   }

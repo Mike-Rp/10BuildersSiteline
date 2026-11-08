@@ -18,6 +18,9 @@ import type { Event as WorkspaceEvent } from "./model"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import MonthlyReport from "./MonthlyReport"
 import { normalizeWorkspacePage } from "./adminNav"
+import useWorkspacePage from "./useWorkspacePage"
+import { ROUTE_CHANGE } from "./workspace-routing"
+import { useExtensionDemo } from "./ExtensionDemoContext"
 import ActiveSites from "./ActiveSites"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -106,9 +109,11 @@ export default function ClientPortal({
   idleWarning: boolean
   onStayActive: () => void
 }) {
-  const [page, setPage] = useState("Project Overview")
+  const extensionDemo = useExtensionDemo()
+  const { page, navigate: setPage, projectId: routeProjectId } = useWorkspacePage("client", !extensionDemo)
   const [siteDetails, setSiteDetails] = useState(false)
-  const [projectId, setProjectId] = useState(projects[0]?.id || "")
+  const [projectId, setProjectId] = useState(routeProjectId || projects[0]?.id || "")
+  useEffect(() => { if (routeProjectId) setProjectId(routeProjectId) }, [routeProjectId])
   const navigation = useSidebarNavigation(!paused)
   const signOut = useSignOutConfirmation(onPause)
   const [bell, setBell] = useState(false)
@@ -118,8 +123,24 @@ export default function ClientPortal({
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [documentQuery, setDocumentQuery] = useState("")
+  useEffect(() => {
+    const changed = () => {
+      setViewer(undefined)
+      setBell(false)
+      setSelectedNotification(undefined)
+      setSiteDetails(false)
+      setReportProjectId("")
+      navigation.closeMobile()
+    }
+    window.addEventListener("popstate", changed)
+    window.addEventListener(ROUTE_CHANGE, changed)
+    return () => {
+      window.removeEventListener("popstate", changed)
+      window.removeEventListener(ROUTE_CHANGE, changed)
+    }
+  }, [])
   useListMemory()
-  const project = projects.find((p) => p.id === projectId) || projects[0]
+  const project = routeProjectId ? projects.find(p => p.id === routeProjectId) : projects.find((p) => p.id === projectId) || projects[0]
   const scheduleToday = useScheduleToday()
   const scheduleAttention = project ? clientExecutiveSummary(project, scheduleToday).schedule : undefined
   const history = project?.history.slice().reverse().sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)) || []
@@ -172,7 +193,7 @@ export default function ClientPortal({
   function navigate(next: string) {
     setSiteDetails(false)
     const target = normalizeWorkspacePage(next)
-    setPage(NAV.some(([label]) => label === target) ? target : "Project Overview")
+    setPage(NAV.some(([label]) => label === target) ? target : "Project Overview", routeProjectId)
     navigation.closeMobile()
     setBell(false)
     setError("")
@@ -622,6 +643,7 @@ export default function ClientPortal({
             <button
               key={label}
               aria-label={label}
+              aria-current={page === label ? "page" : undefined}
               className={`nav-item ${page === label ? "active" : ""}`}
               onClick={() => navigate(label)}
             >
@@ -736,6 +758,7 @@ export default function ClientPortal({
                   value={project.id}
                   onChange={(event) => {
                     setProjectId(event.target.value)
+                    setPage(page === "Active sites" || page === "Preferences" ? "Project Overview" : page, event.target.value)
                     setSiteDetails(false)
                     setViewer(undefined)
                     setDocumentQuery("")
@@ -786,7 +809,7 @@ export default function ClientPortal({
         action={notificationAction(selectedNotification, { id: actor.id, role: "client" }, projects, [], NAV.map(([label]) => label))}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)
-          if (action.kind === "project") { setProjectId(action.id); navigate("Progress History") }
+          if (action.kind === "project") { setProjectId(action.id); setPage("Progress History", action.id) }
           else if (action.kind === "page") navigate(action.page)
         }} />}
       {reportProjectId && <MonthlyReport projects={projects} initialProjectId={reportProjectId} allowProjectChange={false} onClose={()=>setReportProjectId("")} />}

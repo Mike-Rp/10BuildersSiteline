@@ -2,6 +2,7 @@
 // API at VITE_API_URL, opens every page and reports crashes. Used by ui-smoke.mjs.
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
+import { pagePath } from "../src/workspace-routing.ts"
 
 const [, , email, ...navLabels] = process.argv
 // Admin, staff and client accounts each sign in through their own portal page.
@@ -47,7 +48,12 @@ const setValue = (input, value) => {
   input.dispatchEvent(new w.Event("input", { bubbles: true }))
 }
 
-await server.ssrLoadModule("/src/main.tsx")
+const { default: React } = await import("react")
+const { createRoot } = await import("react-dom/client")
+const { default: App } = await server.ssrLoadModule("/src/App.tsx")
+const root = createRoot(document.getElementById("root"))
+const mount = () => root.render(React.createElement(App))
+mount()
 await waitFor(() => document.querySelector("form.login-form"), "the login form")
 const inputs = document.querySelectorAll("form.login-form input")
 setValue(inputs[0], email)
@@ -65,7 +71,17 @@ results.home = text().replace(/\s+/g, " ").slice(0, 160)
 const clickable = () => [...document.querySelectorAll("button, a, [role=button]")]
 const sidebarCounts = () => [...document.querySelectorAll('.sidebar .nav-item')].map(el => [el.getAttribute('aria-label'),el.querySelector('.nav-count')?.textContent || '0'])
 const initialSidebarCounts = JSON.stringify(sidebarCounts())
+const role = document.querySelector('.admin-workspace') ? 'admin' : document.querySelector('.client-portal') ? 'client' : email.startsWith('lea.') ? 'opm' : 'spm'
+const apiClient = await server.ssrLoadModule('/src/api/client.ts')
+const traverse = async direction => {
+  const moved = new Promise(resolve => w.addEventListener('popstate',resolve,{once:true}))
+  w.history[direction]()
+  await moved
+  await sleep(100)
+}
+const active = label => document.querySelector(`.sidebar .nav-item[aria-label="${label}"][aria-current="page"]`)
 for (const label of navLabels) {
+  const previousPath = w.location.pathname
   const target = clickable().find((el) => el.getAttribute("aria-label") === label || el.textContent.trim().replace(/\s+/g, " ").startsWith(label))
   if (!target) {
     results.pages[label] = "no such button"
@@ -73,6 +89,21 @@ for (const label of navLabels) {
   }
   target.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }))
   await sleep(250)
+  const path = pagePath(role,label)
+  if (w.location.pathname !== path || !active(label)) problems.push(`${role} ${label}: URL or active highlight is incorrect`)
+  if (previousPath !== path) {
+    await traverse('back')
+    if (w.location.pathname !== previousPath) problems.push(`${role} ${label}: Back did not restore the previous URL`)
+    await traverse('forward')
+    if (w.location.pathname !== path || !active(label)) problems.push(`${role} ${label}: Forward did not restore the module`)
+  }
+  // Recreate the app at the deep URL with its saved token, as on a browser refresh.
+  root.render(null)
+  await sleep(50)
+  mount()
+  await waitFor(() => active(label) && !document.querySelector('.workspace-skeleton'), `restore ${path}`, 30000)
+  if (w.location.pathname !== path) problems.push(`${role} ${label}: refresh lost the deep URL`)
+  results.pages[label + ' URL/history/session restore'] = 'ok'
   if (JSON.stringify(sidebarCounts()) !== initialSidebarCounts) problems.push('Pending-work sidebar counts changed solely from module navigation')
   for (const badge of document.querySelectorAll('.sidebar .nav-count')) {
     if (!badge.title || !badge.getAttribute('aria-label') || Number(badge.textContent) <= 0) problems.push('Sidebar work badge lacks its count or accessible explanation')
@@ -85,7 +116,7 @@ for (const label of navLabels) {
     if (document.querySelector('[role="dialog"]')) problems.push("Activity log unexpectedly opened as a modal")
   }
   if (["Project intake","Confirmation queue","Assignments"].includes(label)) {
-    const group=document.querySelector('.intake-tabs')
+    const group=document.querySelector('.intake-tabs[aria-label="Intake responsibility"]')
     if (!group) problems.push('Intake responsibility grouping is missing')
     else {
       const tabs=[...group.querySelectorAll(':scope > button')]
@@ -119,18 +150,19 @@ for (const label of navLabels) {
   }
   if (label === "Active sites") {
     // Office and Site PMs review work from the Active sites view tabs; clients and Admin have no review tabs.
-    const tabs = [...document.querySelectorAll('.active-sites-view-tabs [role="tab"]')].map(el => el.textContent.trim())
+    const tabs = [...document.querySelectorAll('.active-sites-view-tabs [role="tab"]')]
     const isClient = !!document.querySelector('.client-portal')
     const isAdmin = !!document.querySelector('.admin-workspace')
-    const reviewTab = tabs.some(label => /^(Updates & issues|Assignments)/.test(label))
-    if (isClient && tabs.length) problems.push('Client received staff review navigation')
+    const reviewTab = tabs.find(tab => /^(Updates & issues|Assignments)/.test(tab.textContent.trim()))
+    if (isClient && reviewTab) problems.push('Client received staff review navigation')
     if (!isClient && !isAdmin && !reviewTab) problems.push('Staff review navigation is missing')
     if (document.querySelector('.as-card .badge')) problems.push('Redundant Active badge remains on a project card')
     if ([...document.querySelectorAll('.as-toolbar label')].some(el => el.textContent.trim().startsWith('Status'))) problems.push('Redundant status filter remains')
     if (reviewTab) {
       reviewTab.click()
       await sleep(100)
-      if ([...document.querySelectorAll('.as-card')].some(el => !el.querySelector('.as-review'))) problems.push('Review tab includes a project without a pending review')
+      if (role === 'opm' && [...document.querySelectorAll('.as-card')].some(el => !el.querySelector('.as-review'))) problems.push('Review tab includes a project without a pending review')
+      if(reviewTab.getAttribute('aria-selected')!=='true') problems.push('Staff review tab did not activate')
       tabs[0].click()
       await sleep(100)
     }
@@ -165,8 +197,44 @@ for (const label of navLabels) {
       }
     }
   }
+  if (w.location.pathname !== path) problems.push(`${role} ${label}: an in-page tab or dialog changed the URL`)
 }
+// Manual cross-role paths must render only the verified role's workspace.
+for (const other of ['admin','opm','spm','client'].filter(value => value !== role)) {
+  w.history.pushState(null,'',pagePath(other))
+  w.dispatchEvent(new w.PopStateEvent('popstate'))
+  await sleep(150)
+  if (w.location.pathname !== pagePath(role) || !active(role === 'client' ? 'Project Overview' : 'Dashboard')) problems.push(`${role}: unauthorized ${other} URL was not redirected`)
+}
+// A Client project URL may only resolve projects returned by the existing scoped loader.
+if (role === 'client') {
+  const option = document.querySelector('.client-project-toolbar select option')
+  if (!option) problems.push('Client dynamic route: missing assigned project')
+  else {
+    const path = pagePath('client','Project Documents',option.value)
+    w.history.pushState(null,'',path)
+    w.dispatchEvent(new w.PopStateEvent('popstate'))
+    await sleep(100)
+    if (!active('Project Documents') || document.querySelector('.client-project-toolbar select')?.value !== option.value) problems.push('Client dynamic project route did not resolve')
+    root.render(null);await sleep(50);mount()
+    await waitFor(() => active('Project Documents') && !document.querySelector('.workspace-skeleton'),'dynamic route refresh')
+    if(w.location.pathname!==path) problems.push('Client dynamic route was lost on refresh')
+    w.history.pushState(null,'','/client/projects/unauthorized-project/documents')
+    w.dispatchEvent(new w.PopStateEvent('popstate'))
+    await sleep(100)
+    if (document.querySelector('.client-project-toolbar') || !document.querySelector('.client-access-empty')) problems.push('Client unauthorized project exposed another project')
+  }
+}
+results.routeSecurity = 'checked cross-role URLs' + (role === 'client' ? ', dynamic links and unauthorized projects' : '')
+// Revoked sessions must leave a protected deep link at its matching sign-in page.
+root.render(null);await sleep(50)
+apiClient.setToken('')
+w.history.replaceState(null,'',pagePath(role))
+mount()
+await waitFor(() => document.querySelector('form.login-form'),'signed-out deep link')
+if(w.location.pathname!==(role === 'client'?'/client/login':'/login')) problems.push('Signed-out protected URL did not redirect to login')
 results.problems = problems
 console.log("RESULT " + JSON.stringify(results))
+root.unmount()
 await server.close()
 process.exit(0)

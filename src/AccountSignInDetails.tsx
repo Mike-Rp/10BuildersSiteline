@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { initials, ROLE_NAMES, type Role } from "./model"
-import { loginPath, loginPortalForRole } from "./login-portal"
+import { shareLoginPath, loginPortalForRole } from "./login-portal"
 import { Badge, Button, Icon, Modal } from "./ui"
 import "./account-sign-in-details.css"
 
@@ -13,7 +13,7 @@ export type CreatedAccountDetails = {
 }
 
 export default function AccountSignInDetails({ details, onClose }: { details: CreatedAccountDetails; onClose: () => void }) {
-  const url = new URL(loginPath(loginPortalForRole(details.role)), window.location.origin).href
+  const url = new URL(shareLoginPath(loginPortalForRole(details.role)), window.location.origin).href
   const [message, setMessage] = useState("")
   const [manualCopy, setManualCopy] = useState("")
   const manual = useRef<HTMLTextAreaElement>(null)

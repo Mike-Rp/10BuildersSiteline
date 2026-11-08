@@ -30,7 +30,7 @@ test("login asks which device to use and replaces a session only after confirmat
         approveReplacement = true
         return Response.json({ message: "Cannot reach the server. Try again." }, { status: 503 })
       }
-      return Response.json({ message: "An existing session was active recently. Last activity: 4 minutes ago.", error: { code: "ACCOUNT_ALREADY_SIGNED_IN" } }, { status: 409 })
+      return Response.json({ error: { message: "An existing session was active recently. Last activity: 4 minutes ago.", code: "ACCOUNT_ALREADY_SIGNED_IN" } }, { status: 409 })
     }
     await act(() => root.render(React.createElement(App)))
     const setValue = async (input, value) => act(() => {

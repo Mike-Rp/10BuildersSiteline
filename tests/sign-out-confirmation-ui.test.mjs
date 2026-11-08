@@ -59,14 +59,15 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         Object.defineProperty(w,"innerWidth",{value:mobile?390:1366,configurable:true})
         user = { id: `signout-${role}`, role, full_name: `Test ${role}`, email: `${role}@example.invalid`, status: "active", date_added: "2026-01-01" }
         // Restore a workspace refresh, rather than an explicit sign-in page.
-        w.history.replaceState(null, "", role === "admin" ? "/admin" : "/")
+        const home = role === "client" ? "/client/overview" : `/${role}/dashboard`
+        w.history.replaceState(null, "", `/${role}`)
         const token = `test.${Buffer.from(JSON.stringify({ sub: user.id, details: { id: user.id, role } })).toString("base64url")}.test`
         client.setToken(token)
         await act(async () => { root.render(React.createElement(App, { key: `${role}-${mobile}` })); await new Promise(resolve => setTimeout(resolve, 25)) })
         for (let n = 0; n < 100 && !document.querySelector('.sidebar [aria-label="Sign out"]'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
         assert.ok(!!document.querySelector('.sidebar [aria-label="Sign out"]'), `Missing exit for ${role}, mobile=${mobile}`)
         assert.equal(w.location.pathname.startsWith('/admin'), role === 'admin', 'restored sessions use the portal for the verified account role')
-        assert.equal(w.location.pathname, `/${role}`)
+        assert.equal(w.location.pathname, home)
         const beforeSwipeLogout=logoutCalls()
         await click([...document.querySelectorAll('.sidebar .nav-item')].find(el=>el.textContent.trim().startsWith('Active sites')))
         await swipe(mobile?'left':'right')
@@ -88,7 +89,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         // A fresh login adds the role workspace after 10BuildLine's landing page.
         // Exercise real browser traversal against the mounted application.
         w.history.replaceState(null, "", role === "admin" ? "/admin/login" : role === "client" ? "/" : "/staff/login")
-        w.history.pushState(null, "", `/${role}`)
+        w.history.pushState(null, "", home)
         const traverse = direction => act(async () => {
           const moved = new Promise(resolve => w.addEventListener("popstate", resolve, {once:true}))
           w.history[direction]()
@@ -108,13 +109,13 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           await new Promise(resolve => setTimeout(resolve, 30))
         })
         for (let n = 0; n < 100 && document.querySelector('form.login-form'); n++) await act(() => new Promise(resolve => setTimeout(resolve, 10)))
-        assert.equal(w.location.pathname, `/${role}`, "successful credentials push the role route")
+        assert.equal(w.location.pathname, home, "successful credentials push the role route")
         assert.ok(!document.querySelector('form.login-form'))
         await traverse("back")
         assert.ok(document.querySelector('form.login-form'), "fresh login preserves the landing entry")
         await traverse("forward")
         assert.ok(document.querySelector('.sidebar [aria-label="Sign out"]'), "Forward restores the authorized workspace")
-        assert.equal(w.location.pathname, `/${role}`)
+        assert.equal(w.location.pathname, home)
         const baseline = logoutCalls()
         async function requestSignOut() {
           const toggle = document.querySelector(".sidebar-toggle, .mobile-menu")
@@ -158,7 +159,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         assert.equal(w.localStorage.getItem(`siteline-recent-projects:${user.id}`), null)
         assert.equal(w.sessionStorage.getItem(`siteline-dashboard-session-greeting:${user.id}`), null)
         assert.ok(!!document.querySelector("form.login-form"), `Confirmed ${role} logout must return to login`)
-        assert.equal(w.location.pathname, role === 'admin' ? '/admin/login' : role === 'client' ? '/login' : '/staff/login')
+        assert.equal(w.location.pathname, role === 'client' ? '/client/login' : '/login')
         assert.equal(!!document.querySelector('.admin-access-badge'), role !== 'client')
         await act(() => root.render(null))
       }
