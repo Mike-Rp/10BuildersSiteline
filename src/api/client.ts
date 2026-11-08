@@ -126,7 +126,7 @@ export async function api<T = unknown>(
     }
     if (!response.ok)
       throw new ApiError(
-        body?.error?.message ||
+        response.status === 413 ? "File too large." : body?.error?.message ||
           body?.message ||
           `Request failed (${response.status}).`,
         response.status,
@@ -151,7 +151,7 @@ export async function apiEnvelope(
     }
     if (!response.ok)
       throw new ApiError(
-        body?.error?.message || body?.message || `Request failed (${response.status}).`,
+        response.status === 413 ? "File too large." : body?.error?.message || body?.message || `Request failed (${response.status}).`,
         response.status,
         body?.error?.code,
       )

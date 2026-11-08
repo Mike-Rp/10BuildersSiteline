@@ -3,6 +3,7 @@ import { employeeIdFromWorkEmail } from "../../Thesis-Backend/src/domain/work-em
 import { headcount, projectPhaseDisciplines, type Account, type Company, type Doc, type Project, type State } from "../model.ts";
 import type { WorkflowCommand } from "../workflows.ts";
 import { DOC_CODES, type Dto } from "./adapter.ts";
+import { DIRECT_UPLOAD_LIMIT_BYTES, UPLOAD_CHUNK_BYTES } from "../../Thesis-Backend/src/domain/upload-limits.js";
 const post = (path: string, json: unknown = {}) => api<Dto>(path, { method: "POST", json });
 const issueCodes: Record<string, string> = {
     "Failed inspection": "failed_inspection", "Material defect / damage": "material_defect",
@@ -10,6 +11,21 @@ const issueCodes: Record<string, string> = {
     "Subcontractor manpower shortage": "manpower_shortage", "Safety incident": "safety_incident", "Other": "other",
 };
 export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document") {
+    if (file.size > DIRECT_UPLOAD_LIMIT_BYTES) {
+        const total = Math.ceil(file.size / UPLOAD_CHUNK_BYTES);
+        for (let index = 0; index < total; index++) {
+            const body = new FormData();
+            body.set("upload_id", id);
+            body.set("index", String(index));
+            body.set("total", String(total));
+            body.set("purpose", purpose);
+            body.set("chunk", file.slice(index * UPLOAD_CHUNK_BYTES, Math.min(file.size, (index + 1) * UPLOAD_CHUNK_BYTES), file.type), file.name);
+            await api<Dto>("/files/chunks", { method: "POST", body });
+        }
+        const saved = await api<Dto>(`/files/${id}/complete`, { method: "POST", json: { purpose } });
+        registerFileUrl(id, saved.download_url);
+        return saved;
+    }
     const body = new FormData();
     body.set("id", id);
     body.set("file", file);

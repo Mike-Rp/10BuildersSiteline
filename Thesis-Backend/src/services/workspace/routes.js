@@ -31,7 +31,7 @@ import { credentialSummary } from "../licenses/credentials.controller.js";
 import { claimFields, claimResetRequest, sendDueReminders } from "../accounts/reset-follow-up.utility.js";
 import { Router } from "express";
 import multer from "multer";
-import { GENERAL_UPLOAD_LIMIT_BYTES, DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB } from "../../domain/upload-limits.js";
+import { GENERAL_UPLOAD_LIMIT_BYTES, DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB, MAX_UPLOAD_CHUNKS, UPLOAD_CHUNK_BYTES } from "../../domain/upload-limits.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, requireLogin, hasProjectAccess, isProjectOpmOrAdmin, HttpError, handleError, sendOk, isUuid, paging } from "../../common/utilities/access.utility.js";
 import { login, staffLogin, adminLogin, logout, reset } from "../auth/controller.js";
@@ -48,12 +48,17 @@ router.post("/projects/:id/monthly-report/export", exportMonthlyReport);
 router.get("/reports/monthly-summary", monthlySummary);
 router.post("/reports/monthly-summary/export", exportMonthlySummary);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: GENERAL_UPLOAD_LIMIT_BYTES, files: 1 } });
+const chunkUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: UPLOAD_CHUNK_BYTES, files: 1, fields: 4, fieldSize: 256 } });
 // Commands an Office PM or Site PM signs, submits or approves. Blocked while their license is expired.
 const LICENSE_COMMANDS = new Set(["upload_registered", "contact_company", "respond_company", "archive_company", "request_company", "archive_company_request",
     "save_allocation_plan", "auto_allocate_company", "release_allocation_company", "set_allocation_location",
     "acknowledge_client_subcon", "report_client_subcon_issue", "upload_agreement", "activate_project"]);
 const parseUpload = (req, res, next) => upload.single("file")(req, res, error => {
     if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? `The file must be ${MANPOWER_UPLOAD_LIMIT_MB} MB or smaller. Documents have a ${DOCUMENT_UPLOAD_LIMIT_MB} MB limit.` : error.message));
+    return next();
+});
+const parseChunk = (req, res, next) => chunkUpload.single("chunk")(req, res, error => {
+    if (error) return handleError(res, new HttpError(400, error.code === "LIMIT_FILE_SIZE" ? "Upload chunk is too large." : error.message));
     return next();
 });
 const codes = ["notice_to_proceed", "building_permit", "owner_contract", "registered_plans", "environmental_certificate", "budget_boq", "subcontractor_agreement"];
@@ -359,6 +364,50 @@ router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"
     await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
  values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
     return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
+}));
+router.post("/files/chunks", requireLogin, parseChunk, endpoint(["admin", "opm", "spm"], async (db, user, req) => {
+    const { upload_id: uploadId, index: rawIndex, total: rawTotal, purpose = "document" } = req.body || {};
+    const index = Number(rawIndex), total = Number(rawTotal), chunk = req.file;
+    if (!chunk || !isUuid(uploadId) || !Number.isInteger(index) || !Number.isInteger(total) || total < 2 || total > MAX_UPLOAD_CHUNKS || index < 0 || index >= total)
+        throw new HttpError(400, "Invalid file upload chunk.");
+    if (!["document", "manpower"].includes(purpose)) throw new HttpError(400, "Unknown upload purpose.");
+    if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
+        throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
+    if ((await db.query("select 1 from stored_files where id=$1", [uploadId])).rowCount)
+        throw new HttpError(409, "This file was already uploaded.");
+    const prior = (await db.query("select chunk_count,original_name,purpose from stored_file_upload_chunks where upload_id=$1 and user_id=$2 limit 1 for update", [uploadId, user.id])).rows[0];
+    if (prior && (prior.chunk_count !== total || prior.original_name !== chunk.originalname || prior.purpose !== purpose))
+        throw new HttpError(409, "The upload details changed. Start the upload again.");
+    await db.query("delete from stored_file_upload_chunks where created_at < now() - interval '24 hours'");
+    const saved = await db.query(`insert into stored_file_upload_chunks(upload_id,user_id,chunk_index,chunk_count,original_name,purpose,content)
+ values($1,$2,$3,$4,$5,$6,$7) on conflict(upload_id,chunk_index) do update set content=excluded.content,created_at=now()
+ where stored_file_upload_chunks.user_id=excluded.user_id and stored_file_upload_chunks.chunk_count=excluded.chunk_count
+ and stored_file_upload_chunks.original_name=excluded.original_name and stored_file_upload_chunks.purpose=excluded.purpose`,
+    [uploadId, user.id, index, total, chunk.originalname, purpose, chunk.buffer]);
+    if (!saved.rowCount) throw new HttpError(409, "The upload details changed. Start the upload again.");
+    return { upload_id: uploadId, index, total };
+}));
+router.post("/files/:id/complete", endpoint(["admin", "opm", "spm"], async (db, user, req) => {
+    const id = req.params.id, purpose = req.body?.purpose || "document";
+    if (!isUuid(id)) throw new HttpError(400, "Invalid upload ID.");
+    if (!["document", "manpower"].includes(purpose)) throw new HttpError(400, "Unknown upload purpose.");
+    if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
+        throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
+    const chunks = (await db.query(`select chunk_index,chunk_count,original_name,purpose,content from stored_file_upload_chunks
+ where upload_id=$1 and user_id=$2 order by chunk_index for update`, [id, user.id])).rows;
+    if (!chunks.length) throw new HttpError(404, "Upload chunks not found. Start the upload again.");
+    const total = chunks[0].chunk_count;
+    if (chunks.length !== total || chunks.some((part, index) => part.chunk_index !== index || part.chunk_count !== total || part.original_name !== chunks[0].original_name || part.purpose !== purpose))
+        throw new HttpError(400, "The upload is incomplete. Retry the upload.");
+    const buffer = Buffer.concat(chunks.map(part => part.content));
+    const originalname = chunks[0].original_name;
+    const file = { originalname, buffer, size: buffer.length };
+    const contentType = await validateUpload(file, purpose);
+    const manpowerCount = purpose === "manpower" ? readManpowerFile(file).length : undefined;
+    await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
+ values($1,$2,$7,$3,$4,$5,$6,$2)`, [id, user.id, originalname, contentType, buffer.length, buffer, purpose === "manpower" ? "manpower" : "upload"]);
+    await db.query("delete from stored_file_upload_chunks where upload_id=$1 and user_id=$2", [id, user.id]);
+    return { id, download_url: "/api/v1/files/" + id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
 }));
 router.post("/subcontractors/registrations", endpoint(["admin"], async (db, user, req) => {
     if (user.role === "spm") await assertLicenseActive(user, db);

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { PROFESSIONS, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { uploadFile } from "./api/actions"
-import { type Account, type RegistrationCredential, uid, today } from "./model"
+import { DOCUMENT_UPLOAD_LIMIT_MB, type Account, type RegistrationCredential, uid, today } from "./model"
 import { Button, Field, Icon } from "./ui"
 import "./registration-credentials.css"
 
@@ -18,7 +18,7 @@ function CredentialDocumentUpload({ id, name, busy, disabled, onFile }: {
     <span id={id ? `${id}-file-status` : undefined} className="credential-file-status" role="status">
       <Icon name={name ? "check" : "doc"} size={15} />{busy ? "Uploading your document…" : name || "No document attached"}
     </span>
-    <small id={id ? `${id}-file-help` : undefined}>PDF, JPG or PNG · Maximum 10 MB</small>
+    <small id={id ? `${id}-file-help` : undefined}>PDF, JPG or PNG · Maximum {DOCUMENT_UPLOAD_LIMIT_MB} MB</small>
   </div>
 }
 
@@ -52,8 +52,8 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
     patch({ initialCredentials: rows.map((row, i) => i === index ? { ...row, ...next } : row) })
   async function upload(index: number, file?: File) {
     if (!file || running.current) return
-    if (!/\.(pdf|jpe?g|png)$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
-      onError("Choose a PDF, JPG or PNG no larger than 10 MB."); return
+    if (!/\.(pdf|jpe?g|png)$/i.test(file.name) || file.size > DOCUMENT_UPLOAD_LIMIT_MB * 1024 * 1024) {
+      onError(`Choose a PDF, JPG or PNG no larger than ${DOCUMENT_UPLOAD_LIMIT_MB} MB.`); return
     }
     running.current = true; setUploadingIndex(index); onBusy(true); onError("")
     try {

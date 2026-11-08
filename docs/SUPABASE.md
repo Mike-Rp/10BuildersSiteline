@@ -14,8 +14,9 @@ The Express backend is included directly in this repository under `Thesis-Backen
 4. Apply the additive integration migration to the database selected in the backend environment:
    `npm --prefix Thesis-Backend run db:integrate`.
    This creates workspace settings and metadata, subcontractor selections, file storage if missing, and optional project fields. It preserves users, projects, companies and workers, enables RLS on its tables, and can be rerun.
-5. Run `npm run dev`. Open **http://localhost:8443**. Express runs at **http://localhost:3000/api/v1**. The launcher restarts the API when `Thesis-Backend/.env` changes; run the integration migration again after switching to a different database.
-6. The frontend defaults to `http://localhost:3000/api/v1`. Override it with `VITE_API_URL` in `.env.local` if needed, then restart Vite.
+5. Apply `Thesis-Backend/migrations/024-chunked-file-uploads.sql` in the Supabase SQL Editor before deploying the chunked upload backend. It creates a private temporary-chunk table; completed files remain in `stored_files`, and unfinished chunks older than 24 hours are cleaned on later chunk uploads.
+6. Run `npm run dev`. Open **http://localhost:8443**. Express runs at **http://localhost:3000/api/v1**. The launcher restarts the API when `Thesis-Backend/.env` changes; run the integration migration again after switching to a different database.
+7. The frontend defaults to `http://localhost:3000/api/v1`. Override it with `VITE_API_URL` in `.env.local` if needed, then restart Vite.
 
 Run the processes separately with `npm run dev:web` and `npm run dev:api`. Check the database connection at `http://localhost:3000/api/v1/health`.
 
@@ -68,7 +69,7 @@ Production always uses `/api/v1` on the website's own HTTPS domain and ignores `
 
 After deployment, open `https://10builderssiteline.vercel.app/api/v1/health`. A 200 response with `{"ok":true,"database":true}` confirms that both the function and database work. A JSON 503 response means the function is running but database configuration or connectivity needs attention. A Vercel 404 means the API function was not deployed.
 
-Vercel Functions limit request and response payloads to 4.5 MB, below this app's existing 10-15 MB upload limits. Larger files require a separate API host or a direct storage upload design. Legacy disk-backed upload endpoints also require adapting storage before using them on serverless hosting; the integrated workspace endpoints store file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
+Vercel Functions limit each request and response payload to 4.5 MB. The app keeps 10 MB document and 15 MB manpower limits by sending files above 4 MB as 3 MB authenticated chunks, then assembling them in Postgres. Apply `Thesis-Backend/migrations/024-chunked-file-uploads.sql` to the production database before deploying this backend change. Legacy disk-backed upload endpoints still require adapting storage before using them on serverless hosting; the integrated workspace endpoints store completed file bytes in Postgres. Archive maintenance needs a scheduled service rather than the local server's background timer.
 
 ## Project-type phases
 
