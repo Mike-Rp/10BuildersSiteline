@@ -10,3 +10,82 @@
   #root .admin-workspace > .main-shell { margin-left: 0; width: 100%; }
   #root .admin-workspace > .sidebar .brand { padding-inline: 16px; }
 }
+
+/* Keep Admin workspace headers readable while the compact navigation is active. */
+@media (max-width: 768px) {
+  #root .admin-workspace .topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+  #root .admin-workspace .topbar > .breadcrumb {
+    flex: 1 1 280px;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 5px 7px;
+    line-height: 1.35;
+  }
+  #root .admin-workspace .topbar .breadcrumb strong {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+  #root .admin-workspace .topbar > .topbar-actions {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+  #root .admin-workspace .topbar .global-search-trigger {
+    min-width: 0;
+    max-width: 100%;
+    gap: 7px;
+    padding: 8px 10px;
+  }
+  #root .admin-workspace .page-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-width: 0;
+  }
+  #root .admin-workspace .page-title-panel .page-title-copy {
+    flex: 1 1 100%;
+  }
+  #root .admin-workspace .page-title-panel .page-title-copy h1 {
+    font-size: clamp(23px, 5vw, 30px);
+    line-height: 1.2;
+    letter-spacing: -.5px;
+    overflow-wrap: anywhere;
+  }
+  #root .admin-workspace .page-title-actions {
+    width: 100%;
+    gap: 8px;
+  }
+  #root .admin-workspace .page-title-actions > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  #root .admin-workspace .panel-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  #root .admin-workspace .panel-header > :first-child { min-width: 0; }
+  #root .admin-workspace .panel-header :is(h2, h3, p) { overflow-wrap: anywhere; }
+}
+@media (max-width: 480px) {
+  #root .admin-workspace .topbar > .breadcrumb { flex-basis: 100%; }
+  #root .admin-workspace .topbar > .topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  #root .admin-workspace .topbar .global-search-trigger span { display: none; }
+  #root .admin-workspace .page-title-panel.page-heading { padding: 0; }
+  #root .admin-workspace .page-title-panel .page-title-copy h1 { font-size: clamp(22px, 7vw, 27px); }
+  #root .admin-workspace .page-title-actions { align-items: stretch; }
+  #root .admin-workspace .page-title-actions > .button { flex: 1 1 100%; justify-content: center; }
+}
