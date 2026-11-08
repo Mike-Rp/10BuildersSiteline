@@ -1,0 +1,11 @@
+#root .company-created-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border: 1px solid #b8d7c5; border-radius: 12px; background: #f0f8f3; color: #193b59; }
+#root .company-created-notice-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: #deeee4; color: #21824d; flex-shrink: 0; }
+#root .company-created-notice-copy { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+#root .company-created-notice-copy strong { font-size: 15px; font-weight: 600; }
+#root .company-created-notice-copy p { margin: 5px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
+#root .company-created-notice-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#root .company-created-notice-actions .button { min-height: 40px; font-size: 13px; padding: 8px 12px; }
+@media (max-width: 540px) {
+  #root .company-created-notice { padding: 12px; }
+  #root .company-created-notice-actions { width: 100%; justify-content: flex-end; }
+}

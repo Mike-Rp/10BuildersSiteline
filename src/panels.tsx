@@ -1823,7 +1823,7 @@ export function CompanyForm({
     documents: [],
     note: "",
     version: 1,
-    verificationDecision: "pending",
+    verificationDecision: role === "admin" ? "verified" : "pending",
   })
   const [error, setError] = useState("")
   const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
@@ -1856,7 +1856,7 @@ export function CompanyForm({
         if (Object.keys(errors).length) return
         if (role === "admin") {
           if (!draft.primaryTrade || !draft.proposedDisciplines?.length) { setError("Choose a primary category and at least one offered trade."); return }
-          if (draft.verificationDecision === "verified" && (!draft.evidenceReviewed || !draft.verificationNote?.trim() || !draft.documents.length)) {
+          if (!draft.evidenceReviewed || !draft.verificationNote?.trim() || !draft.documents.length) {
             setError("Attach supporting records, confirm the evidence review and record a verification note."); return
           }
         }
@@ -1866,6 +1866,7 @@ export function CompanyForm({
         try {
           const foremen = normalizeCompanyForemen(draft)!
           const saved = await onSave({ ...draft, foremen, contact: foremen[0].name, phone: foremen[0].phone, name: draft.name.trim(), email: draft.email.trim().toLowerCase(),
+            verificationDecision: role === "admin" ? "verified" : draft.verificationDecision,
             availability: "available", activeProjectIds: [], manpowerCount: 0, manpowerDocuments: [] })
           if (saved === false) setError("We couldn’t submit this company. Your details are still here—please try again.")
         } catch (reason) {
@@ -1904,14 +1905,10 @@ export function CompanyForm({
         <h4>Supporting company documents</h4>
         <DocumentList docs={draft.documents} onPreview={downloadDoc} />
         <Upload label="Company supporting document" owner={owner} disabled={busy} onSave={doc => patch({ documents: [...draft.documents, doc] })} />
-        <Field label="Verification decision"><select value={draft.verificationDecision || "pending"} disabled={busy} onChange={e => patch({ verificationDecision: e.target.value as "pending" | "verified" })}>
-          <option value="pending">Pending verification</option><option value="verified">Verify company and trade capabilities</option>
-        </select></Field>
-        {draft.verificationDecision === "verified" && <>
+        <div className="company-registration-verification" role="group" aria-label="Company verification process"><span>Verification process</span><Badge tone="green">Verify on registration</Badge></div>
           <label className="check-row"><input type="checkbox" disabled={busy} checked={!!draft.evidenceReviewed} onChange={e => patch({ evidenceReviewed: e.target.checked })} />I reviewed the company records and selected trade capabilities</label>
           <Field label="Verification note *"><textarea maxLength={2000} disabled={busy} value={draft.verificationNote || ""} onChange={e => patch({ verificationNote: e.target.value })} /></Field>
-        </>}
-        <p className="notice">{draft.verificationDecision === "verified" ? "Admin verification is recorded when saved. Project allocation still requires matching trades, availability, capacity and existing acceptance steps." : "Saved as pending verification. Project allocation is blocked until Admin verifies the company and its capabilities."}</p>
+        <p className="notice">The company and selected trade capabilities are verified when registration is saved. Supporting records, your evidence review and a verification note are required. Project allocation still requires matching trades, availability, capacity and existing acceptance steps.</p>
       </section>}
       {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
       {error && (
@@ -1922,7 +1919,7 @@ export function CompanyForm({
       <div className="modal-actions">
         <Button disabled={busy} onClick={onClose}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={busy}>
-          {busy ? "Saving…" : role === "admin" ? draft.verificationDecision === "verified" ? "Register & verify company" : "Save pending verification" : "Submit for Admin approval"}
+          {busy ? "Saving…" : role === "admin" ? "Register & verify company" : "Submit for Admin approval"}
         </Button>
       </div>
     </form>

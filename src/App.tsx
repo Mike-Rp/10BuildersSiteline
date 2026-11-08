@@ -1,6 +1,7 @@
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminProjectDocuments from "./AdminProjectDocuments"
+import "./company-created-notice.css"
 import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import ShareLoginLinks from "./ShareLoginLinks"
@@ -337,6 +338,7 @@ function AppInner() {
   const [globalQuery, setGlobalQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [subconTab, setSubconTab] = useState("registered")
+  const [companyCreatedNotice, setCompanyCreatedNotice] = useState<{ id: string; name: string; verified: boolean; refreshRequired?: boolean }>()
   const [documentsTab, setDocumentsTab] = useState<DocumentsTab>("project")
   const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("engineers")
   const [tab, setTab] = useState("closed")
@@ -694,6 +696,7 @@ function AppInner() {
     setPreview(undefined)
     setConfirmation(undefined)
     setCredentials(undefined)
+    setCompanyCreatedNotice(undefined)
     setNotifications(false)
     setSelectedNotification(undefined)
     setSessionId(account.id)
@@ -718,6 +721,7 @@ function AppInner() {
     clearSession()
     setSelectedNotification(undefined)
     setCredentials(undefined)
+    setCompanyCreatedNotice(undefined)
     setWelcomeGreeting(undefined)
     setSignedOut(true)
     setSessionId("")
@@ -1713,7 +1717,16 @@ function AppInner() {
       )
     const subcontractorsTab = () => (
         <>
-          <div className="modal-actions"><Button variant="primary" icon="plus" onClick={() => setDialog({kind:"add-company"})}>Add company</Button></div>
+          <div className="modal-actions"><Button variant="primary" icon="plus" onClick={() => { setCompanyCreatedNotice(undefined); setDialog({kind:"add-company"}) }}>Add company</Button></div>
+          {companyCreatedNotice && <div className="company-created-notice" role="status" aria-live="polite" aria-atomic="true">
+            <span className="company-created-notice-icon"><Icon name="check" size={22} /></span>
+            <div className="company-created-notice-copy"><strong>{companyCreatedNotice.name} was added successfully.</strong><p>{companyCreatedNotice.verified ? "Registered and verified. The company is listed under Registered Companies." : "Saved under Pending Verification. Verification is required before project allocation."}</p>{companyCreatedNotice.refreshRequired && <p>The company was saved. Refresh the directory to see the latest record.</p>}</div>
+            <div className="company-created-notice-actions">
+              {state.companies.some(company => company.id === companyCreatedNotice.id) && <Button onClick={() => setDialog({ kind: "company", id: companyCreatedNotice.id })}>View Company</Button>}
+              {companyCreatedNotice.refreshRequired && <Button onClick={async () => { try { await reloadWorkspace(); setCompanyCreatedNotice(current => current && { ...current, refreshRequired: false }) } catch { /* Keep the saved-company notice and refresh option visible. */ } }}>Refresh Directory</Button>}
+              <Button variant="icon-button" icon="close" aria-label="Dismiss company creation notification" onClick={() => setCompanyCreatedNotice(undefined)} />
+            </div>
+          </div>}
           {state.phaseAllocationAvailable && <AllocationDirectory onChanged={reloadWorkspace} />}
           <div className="active-sites-view-tabs" role="tablist" aria-label="Subcontractor directory views">
             {[
@@ -3260,7 +3273,13 @@ function AppInner() {
       )}
       {dialog?.kind === "add-company" && <Modal title="Add subcontractor company" subtitle="Company details, trades and Admin verification in one form." wide onClose={() => setDialog(undefined)}>
         <CompanyForm role="admin" owner={actor.name} actorId={actor.id} status="pending" onClose={() => setDialog(undefined)} onSave={async company => {
-          await createCompany(company); await reloadWorkspace(); setDialog(undefined); setSubconTab(company.verificationDecision === "verified" ? "registered" : "pending"); setToast(company.verificationDecision === "verified" ? "Company registered and verified" : "Company saved pending verification")
+          const saved = await createCompany(company)
+          const verified = saved.status === "approved"
+          setCompanyCreatedNotice({ id: saved.id || company.id, name: company.name.trim(), verified })
+          setDialog(undefined)
+          setSubconTab(verified ? "registered" : "pending")
+          try { await reloadWorkspace() }
+          catch { setCompanyCreatedNotice(current => current && { ...current, refreshRequired: true }) }
         }} />
       </Modal>}
       {dialog?.kind === "company" && selectedCompany && (

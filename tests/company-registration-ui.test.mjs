@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-test("Admin company registration defaults pending and requires evidence before verification", async t => {
+test("Admin company registration verifies on save and still requires supporting evidence and review", async t => {
   const [{JSDOM},{createServer},React]=await Promise.all([import('jsdom'),import('vite'),import('react')])
   const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'}),w=dom.window,previous=new Map()
   for(const [k,value] of Object.entries({window:w,document:w.document,navigator:w.navigator,HTMLElement:w.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true})) {
@@ -18,18 +18,30 @@ test("Admin company registration defaults pending and requires evidence before v
   assert.match(availability.textContent,/Set automatically/)
   assert.equal(availability.querySelectorAll('input,select,textarea').length,0,'Automatic availability is presented as status, not an editable field')
   const field=label=>[...document.querySelectorAll('input')].find(el=>el.getAttribute('aria-label')===label)||document.getElementById([...document.querySelectorAll('label')].find(l=>l.textContent===label)?.htmlFor||'')
-  const enter=(label,value)=>React.act(()=>{const el=field(label);assert.ok(el,label);Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?w.HTMLSelectElement.prototype:w.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new w.Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})
+  const enter=(label,value)=>React.act(()=>{const el=field(label);assert.ok(el,label);Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?w.HTMLSelectElement.prototype:el.tagName==='TEXTAREA'?w.HTMLTextAreaElement.prototype:w.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new w.Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})
   const submit=()=>React.act(async()=>document.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})))
   await enter('Company name *','AquaLine');await enter('Company email *','aqualine@gmail.com')
   await enter('Primary foreman full name','Juan Cruz');await enter('Primary foreman mobile number','09171234567')
   await enter('Primary company category *','Mechanical / Plumbing')
   const trade=[...document.querySelectorAll('label')].find(b=>b.textContent.trim()==='Plumbing')?.querySelector('input')
   assert.ok(trade);await React.act(()=>trade.click())
-  await submit();assert.equal(saved.length,1);assert.equal(saved[0].verificationDecision,'pending')
+  assert.equal([...document.querySelectorAll('label')].some(label=>label.textContent==='Verification decision'),false)
+  assert.match(document.body.textContent,/Verify on registration/)
+  await submit();assert.equal(saved.length,0)
+  assert.match(document.body.textContent,/Attach supporting records/)
+  t.mock.method(globalThis,'fetch',async()=>Response.json({data:{download_url:'/test-company-proof'}}))
+  const file=document.querySelector('input[type="file"]')
+  Object.defineProperty(file,'files',{configurable:true,value:[new File(['%PDF-1.4'],'company-proof.pdf',{type:'application/pdf'})]})
+  await React.act(()=>file.dispatchEvent(new w.Event('change',{bubbles:true})))
+  await React.act(async()=>{[...document.querySelectorAll('button')].find(button=>button.textContent==='Confirm upload').click();await new Promise(resolve=>setTimeout(resolve,0))})
+  await submit();assert.equal(saved.length,0,'Uploading proof alone does not replace the Admin review')
+  await React.act(()=>document.querySelector('.check-row input').click())
+  await submit();assert.equal(saved.length,0,'The verification note is still required')
+  await enter('Verification note *','Reviewed company proof and Plumbing capabilities.')
+  await submit();assert.equal(saved.length,1);assert.equal(saved[0].verificationDecision,'verified')
+  assert.equal(saved[0].evidenceReviewed,true);assert.equal(saved[0].documents.length,1)
   assert.equal(saved[0].primaryTrade,'Mechanical / Plumbing');assert.deepEqual(saved[0].proposedDisciplines,['Plumbing'])
   assert.deepEqual(saved[0].activeProjectIds,[]);assert.equal(saved[0].manpowerCount,0)
   assert.equal(saved[0].availability,'available','Registration still saves the same automatic availability value')
-  await enter('Verification decision','verified');await submit();assert.equal(saved.length,1)
-  assert.match(document.body.textContent,/Attach supporting records/)
   assert.doesNotMatch(document.body.textContent,/Site PM reviews|SPM review/)
 })
