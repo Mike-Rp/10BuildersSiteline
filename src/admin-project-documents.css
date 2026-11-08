@@ -11,7 +11,8 @@
 #root .admin-project-document-popup .section-description { margin: 10px 0 14px; font-size: 14px; }
 #root .admin-project-document-popup .document-info { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 540px) {
-  #root .admin-project-document-folder { padding: 14px; flex-wrap: wrap; }
-  #root .admin-project-document-folder .folder-open-label { margin-left: 44px; }
+  #root .admin-project-document-folder { display: grid; grid-template-columns: 24px minmax(0, 1fr); padding: 14px; }
+  #root .admin-project-document-folder > span:first-of-type { overflow-wrap: anywhere; }
+  #root .admin-project-document-folder .folder-open-label { grid-column: 2; margin-left: 0; }
   #root .admin-project-document-popup .document-row { flex-wrap: wrap; gap: 8px; }
 }

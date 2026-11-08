@@ -8,7 +8,7 @@
 #root .admin-workspace .team-accounts-panel th:nth-child(3) { width: 24%; }
 #root .admin-workspace .team-accounts-panel th:nth-child(4) { width: 17%; }
 #root .admin-workspace .team-accounts-panel th:nth-child(5) { width: 12%; }
-#root .admin-workspace .team-accounts-panel th:nth-child(6) { width: 5%; }
+#root .admin-workspace .team-accounts-panel th:nth-child(6) { width: 72px; }
 #root .admin-workspace .team-accounts-panel :is(th,td) { padding: 12px 10px; white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
 #root .admin-workspace .team-accounts-panel .person-cell { min-width: 0; max-width: 100%; align-items: flex-start; }
 #root .admin-workspace .team-accounts-panel .person-cell > span:last-child { min-width: 0; }
@@ -54,6 +54,7 @@
 #root .admin-workspace .admin-overview .urgent-action-banner { background: #fbedec; border-color: #d9a5a1; border-left-color: #9b3434; padding: 16px; margin-bottom: 16px; }
 #root .admin-workspace .admin-overview :is(.urgent-banner-eyebrow, .urgent-banner-icon, .urgent-banner-copy h2) { color: #9b3434; }
 #root .admin-workspace .admin-overview .urgent-banner-items { margin-top: 12px; border-color: #e6c5c2; }
+#root .admin-workspace .admin-overview .urgent-banner-copy > p { color: #52677d; }
 #root .admin-workspace .admin-overview .urgent-banner-item { background: #fff; border-color: #eedcda; padding: 11px 14px; }
 #root .admin-workspace .admin-overview .urgent-banner-item:hover { background: #fff5f4; }
 #root .admin-workspace .admin-overview .executive-summary { padding: 16px; margin-bottom: 16px; }

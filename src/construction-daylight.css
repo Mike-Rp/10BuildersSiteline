@@ -44,7 +44,7 @@
 }
 
 html { color-scheme: light; scroll-padding-top: 105px; }
-body { min-width: 320px; background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-body); line-height: 1.65; }
+body { min-width: 0; background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-body); line-height: 1.65; }
 ::selection { color: var(--color-surface); background: var(--color-primary); }
 #root { font-family: var(--font-sans); font-optical-sizing: auto; }
 #root :is(button, input, select, textarea) { font-family: inherit; }

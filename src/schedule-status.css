@@ -1,6 +1,6 @@
 #root .schedule-status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--color-line); border-radius: 5px; background: var(--surface-subtle); color: var(--color-muted); font-size: 14px; font-weight: 600; line-height: 1.5; white-space: normal; }
 #root .schedule-status-badge > span { display: inline-flex; flex: none; }
-#root .schedule-status-badge.green { background: var(--green-soft); color: var(--color-success); }
+#root .schedule-status-badge.green { background: var(--green-soft); color: #116b33; }
 #root .schedule-status-badge.red { background: var(--red-soft); color: var(--color-danger); }
 #root .project-schedule-details { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 12px 0 18px; color: var(--color-ink); font-size: 14px; line-height: 1.6; }
 #root .project-schedule-details > strong { color: var(--color-danger); font-size: 14px; }

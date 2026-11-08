@@ -35,5 +35,5 @@
   #root .role-workspace .opm-confirmation-card .role-intake-timeline li > strong { margin: 0; }
   #root .role-workspace .opm-confirmation-card .role-intake-timeline li::after { left: 11px; right: auto; top: 23px; width: 2px; height: calc(100% - 23px); }
   #root .role-workspace .opm-confirmation-next-action .role-actions { width: 100%; }
-  #root .role-workspace .opm-confirmation-next-action .role-actions .button { flex: 1 1 180px; }
+  #root .role-workspace .opm-confirmation-next-action .role-actions .button { flex: 0 1 auto; }
 }

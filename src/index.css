@@ -28,7 +28,7 @@
   --shadow: none;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 360px; font-size: 14px; line-height: 1.5; }
+body { margin: 0; min-width: 0; font-size: 14px; line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
@@ -399,6 +399,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .check-row.subsection { margin-top: 22px; }
 .password-display { padding: 14px 16px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--color-line); display: flex; align-items: center; justify-content: space-between; gap: 15px; margin: 18px 0; }
 .password-display code { letter-spacing: 2px; font-size: 18px; }
+@media (max-width: 540px) {
+  .password-display { flex-direction: column; align-items: stretch; }
+  .password-display code { min-width: 0; overflow-wrap: anywhere; }
+}
 .intake-steps { display: flex; align-items: center; justify-content: center; gap: 20px; padding-bottom: 24px; margin-bottom: 26px; border-bottom: 1px solid var(--color-line); }
 .intake-steps > span { display: flex; align-items: center; gap: 9px; color: var(--color-muted); font-size: 14px; }
 .intake-steps b { height: 25px; width: 25px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--surface-subtle); color: var(--color-muted); font-size: 14px; }
