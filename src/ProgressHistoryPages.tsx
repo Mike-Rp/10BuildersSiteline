@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react"
 import { Button } from "./ui"
 
-export default function SpmProgressHistoryPages({ rows }: { rows: ReactNode[] }) {
+export default function ProgressHistoryPages({ rows }: { rows: ReactNode[] }) {
   const [page, setPage] = useState(1)
   const pages = Math.max(1, Math.ceil(rows.length / 3))
   const current = Math.min(page, pages)

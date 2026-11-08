@@ -3,7 +3,7 @@ import test from "node:test"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
-test("SPM history pages preserve records and evidence, clamp changes and reset between projects", async()=>{
+test("Shared OPM/SPM history pages preserve records and evidence, clamp changes and reset between projects", async()=>{
   const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'})
   const previous=new Map()
   for(const [key,value]of Object.entries({window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,Node:dom.window.Node,IS_REACT_ACT_ENVIRONMENT:true})){
@@ -13,7 +13,7 @@ test("SPM history pages preserve records and evidence, clamp changes and reset b
   const {default:React,act}=await import('react'),{createRoot}=await import('react-dom/client')
   const root=createRoot(document.getElementById('root'))
   try {
-    const {default:Pages}=await server.ssrLoadModule('/src/SpmProgressHistoryPages.tsx')
+    const {default:Pages}=await server.ssrLoadModule('/src/ProgressHistoryPages.tsx')
     let evidence
     const rows=Array.from({length:7},(_,index)=>React.createElement('div',{key:index,className:'history-row'},`Record ${index+1} · ${index*10}%`,React.createElement('button',{onClick:()=>{evidence=index+1}},`Evidence ${index+1}`)))
     const render=async(key,items=rows)=>act(()=>root.render(React.createElement(Pages,{key,rows:items})))
