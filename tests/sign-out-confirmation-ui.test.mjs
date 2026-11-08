@@ -51,7 +51,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
       event('touchstart',start,swipeClock);event('touchmove',end,swipeClock+60);event('touchend',end,swipeClock+140);swipeClock+=300
     })
 
-    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Log out of your account?"]')
+    const confirmation = () => document.querySelector('[role="dialog"][aria-label="Are you sure you want to log out?"]')
     const confirmButton = () => [...confirmation().querySelectorAll("button")].find(b => b.textContent.trim() === "Log Out")
     for (const role of ["admin", "opm", "spm", "client"]) {
       for (const mobile of [false, true]) {
@@ -111,7 +111,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
           await click(document.querySelector('.sidebar [aria-label="Sign out"]'))
           assert.ok(!!confirmation(), `Missing confirmation for ${role}, mobile=${mobile}`)
           assert.ok(!confirmation().closest(".sidebar"), "dialog must remain visible when the sidebar closes")
-          assert.match(confirmation().textContent, /Are you sure you want to log out\? You will need to sign in again to access your account\./)
+          assert.match(confirmation().textContent, /You will need to sign in again to access your account\./)
           assert.ok(document.activeElement === confirmation(),'The dialog receives focus')
           const buttons = [...confirmation().querySelectorAll('button')]
           await act(()=>{

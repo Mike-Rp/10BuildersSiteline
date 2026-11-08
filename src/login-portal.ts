@@ -5,6 +5,14 @@ import { domainPortal, PORTAL_ORIGINS, portalDomainRedirect } from "./portal-dom
 export type LoginPortal = "admin" | "staff" | "client"
 export const workspacePath = (role: Role) => pagePath(role)
 
+// Capability detection only. Each navigate event must also be cancelable;
+// browsers may disallow cancellation for a particular history traversal.
+export function loginBackNavigation() {
+  if (typeof window === "undefined" || window.top !== window) return
+  const navigation = (window as Window & { navigation?: EventTarget & { currentEntry?: { index: number } | null } }).navigation
+  if (navigation?.currentEntry && navigation.currentEntry.index >= 0 && typeof navigation.addEventListener === "function") return navigation
+}
+
 export function isLandingPath(pathname: string) {
   return /^\/(?:login\/?|(?:admin|staff|client)\/login\/?)?$/i.test(pathname)
 }
@@ -67,8 +75,10 @@ export function navigateToWorkspace(role: Role, freshLogin = false) {
     return changeRoute("/", true)
   }
   if (domain && !freshLogin && portalDomainRedirect(window.location)) return changeRoute("/", true)
-  // Replace sign-in rather than leaving it immediately behind the workspace.
-  // Older login entries are handled by the authenticated route guard.
-  if (freshLogin || current !== path) changeRoute(path, true)
+  // Keep the actual visited login entry only when pre-navigation events exist.
+  // No synthetic entries: unsupported browsers replace login, and the route
+  // guard remains the fallback when a particular Back event cannot be canceled.
+  const keepLogin = freshLogin && isLandingPath(current) && !!loginBackNavigation()
+  if (freshLogin || current !== path) changeRoute(path, !keepLogin)
   return path
 }

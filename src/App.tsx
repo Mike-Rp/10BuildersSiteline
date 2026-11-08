@@ -24,6 +24,7 @@ import useSidebarNavigation from "./useSidebarNavigation"
 import useWorkspacePage from "./useWorkspacePage"
 import { changeRoute, ROUTE_CHANGE } from "./workspace-routing"
 import useSignOutConfirmation from "./useSignOutConfirmation"
+import useLoginBackConfirmation from "./useLoginBackConfirmation"
 import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
 import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
@@ -58,6 +59,7 @@ import PasswordReset from "./PasswordReset"
 import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import { flushSync } from "react-dom"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
@@ -447,7 +449,25 @@ function AppInner() {
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
+  useEffect(() => {
+    const returned = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      sessionRestore.current.clear()
+      sessionLoadVersion.current += 1
+      // A cached document does not remount React. Hide its old login/workspace
+      // immediately, then verify the current tab's session before displaying it.
+      flushSync(() => {
+        setSignedOut(true)
+        setCheckingSession(true)
+        setRestoreError("")
+        setRestoreAttempt(attempt => attempt + 1)
+      })
+    }
+    window.addEventListener("pageshow", returned)
+    return () => window.removeEventListener("pageshow", returned)
+  }, [])
   const signOut = useSignOutConfirmation(() => { setRestoreError(""); endSession() })
+  useLoginBackConfirmation(!signedOut && !signingOut && !checkingSession && !mustResetPassword, actor.id, signOut.request)
   const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:NAV.map(item=>item.label),enabled:!signedOut && !checkingSession && !mustResetPassword && !isLandingPath(routePath) && actor.role==='admin',blocked:navigation.compact && navigation.expanded,navigate})
   useEffect(() => {
     const storedUser = tokenUser()
@@ -743,6 +763,7 @@ function AppInner() {
   async function endSession() {
     if (signOutInFlight.current) return
     signOutInFlight.current = true
+    signOut.cancel()
     setSigningOut(true)
     const portal = currentLoginPortal()
     changeRoute(loginPath(portal), true, { loginPortal: portal })
@@ -2917,6 +2938,7 @@ function AppInner() {
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (
+      <>
       <ClientPortal
         key={actor.id}
         actor={{
@@ -2985,12 +3007,15 @@ function AppInner() {
         idleWarning={idleWarning}
         onStayActive={stayActive}
       />
+      {signOut.dialog}
+      </>
     )
   }
   if ((actor.role === "opm" || actor.role === "spm") && state.license?.self && requiresRenewalOnlyAccess(state.license.self))
     return <><RestrictedRenewalPage actor={actor} status={state.license.self} onReload={reloadWorkspace} onSignOut={signOut.request} />{signOut.dialog}</>
   if (actor.role === "opm" || actor.role === "spm")
     return (
+      <>
       <RoleWorkspace
         key={actor.id}
         state={state}
@@ -3007,6 +3032,8 @@ function AppInner() {
         onResume={endSession}
         onPause={endSession}
       />
+      {signOut.dialog}
+      </>
     )
   const navigationCounts = navigationAttention(state, actor)
   return (
