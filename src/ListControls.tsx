@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import {
   useEffect,
   useRef,
@@ -196,18 +197,20 @@ export function ListToolbar<T>({
           </div>
         )}
         {(config.filters || []).map((def) => (
-          <label className="list-filter" key={def.id}>
+          <div className="list-filter" key={def.id}>
             <span>{def.label}</span>
             {def.kind === "date" ? (
-              <input
-                type="date"
+              <DatePicker
+                calendarTitle={def.label}
+                aria-label={def.label}
                 value={query.filters[def.id] || ""}
-                onChange={(event) =>
-                  update(list, (q) => withFilter(q, def.id, event.target.value))
+                onValueChange={date =>
+                  update(list, (q) => withFilter(q, def.id, date))
                 }
               />
             ) : (
               <select
+                aria-label={def.label}
                 value={query.filters[def.id] || "all"}
                 onChange={(event) =>
                   update(list, (q) => withFilter(q, def.id, event.target.value))
@@ -221,7 +224,7 @@ export function ListToolbar<T>({
                 ))}
               </select>
             )}
-          </label>
+          </div>
         ))}
         {extra}
         {narrowed && (

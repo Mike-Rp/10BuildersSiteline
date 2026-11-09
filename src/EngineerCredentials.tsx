@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { useEffect, useRef, useState } from "react"
 import { api,downloadBlob } from "./api/client"
 import {
@@ -270,11 +271,11 @@ export default function EngineerCredentials({
               />
             </Field>
             <Field label="Expiry date">
-              <input
+              <DatePicker
                 required
-                type="date"
+                calendarTitle="Expiry date"
                 value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
+                onValueChange={date => setExpiry(date)}
               />
             </Field>
             <Field label="Supporting credential document">
