@@ -8,7 +8,6 @@ import AdminProjectDocuments from "./AdminProjectDocuments"
 import "./company-created-notice.css"
 import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
-import ShareLoginLinks from "./ShareLoginLinks"
 import AccountSignInDetails, { type CreatedAccountDetails } from "./AccountSignInDetails"
 import IntakeRecord from "./IntakeRecord"
 import AdminIntakeCards from "./AdminIntakeCards"
@@ -336,7 +335,6 @@ function AppInner() {
   const [intakeLogTab, setIntakeLogTab] = useState<"current" | "history">("current")
   const [dialog, setDialog] = useState<Dialog>()
   const [securityOpen,setSecurityOpen]=useState(false)
-  const [shareLoginLinksOpen, setShareLoginLinksOpen] = useState(false)
   const [securityTab,setSecurityTab]=useState<'password'|'codes'>('codes')
   const [projectHistoryPage, setProjectHistoryPage] = useState(1)
   const [preview, setPreview] = useState<Doc>()
@@ -381,7 +379,6 @@ function AppInner() {
       setNotifications(false)
       setSelectedNotification(undefined)
       setSecurityOpen(false)
-      setShareLoginLinksOpen(false)
       setMonthlySummaryOpen(false)
       setReportProjectId("")
       setOverrideTarget(undefined)
@@ -2007,16 +2004,13 @@ function AppInner() {
         <>
           {pageHeading(
             "Team & Accounts",
-            <div className="share-login-header-actions">
-            <Button onClick={() => setShareLoginLinksOpen(true)}>Share login links</Button>
             <Button
               variant="primary"
               icon="plus"
               onClick={() => setDialog({ kind: "add-account" })}
             >
               Add account
-            </Button>
-            </div>,
+            </Button>,
           )}
           <Panel
             title="Organization accounts"
@@ -3227,7 +3221,6 @@ function AppInner() {
         </main>
       </div>
       {securityOpen&&<AdminAccountSecurity initialTab={securityTab} onClose={()=>setSecurityOpen(false)} onPasswordChanged={endSession}/>}
-      {shareLoginLinksOpen && <ShareLoginLinks onClose={() => setShareLoginLinksOpen(false)} />}
       {dialog?.kind === "intake" && (
         <Modal
           title={selectedProject ? "Resubmit project" : "New project intake"}
