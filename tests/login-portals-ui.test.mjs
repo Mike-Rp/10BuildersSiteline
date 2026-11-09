@@ -48,7 +48,7 @@ test("login pages verify saved sessions and show retry on outages instead of exp
   }
 })
 
-test("all three login pages use the approved branding, switches, and their own server entry point", {timeout:30000}, async () => {
+test("all three login pages use the approved branding and their own server entry point", {timeout:30000}, async () => {
   const dom = new JSDOM('<div id="root"></div>', {url:"http://localhost/login",pretendToBeVisual:true})
   const w=dom.window, previous=new Map()
   for(const [key,value] of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Node:w.Node,IS_REACT_ACT_ENVIRONMENT:true})) {
@@ -90,22 +90,7 @@ test("all three login pages use the approved branding, switches, and their own s
       const switches=[...document.querySelectorAll('.login-portal-nav a')].map(a=>[a.textContent.trim(),a.getAttribute('href')])
       assert.deepEqual(switches,[],'Client and staff sign-in pages must not link to each other')
       assert.equal(document.querySelector('.login-content .login-portal-switch'),null,'Switches must stay outside the credential form')
-      const selector=document.querySelector('.login-role-selector')
-      assert.equal(!!selector,internal)
-      if(internal){
-        assert.deepEqual([...selector.querySelectorAll('a')].map(a=>[a.textContent,a.getAttribute('href')]),[['Staff','/login'],['Admin','/login']])
-        assert.equal(selector.querySelectorAll('[aria-current="page"]').length,1)
-        assert.equal(selector.querySelector('[aria-current="page"]').getAttribute('href'),'/login')
-        assert.equal(selector.closest('form'),null,'Switching login pages must not submit credentials')
-        const url = w.location.href, history = w.history.length
-        await act(() => selector.querySelector(`[aria-label="${admin ? 'Staff' : 'Administrator'} sign-in"]`).click())
-        assert.equal(w.location.href,url,'Switching portal tabs keeps the URL')
-        assert.equal(w.history.length,history,'Portal tabs do not add history entries')
-        assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Staff sign-in':'Administrator sign-in')
-        await act(() => document.querySelector(`.login-role-selector [aria-label="${admin ? 'Administrator' : 'Staff'} sign-in"]`).click())
-        assert.equal(w.location.href,url)
-        assert.equal(document.querySelector('.login-heading h1').textContent,admin?'Administrator sign-in':'Staff sign-in')
-      }
+      assert.equal(document.querySelector('.login-role-selector'),null,'Internal login pages do not show the Staff/Admin selector')
       if(!internal){
         assert.match(document.querySelector('.client-access-badge').textContent,/Client access/)
         assert.equal(document.querySelector('.login-info h2').textContent,'Your project, in view')

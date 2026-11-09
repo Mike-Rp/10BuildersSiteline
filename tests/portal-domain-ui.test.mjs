@@ -91,7 +91,7 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
         assert.equal(w.location.search,'')
         assert.equal(w.location.hash,'')
         assert.equal(document.querySelector('.login-heading h1').textContent,'Staff sign-in')
-        assert.equal(document.querySelectorAll('.login-role-selector a').length,2)
+        assert.equal(document.querySelector('.login-role-selector'),null)
         assert.equal(document.querySelector('.client-access-badge'),null)
         assert.equal(document.querySelector('.sidebar'),null)
         assert.equal(client.getToken(),savedToken)
@@ -109,7 +109,7 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
       await until(()=>document.querySelector('form.login-form'),'Root login form')
       assert.equal(w.location.pathname,'/')
       assert.equal(document.querySelector('.login-heading h1').textContent,role === 'client' ? 'Welcome to 10BuildLine' : role === 'admin' ? 'Administrator sign-in' : 'Staff sign-in')
-      if (role === 'opm' || role === 'spm') assert.equal(document.querySelectorAll('.login-role-selector a').length,2)
+      assert.equal(document.querySelector('.login-role-selector'),null)
       const dashboard = `/${role}/${role === 'client' ? 'overview' : 'dashboard'}`
       await clear()
       w.history.replaceState(null,'',dashboard)
