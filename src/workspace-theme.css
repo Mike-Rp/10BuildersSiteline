@@ -190,12 +190,20 @@
   min-width: 100px;
 }
 #root .app-shell :is(.pagination.compact, .history-pagination, .spm-history-pagination) {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(100%, 360px);
+  margin-inline: auto;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
+#root .app-shell :is(.pagination.compact, .history-pagination, .spm-history-pagination) > .button {
+  min-width: 0;
+  width: 100%;
+  padding-inline: 8px;
+}
+#root .app-shell .panel > .pagination.compact { width: min(calc(100% - 36px), 360px); }
 #root .app-shell :is(.pagination-status, .pagination-mini, .history-pagination > span, .spm-history-pagination > span) {
   min-width: 0;
   font-size: 14px;
@@ -203,22 +211,41 @@
   text-align: center;
 }
 #root .app-shell .pagination-pages { justify-content: center; gap: 8px; }
-#root .app-shell .explorer-card { align-content: stretch; }
-#root .app-shell .explorer-card-footer { align-self: end; gap: 12px; }
+#root .app-shell .explorer-card { grid-template-rows: 1fr auto; align-content: stretch; }
+#root .app-shell .explorer-card-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-self: end;
+  align-items: start;
+  gap: 12px;
+}
+#root .app-shell .explorer-card-footer > .document-status-line {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
 #root .app-shell .explorer-card-footer .badge {
   max-width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-#root .app-shell .button.explorer-card-action { width: 112px; }
-@media (max-width: 640px) {
-  #root .app-shell .explorer-card-footer { flex-direction: column; align-items: stretch; }
-  #root .app-shell .explorer-card-footer > .document-status-line { flex: none; }
-  #root .app-shell .button.explorer-card-action { align-self: flex-end; }
+#root .app-shell .button.explorer-card-action {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: end;
+  width: 112px;
+  max-width: 100%;
+  margin: 0;
 }
-@media (max-width: 380px) {
-  #root .app-shell :is(.pagination-status, .pagination-mini, .history-pagination > span, .spm-history-pagination > span) {
-    flex-basis: 100%;
-    order: -1;
+@media (max-width: 640px) {
+  #root .app-shell .pagination-pages {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(100%, 360px);
+  }
+  #root .app-shell .pagination-pages > .button {
+    min-width: 0;
+    width: 100%;
+    padding-inline: 8px;
   }
 }
