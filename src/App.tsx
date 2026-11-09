@@ -64,7 +64,7 @@ import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
-import { roleAllowedOnHost } from "./portal-domain"
+import { domainPortal, PORTAL_ORIGINS, roleAllowedOnHost } from "./portal-domain"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -2931,6 +2931,11 @@ function AppInner() {
     )
   if (signedOut || !actor.id)
     return <LoginPage key={loginPortal} portal={loginPortal} onPortalChange={portal => {
+      const currentDomain = domainPortal(window.location.hostname)
+      if (currentDomain && currentDomain !== portal) {
+        window.location.assign(PORTAL_ORIGINS[portal] + (portal === "admin" ? "/?tab=admin" : "/"))
+        return
+      }
       window.history.replaceState({ ...window.history.state, loginPortal: portal }, "")
       setLoginPortal(portal)
     }} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />

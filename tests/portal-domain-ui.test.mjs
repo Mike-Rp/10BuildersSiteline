@@ -100,7 +100,7 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
       }
     }
     for (const role of ['client','admin','opm','spm']) {
-      const host = role === 'client' ? '10buildline.site' : 'staff.10buildline.site'
+      const host = role === 'client' ? '10buildline.site' : role === 'admin' ? 'admin.10buildline.site' : 'staff.10buildline.site'
       dom.reconfigure({url:`https://${host}/`})
       w.history.replaceState(null,'','/')
       client.setToken('')
@@ -108,16 +108,8 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
       await mount()
       await until(()=>document.querySelector('form.login-form'),'Root login form')
       assert.equal(w.location.pathname,'/')
-      assert.equal(document.querySelector('.login-heading h1').textContent,role === 'client' ? 'Welcome to 10BuildLine' : 'Staff sign-in')
-      if (role !== 'client') {
-        const length = w.history.length
-        for (const tab of ['Administrator','Staff',...(role === 'admin' ? ['Administrator'] : [])]) {
-          await act(()=>document.querySelector(`[aria-label="${tab} sign-in"]`).click())
-          assert.equal(document.querySelector('.login-heading h1').textContent,`${tab} sign-in`)
-          assert.equal(w.location.pathname,'/')
-          assert.equal(w.history.length,length)
-        }
-      }
+      assert.equal(document.querySelector('.login-heading h1').textContent,role === 'client' ? 'Welcome to 10BuildLine' : role === 'admin' ? 'Administrator sign-in' : 'Staff sign-in')
+      if (role === 'opm' || role === 'spm') assert.equal(document.querySelectorAll('.login-role-selector a').length,2)
       const dashboard = `/${role}/${role === 'client' ? 'overview' : 'dashboard'}`
       await clear()
       w.history.replaceState(null,'',dashboard)
@@ -228,10 +220,10 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
     assert.equal(logoutCalls,4)
     // Opposite-portal sessions are rejected locally, before loading modules.
     // A forged decoded role is also rejected if /auth/me returns a different portal.
-    for (const host of ['10buildline.site','staff.10buildline.site']) {
-      const allowedRole = host === '10buildline.site' ? 'client' : 'admin'
-      const wrongRole = host === '10buildline.site' ? 'admin' : 'client'
-      const path = host === '10buildline.site' ? '/client/documents' : '/admin/team'
+    for (const host of ['10buildline.site','staff.10buildline.site','admin.10buildline.site']) {
+      const allowedRole = host === '10buildline.site' ? 'client' : host === 'admin.10buildline.site' ? 'admin' : 'opm'
+      const wrongRole = host === '10buildline.site' ? 'admin' : host === 'admin.10buildline.site' ? 'opm' : 'client'
+      const path = host === '10buildline.site' ? '/client/documents' : host === 'admin.10buildline.site' ? '/admin/team' : '/opm/documents'
       for (const verifiedMismatch of [false,true]) {
         dom.reconfigure({url:`https://${host}${path}`})
         w.history.replaceState(null,'',path)
@@ -244,7 +236,7 @@ test("production host simulation: roots, toggle, all role logins, refresh, autho
         assert.equal(w.location.hostname,host)
         assert.equal(client.getToken(),'')
         assert.equal(document.querySelector('.sidebar'),null)
-        assert.equal(document.querySelector('.login-heading h1').textContent,host === '10buildline.site' ? 'Welcome to 10BuildLine' : 'Staff sign-in')
+        assert.equal(document.querySelector('.login-heading h1').textContent,host === '10buildline.site' ? 'Welcome to 10BuildLine' : host === 'admin.10buildline.site' ? 'Administrator sign-in' : 'Staff sign-in')
         assert.equal(requestCalls-before,verifiedMismatch ? 1 : 0,'No workspace data may be fetched for the opposite portal')
         await clear()
       }

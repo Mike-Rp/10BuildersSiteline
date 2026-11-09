@@ -32,13 +32,14 @@ export function loginPath(portal: LoginPortal) {
   return portal === "client" ? "/client/login" : "/login"
 }
 export function shareLoginPath(portal: LoginPortal) {
-  if (currentDomain()) return PORTAL_ORIGINS[portal === "client" ? "client" : "staff"] + (portal === "admin" ? "/?tab=admin" : "/")
+  if (currentDomain()) return PORTAL_ORIGINS[portal] + (portal === "admin" ? "/?tab=admin" : "/")
   return portal === "admin" ? "/login?tab=admin" : loginPath(portal)
 }
 
 export function currentLoginPortal(): LoginPortal {
   if (typeof window === "undefined") return "client"
   const domain = currentDomain()
+  if (domain === "admin") return "admin"
   if (domain === "client") return "client"
   if (domain === "staff" && portalDomainRedirect(window.location)) return "staff"
   if (window.location.pathname === "/" && domain !== "staff") return "client"
@@ -70,7 +71,7 @@ export function navigateToWorkspace(role: Role, freshLogin = false) {
   const valid = typeof requested === "string" && resolveWorkspaceRoute(role, requested)
   const path = valid ? pagePath(role, valid.page, valid.projectId) : workspacePath(role)
   const domain = currentDomain()
-  const target = role === "client" ? "client" : "staff"
+  const target = role === "client" ? "client" : role === "admin" ? "admin" : "staff"
   if (domain && domain !== target) {
     return changeRoute("/", true)
   }

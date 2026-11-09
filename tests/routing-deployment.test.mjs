@@ -38,9 +38,10 @@ test("host-specific redirects keep disallowed portal paths on the same domain be
     assert.equal(match('10buildline.site',path)?.destination,path === '/client/login' ? '/' : undefined,path)
     assert.equal(match('www.10buildline.site',path)?.destination,path === '/client/login' ? '/' : undefined,path)
   }
-  for (const host of ['10buildline.site','www.10buildline.site','staff.10buildline.site','preview.vercel.app','localhost']) {
+  for (const host of ['10buildline.site','www.10buildline.site','staff.10buildline.site','admin.10buildline.site','preview.vercel.app','localhost']) {
     for (const path of ['/','/api/v1/auth/login','/api/v1/auth/admin/login','/api/v1/auth/me','/assets/app.js']) assert.equal(match(host,path),undefined,host+path)
   }
+  assert.equal(match('admin.10buildline.site','/admin/dashboard'),undefined)
   for (const path of ['/admin','/admin/dashboard','/opm/documents','/spm/resources']) assert.equal(match('staff.10buildline.site',path),undefined,path)
   assert.equal(match('staff.10buildline.site','/admin/login').destination,'/?tab=admin')
   assert.equal(match('staff.10buildline.site','/staff/login').destination,'/?tab=staff')

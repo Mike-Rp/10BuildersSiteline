@@ -2,13 +2,15 @@ import { resolveWorkspaceRoute } from "./workspace-routing.ts"
 
 // These domains serve the same deployment. Unknown hosts (local/preview) keep
 // path-based portal selection so development never navigates to production.
-export type DomainPortal = "client" | "staff"
+export type DomainPortal = "admin" | "client" | "staff"
 export const PORTAL_ORIGINS = {
+  admin: "https://admin.10buildline.site",
   client: "https://10buildline.site",
   staff: "https://staff.10buildline.site",
 } as const
 
 export function domainPortal(hostname: string): DomainPortal | undefined {
+  if (hostname.toLowerCase() === "admin.10buildline.site") return "admin"
   if (["10buildline.site", "www.10buildline.site"].includes(hostname.toLowerCase())) return "client"
   if (hostname.toLowerCase() === "staff.10buildline.site") return "staff"
 }
@@ -16,6 +18,7 @@ export function domainPortal(hostname: string): DomainPortal | undefined {
 export function roleAllowedOnHost(role: string, hostname: string): boolean {
   const portal = domainPortal(hostname)
   if (!portal) return true
+  if (portal === "admin") return role === "admin"
   return portal === "client" ? role === "client" : ["admin", "opm", "spm"].includes(role)
 }
 
@@ -25,9 +28,12 @@ export function portalDomainRedirect(location: Pick<Location, "hostname" | "path
   if (!current) return
   const { pathname } = location
   if (pathname === "/" || /^\/api(?:\/|$)/i.test(pathname)) return
-  const loginAlias = current === "client" ? /^\/client\/login\/?$/i : /^\/(?:login|(?:admin|staff)\/login)\/?$/i
+  const loginAlias = current === "client" ? /^\/client\/login\/?$/i
+    : current === "admin" ? /^\/(?:login|admin\/login)\/?$/i
+    : /^\/(?:login|(?:admin|staff)\/login)\/?$/i
   if (loginAlias.test(pathname)) return
   const valid = current === "client" ? resolveWorkspaceRoute("client", pathname)
+    : current === "admin" ? resolveWorkspaceRoute("admin", pathname)
     : (["admin", "opm", "spm"] as const).some(role => resolveWorkspaceRoute(role, pathname))
   // Wrong-portal and unknown paths both return to this hostname's root.
   if (!valid) return "/"

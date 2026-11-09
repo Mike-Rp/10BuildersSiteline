@@ -25,11 +25,11 @@ test("login portals enforce database roles before creating or replacing sessions
   await db.exec("update user_licenses set license_expiry=current_date+400 where superseded_at is null; delete from license_renewal_requests where file_ref like 'seed/licenses/renewal-%'")
   const dbPort=await port(),apiPort=await port()
   socket=new PGLiteSocketServer({db,port:dbPort,host:'127.0.0.1'});await socket.start()
-  child=spawn(process.execPath,['src/index.js'],{cwd:here('../Thesis-Backend/'),env:{...process.env,NODE_ENV:'development',DB_SERVER:'127.0.0.1',DB_PORT:String(dbPort),DB_NAME:'postgres',DB_USER:'postgres',DB_PASSWORD:'x',DB_POOL_MAX:'1',PGSSLMODE:'disable',JWT_SECRET:'isolated-login-portals-test-secret-0123456789',HOST:'127.0.0.1',PORT:String(apiPort),ARCHIVE_MAINTENANCE_ENABLED:'false',CORS_ORIGINS:'https://10buildline.site,https://staff.10buildline.site'},stdio:'ignore'})
+  child=spawn(process.execPath,['src/index.js'],{cwd:here('../Thesis-Backend/'),env:{...process.env,NODE_ENV:'development',DB_SERVER:'127.0.0.1',DB_PORT:String(dbPort),DB_NAME:'postgres',DB_USER:'postgres',DB_PASSWORD:'x',DB_POOL_MAX:'1',PGSSLMODE:'disable',JWT_SECRET:'isolated-login-portals-test-secret-0123456789',HOST:'127.0.0.1',PORT:String(apiPort),ARCHIVE_MAINTENANCE_ENABLED:'false',CORS_ORIGINS:'https://10buildline.site,https://staff.10buildline.site,https://admin.10buildline.site'},stdio:'ignore'})
   const base=`http://127.0.0.1:${apiPort}/api/v1`
   const deadline=Date.now()+20000
   while(true){try{if((await fetch(base+'/health')).ok)break}catch{}if(Date.now()>deadline)throw Error('Test API did not start');await new Promise(resolve=>setTimeout(resolve,100))}
-  for (const origin of ['https://10buildline.site','https://staff.10buildline.site']) {
+  for (const origin of ['https://10buildline.site','https://staff.10buildline.site','https://admin.10buildline.site']) {
     const preflight=await fetch(base+'/auth/me',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization'}})
     assert.equal(preflight.status,204)
     assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),origin)
