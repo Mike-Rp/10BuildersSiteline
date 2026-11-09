@@ -753,6 +753,28 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual((await loadState(user)).muted,["notice"])
   })
 
+  await t.test("the data refresh interval is Admin-only, validated, merged with other rules, and visible to every role",async()=>{
+    let session=await asUser("patricia.domingo@10builders.com")
+    const before=await api("/workspace")
+    assert.equal(before.rules.refreshSeconds,undefined,"missing means the 5 minute default")
+    const base={grace:before.rules.grace,cap:before.rules.cap,response:before.rules.response,idle:before.rules.idle}
+    for(const bad of [14,0,-5,3601,1.5,"60",null,"abc"]) await assert.rejects(api("/workspace/settings",{method:"PUT",json:{...base,refreshSeconds:bad}}),/refresh interval/i,String(bad))
+    assert.equal((await api("/workspace")).rules.refreshSeconds,undefined,"a rejected value saves nothing")
+    for(const good of [15,300,3600]) assert.equal((await api("/workspace/settings",{method:"PUT",json:{...base,refreshSeconds:good}})).refreshSeconds,good)
+    await api("/workspace/settings",{method:"PUT",json:{...base,refreshSeconds:15}})
+    // Saving other rules without the interval keeps it (the screen merges settings it does not send).
+    await api("/workspace/settings",{method:"PUT",json:{...base,idle:base.idle}})
+    assert.equal((await api("/workspace")).rules.refreshSeconds,15)
+    for(const email of ["lea.fernandez@10builders.com","f.uy@aldenheights-hoa.com"]) {
+      session=await asUser(email)
+      assert.equal((await api("/workspace")).rules.refreshSeconds,15,email+" reads the interval")
+      await assert.rejects(api("/workspace/settings",{method:"PUT",json:{...base,refreshSeconds:60}}),/Forbidden|denied|permission/i)
+    }
+    session=await asUser("patricia.domingo@10builders.com")
+    await api("/workspace/settings",{method:"PUT",json:{...base,refreshSeconds:300}})
+    assert.equal((await api("/workspace")).rules.refreshSeconds,300)
+  })
+
   await t.test("clients cannot change rules, upload files, or read another client's project",async()=>{
     const {user,state}=await asUser("f.uy@aldenheights-hoa.com")
     await assert.rejects(api("/workspace/settings",{method:"PUT",json:{grace:1,cap:1,response:1,idle:1}}),/Forbidden|denied|permission/i)

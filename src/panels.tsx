@@ -69,6 +69,7 @@ import {
   type State,
 } from "./model"
 import "./upload-control.css"
+import { REFRESH_CHOICES, clampRefreshSeconds } from "./refresh-interval"
 
 const INTAKE_PROJECT_TYPES = [
   {
@@ -1952,6 +1953,12 @@ export function SettingsForm({
   const [remindersSaving, setRemindersSaving] = useState(false)
   const [remindersError, setRemindersError] = useState("")
   const [remindersSaved, setRemindersSaved] = useState(false)
+  const savedRefresh = clampRefreshSeconds(rules.refreshSeconds)
+  const [refreshDraft, setRefreshDraft] = useState(savedRefresh)
+  const [refreshSaving, setRefreshSaving] = useState(false)
+  const [refreshError, setRefreshError] = useState("")
+  const [refreshSaved, setRefreshSaved] = useState(false)
+  const refreshOptions = REFRESH_CHOICES.some(c => c.seconds === savedRefresh) ? REFRESH_CHOICES : [...REFRESH_CHOICES, { seconds: savedRefresh, label: `${savedRefresh} seconds` }].sort((a, b) => a.seconds - b.seconds)
   const reminderTokens = reminders.trim().split(/[\s,]+/).filter(Boolean)
   const parsedReminders = reminderTokens.map(Number)
   const remindersValid =
@@ -2067,6 +2074,47 @@ export function SettingsForm({
           <p id="reminder-days-help" className={remindersValid ? "reminder-rule-hint" : "error"}>Enter up to 12 whole numbers from 0 to 365, separated by commas. Example: 60, 30, 14, 7, 0.</p>
           {remindersError && <p className="error" role="alert">{remindersError}</p>}
           {remindersSaved && <p role="status">License renewal reminder days saved.</p>}
+        </div>
+        <div className="rule-row refresh-rule-row">
+          <div>
+            <h3>Data refresh interval</h3>
+            <p>How often open screens re-read data from the database. Shorter intervals use more of the monthly data allowance, so choose 15 seconds only for a live demonstration and switch back afterwards.</p>
+          </div>
+          <div className="reminder-rule-controls">
+            <select
+              aria-label="Data refresh interval"
+              aria-describedby="refresh-interval-help"
+              disabled={refreshSaving}
+              value={refreshDraft}
+              onChange={(e) => { setRefreshDraft(Number(e.target.value)); setRefreshError(""); setRefreshSaved(false) }}
+            >
+              {refreshOptions.map(choice => <option key={choice.seconds} value={choice.seconds}>{choice.label}</option>)}
+            </select>
+            {refreshDraft !== savedRefresh && (
+              <>
+                <Button
+                  variant="primary"
+                  disabled={refreshSaving}
+                  onClick={async () => {
+                    setRefreshSaving(true); setRefreshError(""); setRefreshSaved(false)
+                    try {
+                      const saved = await onSave({ ...rules, refreshSeconds: refreshDraft }, "Data refresh interval")
+                      if (saved === false) { setRefreshError("The refresh interval could not be saved. Your choice is still here. Try again."); return }
+                      setRefreshSaved(true)
+                    } catch (reason) {
+                      setRefreshError(reason instanceof Error ? reason.message : "The refresh interval could not be saved. Try again.")
+                    } finally { setRefreshSaving(false) }
+                  }}
+                >
+                  {refreshSaving ? "Saving…" : "Confirm change"}
+                </Button>
+                <Button disabled={refreshSaving} onClick={() => { setRefreshDraft(savedRefresh); setRefreshError(""); setRefreshSaved(false) }}>Cancel</Button>
+              </>
+            )}
+          </div>
+          <p id="refresh-interval-help" className="reminder-rule-hint">Screens that are already open switch to the new interval after their next refresh, which is at most one old interval away. Pressing F5 applies it at once.</p>
+          {refreshError && <p className="error" role="alert">{refreshError}</p>}
+          {refreshSaved && <p role="status">Data refresh interval saved.</p>}
         </div>
       </div>
       {error && <p className="error">{error}</p>}

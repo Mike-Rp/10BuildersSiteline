@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { api } from "./api/client"
 import { Badge, Button, Field, Modal } from "./ui"
 import PhaseAllocationPanel from "./PhaseAllocationPanel"
+import { startPolling } from "./refresh-interval"
 
 export default function AllocationDirectory({
   onChanged,
@@ -30,10 +31,10 @@ export default function AllocationDirectory({
   }
   useEffect(() => {
     void refresh()
-    const timer=window.setInterval(()=>void refresh(),30000)
+    const stop=startPolling(refresh)
     const onFocus=()=>void refresh()
     window.addEventListener('focus',onFocus)
-    return()=>{window.clearInterval(timer);window.removeEventListener('focus',onFocus)}
+    return()=>{stop();window.removeEventListener('focus',onFocus)}
   }, [])
   return (
     <section className="detail-section">

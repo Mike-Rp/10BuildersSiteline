@@ -5,13 +5,14 @@ import {api,downloadBlob} from './api/client'
 import {uploadFile} from './api/actions'
 import {Button} from './ui'
 import './phase-engineers.css'
+import { startPolling } from "./refresh-interval"
 type Responsibility={id:string;user_id:string;name:string;phase:string;project_stage_id:number;assigned_disciplines:string[];status:string;completion_status:string;completion_note?:string;completion_file_id?:string;review_note?:string;offer_deadline_at?:string;complete?:boolean;progress?:number;requirements?:number;approved?:number;missing?:{title:string;status:string}[];replacement_candidates?:{id:string;name:string}[]}
 type Context={available:boolean;rows:Responsibility[];canReview:boolean;currentStage:number;lifecycle:string;availabilityLabel?:string}
 export default function EngineerResponsibilities({project,actor,onReload}:{project:Project;actor:Account;onReload:()=>unknown}) {
  const [context,setContext]=useState<Context>(),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notes,setNotes]=useState<Record<string,string>>({}),[files,setFiles]=useState<Record<string,File>>({}),[replacements,setReplacements]=useState<Record<string,string>>({})
  const locked=useRef(false)
  async function load(){setContext(await api<Context>(`/projects/${project.id}/engineer-responsibilities`))}
- useEffect(()=>{let disposed=false;const read=()=>api<Context>(`/projects/${project.id}/engineer-responsibilities`).then(c=>{if(!disposed)setContext(c)}).catch(e=>{if(!disposed)setError(e.message)});void read();const timer=setInterval(()=>void read(),15000);return()=>{disposed=true;clearInterval(timer)}},[project.id])
+ useEffect(()=>{let disposed=false;const read=()=>api<Context>(`/projects/${project.id}/engineer-responsibilities`).then(c=>{if(!disposed)setContext(c)}).catch(e=>{if(!disposed)setError(e.message)});void read();const stop=startPolling(read);return()=>{disposed=true;stop()}},[project.id])
  if(!context?.available||!context.rows.length)return null
  async function act(row:Responsibility,action:string) {
   if(locked.current)return;locked.current=true;setBusy(true);setError('')

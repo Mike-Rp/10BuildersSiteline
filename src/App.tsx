@@ -58,6 +58,7 @@ import PasswordReset from "./PasswordReset"
 import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import { applyRefreshSetting, isStale, startPolling } from "./refresh-interval"
 import { flushSync } from "react-dom"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
@@ -320,6 +321,7 @@ function AppInner() {
     }
   })
   const stateRef = useRef(state)
+  const lastLoadAt = useRef(Date.now())
   stateRef.current = state
   const actor =
     state.accounts.find((a) => a.id === sessionId) ||
@@ -531,7 +533,8 @@ function AppInner() {
     const check = () => {
       if (document.visibilityState !== "hidden") void api("/auth/me").catch(() => {})
     }
-    const timer = window.setInterval(check, 15000)
+    // The session check is tiny but runs on every screen, so it waits a minute between checks.
+    const timer = window.setInterval(check, 60000)
     window.addEventListener("focus", check)
     document.addEventListener("visibilitychange", check)
     return () => {
@@ -588,10 +591,13 @@ function AppInner() {
     try { loaded=await loadApiState({id:actor.id,role:actor.role,full_name:actor.name,email:actor.email}) }
     catch (error) { setReadinessAvailable(false); throw error }
     stateRef.current=loaded
+    lastLoadAt.current=Date.now()
     setState(loaded)
     setReadinessAvailable(true)
     return loaded
   }
+  // Every timer follows the Administrator's data refresh setting (default 5 minutes).
+  useEffect(() => { applyRefreshSetting(state.rules) }, [state.rules?.refreshSeconds])
   // Let the next Site PM see an OPM handoff without a manual page reload.
   useEffect(() => {
     if (signedOut || !["admin", "opm", "spm"].includes(actor.role) || !tokenUser()) return
@@ -603,16 +609,18 @@ function AppInner() {
       try {
         const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
         if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true) }
+        lastLoadAt.current = Date.now()
       } catch { if(active)setReadinessAvailable(false) /* A failed read does not assert current blockers. */ }
       finally { loading = false }
     }
-    const timer = window.setInterval(() => { void refresh() }, 15000)
-    const onFocus = () => { void refresh() }
+    const stopPolling = startPolling(refresh)
+    // Coming back to a tab that sat idle for a full interval catches up at once. Quick switches do not reload.
+    const onFocus = () => { if (isStale(lastLoadAt.current)) void refresh() }
     const onRestricted = () => { loading = false; void refresh() }
     window.addEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted)
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onFocus)
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
+    return () => { active = false; stopPolling(); window.removeEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
   }, [actor.id, actor.role, signedOut])
   async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
     if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}

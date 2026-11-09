@@ -6,6 +6,7 @@ import { DOC_LABELS, type Project } from "./model"
 import type { WorkflowCommand } from "./workflows"
 import { suggestCompanyPair } from "./allocation-suggestion"
 import "./phase-allocation.css"
+import { startPolling } from "./refresh-interval"
 
 type Row = {
   phase: string
@@ -108,9 +109,9 @@ export default function PhaseAllocationPanel({
     if(!waitingForResponse)return
     let live=true
     const update=()=>{const sequence=++loadSequence.current;api<Data>(`/projects/${projectId}/phase-allocation`).then(next=>{if(live&&sequence===loadSequence.current)setData(next)}).catch(e=>{if(live)setError(e.message)})}
-    const timer=window.setInterval(update,15000)
+    const stop=startPolling(update)
     window.addEventListener('focus',update)
-    return()=>{live=false;window.clearInterval(timer);window.removeEventListener('focus',update)}
+    return()=>{live=false;stop();window.removeEventListener('focus',update)}
   },[projectId,waitingForResponse])
   const post = async (action: string, extra: Record<string, unknown> = {}) => {
     if (busy || saving.current || !data) return

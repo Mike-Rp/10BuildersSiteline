@@ -332,6 +332,8 @@ router.put("/workspace/settings", endpoint(["admin"], async (db, user, req) => {
     if (rules.reminderDays !== undefined && (!Array.isArray(rules.reminderDays) || !rules.reminderDays.length || rules.reminderDays.length > 12
         || rules.reminderDays.some(d => !Number.isInteger(d) || d < 0 || d > 365)))
         throw new HttpError(400, "Reminder days must be whole numbers from 0 to 365.");
+    if (rules.refreshSeconds !== undefined && (!Number.isInteger(rules.refreshSeconds) || rules.refreshSeconds < 15 || rules.refreshSeconds > 3600))
+        throw new HttpError(400, "The data refresh interval must be a whole number of seconds from 15 to 3600.");
     await db.query("update workspace_settings set rules=$1 where singleton", [JSON.stringify(rules)]);
     await event(db, user, null, "Workspace rules updated");
     return rules;

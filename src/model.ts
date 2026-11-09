@@ -505,6 +505,8 @@ export type Rules = {
   response: number
   idle: number
   reminderDays?: number[]
+  /** Seconds between automatic data reads (15 to 3600). Missing means the 5 minute default. */
+  refreshSeconds?: number
 }
 export type State = {
   multiEngineerAllocationAvailable?: boolean

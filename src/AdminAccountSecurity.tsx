@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react'
 import {api} from './api/client'
 import {Button,Field,Modal} from './ui'
 import './admin-security.css'
+import { startPolling } from "./refresh-interval"
 export type RecoveryStatus={configured:boolean;generatedAt?:string;refreshRequired:boolean;remaining:number;used:number;codes:{number:number;state:'used'|'available';usedAt?:string}[]}
 const updated=()=>window.dispatchEvent(new Event('admin-recovery-updated'))
 function PasswordInput({label,value,onChange,disabled,newPassword=false}:{label:string;value:string;onChange:(value:string)=>void;disabled:boolean;newPassword?:boolean}) {
@@ -14,9 +15,9 @@ export function AdminRecoveryNotice({onManage}:{onManage:()=>void}) {
  useEffect(()=>{
   let active=true
   const read=()=>api<RecoveryStatus>('/auth/admin/recovery-codes').then(s=>{if(active)setStatus(s)}).catch(()=>{})
-  void read();const timer=setInterval(()=>void read(),30000)
+  void read();const stop=startPolling(read)
   window.addEventListener('focus',read);window.addEventListener('admin-recovery-updated',read)
-  return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',read);window.removeEventListener('admin-recovery-updated',read)}
+  return()=>{active=false;stop();window.removeEventListener('focus',read);window.removeEventListener('admin-recovery-updated',read)}
  },[])
  if(!status?.refreshRequired)return null
  return <section className="admin-recovery-notice" role="status"><div><strong>{status.remaining?'A recovery code was used':'No recovery codes remaining'}</strong><p>{status.remaining?'Generate a new set and store it securely. Your remaining codes still work until replaced.':'Generate a new set to preserve account recovery.'}</p></div><Button onClick={onManage}>Manage recovery codes</Button></section>

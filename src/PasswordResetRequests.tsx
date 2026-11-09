@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { api } from "./api/client"
 import { Button, Field, Modal } from "./ui"
 import { waitLabel } from "./password-reset-wait"
+import { startPolling } from "./refresh-interval"
 export type PasswordResetRequest = {
   id: string; full_name: string; email: string; role?: string; requested_at: string;
   status?: "pending" | "completed"; read_at?: string | null; completed_at?: string; completed_by?: string; completed_by_name?: string | null;
@@ -23,9 +24,9 @@ export default function PasswordResetRequests({ children }: { children: (request
       catch(e) { if(live) setLoadError((e as Error).message) }
     }
     void refresh()
-    const timer=setInterval(refresh,10000)
+    const stop=startPolling(refresh)
     window.addEventListener("focus",refresh)
-    return ()=>{live=false;clearInterval(timer);window.removeEventListener("focus",refresh)}
+    return ()=>{live=false;stop();window.removeEventListener("focus",refresh)}
   },[])
   async function open(id: string, requestedAt?: string) {
     const item=requests.find(r=>r.id===id && (!requestedAt || r.requested_at===requestedAt))
