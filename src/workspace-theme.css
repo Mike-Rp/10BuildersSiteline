@@ -74,7 +74,7 @@
 #root .app-shell .dashboard-welcome { color: var(--color-muted); font-weight: 400; }
 #root .app-shell .page-heading.page-title-panel { background: transparent; padding: 0; border: 0; border-radius: 0; gap: 16px; margin-bottom: 20px; }
 #root .app-shell .page-title-panel .page-title-copy h1 { font-size: clamp(29px,3vw,44px); line-height: 1.18; font-weight: 550; letter-spacing: -1.5px; color: var(--color-ink); }
-#root .app-shell .button { min-height: 42px; border-radius: 12px; font-size: 14px; padding: 10px 14px; box-shadow: none; }
+#root .app-shell .button { min-height: 44px; border-radius: 12px; font-size: 14px; padding: 10px 14px; box-shadow: none; }
 #root .app-shell .button.primary { background: #193b59; border-color: #193b59; color: #fff; }
 #root .app-shell .button.primary:hover:not(:disabled) { background: #244f73; }
 #root .app-shell .admin-overview .ao-new-intake { min-width: 0; min-height: 44px; padding: 12px 18px; border-radius: 12px; box-shadow: none; }
@@ -173,4 +173,52 @@
 }
 @media print {
   #root .app-shell .main-shell { margin: 0; padding: 0; width: 100%; background: #fff; }
+}
+
+/* Shared action sizing stays stable across dashboard and module pagers. */
+#root .app-shell :is(.pagination, .history-pagination, .spm-history-pagination, .ao-pager, .report-summary-pagination, .client-search-pages) .button,
+#root .app-shell .button.explorer-card-action {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+#root .app-shell :is(.pagination, .history-pagination, .spm-history-pagination, .ao-pager, .report-summary-pagination, .client-search-pages) .button:not(.pagination-page) {
+  min-width: 100px;
+}
+#root .app-shell :is(.pagination.compact, .history-pagination, .spm-history-pagination) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+#root .app-shell :is(.pagination-status, .pagination-mini, .history-pagination > span, .spm-history-pagination > span) {
+  min-width: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+#root .app-shell .pagination-pages { justify-content: center; gap: 8px; }
+#root .app-shell .explorer-card { align-content: stretch; }
+#root .app-shell .explorer-card-footer { align-self: end; gap: 12px; }
+#root .app-shell .explorer-card-footer .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .button.explorer-card-action { width: 112px; }
+@media (max-width: 640px) {
+  #root .app-shell .explorer-card-footer { flex-direction: column; align-items: stretch; }
+  #root .app-shell .explorer-card-footer > .document-status-line { flex: none; }
+  #root .app-shell .button.explorer-card-action { align-self: flex-end; }
+}
+@media (max-width: 380px) {
+  #root .app-shell :is(.pagination-status, .pagination-mini, .history-pagination > span, .spm-history-pagination > span) {
+    flex-basis: 100%;
+    order: -1;
+  }
 }
