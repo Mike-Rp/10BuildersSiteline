@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { useState, type FormEvent } from "react"
 import { Badge, Button, Empty, Field, Modal } from "./ui"
 import { dateLabel, validateFile } from "./model"
@@ -508,17 +509,17 @@ export default function ExtensionWorkflow({
               hint={`Must be later than ${dateLabel(editProject.approved)}.`}
               error={errors.proposed}
             >
-              <input
-                type="date"
+              <DatePicker
+                calendarTitle="Proposed Revised Completion Date"
                 required
                 min={new Date(Date.parse(editProject.approved) + 86400000)
                   .toISOString()
                   .slice(0, 10)}
                 value={editing.report.proposed}
-                onChange={(e) =>
+                onValueChange={date =>
                   setEditing({
                     ...editing,
-                    report: { ...editing.report, proposed: e.target.value },
+                    report: { ...editing.report, proposed: date },
                   })
                 }
               />

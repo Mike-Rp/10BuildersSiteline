@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { PROFESSIONS, licenseNumberError } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 // Expired-license workflow screens. All rules (who is paused, when an override opens, who may be suggested) are
@@ -114,7 +115,7 @@ function RenewalSubmit() {
     <div className="license-renewal-form">
       <Field label="Licensed profession"><select value={profession} onChange={e=>setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p=><option key={p}>{p}</option>)}</select></Field>
       <Field label="License number"><input inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={number} onChange={(e) => setNumber(e.target.value)} /></Field>
-      <Field label="New expiry date"><input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
+      <Field label="New expiry date"><DatePicker calendarTitle="New expiry date" value={expiry} onValueChange={date => setExpiry(date)} /></Field>
       <Field label="Renewed license file"><input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0])} /></Field>
       {error && <p className="error" role="alert">{error}</p>}
       <Button onClick={send} disabled={busy}>{busy ? "Submitting…" : "Send for verification"}</Button>
@@ -375,7 +376,7 @@ export function OverrideDialog({
                 <h3>Office appointment confirmation</h3>
                 <p>Contact the chosen engineer and arrange signing at the office. Confirm only after the appointment is signed.</p>
                 <label><input type="checkbox" checked={signed} onChange={e => setSigned(e.target.checked)} /> I confirm the project-specific appointment was signed at the office.</label>
-                <Field label="Actual signing date"><input type="date" value={signedOn} max={new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())} onChange={e => setSignedOn(e.target.value)} required /></Field>
+                <Field label="Actual signing date"><DatePicker calendarTitle="Actual signing date" value={signedOn} max={new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())} onValueChange={date => setSignedOn(date)} required /></Field>
               </section>
               <div className="notice neutral what-happens">
                 <Icon name="shield" />

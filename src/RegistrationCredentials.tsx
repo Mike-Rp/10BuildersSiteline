@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { useRef, useState } from "react"
 import { PROFESSIONS, ENGINEER_SPECIALIZATIONS, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { uploadFile } from "./api/actions"
@@ -84,7 +85,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
             <option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}
           </select></Field>
           <Field label="License number exactly as printed *"><input required inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
-          <Field label="Expiry date *"><input required type="date" min={today()} value={row.license_expiry} onChange={e => update(index, { license_expiry: e.target.value })} /></Field>
+          <Field label="Expiry date *"><DatePicker required calendarTitle="Expiry date" min={today()} value={row.license_expiry} onValueChange={date => update(index, { license_expiry: date })} /></Field>
           <Field label="Supporting credential document *"><CredentialDocumentUpload name={row.fileName} busy={uploadingIndex === index} disabled={uploadingIndex !== null} onFile={file => void upload(index, file)} /></Field>
         </div>
         <fieldset className="credential-specializations"><legend>Areas of specialization · Credential {index+1} · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button type="button" key={tag} className={`chip ${tags.includes(tag)?'selected':''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag)&&tags.length>=3} onClick={()=>update(index,{specializations:tags.includes(tag)?tags.filter(t=>t!==tag):[...tags,tag]})}>{tag}</button>)}</div></fieldset>

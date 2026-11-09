@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,phaseCoverageMeetsQuota} from './PhaseEngineerAllocation'
 import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
@@ -1762,11 +1763,11 @@ export function LicenseForm({
           />
         </Field>
         <Field label="Expiry date *">
-          <input
+          <DatePicker
             required
-            type="date"
+            calendarTitle="Expiry date"
             value={expiry}
-            onChange={(e) => setExpiry(e.target.value)}
+            onValueChange={date => setExpiry(date)}
           />
         </Field>
         <Field label="Certifications (comma-separated)" wide>

@@ -1,3 +1,4 @@
+import DatePicker from "./DatePicker"
 import { useEffect, useRef, useState } from "react"
 import { api } from "./api/client"
 import { submitOwnRenewal, openRenewalFile } from "./api/licenses"
@@ -49,7 +50,7 @@ export default function RestrictedRenewalPage({ actor, status, onReload, onSignO
         }}>
           <Field label="Licensed profession"><select required disabled={busy} value={profession} onChange={e => setProfession(e.target.value)}><option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}</select></Field>
           <Field label="PRC license number"><input required disabled={busy} inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="0012345" value={number} onChange={e => setNumber(e.target.value)} /></Field>
-          <Field label="New expiry date"><input required disabled={busy} type="date" value={expiry} onChange={e => setExpiry(e.target.value)} /></Field>
+          <Field label="New expiry date"><DatePicker required disabled={busy} calendarTitle="New expiry date" value={expiry} onValueChange={date => setExpiry(date)} /></Field>
           <Field label="Supporting license document"><input required disabled={busy} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setFile(e.target.files?.[0])} /></Field>
           <Button type="submit" variant="primary" disabled={busy}>{busy ? "Submitting…" : "Submit for Admin verification"}</Button>
         </form>
