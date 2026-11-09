@@ -24,6 +24,7 @@ import activityLogRoutes from "./services/activity-logs/routes.js";
 import notificationRoutes from "./services/notifications/routes.js";
 import licenseRoutes from "./services/licenses/routes.js";
 import cronRoutes from "./services/cron/routes.js";
+import backupRoutes from "./services/backups/routes.js";
 
 import types from 'pg-types';
  
@@ -96,6 +97,7 @@ app.post([`${apiURL}/auth`, `${apiURL}/auth/admin`, '/api/v1/auth/login', '/api/
  
 app.get('/api/v1/health',async(req,res)=>{try{await (await databasePool()).query('select 1');res.json({ok:true,database:true});}catch{res.status(503).json({ok:false,database:false});}});
 app.use(`${apiURL}/cron`, cronRoutes);
+app.use(`${apiURL}/backups`, backupRoutes);
 app.use(`${apiURL}/notifications/v2`, notificationRoutes);
 app.use('/api/v1',workspaceRoutes);
 app.use(apiURL+'/archive',archiveRoutes);

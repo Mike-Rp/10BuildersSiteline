@@ -33,6 +33,7 @@ import { currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/cur
 import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
 import PasswordResetRequests from "./PasswordResetRequests"
 import AdminDashboard from "./AdminDashboard"
+import Backups from "./Backups"
 import PageTitlePanel from "./PageTitlePanel"
 import DashboardWelcome from "./DashboardWelcome"
 import NotificationDetail from "./NotificationDetail"
@@ -2272,6 +2273,7 @@ function AppInner() {
               }
             />
           </Panel>
+          <Backups />
           <Panel
             title="Notification preferences"
           >
