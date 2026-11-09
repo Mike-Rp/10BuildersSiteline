@@ -1,3 +1,4 @@
+import AdminWorkspaceSearch from "./AdminWorkspaceSearch"
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminProjectDocuments from "./AdminProjectDocuments"
@@ -343,7 +344,6 @@ function AppInner() {
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [toast, setToast] = useState("")
   const [query, setQuery] = useState("")
-  const [globalQuery, setGlobalQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [subconTab, setSubconTab] = useState("registered")
   const [companyCreatedNotice, setCompanyCreatedNotice] = useState<{ id: string; name: string; verified: boolean; refreshRequired?: boolean }>()
@@ -2913,12 +2913,6 @@ function AppInner() {
       </div>
     )
   }
-  const globalProjects = state.projects.filter((p) =>
-    p.name.toLowerCase().includes(globalQuery.toLowerCase()),
-  )
-  const globalPeople = state.accounts.filter((a) =>
-    a.name.toLowerCase().includes(globalQuery.toLowerCase()),
-  )
   const pendingRole = loadingWorkspaceRole ?? (tokenUser()?.role === "client" ? "client" : undefined)
   const loadingRole = pendingRole && roleAllowedOnHost(pendingRole, window.location.hostname) ? pendingRole : undefined
   if (signingOut) return <WorkspaceSkeleton role={loadingRole} />
@@ -3362,66 +3356,11 @@ function AppInner() {
           {companyDetails(selectedCompany)}
         </Modal>
       )}
-      {dialog?.kind === "search" && (
-        <Modal
-          title="Search workspace"
+      {actor.role === "admin" && dialog?.kind === "search" && (
+        <AdminWorkspaceSearch role={actor.role} state={state} projectStatuses={STATUS}
           onClose={() => setDialog(undefined)}
-        >
-          <Search
-            value={globalQuery}
-            onChange={setGlobalQuery}
-            placeholder="Search the entire workspace"
-          />
-          <div className="global-results">
-            <h4>Projects</h4>
-            {globalProjects.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setDialog({ kind: "project", id: p.id })}
-              >
-                <Icon name="building" />
-                <span>
-                  {p.name}
-                  <small>
-                    {p.type} · {STATUS[p.status]}
-                  </small>
-                </span>
-                <Icon name="chevron" size={15} />
-              </button>
-            ))}
-            <h4>People</h4>
-            {globalPeople.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => setDialog({ kind: "account", id: a.id })}
-              >
-                <span className="avatar small">{initials(a.name)}</span>
-                <span>
-                  {a.name}
-                  <small>{ROLE_NAMES[a.role]}</small>
-                </span>
-                <Icon name="chevron" size={15} />
-              </button>
-            ))}
-            <h4>Companies</h4>
-            {state.companies
-              .filter((c) =>
-                c.name.toLowerCase().includes(globalQuery.toLowerCase()),
-              )
-              .map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setDialog({ kind: "company", id: c.id })}
-                >
-                  <Icon name="users" />
-                  <span>
-                    {c.name}
-                    <small>Subcontractor company</small>
-                  </span>
-                </button>
-              ))}
-          </div>
-        </Modal>
+          onOpen={(kind, id) => setDialog({ kind, id })}
+          onPreview={previewDoc} />
       )}
       {dialog?.kind === "help" && (
         <Modal
