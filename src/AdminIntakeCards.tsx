@@ -4,8 +4,8 @@ import { stageLabel } from "./IntakeGuidance"
 import { Button, Icon } from "./ui"
 import "./admin-intake-cards.css"
 
-export default function AdminIntakeCards({ state, projects, actor, onOpen }: {
-  state: State; projects: Project[]; actor: Account; onOpen: (project: Project, edit: boolean) => void
+export default function AdminIntakeCards({ state, projects, actor, onOpen, highlightedId }: {
+  highlightedId?: string; state: State; projects: Project[]; actor: Account; onOpen: (project: Project, edit: boolean) => void
 }) {
   return <div className="admin-intake-cards">
     {projects.map(project => {
@@ -13,7 +13,7 @@ export default function AdminIntakeCards({ state, projects, actor, onOpen }: {
       if (!guidance) return null
       const current = intakeProgressStep(project, guidance)
       const steps = [current === 0 ? "Intake Setup" : "Intake Submitted", "Office PM Review", "Documents", "Site PM Confirmation", "Subcontractor Allocation"]
-      return <article className="admin-intake-card" key={project.id} aria-label={project.name}>
+      return <article className={`admin-intake-card ${highlightedId === project.id ? "search-result-highlight" : ""}`} key={project.id} aria-label={project.name}>
         <header className="admin-intake-card-heading">
           <div className="admin-intake-card-identity">
             <h3><button type="button" onClick={() => onOpen(project, false)}>{project.name}</button></h3>

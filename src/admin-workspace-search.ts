@@ -12,6 +12,7 @@ export type WorkspaceResult = {
   status?: string
   type?: string
   doc?: Doc
+  documentContext?: { kind: "project" | "account" | "company"; id: string; categoryId?: string; folderId?: string }
 }
 export const categoryLabels: Record<SearchCategory, string> = {
   projects: "Projects", people: "People", companies: "Companies", documents: "Documents",
@@ -23,11 +24,11 @@ export const normalizeSearch = (value: string) => value.normalize("NFKC").toLoca
 export function adminWorkspaceIndex(state: State, projectStatuses: Record<string, string>): WorkspaceResult[] {
   const results: WorkspaceResult[] = []
   const documents = new Set<string>()
-  function addDocument(doc: Doc, source: string, context: string) {
+  function addDocument(doc: Doc, source: string, context: string, documentContext: WorkspaceResult["documentContext"]) {
     if (!doc.uploaded || documents.has(doc.id)) return
     documents.add(doc.id)
     results.push({ id: doc.id, category: "documents", name: doc.name || doc.label,
-      subtitle: `${doc.label} · ${context}`, type: source, doc,
+      subtitle: `${doc.label} · ${context}`, type: source, doc, documentContext,
       text: `${doc.name} ${doc.label} ${context} ${doc.owner} ${doc.phase || ""}` })
   }
   for (const project of state.projects) {
@@ -36,19 +37,19 @@ export function adminWorkspaceIndex(state: State, projectStatuses: Record<string
       subtitle: `${project.type} · ${status}`, status: project.status, type: project.type,
       text: `${project.name} ${project.type} ${status} ${project.location} ${project.phase}` })
     for (const category of projectDocumentIndex(project)) for (const folder of category.folders)
-      for (const { doc } of folder.files) addDocument(doc, "Project", project.name)
+      for (const { doc } of folder.files) addDocument(doc, "Project", project.name, { kind: "project", id: project.id, categoryId: category.id, folderId: folder.id })
   }
   for (const account of state.accounts) {
     results.push({ id: account.id, category: "people", name: account.name,
       subtitle: `${ROLE_NAMES[account.role]} · ${friendlyStatus(account.status)}`, status: account.status, type: ROLE_NAMES[account.role],
       text: `${account.name} ${account.email} ${ROLE_NAMES[account.role]} ${friendlyStatus(account.status)} ${account.license} ${account.scope.join(" ")}` })
-    for (const doc of account.docs) addDocument(doc, "Person", account.name)
+    for (const doc of account.docs) addDocument(doc, "Person", account.name, { kind: "account", id: account.id })
   }
   for (const company of state.companies) {
     results.push({ id: company.id, category: "companies", name: company.name,
       subtitle: `Subcontractor · ${friendlyStatus(company.status)}`, status: company.status, type: company.availability,
       text: `${company.name} ${company.email} ${company.contact} ${company.primaryTrade || ""} ${friendlyStatus(company.status)} ${company.availability}` })
-    for (const doc of [...company.documents, ...company.manpowerDocuments]) addDocument(doc, "Company", company.name)
+    for (const doc of [...company.documents, ...company.manpowerDocuments]) addDocument(doc, "Company", company.name, { kind: "company", id: company.id })
   }
   return results
 }

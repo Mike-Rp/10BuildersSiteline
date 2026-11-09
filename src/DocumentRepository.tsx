@@ -63,6 +63,7 @@ const projectFileCount = (project: RepositoryProject) =>
 
 export default function DocumentRepository({
   projects,
+  focusedFileId,
   onOpen,
   onDownload,
   className = "",
@@ -87,6 +88,7 @@ export default function DocumentRepository({
   onRetry,
 }: {
   projects: RepositoryProject[]
+  focusedFileId?: string
   onOpen: (projectId: string, fileId: string) => void
   onDownload?: (projectId: string, fileId: string) => void
   className?: string
@@ -161,7 +163,7 @@ export default function DocumentRepository({
   )
   const visibleFiles = (folder?.files || []).filter(
     (file) =>
-      !inProject || folder?.name.toLowerCase().includes(term) || fileMatches(file),
+      (!focusedFileId || file.id === focusedFileId) && (!inProject || folder?.name.toLowerCase().includes(term) || fileMatches(file)),
   )
 
   // Role scoping already happened: callers pass only what this role may open.
@@ -447,7 +449,7 @@ export default function DocumentRepository({
           ) : (
           <div className="document-reference-list">
             {filesList.view.items.map((file) => (
-              <div className={`document-reference-row${fileDetails ? " document-reference-row-detailed" : ""}`} key={file.id}>
+              <div className={`document-reference-row${fileDetails ? " document-reference-row-detailed" : ""}${focusedFileId === file.id ? " search-result-highlight" : ""}`} key={file.id}>
                 <span className="file-icon">
                   <Icon name="doc" />
                 </span>

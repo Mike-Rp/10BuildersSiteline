@@ -11,6 +11,7 @@ type Props = {
   onClose: () => void
   onOpen: (kind: "project" | "account" | "company", id: string) => void
   onPreview: (doc: Doc) => void
+  onSelect?: (result: WorkspaceResult) => void
 }
 function Match({ text, query }: { text: string; query: string }) {
   const term = query.trim()
@@ -18,7 +19,7 @@ function Match({ text, query }: { text: string; query: string }) {
   return index < 0 ? <>{text}</> : <>{text.slice(0, index)}<mark>{text.slice(index, index + term.length)}</mark>{text.slice(index + term.length)}</>
 }
 
-export default function AdminWorkspaceSearch({ role, state, projectStatuses, onClose, onOpen, onPreview }: Props) {
+export default function AdminWorkspaceSearch({ role, state, projectStatuses, onClose, onOpen, onPreview, onSelect }: Props) {
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState<SearchCategory | "all">("all")
   const [sort, setSort] = useState<"relevance" | "name">("relevance")
@@ -36,6 +37,7 @@ export default function AdminWorkspaceSearch({ role, state, projectStatuses, onC
   const changeCategory = (next: typeof category) => { setCategory(next); setStatus(""); setType(""); setLimit(10) }
   const browsePrompt = category === "all" && !normalizeSearch(query)
   function open(result: WorkspaceResult) {
+    if (onSelect) { onSelect(result); return }
     if (result.doc) { onClose(); onPreview(result.doc); return }
     onOpen(result.category === "projects" ? "project" : result.category === "people" ? "account" : "company", result.id)
   }

@@ -1,3 +1,6 @@
+import { resolveAdminSearchDestination, type AdminSearchDestination } from "./admin-search-destination"
+import type { WorkspaceResult } from "./admin-workspace-search"
+import "./admin-search-destination.css"
 import AdminWorkspaceSearch from "./AdminWorkspaceSearch"
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import EngineerResponsibilities from './EngineerResponsibilities'
@@ -345,6 +348,9 @@ function AppInner() {
   const [toast, setToast] = useState("")
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState("all")
+  const [searchLanding, setSearchLanding] = useState<AdminSearchDestination>()
+  const [projectRepositoryPath, setProjectRepositoryPath] = useState<{ projectId?: string; categoryId?: string; folderId?: string }>({})
+  useEffect(() => { setSearchLanding(undefined); setProjectRepositoryPath({}) }, [actor.id])
   const [subconTab, setSubconTab] = useState("registered")
   const [companyCreatedNotice, setCompanyCreatedNotice] = useState<{ id: string; name: string; verified: boolean; refreshRequired?: boolean }>()
   const [documentsTab, setDocumentsTab] = useState<DocumentsTab>("project")
@@ -642,6 +648,7 @@ function AppInner() {
   }
   // Old page names (stored notification targets, links) open the matching tab of Documents/Directory.
   function navigate(next: string) {
+    setSearchLanding(undefined)
     if (next === "Reports") { setMonthlySummaryOpen(true); return }
     setActiveSitesScheduleFilter("")
     const target = resolveAdminTarget(next)
@@ -653,11 +660,35 @@ function AppInner() {
     navigation.closeMobile()
     setNotifications(false)
   }
+  function focusSearchItems<T extends { id: string }>(items: T[], key: string): T[] {
+    return searchLanding?.listKey === key ? items.filter(item => item.id === searchLanding.recordId) : items
+  }
+  function openSearchResult(result: WorkspaceResult) {
+    if (actor.role !== "admin") return
+    const destination = resolveAdminSearchDestination(state, result)
+    if (!destination) { setToast("This record is no longer available. Refresh your search."); return }
+    navigate(destination.page)
+    if (destination.directoryTab) setDirectoryTab(destination.directoryTab)
+    if (destination.documentsTab) setDocumentsTab(destination.documentsTab)
+    if (destination.subconTab) setSubconTab(destination.subconTab)
+    if (destination.archiveTab) setTab(destination.archiveTab)
+    if (destination.page === "Project intake") { setIntakeLogTab("current"); setIntakeView("all") }
+    setProjectRepositoryPath(destination.repositoryPath || {})
+    updateListQuery(destination.listKey, query => ({ ...query, search: "", filters: {}, page: 1 }))
+    if (destination.repositoryPath) updateListQuery(`admin:documents:files:${destination.recordId}:${destination.repositoryPath.folderId}`, query => ({ ...query, search: "", filters: {}, page: 1 }))
+    setSearchLanding(destination)
+    if (destination.document) {
+      setDialog(destination.recordKind === "company" || (destination.recordKind === "account" && destination.page !== "Documents") ? { kind: destination.dialog, id: destination.recordId } : undefined)
+      previewDoc(destination.document)
+    } else setDialog({ kind: destination.dialog, id: destination.recordId })
+  }
   function selectDocumentsTab(tab: DocumentsTab) {
+    setSearchLanding(undefined)
     resetListState()
     setDocumentsTab(tab)
   }
   function selectDirectoryTab(tab: DirectoryTab) {
+    setSearchLanding(undefined)
     resetListState()
     setDirectoryTab(tab)
   }
@@ -1088,7 +1119,7 @@ function AppInner() {
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
   const intakeCounts = intakeViewCounts(intakeItems, p => intakeGuidance(state, p, actor))
-  const intakeList = runList(intakeLogTab === "history" ? "admin:intake-history" : "admin:intake", intakeItems.filter(p => intakeLogTab === "history" || intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), {
+  const intakeList = runList(intakeLogTab === "history" ? "admin:intake-history" : "admin:intake", focusSearchItems(intakeItems.filter(p => intakeLogTab === "history" || intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), intakeLogTab === "history" ? "admin:intake-history" : "admin:intake"), {
     searchText: projectSearch,
     filters: [
       {
@@ -1127,10 +1158,10 @@ function AppInner() {
     ],
   }
   const engineerPath = engineerQueryString(getListQuery("admin:engineers"))
-  const engineersOnServer = engineerPath !== undefined
+  const engineersOnServer = engineerPath !== undefined && searchLanding?.listKey !== "admin:engineers"
   const serverEngineers = useAccountsPage({
     queryString: engineerPath,
-    enabled: page === "Directory" && directoryTab === "engineers",
+    enabled: page === "Directory" && directoryTab === "engineers" && engineersOnServer,
     refreshKey: state.accounts,
     onClamp: (last) =>
       updateListQuery("admin:engineers", (q) => withPage(q, last)),
@@ -1152,10 +1183,10 @@ function AppInner() {
       )
     : runList(
         "admin:engineers",
-        stableSort(engineers, (a, b) => a.name.localeCompare(b.name), (a) => a.id),
+        stableSort(focusSearchItems(engineers, "admin:engineers"), (a, b) => a.name.localeCompare(b.name), (a) => a.id),
         engineersConfig,
       )
-  const engineerDocsList = runList("admin:engineer-docs", engineers, {
+  const engineerDocsList = runList("admin:engineer-docs", focusSearchItems(engineers, "admin:engineer-docs"), {
     searchText: accountSearch,
     filters: [
       { ...roleFilter_, options: roleFilter_.options!.filter((o) => o.value !== "client") },
@@ -1168,7 +1199,7 @@ function AppInner() {
     ).length
   const companiesList = runList(
     "admin:companies",
-    state.companies.filter((c) => c.status === "approved"),
+    focusSearchItems(state.companies.filter((c) => c.status === "approved"), "admin:companies"),
     {
       searchText: (c) => `${c.name} ${c.contact} ${c.email}`,
       filters: [
@@ -1201,7 +1232,7 @@ function AppInner() {
   const teamAlerts = new Set(teamLicenseItems.map(item => item.id))
   const teamList = runList(
     "admin:team",
-    state.accounts.filter((a) => a.status !== "deactivated"),
+    focusSearchItems(state.accounts.filter((a) => a.status !== "deactivated"), "admin:team"),
     {
       searchText: (a) =>
         `${a.name} ${a.email} ${a.scope.join(" ")} ${a.status}`,
@@ -1387,7 +1418,7 @@ function AppInner() {
   function subconRequests(status: string) {
     const requestList = runList(
       `admin:subcon-${status}`,
-      state.companies.filter((c) => c.status === status),
+      focusSearchItems(state.companies.filter((c) => c.status === status), `admin:subcon-${status}`),
       {
         searchText: (c) =>
           `${c.name} ${c.contact} ${c.submittedBy || ""} ${projectFor(c.projectId)}`,
@@ -1409,6 +1440,7 @@ function AppInner() {
             <Panel
               key={c.id}
               title={c.name}
+              className={searchLanding?.recordId === c.id ? "search-result-highlight" : undefined}
               actions={<Badge tone={c.status === "pending" ? "amber" : c.status === "approved" ? "green" : "gray"}>{c.status === "pending" ? "Pending Admin verification" : c.status}</Badge>}
             >
               <div className="approval-content">
@@ -1568,7 +1600,7 @@ function AppInner() {
             "Active sites",
           )}
           <ExtensionWorkflow actor={actor} />
-          <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => {
+          <ActiveSites focusedId={searchLanding?.recordKind === "project" ? searchLanding.recordId : undefined} key={`${actor.id}:${activeSitesScheduleFilter}:${searchLanding?.recordId || ""}`} initialScheduleFilter={activeSitesScheduleFilter} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} reviewAvailable projects={active.map(p => {
             const assigned = p.team.find(member => member.phase === p.phase)
             const assignedSpm = state.accounts.find(account => account.id === assigned?.accountId)
             const activities = checklistFor(p)
@@ -1609,8 +1641,8 @@ function AppInner() {
             subtitle={`${intake.length} current intake records · ${intakeHistory.length} completed intake records`}
           >
             <div className="intake-tabs" role="group" aria-label="Intake log view">
-              <button type="button" aria-pressed={intakeLogTab === "current"} onClick={() => setIntakeLogTab("current")}>Current Intake ({intake.length})</button>
-              <button type="button" aria-pressed={intakeLogTab === "history"} onClick={() => setIntakeLogTab("history")}>Intake History ({intakeHistory.length})</button>
+              <button type="button" aria-pressed={intakeLogTab === "current"} onClick={() => { setSearchLanding(undefined); setIntakeLogTab("current") }}>Current Intake ({intake.length})</button>
+              <button type="button" aria-pressed={intakeLogTab === "history"} onClick={() => { setSearchLanding(undefined); setIntakeLogTab("history") }}>Intake History ({intakeHistory.length})</button>
             </div>
             {intakeLogTab === "current" && <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />}
             <ListSection
@@ -1619,7 +1651,7 @@ function AppInner() {
               noun="record"
               render={(items) => intakeLogTab === "history"
                 ? <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={p => setDialog({ kind: "intake-record", id: p.id })} onOpenActive={p => { navigate("Active sites"); setDialog({ kind: "project", id: p.id }) }} />
-                : <AdminIntakeCards state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} />}
+                : <AdminIntakeCards highlightedId={searchLanding?.recordId} state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} />}
               empty={<Empty title={intakeLogTab === "history" ? "No completed intake records" : !intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>{intakeLogTab === "history" ? "Activated projects remain here for reference. Ongoing monitoring is available in Active Sites." : "Existing intake records appear here as projects move through setup."}</Empty>}
             />
           </Panel>
@@ -1628,6 +1660,10 @@ function AppInner() {
     const projectDocumentsTab = () => (
         <>
           <DocumentRepository
+            key={searchLanding?.document?.id || "repository"}
+            focusedFileId={searchLanding?.repositoryPath?.folderId === projectRepositoryPath.folderId ? searchLanding?.document?.id : undefined}
+            path={projectRepositoryPath}
+            onPathChange={setProjectRepositoryPath}
             listKey="admin:documents"
             recentKey={actor.id}
             projects={state.projects.map((project) => ({
@@ -1662,7 +1698,7 @@ function AppInner() {
                 <div className="folder-grid">
                   {items.map((a) => (
                     <button
-                      className="folder-card"
+                      className={`folder-card ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""}`}
                       key={a.id}
                       onClick={() =>
                         setDialog({ kind: "engineer-docs", id: a.id })
@@ -1738,7 +1774,7 @@ function AppInner() {
                 <div className="engineer-grid">
                   {items.map((a) => (
                     <button
-                      className={`engineer-card ${a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) ? "engineer-needs-credentials" : ""}`}
+                      className={`engineer-card ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""} ${a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) ? "engineer-needs-credentials" : ""}`}
                       key={a.id}
                       onClick={() => setDialog({ kind: "account", id: a.id })}
                     >
@@ -1811,7 +1847,7 @@ function AppInner() {
                   tabs[next]?.focus()
                   tabs[next]?.click()
                 }}
-                onClick={() => setSubconTab(v)}
+                onClick={() => { setSearchLanding(undefined); setSubconTab(v) }}
               >
                 {l}
               </button>
@@ -1838,7 +1874,7 @@ function AppInner() {
                       ),
                     )
                     return (
-                      <div className="company-card-shell" key={c.id}>
+                      <div className={`company-card-shell ${searchLanding?.recordId === c.id ? "search-result-highlight" : ""}`} key={c.id}>
                       <button
                         className="company-card"
                         onClick={() => setDialog({ kind: "company", id: c.id })}
@@ -2013,7 +2049,7 @@ function AppInner() {
                 </thead>
                 <tbody>
                   {teamList.view.items.map((a) => (
-                      <tr key={a.id} className={teamAlerts.has(a.id) ? "team-needs-attention" : undefined}>
+                      <tr key={a.id} className={`${teamAlerts.has(a.id) ? "team-needs-attention" : ""} ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""}`}>
                         <td data-label="Person">
                           <button
                             className="person-cell clickable"
@@ -2098,12 +2134,12 @@ function AppInner() {
       const deactivated = state.accounts.filter(
         (a) => a.status === "deactivated",
       )
-      const archiveList = runList(`admin:archive-${tab}`, archived, {
+      const archiveList = runList(`admin:archive-${tab}`, focusSearchItems(archived, `admin:archive-${tab}`), {
         searchText: projectSearch,
         filters: [typeFilter(archived), ...dateFilters<Project>(closedDate, "Closed")],
       })
       const accountArchive = (key: string, items: Account[]) =>
-        runList(key, items, {
+        runList(key, focusSearchItems(items, key), {
           searchText: (a) => `${a.name} ${a.email} ${ROLE_NAMES[a.role]}`,
           filters: [roleFilter_],
         })
@@ -2131,7 +2167,7 @@ function AppInner() {
                 <button
                   key={v}
                   className={tab === v ? "active" : ""}
-                  onClick={() => setTab(v)}
+                  onClick={() => { setSearchLanding(undefined); setTab(v) }}
                 >
                   {l}
                 </button>
@@ -2216,7 +2252,7 @@ function AppInner() {
                   render={(items) => (
                 <>
                 {items.map((a) => (
-                  <div className="archive-account" key={a.id}>
+                  <div className={`archive-account ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""}`} key={a.id}>
                     <strong>{a.name}</strong>
                     <span>{ROLE_NAMES[a.role]}</span>
                     <Status status={a.status} />
@@ -2236,7 +2272,7 @@ function AppInner() {
                 list={archiveList}
                 placeholder="Search archived projects"
                 noun="record"
-                render={(items) => <ArchiveProjectCards projects={items} closedDate={closedDate} onOpen={p => setDialog({ kind: "project", id: p.id })} />}
+                render={(items) => <ArchiveProjectCards highlightedId={searchLanding?.recordId} projects={items} closedDate={closedDate} onOpen={p => setDialog({ kind: "project", id: p.id })} />}
                 empty={<p className="compact-empty">No records in this archive category.</p>}
               />
             )}
@@ -3181,6 +3217,12 @@ function AppInner() {
             </span>
           </div>
           <AdminRecoveryNotice onManage={()=>{setSecurityTab('codes');setSecurityOpen(true)}}/>
+          {searchLanding && <div className="search-landing-notice" role="status">
+            <Icon name="search" size={20} />
+            <div><strong>Opened from search: {searchLanding.document?.name || searchLanding.name}</strong><p>{searchLanding.page}{searchLanding.directoryTab === "subcontractors" ? " · Subcontractors" : searchLanding.directoryTab === "engineers" ? " · Engineers" : ""} · {searchLanding.document ? searchLanding.name : "Showing the selected record"}</p></div>
+            <Button onClick={() => { if (searchLanding.document) previewDoc(searchLanding.document); else setDialog({ kind: searchLanding.dialog, id: searchLanding.recordId }) }}>View {searchLanding.document ? "document" : "details"}</Button>
+            <Button onClick={() => { setSearchLanding(undefined); setProjectRepositoryPath({}) }}>Show all records</Button>
+          </div>}
           {renderPage()}
         </main>
       </div>
@@ -3360,7 +3402,7 @@ function AppInner() {
         <AdminWorkspaceSearch role={actor.role} state={state} projectStatuses={STATUS}
           onClose={() => setDialog(undefined)}
           onOpen={(kind, id) => setDialog({ kind, id })}
-          onPreview={previewDoc} />
+          onPreview={previewDoc} onSelect={openSearchResult} />
       )}
       {dialog?.kind === "help" && (
         <Modal

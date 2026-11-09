@@ -32,6 +32,7 @@ const progressValue = (project: SiteCard, overallOnly: boolean) => {
 }
 
 export default function ActiveSites({
+  focusedId,
   projects,
   onOpen,
   renderActions,
@@ -44,6 +45,7 @@ export default function ActiveSites({
   overallOnly = false,
   showAllStatuses = false,
 }: {
+  focusedId?: string
   projects: SiteCard[]
 
   onOpen: (id: string) => void
@@ -86,6 +88,7 @@ export default function ActiveSites({
       displayedProjects
         .filter(
           (p) =>
+            (!focusedId || p.id === focusedId) &&
             (selectedTab === "all" || p.needsReview === true) &&
             (!showAllStatuses || statusFilter === "all" || p.status === statusFilter) &&
             (!scheduleFilter || projectScheduleStatus(p, reportingDate).status === "Delayed") &&
@@ -107,7 +110,7 @@ export default function ActiveSites({
 
           return a.name.localeCompare(b.name)
         }),
-    [displayedProjects, query, type, phase, statusFilter, showAllStatuses, selectedTab, sort, scheduleFilter, reportingDate, overallOnly],
+    [displayedProjects, focusedId, query, type, phase, statusFilter, showAllStatuses, selectedTab, sort, scheduleFilter, reportingDate, overallOnly],
   )
 
   const pages = Math.max(1, Math.ceil(filtered.length / size))
@@ -306,7 +309,7 @@ export default function ActiveSites({
       </div>
       {layout === "cards" ? <div className="as-grid">
         {visible.map((p) => (
-          <article className="as-card" key={p.id}>
+          <article className={`as-card ${focusedId === p.id ? "search-result-highlight" : ""}`} key={p.id}>
             <div className="as-card-body">
               <div className="as-card-heading">
                 <span className="as-type">{p.type}</span>
@@ -365,7 +368,7 @@ export default function ActiveSites({
         <thead><tr><th>Project</th><th>Current phase</th><th>Schedule status</th><th>Target completion</th><th>Details</th></tr></thead>
         <tbody>{visible.map(p => {
           const schedule = projectScheduleStatus(p, reportingDate)
-          return <tr key={p.id}><th scope="row">{p.name}</th><td><div className="as-current-phase-status"><Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} /><span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span></div></td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
+          return <tr key={p.id} className={focusedId === p.id ? "search-result-highlight" : undefined}><th scope="row">{p.name}</th><td><div className="as-current-phase-status"><Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} /><span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span></div></td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
         })}</tbody>
       </table></div></div>}
       {!visible.length && (

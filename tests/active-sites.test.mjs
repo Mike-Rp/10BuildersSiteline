@@ -326,6 +326,19 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
     assert.equal(document.querySelector(".as-review"), null)
     assert.equal(cards().length, 1)
 
+    // A search destination reveals a record past page one without dropping it
+    // from the supplied project set or changing the normal browse afterward.
+    await act(() => root.render(React.createElement(ActiveSites, {
+      key: "search-focus", projects, focusedId: projects[projects.length - 1].id, onOpen: () => {},
+    })))
+    assert.equal(cards().length, 1)
+    assert.ok(cards()[0].classList.contains("search-result-highlight"))
+    assert.match(cards()[0].textContent, new RegExp(projects[projects.length - 1].name))
+    await act(() => root.render(React.createElement(ActiveSites, {
+      key: "search-cleared", projects, onOpen: () => {},
+    })))
+    assert.ok(cards().length > 1)
+
   } finally {
     await act(() => root.unmount())
 

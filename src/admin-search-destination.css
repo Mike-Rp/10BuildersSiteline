@@ -1,0 +1,5 @@
+.search-landing-notice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 18px; border: 1px solid #8bb4dc; border-radius: 10px; background: #edf5ff; color: #193b59; }
+.search-landing-notice > div { flex: 1; min-width: 180px; overflow-wrap: anywhere; }
+.search-landing-notice p { margin-top: 3px; font-size: 13px; color: var(--color-muted); }
+#root .search-result-highlight { outline: 2px solid #5285af; outline-offset: -2px; background-color: #f0f6ff; }
+@media (max-width: 540px) { .search-landing-notice { padding: 12px; gap: 8px; } }
