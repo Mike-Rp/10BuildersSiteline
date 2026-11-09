@@ -9,6 +9,64 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
+test("SPM Assignments badge matches its projects even when responses are blocked", async () => {
+  await withUi(async ({ React, root, server, w, click }) => {
+    const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
+    const state = activeFixture(), original = currentProject(state)
+    state.projects = [
+      { ...structuredClone(original), id: "first-assignment", name: "First Assignment", status: "pending" },
+      { ...structuredClone(original), id: "second-assignment", name: "Second Assignment", status: "pending", opmAccepted: false },
+    ]
+    const actor = state.accounts.find(account => account.id === "a4")
+    actor.expiry = "2099-01-01"
+    await React.act(() => root.render(React.createElement(Workspace, {
+      state, actor, onCommand() {}, onRead() {}, onMute() {}, onReload() {}, paused: false,
+      onResume() {}, onPause() {}, idleWarning: false, onStayActive() {},
+    })))
+    await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
+    const assignments = () => [...document.querySelectorAll('[aria-label="Active Sites views"] [role="tab"]')].find(button => button.textContent.includes("Assignments"))
+    assert.match(assignments().textContent, /Assignments\s*2/)
+    await click(assignments())
+    assert.equal(document.querySelectorAll('.as-card').length, 2)
+    const search = document.querySelector('.active-sites input')
+    await React.act(() => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value').set.call(search, 'First Assignment')
+      search.dispatchEvent(new w.Event('input', { bubbles: true }))
+    })
+    assert.equal(document.querySelectorAll('.as-card').length, 1)
+    assert.match(assignments().textContent, /Assignments\s*2/, "badge counts all assigned projects before panel filters")
+  })
+})
+
+test("client subcontractor activation is enabled after acknowledgment on allocation-version projects", async () => {
+  await withUi(async ({ React, root, server, click, button }) => {
+    const { default: LeadPanel } = await server.ssrLoadModule("/src/LeadSubcontractorPanel.tsx")
+    const state = activeFixture(), project = currentProject(state)
+    project.status = "pending"
+    project.workflow.activation = undefined
+    project.subcontractorAllocationVersion = 1
+    project.clientSubcon = "Client Company"
+    project.clientSubconReview = { acknowledgedById: "a4", acknowledgedBy: "Lead Site PM", acknowledgedAt: "2026-11-05T15:40:00Z", issues: [] }
+    project.team = PROJECT_PHASE_DEFINITIONS.Residential.map(({ name, disciplines }, sequence) => ({ phase: name, requiredDisciplines: disciplines, sequence, accountId: sequence === 0 ? "a4" : "a5", status: "confirmed" }))
+    const actor = state.accounts.find(account => account.id === "a4")
+    let commands = 0
+    await React.act(() => root.render(React.createElement(LeadPanel, {
+      state, project, actor, onAction(command) { assert.equal(command.type, "activate_project"); commands++; return true },
+      onCrew() {}, onNewCompany() {}, onPreview() {}, onActivated() {}, onOpenActive() {},
+    })))
+    assert.equal(document.querySelector('.activation-count').textContent.trim(), "5 of 5 Passed")
+    assert.match(document.querySelector('.lead-activation-panel .badge').textContent, /Ready to activate/)
+    assert.ok(!document.querySelector('.activation-checklist').textContent.includes('Signed Site PM'))
+    const activate = button("Activate Project & Move to Active Sites")
+    assert.equal(activate.disabled, false)
+    await click(activate)
+    const confirm = document.querySelector('[role="dialog"] .modal-actions .primary')
+    assert.ok(confirm)
+    await click(confirm)
+    assert.equal(commands, 1)
+  })
+})
+
 test("workspace saves prevent duplicate requests, retain failed notes, and allow retry", async () => {
   await withUi(async ({ React, root, server, w, click, button }) => {
     const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")

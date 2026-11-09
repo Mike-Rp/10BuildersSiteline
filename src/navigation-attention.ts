@@ -2,7 +2,7 @@ import { adminDashboardOverview } from "./admin-dashboard.ts"
 import { hasPendingSiteReview } from "./active-sites-review.ts"
 import { intakeGuidance, intakeViewCounts, isIntake } from "./intake-guidance.ts"
 import type { Account, State } from "./model.ts"
-import { assignmentBlock, checklistFor, officePmStage, ownedProjects, workflowFor } from "./workflows.ts"
+import { checklistFor, officePmStage, ownedProjects, workflowFor } from "./workflows.ts"
 
 export type NavigationAttention = Record<string, { count: number; description: string }>
 
@@ -42,8 +42,10 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
   }
   return {
     Assignments: {
-      count: projects.filter(project => !assignmentBlock(project, actor.id) && project.team.some(row => row.accountId === actor.id && row.status === "pending")).length,
-      description: "projects requiring your phase assignment response",
+      // The Assignments tab displays all owned projects, including upcoming,
+      // accepted and additional-engineer assignments, not just response tasks.
+      count: projects.length,
+      description: "projects in your assignments",
     },
     "Active sites": { count: active.filter(hasPendingSiteReview).length, description: "assigned projects awaiting Office PM review" },
   }

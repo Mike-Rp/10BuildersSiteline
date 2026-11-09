@@ -78,13 +78,30 @@ test("Office PM badges separate actionable confirmations, documents and review i
   assert.equal(refreshed.Documents.count,2)
 })
 
-test("Site PM badges respect independent assignments and lead gates; client gets no staff queues", () => {
+test("Site PM Assignments counts every project in the panel; client gets no staff queues", () => {
   const state = emptyState()
   state.projects = [project("response",{status:"pending",team:[{phase:"Mobilization",accountId:"spm",status:"pending"}]}),project("blocked",{status:"pending",opmAccepted:false,team:[{phase:"Mobilization",accountId:"spm",status:"pending"}]}),project("review",{workflow:{pendingUpdate:{},pendingRework:{}}}),project("other",{team:[{phase:"Mobilization",accountId:"other",status:"pending"}],workflow:{pendingUpdate:{}}})]
-  assert.equal(navigationAttention(state,actor("spm")).Assignments.count,1)
+  assert.equal(navigationAttention(state,actor("spm")).Assignments.count,3)
   assert.equal(navigationAttention(state,actor("spm"))["Active sites"].count,1)
   assert.equal(navigationAttention(state,actor("spm","other"))["Active sites"].count,1)
   assert.equal(navigationAttention(state,actor("spm","unassigned")).Assignments.count,0)
   assert.equal(navigationAttention(state,actor("spm","unassigned"))["Active sites"].count,0)
   assert.deepEqual(navigationAttention(state,actor("client")),{})
+})
+
+test("Assignments counts projects once across phases and includes additional engineers and activation work", () => {
+  const state = emptyState()
+  state.projects = [
+    project("agreement", { status: "pending" }),
+    project("waiting", { status: "pending", opmAccepted: false, docs: [] }),
+    project("additional", { team: [
+      { phase: "Mobilization", accountId: "lead", status: "confirmed", engineers: [{ accountId: "spm", status: "confirmed" }] },
+      { phase: "Foundation", accountId: "spm", status: "confirmed" },
+    ] }),
+    project("completed", { status: "completed" }),
+    project("unrelated", { team: [{ phase: "Mobilization", accountId: "other", status: "pending" }] }),
+  ]
+  assert.equal(navigationAttention(state, actor("spm")).Assignments.count, 4)
+  state.projects = state.projects.filter(project => project.id !== "waiting")
+  assert.equal(navigationAttention(state, actor("spm")).Assignments.count, 3)
 })

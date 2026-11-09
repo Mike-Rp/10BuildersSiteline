@@ -313,7 +313,7 @@ function LegacyLeadSubcontractorPanel({
                 label: "Review assigned subcontractor",
                 complete: !!review.acknowledgedAt,
               },
-              { label: "Sign & activate", complete: active },
+              { label: "Activate project", complete: active },
             ]
           : [
               { label: "Contact a subcontractor", complete: !!current },
@@ -888,11 +888,11 @@ function LegacyLeadSubcontractorPanel({
               ? "Project active"
               : clientOwned && checks.every((c) => c.passed)
                 ? "Ready to activate"
+              : clientOwned
+                ? responsesComplete ? "Awaiting activation requirements" : "Awaiting your acknowledgment"
                 : responsesComplete
                   ? "Ready for signed agreement"
-                  : clientOwned
-                    ? "Awaiting your acknowledgment"
-                    : "Awaiting subcontractor acceptance"}
+                  : "Awaiting subcontractor acceptance"}
           </Badge>
         </div>
         {clientOwned && (

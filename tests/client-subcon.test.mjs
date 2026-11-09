@@ -27,6 +27,27 @@ function ready() {
 }
 const sub = (s) => currentProject(s).clientSubconReview
 
+test("acknowledged client subcontractors activate despite newer allocation metadata", () => {
+  for (const allocation of [undefined, { revision: 1, companyIds: [], scopes: [] }]) {
+    let state = ready()
+    const project = currentProject(state)
+    project.subcontractorAllocationVersion = 1
+    if (allocation) project.subcontractorAllocation = allocation
+    assert.throws(() => execute(state, "a4", { type: "activate_project" }), /prerequisites are incomplete/)
+    state = execute(state, "a4", { type: "acknowledge_client_subcon" })
+    const checks = activationChecks(state, currentProject(state))
+    assert.equal(checks.length, 5)
+    assert.ok(checks.every(check => check.passed))
+    assert.ok(!checks.some(check => check.id === "agreement"))
+    assert.throws(() => execute(state, "a5", { type: "activate_project" }), /Lead Site PM/)
+    assert.throws(() => execute(state, "a4", { type: "upload_agreement", doc: evidence("duplicate.pdf") }), /No second agreement upload/)
+    const activated = execute(state, "a4", { type: "activate_project" })
+    assert.equal(currentProject(activated).status, "active")
+    assert.equal(currentProject(activated).workflow.activation.byId, "a4")
+    assert.ok(currentProject(activated).docs.some(doc => doc.label === "Client & Subcontractor Agreement" && doc.uploaded))
+  }
+})
+
 test("client company details can be reviewed without an agreement on new allocation-version projects",()=>{
   const state=ready(), p=currentProject(state)
   p.docs=p.docs.filter(doc=>doc.label!=="Client & Subcontractor Agreement")

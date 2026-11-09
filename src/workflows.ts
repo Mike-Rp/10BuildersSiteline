@@ -400,7 +400,9 @@ export function activationChecks(state: State, p: Project) {
   const agreement = p.docs.some((d) => d.label === DOC_LABELS[6] && d.uploaded)
   const clientReady =
     !!client && ["active", "invited", "pending-setup"].includes(client.status)
-  const own = !!p.clientSubcon && !p.subcontractorAllocation && p.subcontractorAllocationVersion !== 1
+  // Client-provided companies keep their acknowledgment/activation workflow,
+  // even when the project carries the newer allocation version or metadata.
+  const own = !!p.clientSubcon
   return [
     {
       id: "office",
@@ -968,7 +970,7 @@ export function applyWorkflow(
     type = "request",
     target = "Assignments",
   ) => event(next, p, actor.id, title, detail, type, target, undefined, now)
-  if (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1) {
+  if (!p.clientSubcon && (p.subcontractorAllocation || p.subcontractorAllocationVersion === 1)) {
     assert(!["select_company", "replace_company", "archive_company", "activate_project"].includes(command.type), "Use the trade allocation plan and signed agreement workflow.")
     if (command.type === "upload_agreement") assert(command.allocationRevision === p.subcontractorAllocation?.revision, "The allocation changed. Refresh the project.")
   }
@@ -1573,7 +1575,7 @@ export function applyWorkflow(
     case "upload_agreement": {
       assertLead(p, actor)
       assert(
-        !p.clientSubcon || !!p.subcontractorAllocation,
+        !p.clientSubcon,
         "Client-provided subcontractor projects are activated with Activate Project. No second agreement upload is needed.",
       )
       requireDoc(command.doc)
