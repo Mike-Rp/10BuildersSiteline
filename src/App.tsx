@@ -2931,10 +2931,7 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage key={loginPortal} portal={loginPortal} onPortalChange={portal => {
-      window.history.replaceState({ ...window.history.state, loginPortal: portal }, "")
-      setLoginPortal(portal)
-    }} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
+    return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)

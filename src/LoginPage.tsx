@@ -14,14 +14,12 @@ export default function LoginPage({
   workspaceRole,
   sessionMessage,
   portal = "client",
-  onPortalChange,
   onSignIn,
 }: {
   checkingSession?: boolean
   workspaceRole?: Role
   sessionMessage?: string
   portal?: LoginPortal
-  onPortalChange?: (portal: LoginPortal) => void
   onSignIn: (email: string, password: string, replaceSession?: boolean) => Promise<void>
 }) {
   const [resetOpen, setResetOpen] = useState(false)
@@ -165,11 +163,6 @@ export default function LoginPage({
               <h1>{admin ? "Administrator sign-in" : staff ? "Staff sign-in" : "Welcome to 10BuildLine"}</h1>
               <p>{admin ? "Use your administrator account to manage the 10BuildLine workspace." : staff ? "For Office PMs and Site PMs." : "Sign in to follow your project’s progress, updates, and shared documents."}</p>
             </div>
-
-            {internal && <nav className="login-role-selector" aria-label="Staff and administrator sign-in">
-              <a href="/login" aria-label="Staff sign-in" aria-current={staff ? "page" : undefined} onClick={event => { event.preventDefault(); if (!loading) onPortalChange?.("staff") }}>Staff</a>
-              <a href="/login" aria-label="Administrator sign-in" aria-current={admin ? "page" : undefined} onClick={event => { event.preventDefault(); if (!loading) onPortalChange?.("admin") }}>Admin</a>
-            </nav>}
 
             <form className="login-form" onSubmit={submit} noValidate>
               {(deviceNotice || sessionMessage) && <p className="notice" role="status">{deviceNotice || sessionMessage}</p>}
