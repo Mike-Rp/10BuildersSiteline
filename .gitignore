@@ -23,3 +23,9 @@ logs/
 
 # Local frontend snapshot; not backend source.
 /Thesis-Backend/10BuildersSiteline-office-pm-and-documents/
+
+# Backups, keys and backup settings never belong in the repository
+*.pem
+*.dump
+*.dump.enc
+backup.env

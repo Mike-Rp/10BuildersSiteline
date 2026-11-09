@@ -2076,7 +2076,7 @@ export function SettingsForm({
           {remindersError && <p className="error" role="alert">{remindersError}</p>}
           {remindersSaved && <p role="status">License renewal reminder days saved.</p>}
         </div>
-        <div className="rule-row refresh-rule-row">
+        <div className="rule-row reminder-rule-row refresh-rule-row">
           <div>
             <h3>Data refresh interval</h3>
             <p>How often open screens re-read data from the database. Shorter intervals use more of the monthly data allowance, so choose 15 seconds only for a live demonstration and switch back afterwards.</p>
