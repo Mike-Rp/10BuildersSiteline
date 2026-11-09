@@ -203,14 +203,21 @@
   width: 100%;
   padding-inline: 8px;
 }
-#root .app-shell .panel > .pagination.compact { width: min(calc(100% - 36px), 360px); }
+#root .app-shell .panel > .pagination.compact {
+  width: min(calc(100% - 36px), 360px);
+  margin-inline: auto;
+}
 #root .app-shell :is(.pagination-status, .pagination-mini, .history-pagination > span, .spm-history-pagination > span) {
   min-width: 0;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-#root .app-shell .pagination-pages { justify-content: center; gap: 8px; }
+#root .app-shell .pagination-pages {
+  justify-content: center;
+  margin-inline: auto;
+  gap: 8px;
+}
 #root .app-shell .explorer-card { grid-template-rows: 1fr auto; align-content: stretch; }
 #root .app-shell .explorer-card-footer {
   display: grid;
