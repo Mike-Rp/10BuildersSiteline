@@ -22,6 +22,8 @@ import { mirrorLegacyNotifications, mirrorLegacyReads } from "../notifications/n
 import { monthlyReport, exportMonthlyReport, monthlySummary, exportMonthlySummary } from "../reports/controller.js";
 import { snapshotProjectChecklists } from "../progress/verified.utility.js";
 import { validateUpload } from "./upload-policy.utility.js";
+import { completeStorageUpload, requestUploadTarget } from "../storage/stored-file.utility.js";
+import { openObject, pipeObject } from "../storage/storage.service.js";
 import { readManpowerFile, registerCompany, withdrawCompanyRequest } from "./manpower-import.utility.js";
 import { assertPhaseCoverage } from "../projects/phase-coverage.utility.js";
 import { companyRemovalReadiness, removeCompany } from "./company-removal.utility.js";
@@ -98,7 +100,9 @@ async function file(db, user, id, purpose = "document") {
     const row = (await db.query("select * from stored_files where id=$1", [id])).rows[0];
     if (!row || !(user.role === "admin" || row.uploaded_by === user.id))
         throw new HttpError(404, "Uploaded file not found.");
-    await validateUpload(row, purpose);
+    // Storage-backed files were already type-checked when the upload completed; their bytes are not in the database.
+    if (!row.storage_path)
+        await validateUpload(row, purpose);
     return row;
 }
 async function linkDocument(db, user, p, code, fileId) {
@@ -417,6 +421,11 @@ router.post("/files/:id/complete", endpoint(["admin", "opm", "spm"], async (db, 
     await db.query("delete from stored_file_upload_chunks where upload_id=$1 and user_id=$2", [id, user.id]);
     return { id, download_url: "/api/v1/files/" + id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
 }));
+// Direct-to-storage uploads: the browser sends the file straight to a private bucket,
+// so it never passes through the serverless function and its 4.5 MB request cap.
+router.post("/files/upload-url", endpoint(["admin", "opm", "spm"], (db, user, req) => requestUploadTarget(db, user, req.body || {})));
+router.post("/files/:id/complete-storage", endpoint(["admin", "opm", "spm"], (db, user, req) =>
+    completeStorageUpload(db, user, { ...(req.body || {}), id: req.params.id })));
 router.post("/subcontractors/registrations", endpoint(["admin"], async (db, user, req) => {
     if (user.role === "spm") await assertLicenseActive(user, db);
     const saved = await registerCompany(db, user, req.body, file);
@@ -467,8 +476,12 @@ router.get("/files/:id/content", async (req, res) => {
                 }
             }
         });
+        // Open the object before setting headers, so a missing file still returns a clean JSON error.
+        const opened = row.storage_path ? await openObject(row.storage_bucket, row.storage_path) : null;
         res.type(row.content_type).set("Cache-Control", "private, no-store");
         res.set("Content-Disposition", "inline; filename*=UTF-8''" + encodeURIComponent(row.original_name));
+        if (opened)
+            return await pipeObject(res, opened);
         res.send(row.content);
     }
     catch (error) {

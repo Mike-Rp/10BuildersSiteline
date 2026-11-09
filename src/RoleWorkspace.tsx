@@ -1860,6 +1860,7 @@ export default function RoleWorkspace({
                   {["missing","rework_required"].includes(item.status) && (
                     <Upload
                       label={item.label}
+                      storageKind="evidence"
                       owner={actor.name}
                       buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
@@ -1902,6 +1903,7 @@ export default function RoleWorkspace({
                 </div>
                 <Upload
                   label="General field evidence"
+                  storageKind="evidence"
                   owner={actor.name}
                   onSave={setEvidence}
                 />
@@ -2030,6 +2032,7 @@ export default function RoleWorkspace({
             <h3>Site photo gallery</h3>
             <Upload
               label="Site photo (pending client release)"
+              storageKind="photo"
               buttonLabel="Upload site photo"
               disabled={saving}
               owner={actor.name}

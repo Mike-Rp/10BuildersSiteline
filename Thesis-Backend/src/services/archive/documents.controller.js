@@ -3,6 +3,7 @@ import path from "node:path";
 import execute from "../../common/utilities/query.utility.js";
 import { requireUser,handleError,sendOk,sendError,HttpError,isUuid } from "../../common/utilities/access.utility.js";
 import { archiveProjectAccess } from "./audit.utility.js";
+import { openObject, pipeObject } from "../storage/storage.service.js";
 
 const readDb={query:execute};
 async function documentActor(req,res) {
@@ -41,12 +42,14 @@ export const downloadArchiveFile = async (req,res) => {
     if(!isUuid(req.params.fileId)) return sendError(res,"Invalid file id.",400);
     const kind=req.params.kind,id=req.params.fileId,project=req.params.id;
     if(kind==="phase-files") {
-      const found=await execute("SELECT original_name,content_type,content FROM project_phase_files WHERE id=$1 AND project_id=$2",[id,project]);
+      const found=await execute("SELECT original_name,content_type,content,to_jsonb(f)->>'storage_bucket' AS storage_bucket,to_jsonb(f)->>'storage_path' AS storage_path FROM project_phase_files f WHERE id=$1 AND project_id=$2",[id,project]);
       if(!found.rowCount) return sendError(res,"File not found.",404);
       const f=found.rows[0];
+      const opened=f.storage_path ? await openObject(f.storage_bucket,f.storage_path) : null;
       res.set("Content-Type",f.content_type);
       res.set("Content-Disposition",`attachment; filename*=UTF-8''${encodeURIComponent(f.original_name)}`);
       res.set("Cache-Control","private, no-store");res.set("X-Content-Type-Options","nosniff");
+      if(opened) return await pipeObject(res,opened);
       return res.send(f.content);
     }
     let found;

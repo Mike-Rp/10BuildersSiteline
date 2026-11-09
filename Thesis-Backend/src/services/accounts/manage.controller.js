@@ -237,7 +237,8 @@ async function insertAccountRecord(client, actor, body) {
       const stored = (await client.query("select * from stored_files where id=$1 for update", [credential.file_id])).rows[0];
       if (!stored || stored.uploaded_by !== actor.id || stored.purpose !== "upload" || stored.project_id)
         throw new HttpError(404, "Available credential upload not found. Upload a new document.");
-      await validateUpload(stored, "document");
+      // Storage-backed files were type-checked when the upload completed.
+      if (!stored.storage_path) await validateUpload(stored, "document");
       if (!["application/pdf", "image/jpeg", "image/png"].includes(stored.content_type))
         throw new HttpError(400, "Credential documents must be PDF, JPG or PNG.");
       await client.query("update stored_files set user_id=$2,purpose='account' where id=$1", [stored.id, userId]);

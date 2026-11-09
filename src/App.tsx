@@ -2781,6 +2781,7 @@ function AppInner() {
                   <Upload
                     disabled={a.status === "deactivated"}
                     label="Employment Contract"
+                    storageKind="credential"
                     onSave={(d) => addAccountDoc(a, d)}
                   />
                 )}

@@ -11,7 +11,8 @@ import {
 } from "../../common/utilities/access.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { assertLicenseActive } from "../../common/utilities/license-gate.utility.js";
-import { insertFile } from "./phase-upload.utility.js";
+import { insertFile, insertFileFromStored } from "./phase-upload.utility.js";
+import { openObject, pipeObject } from "../storage/storage.service.js";
 import { submitChecklist } from "./phase-submission.utility.js";
 import { assertAssignmentWritable, phaseAssignments, multiSpmInstalled } from "./assignment.utility.js";
 import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
@@ -278,9 +279,15 @@ export const uploadPhaseFile = async (req, res) => {
       const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id, p.id);
       await assertPhaseUnlocked(client, p, stage.id);
       await assertAssignmentWritable(client,req.user,p,stage.id);
+      // A JSON body with file_id references a file that was already uploaded (directly to
+      // storage or in chunks), so a large file never has to be re-sent through this request.
+      const storedId = req.file ? undefined : req.body?.file_id;
       return projectRequest(client,p.id,req.user.id,req.body?.request_id,'phase-file',
-        {stage_id:stage.id,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},
-        ()=>insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id));
+        storedId ? {stage_id:stage.id,file_id:storedId}
+          : {stage_id:stage.id,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},
+        ()=>storedId
+          ? insertFileFromStored(client, { ...p, current_stage_id: stage.id }, storedId, req.user.id)
+          : insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id));
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -294,15 +301,19 @@ export const downloadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       await phaseProject(client, user, req.params.id);
       const file = await client.query(
-        `SELECT original_name, content_type, content FROM project_phase_files
+        `SELECT original_name, content_type, content,
+                to_jsonb(f)->>'storage_bucket' AS storage_bucket, to_jsonb(f)->>'storage_path' AS storage_path
+           FROM project_phase_files f
           WHERE id = $1 AND project_id = $2`, [req.params.fileId, req.params.id]);
       if (!file.rowCount) throw new HttpError(404, "File not found.");
       return file.rows[0];
     });
+    const opened = data.storage_path ? await openObject(data.storage_bucket, data.storage_path) : null;
     res.set("Content-Type", data.content_type);
     res.set("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(data.original_name)}`);
     res.set("X-Content-Type-Options", "nosniff");
     res.set("Cache-Control", "private, no-store");
+    if (opened) return await pipeObject(res, opened);
     return res.send(data.content);
   } catch (error) { return handleError(res, error); }
 };

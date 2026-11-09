@@ -1,6 +1,8 @@
 import {useEffect,useState,useRef} from 'react'
+import {uid} from './model'
 import type {Account,Project} from './model'
 import {api,downloadBlob} from './api/client'
+import {uploadFile} from './api/actions'
 import {Button} from './ui'
 import './phase-engineers.css'
 type Responsibility={id:string;user_id:string;name:string;phase:string;project_stage_id:number;assigned_disciplines:string[];status:string;completion_status:string;completion_note?:string;completion_file_id?:string;review_note?:string;offer_deadline_at?:string;complete?:boolean;progress?:number;requirements?:number;approved?:number;missing?:{title:string;status:string}[];replacement_candidates?:{id:string;name:string}[]}
@@ -17,8 +19,10 @@ export default function EngineerResponsibilities({project,actor,onReload}:{proje
    let fileId:string|undefined
    if(action==='submit_completion') {
     if(!files[row.id])throw new Error('Select supporting evidence for your responsibilities.')
-    const form=new FormData();form.set('file',files[row.id]);form.set('stage',row.phase)
-    const saved=await api<{id?:string;file?:{id:string}}>(`/projects/${project.id}/phase-files`,{method:'POST',body:form});fileId=saved.file?.id||saved.id
+    // Upload first (direct to storage, or in chunks), then send only the file id. Posting the
+    // file itself here is what hit the serverless 4.5 MB request cap.
+    const uploadId=uid();await uploadFile(uploadId,files[row.id],'document','evidence')
+    const saved=await api<{id?:string;file?:{id:string}}>(`/projects/${project.id}/phase-files`,{method:'POST',json:{file_id:uploadId,stage:row.phase,request_id:uploadId}});fileId=saved.file?.id||saved.id
    }
    await api(`/projects/${project.id}/engineer-responsibilities/${row.id}`,{method:'POST',json:{action,note:notes[row.id],fileId,newUserId:replacements[row.id]}})
    await load();await onReload()

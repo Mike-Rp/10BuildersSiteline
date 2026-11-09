@@ -10,7 +10,40 @@ const issueCodes: Record<string, string> = {
     "Rework required": "rework_required", "Design / plan change": "design_change", "Weather delay": "weather_delay",
     "Subcontractor manpower shortage": "manpower_shortage", "Safety incident": "safety_incident", "Other": "other",
 };
-export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document") {
+// Which private storage bucket a file belongs in. The server maps each kind to a bucket.
+export type UploadKind = "photo" | "evidence" | "document" | "credential";
+const MIME_BY_EXTENSION: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg" };
+// Sends the file straight to storage, so it never passes through the serverless
+// function and its 4.5 MB request cap. Returns null when the server has storage
+// switched off, so the caller uses the older database-backed upload.
+async function uploadToStorage(id: string, file: File, kind: UploadKind): Promise<Dto | null> {
+    const target = await api<Dto>("/files/upload-url", { method: "POST", json: { id, name: file.name, size: file.size, kind } });
+    if (target.mode !== "storage" || typeof target.upload_url !== "string") return null;
+    const type = file.type || MIME_BY_EXTENSION[file.name.split(".").pop()?.toLowerCase() || ""] || "application/octet-stream";
+    const body = new FormData();
+    body.set("cacheControl", "3600");
+    body.set("", new File([file], file.name, { type }));
+    const response = await fetch(target.upload_url, { method: "PUT", headers: { "x-upsert": "false" }, body, signal: AbortSignal.timeout(120_000) });
+    if (!response.ok) {
+        const detail = await response.json().catch(() => undefined) as { message?: string } | undefined;
+        throw new ApiError(response.status === 413 ? "File too large. Choose a smaller file and try again." : detail?.message || "The file could not be uploaded. Try again.", response.status);
+    }
+    return await api<Dto>(`/files/${id}/complete-storage`, { method: "POST", json: { name: file.name, kind } });
+}
+export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document", kind: UploadKind = "document") {
+    if (purpose === "document") {
+        try {
+            const stored = await uploadToStorage(id, file, kind);
+            if (stored) {
+                registerFileUrl(id, stored.download_url);
+                return stored;
+            }
+        } catch (error) {
+            // A rejected file or a refused request is a real answer. Only a network or
+            // browser failure (for example a blocked cross-origin request) falls back.
+            if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error;
+        }
+    }
     const uploadInChunks = async () => {
         const total = Math.ceil(file.size / UPLOAD_CHUNK_BYTES);
         for (let index = 0; index < total; index++) {
@@ -44,14 +77,10 @@ export async function uploadFile(id: string, file: File, purpose: "document" | "
     registerFileUrl(id, saved.download_url);
     return saved;
 }
+// The evidence file is already uploaded, so only its id is sent. Re-sending the file
+// itself used to hit the serverless 4.5 MB request cap.
 async function phaseFile(projectId: string, doc: Doc) {
-    const blob = await downloadApiFile(doc.id);
-    if (!blob)
-        throw new Error("The uploaded evidence file is unavailable.");
-    const form = new FormData();
-    form.set("file", blob, doc.name);
-    form.set("request_id", doc.id);
-    const saved = await api<Dto>("/projects/" + projectId + "/phase-files", { method: "POST", body: form });
+    const saved = await api<Dto>("/projects/" + projectId + "/phase-files", { method: "POST", json: { file_id: doc.id, request_id: doc.id } });
     return saved.file?.id || saved.id;
 }
 export async function sendApiWorkflow(state: State, actor: Account, command: WorkflowCommand) {

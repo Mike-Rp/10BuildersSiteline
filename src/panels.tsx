@@ -3,7 +3,7 @@ import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,pha
 import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
 import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
-import { uploadFile } from "./api/actions"
+import { uploadFile, type UploadKind } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
 import ClientSearch from "./ClientSearch"
 import CompanyTradePicker from "./CompanyTradePicker"
@@ -88,7 +88,7 @@ const INTAKE_PROJECT_TYPES = [
   },
 ] as const
 
-async function saveFile(id:string,file:File,spreadsheet=false) { return await uploadFile(id,file,spreadsheet ? "manpower" : "document") }
+async function saveFile(id:string,file:File,spreadsheet=false,kind:UploadKind="document") { return await uploadFile(id,file,spreadsheet ? "manpower" : "document",kind) }
 export async function fileFor(id:string) { return downloadApiFile(id) }
 export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -134,6 +134,7 @@ export function Upload({
   ariaLabel,
   spreadsheet = false,
   clientVisible = false,
+  storageKind = "document",
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
@@ -146,6 +147,8 @@ export function Upload({
   spreadsheet?: boolean
   // Internal by default, including site photos that still require an authorized release.
   clientVisible?: boolean
+  // Picks the private storage bucket: site photos, phase evidence, documents or credentials.
+  storageKind?: UploadKind
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
@@ -172,7 +175,7 @@ export function Upload({
       const docs: Doc[] = []
       for (const file of files) {
         const id = uid()
-        const uploaded = await saveFile(id, file, spreadsheet)
+        const uploaded = await saveFile(id, file, spreadsheet, storageKind)
         const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
         if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
         docs.push(doc)
@@ -963,6 +966,7 @@ export function AccountDeactivationForm({
               ) : (
                 <Upload
                   label="Resignation Letter"
+                  storageKind="credential"
                   owner={admin.name}
                   buttonLabel="Upload resignation letter"
                   onSave={(document) => {
@@ -1780,7 +1784,7 @@ export function LicenseForm({
             {doc.name}
           </div>
         ) : (
-          <Upload label="PRC License" onSave={setDoc} />
+          <Upload label="PRC License" storageKind="credential" onSave={setDoc} />
         )}
       </section>
       {error && <p className="error">{error}</p>}

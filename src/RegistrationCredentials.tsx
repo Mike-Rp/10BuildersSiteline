@@ -63,7 +63,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
     running.current = true; setUploadingIndex(index); onBusy(true); onError("")
     try {
       const id = uid()
-      await uploadFile(id, file)
+      await uploadFile(id, file, "document", "credential")
       update(index, { file_id: id, fileName: file.name })
     } catch (error) { onError((error as Error).message) }
     finally { running.current = false; setUploadingIndex(null); onBusy(false) }

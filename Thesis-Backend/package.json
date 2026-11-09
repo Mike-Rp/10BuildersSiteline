@@ -14,13 +14,15 @@
     "db:normalize-types": "node scripts/normalize-project-types.js",
     "db:project-types": "node scripts/migrate-project-types.js",
     "db:mixed-use-scope": "node scripts/migrate-mixed-use-scope.js",
-    "db:license-workflow": "node scripts/migrate-license-workflow.js"
+    "db:license-workflow": "node scripts/migrate-license-workflow.js",
+    "db:files-to-storage": "node scripts/migrate-files-to-storage.js"
   },
   "type": "module",
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
