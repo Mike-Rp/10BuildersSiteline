@@ -30,7 +30,7 @@ export default function ClientOverview({ project, latest, photos, onNavigate, on
       </div>
     </PageTitlePanel>
     <div className="co-project-meta">
-      <span>{project.type}{project.location ? ` · ${project.location}` : ""}</span>
+      <span>{project.type}</span>
       <Badge tone="green">{project.status === "completed" ? "Completed" : "Active"}</Badge>
     </div>
     <ProjectScheduleDetails project={project} today={today} />

@@ -485,7 +485,6 @@ export default function ClientPortal({
       <ProjectScheduleDetails project={project} today={scheduleToday} />
       <dl className="client-project-facts">
         <div><dt>Project type</dt><dd>{project.type}</dd></div>
-        <div><dt>Location</dt><dd>{project.location || "Not set"}</dd></div>
         <div><dt>Floor area</dt><dd>{project.area} sqm</dd></div>
         <div><dt>Floors</dt><dd>{project.floors}</dd></div>
         <div><dt>Target start</dt><dd>{project.start ? dateLabel(project.start) : "Not set"}</dd></div>
