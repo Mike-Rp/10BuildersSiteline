@@ -53,7 +53,7 @@ test("guide supports first visit, skipping, role topics, navigation and replay",
     await click("Next")
     assert.match(document.querySelector(".tour-tooltip").textContent, /This button opens your assigned phase/)
     await click("Next")
-    assert.match(document.querySelector(".tour-tooltip").textContent, /not currently available/)
+    assert.match(document.querySelector(".tour-tooltip").textContent, /needs an open project or form/)
     const attachment = document.createElement("button")
     attachment.textContent = "Add attachments"
     await React.act(async () => document.body.append(attachment))
@@ -71,6 +71,56 @@ test("guide supports first visit, skipping, role topics, navigation and replay",
     assert.equal(document.querySelector('[role="dialog"]'), null)
     await mount(false)
     assert.equal(document.querySelector(".workspace-guide-trigger").disabled, true)
+    await React.act(async () => root.render(null))
+    const updates = document.createElement("button")
+    updates.dataset.guide = "updates-tab"
+    updates.textContent = "Updates & issues 0"
+    updates.setAttribute("aria-selected", "false")
+    updates.onclick = () => {
+      updates.setAttribute("aria-selected", "true")
+      const queue = document.createElement("section")
+      queue.id = "active-sites-review"
+      queue.innerHTML = '<p data-guide="no-pending-evidence">No QA/QC evidence is awaiting review.</p>'
+      document.body.append(queue)
+    }
+    document.body.append(updates)
+    await React.act(async () => root.render(React.createElement(Guide, { actor: { id: "test-opm", name: "Lea", role: "opm" }, onNavigate: page => { destination = page } })))
+    await click("Choose a guide topic")
+    const reviewTopic = [...document.querySelectorAll(".workspace-guide-topics button")].find(b => b.textContent.startsWith("Review submitted evidence"))
+    await React.act(async () => reviewTopic.click())
+    assert.equal([...document.querySelectorAll(".tour-tooltip button")].find(b => b.textContent === "Next").disabled, true, "requires opening review tab")
+    await click("Updates & issues 0")
+    assert.equal([...document.querySelectorAll(".tour-tooltip button")].find(b => b.textContent === "Next").disabled, false)
+    await click("Next")
+    assert.match(document.querySelector(".tour-tooltip").textContent, /No QA\/QC evidence is awaiting review/)
+    await click("Skip this section")
+    assert.equal(document.querySelector(".tour-tooltip"), null)
+    assert.equal(destination, "Active sites")
+    document.querySelector('[data-guide="no-pending-evidence"]').remove()
+    let reviewOpened = 0
+    const reviewButton = document.createElement("button")
+    reviewButton.dataset.guide = "review-evidence"
+    reviewButton.textContent = "Review evidence"
+    reviewButton.onclick = () => {
+      reviewOpened++
+      const panel = document.createElement("section")
+      panel.innerHTML = '<section aria-label="Submitted evidence preview">Evidence file</section><div aria-label="Evidence decision"><button>Approve</button><button>Reject</button></div>'
+      document.body.append(panel)
+    }
+    document.querySelector("#active-sites-review").append(reviewButton)
+    await click("Workspace guide")
+    await React.act(async () => [...document.querySelectorAll(".workspace-guide-topics button")].find(b => b.textContent.startsWith("Review submitted evidence")).click())
+    await click("Next")
+    assert.equal(reviewOpened, 0, "guide does not automatically open or act on submissions")
+    assert.match(document.querySelector("#tour-description").textContent, /This button opens the evidence review/)
+    assert.equal([...document.querySelectorAll(".tour-tooltip button")].find(b => b.textContent === "Next").disabled, true)
+    await click("Review evidence")
+    await click("Next")
+    assert.match(document.querySelector(".tour-tooltip").textContent, /Inspect the evidence/)
+    await click("Next")
+    assert.match(document.querySelector(".tour-tooltip").textContent, /Understand review decisions/)
+    await click("Finish")
+    assert.equal(reviewOpened, 1)
   } finally {
     await React.act(async () => root.unmount())
     await server.close()

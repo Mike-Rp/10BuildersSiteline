@@ -2088,7 +2088,7 @@ export default function RoleWorkspace({
           <button type="button" role="tab" aria-selected={activeSitesView === "sites"} onClick={() => setActiveSitesView("sites")}>
             <Icon name="building" size={17} /> Active sites <span>{allActive.length}</span>
           </button>
-          {isOpm ? <button type="button" role="tab" aria-selected={activeSitesView === "updates"} onClick={() => setActiveSitesView("updates")}>
+          {isOpm ? <button data-guide="updates-tab" type="button" role="tab" aria-selected={activeSitesView === "updates"} onClick={() => setActiveSitesView("updates")}>
             <Icon name="shield" size={17} /> Updates &amp; issues <span>{pendingUpdates.length + pendingRework.length + qaCount}</span>
           </button> : <button type="button" role="tab" aria-selected={activeSitesView === "assignments"} onClick={() => setActiveSitesView("assignments")}>
             <Icon name="check" size={17} /> Assignments <span>{navigationCounts.Assignments?.count ?? 0}</span>
@@ -2203,6 +2203,7 @@ export default function RoleWorkspace({
             }}>Open phase workspace</Button> : null
           }} />}
         {isOpm && !extensionDemo && activeSitesView === "updates" && <div id="active-sites-review" className="active-site-review-queue">
+          {qaCount === 0 && <p data-guide="no-pending-evidence" className="notice">No QA/QC evidence is awaiting review. Other progress updates or issues may still need your attention.</p>}
           <Panel title={`Updates and issues needing review (${pendingUpdates.length + pendingRework.length + qaCount})`} subtitle="Review each item in its project card. Your decision updates that site immediately.">
             {(pendingUpdates.length + pendingRework.length + qaCount) > 0 ? <div className="active-site-review-list">{allActive.filter(project => workflowFor(project).pendingUpdate || workflowFor(project).pendingRework || (pendingChecklistFor(project).length > 0)).map(project => {
               const work = workflowFor(project)
@@ -2230,7 +2231,7 @@ export default function RoleWorkspace({
                 </div>}
                 {(pendingChecklistFor(project).length > 0) && <div className="active-site-review-item">
                   <div className="active-site-review-heading"><strong>QA/QC evidence</strong><Status value={`${pendingChecklistFor(project).length} awaiting review`} /></div>
-                  {pendingChecklistFor(project).map(item => <div className="active-site-qa-item" key={item.id}><div><strong>{item.label}</strong><p className="role-muted">{item.submittedByName || (item.submittedBy ? actorName(item.submittedBy) : "Evidence submitted")} · {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "Date unavailable"}</p>{item.doc && <Button icon="doc" onClick={() => showDoc(project, item.doc!)}>View {item.doc.name}</Button>}</div><Button variant="primary" icon="doc" disabled={saving} onClick={() => setEvidenceReview({ type: "approve_checklist", projectId: project.id, phase: project.phase, itemId: item.id, evidenceId: item.evidenceId, expectedVersion: item.version })}>Review evidence</Button></div>)}
+                  {pendingChecklistFor(project).map(item => <div className="active-site-qa-item" key={item.id}><div><strong>{item.label}</strong><p className="role-muted">{item.submittedByName || (item.submittedBy ? actorName(item.submittedBy) : "Evidence submitted")} · {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "Date unavailable"}</p>{item.doc && <Button icon="doc" onClick={() => showDoc(project, item.doc!)}>View {item.doc.name}</Button>}</div><Button data-guide="review-evidence" variant="primary" icon="doc" disabled={saving} onClick={() => setEvidenceReview({ type: "approve_checklist", projectId: project.id, phase: project.phase, itemId: item.id, evidenceId: item.evidenceId, expectedVersion: item.version })}>Review evidence</Button></div>)}
                 </div>}
                 <Button variant="text-button" onClick={() => setDialog({ kind: "project", projectId: project.id })}>View project details <Icon name="arrow" size={15} /></Button>
               </section>
