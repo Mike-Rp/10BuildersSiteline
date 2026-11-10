@@ -169,7 +169,7 @@ body { min-width: 0; background: var(--color-canvas); color: var(--color-ink); f
 #root .phase-label { padding: 5px 8px; border: 1px solid var(--color-line); border-radius: 4px; background: var(--surface-subtle); color: var(--color-muted); font-size: 14px; }
 #root .lead-cell { gap: 9px; font-size: 14px; color: var(--color-muted); }
 #root .row-arrow { color: var(--color-primary); min-height: 38px; min-width: 30px; }
-#root .panel-foot { padding: 10px var(--space-panel); color: var(--color-muted); font-size: 14px; background: var(--surface-subtle); border-color: var(--color-line); }
+#root .panel-foot { padding: 16px var(--space-panel); color: var(--color-muted); font-size: 14px; background: var(--surface-subtle); border-color: var(--color-line); }
 #root .confirmation-progress > span { color: var(--color-ink); font-size: 14px; }
 #root .confirmation-progress small { color: var(--color-muted); font-size: 14px; margin-top: 5px; }
 #root .tabs { gap: 20px; border-color: var(--color-line); padding-inline: var(--space-panel); }

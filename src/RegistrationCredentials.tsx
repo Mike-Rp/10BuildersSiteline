@@ -23,29 +23,64 @@ function CredentialDocumentUpload({ id, name, busy, disabled, onFile }: {
   </div>
 }
 
-export function validateRegistrationCredentials(value: Partial<Account>) {
+export type RegistrationCredentialErrors = {
+  profession?: string
+  license_number?: string
+  license_expiry?: string
+  file_id?: string
+  specializations?: string
+}
+
+export function registrationCredentialErrors(value: Partial<Account>) {
   const rows = value.initialCredentials || []
-  if (!rows.length) return "Add at least one professional credential."
-  for (const row of rows) {
+  const fields = rows.map((row): RegistrationCredentialErrors => {
+    const errors: RegistrationCredentialErrors = {}
     const issue = licenseNumberError(row.license_number)
-    if (!PROFESSIONS.includes(row.profession)) return "Select each licensed profession."
-    if (issue) return issue
-    if (!isoDateValid(row.license_expiry) || row.license_expiry <= today()) return "Enter a future credential expiry date."
-    if (!row.file_id) return "Attach a supporting document for each credential."
+    if (!PROFESSIONS.includes(row.profession)) errors.profession = "Select a licensed profession."
+    if (issue) errors.license_number = issue
+    if (!isoDateValid(row.license_expiry) || row.license_expiry <= today()) errors.license_expiry = "Enter a future expiry date."
+    if (!row.file_id) errors.file_id = "Attach a supporting document."
     const tags=row.specializations||[]
-    if(tags.length>3||new Set(tags).size!==tags.length||tags.some(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag)))return "Choose up to three supported specializations per credential."
+    if(tags.length>3||new Set(tags).size!==tags.length||tags.some(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag))) errors.specializations = "Choose up to three supported specializations."
+    return errors
+  })
+  const seenProfessions = new Set<string>()
+  let duplicateProfession = false
+  for (const [index, row] of rows.entries()) {
+    if (!row.profession) continue
+    if (seenProfessions.has(row.profession)) {
+      duplicateProfession = true
+      fields[index].profession = "Enter each profession only once."
+    }
+    seenProfessions.add(row.profession)
   }
-  if (new Set(rows.map(c => c.profession)).size !== rows.length) return "Enter each profession only once."
-  if (value.credentialDecision === "verified" && (!value.credentialEvidenceReviewed || !value.credentialReviewNote?.trim()))
-    return "Confirm the evidence review and record a verification note."
+  const verificationNote = value.credentialDecision === "verified" && (!value.credentialEvidenceReviewed || !value.credentialReviewNote?.trim())
+    ? "Confirm the evidence review and enter a verification note."
+    : ""
+  return { fields, missingCredential: rows.length === 0, duplicateProfession, verificationNote }
+}
+
+export function validateRegistrationCredentials(value: Partial<Account>) {
+  const result = registrationCredentialErrors(value)
+  if (result.missingCredential) return "Add at least one professional credential."
+  for (const errors of result.fields) {
+    if (errors.profession) return errors.profession
+    if (errors.license_number) return errors.license_number
+    if (errors.license_expiry) return errors.license_expiry
+    if (errors.file_id) return errors.file_id
+    if (errors.specializations) return errors.specializations
+  }
+  if (result.duplicateProfession) return "Enter each profession only once."
+  if (result.verificationNote) return result.verificationNote
   return ""
 }
 
-export default function RegistrationCredentials({ value, onChange, onBusy, onError }: {
+export default function RegistrationCredentials({ value, onChange, onBusy, onError, errors = [] }: {
   value: Partial<Account>
   onChange: (value: Partial<Account>) => void
   onBusy: (busy: boolean) => void
   onError: (message: string) => void
+  errors?: RegistrationCredentialErrors[]
 }) {
   const running = useRef(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
@@ -81,13 +116,14 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
         <p className="role-muted">{row.profession||'Select a profession'} · {tags.length}/3 specializations · Pending verification until reviewed</p>
         <div id={`credential-${key}`} hidden={!open}>
         <div className="form-grid">
-          <Field label="Licensed profession *"><select required value={row.profession} onChange={e => update(index, { profession: e.target.value })}>
+          <Field label="Licensed profession *" error={errors[index]?.profession}><select required value={row.profession} onChange={e => update(index, { profession: e.target.value })}>
             <option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}
           </select></Field>
-          <Field label="License number exactly as printed *"><input required inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
-          <Field label="Expiry date *"><DatePicker required calendarTitle="Expiry date" min={today()} value={row.license_expiry} onValueChange={date => update(index, { license_expiry: date })} /></Field>
-          <Field label="Supporting credential document *"><CredentialDocumentUpload name={row.fileName} busy={uploadingIndex === index} disabled={uploadingIndex !== null} onFile={file => void upload(index, file)} /></Field>
+          <Field label="License number exactly as printed *" error={errors[index]?.license_number}><input required inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
+          <Field label="Expiry date *" error={errors[index]?.license_expiry}><DatePicker required calendarTitle="Expiry date" min={today()} value={row.license_expiry} onValueChange={date => update(index, { license_expiry: date })} /></Field>
+          <Field label="Supporting credential document *" error={errors[index]?.file_id}><CredentialDocumentUpload name={row.fileName} busy={uploadingIndex === index} disabled={uploadingIndex !== null} onFile={file => void upload(index, file)} /></Field>
         </div>
+        {errors[index]?.specializations && <p className="field-error" role="alert">{errors[index]?.specializations}</p>}
         <fieldset className="credential-specializations"><legend>Areas of specialization · Credential {index+1} · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button type="button" key={tag} className={`chip ${tags.includes(tag)?'selected':''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag)&&tags.length>=3} onClick={()=>update(index,{specializations:tags.includes(tag)?tags.filter(t=>t!==tag):[...tags,tag]})}>{tag}</button>)}</div></fieldset>
         </div>
       </section>})}
@@ -99,14 +135,14 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
   </>
 }
 
-export function RegistrationVerification({ value, onChange }: { value: Partial<Account>; onChange: (value: Partial<Account>) => void }) {
+export function RegistrationVerification({ value, onChange, noteError }: { value: Partial<Account>; onChange: (value: Partial<Account>) => void; noteError?: string }) {
   const patch = (next: Partial<Account>) => onChange({ ...value, ...next })
   return (
     <section className="form-section">
       <h3>Admin verification</h3>
       <p>Credentials are saved as Pending Verification. Only confirm this review if you have checked the supporting evidence and want to verify them when creating the account.</p>
         <label className="check-row"><input type="checkbox" checked={!!value.credentialEvidenceReviewed} onChange={e => patch({ credentialEvidenceReviewed: e.target.checked })} />I reviewed the supporting evidence for every credential</label>
-        {value.credentialEvidenceReviewed&&<Field label="Verification note *"><textarea required maxLength={2000} value={value.credentialReviewNote || ""} onChange={e => patch({ credentialReviewNote: e.target.value })} /></Field>}
+        {value.credentialEvidenceReviewed&&<Field label="Verification note *" error={noteError}><textarea required maxLength={2000} value={value.credentialReviewNote || ""} onChange={e => patch({ credentialReviewNote: e.target.value })} /></Field>}
       <p className="notice">Your review identity, note and time are recorded. Assignments still require matching scope, account activation and availability.</p>
     </section>
   )

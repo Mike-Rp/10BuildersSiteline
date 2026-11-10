@@ -1,7 +1,7 @@
 import DatePicker from "./DatePicker"
 import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,phaseCoverageMeetsQuota} from './PhaseEngineerAllocation'
-import RegistrationCredentials, { RegistrationVerification, validateRegistrationCredentials } from "./RegistrationCredentials"
+import RegistrationCredentials, { RegistrationVerification, registrationCredentialErrors, validateRegistrationCredentials, type RegistrationCredentialErrors } from "./RegistrationCredentials"
 import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import { uploadFile, type UploadKind } from "./api/actions"
@@ -579,7 +579,7 @@ export function AccountForm({
       lastName: next.last.trim(),
       name: [next.first, next.middle, next.last].map(value => value.trim()).filter(Boolean).join(" "),
     }))
-    setError("")
+    clearValidation()
   }
   const [pass, setPass] = useState(password())
   const registeringEngineer = !account && !clientOnly && ["spm", "opm"].includes(draft.role)
@@ -589,9 +589,24 @@ export function AccountForm({
   })
   const [uploadingCredential, setUploadingCredential] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [credentialErrors, setCredentialErrors] = useState<RegistrationCredentialErrors[]>([])
+  const [verificationNoteError, setVerificationNoteError] = useState("")
+  const [experienceError, setExperienceError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  const patch = (p: Partial<Account>) => setDraft({ ...draft, ...p })
+  function clearValidation() {
+    setError("")
+    setEmailError("")
+    setFieldErrors({})
+    setCredentialErrors([])
+    setVerificationNoteError("")
+    setExperienceError("")
+  }
+  const patch = (p: Partial<Account>) => {
+    setDraft(current => ({ ...current, ...p }))
+    clearValidation()
+  }
   const [emailError, setEmailError] = useState("")
   const requiresClientEmail = !account && draft.role === "client"
   const existingClient = clientOnly
@@ -600,9 +615,13 @@ export function AccountForm({
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (savingRef.current || uploadingCredential) return
+    clearValidation()
     const creationCredentials = { ...credentialDraft, credentialDecision: credentialDraft.credentialEvidenceReviewed ? "verified" as const : "pending" as const }
     const submittedDraft=registeringEngineer&&draft.role==='spm'?{...draft,...creationCredentials,scope:[...new Set((credentialDraft.initialCredentials||[]).flatMap(c=>c.specializations||[]))]}:draft
     if (registeringEngineer) {
+      const validation = registrationCredentialErrors(creationCredentials)
+      setCredentialErrors(validation.fields)
+      if (validation.verificationNote) setVerificationNoteError(validation.verificationNote)
       const issue = validateRegistrationCredentials(creationCredentials)
       if (issue) { setError(issue); return }
     }
@@ -610,11 +629,14 @@ export function AccountForm({
     setEmailError(invalidClientEmail)
     if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
-      try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { setError((reason as Error).message); return }
-      if (!account && !Object.keys(draft.experienceByType || {}).length) { setError("Enter experience for at least one project type. Use 0 years and 0 months for a new engineer."); return }
+      try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { const message = (reason as Error).message; setExperienceError(message); setError(message); return }
+      if (!account && !Object.keys(draft.experienceByType || {}).length) { const message = "Record experience for at least one project type. Enter 0 years and 0 months for a new engineer."; setExperienceError(message); setError(message); return }
     }
-    if (generatedIdentity && (!nameParts.first.trim() || !nameParts.last.trim())) { setError("Enter a first and last name."); return }
-    if (draft.phone && !/^\d{11}$/.test(draft.phone)) { setError("Contact number must contain exactly 11 digits."); return }
+    const nameIssues: Record<string, string> = {}
+    if (generatedIdentity && !nameParts.first.trim()) nameIssues.firstName = "Enter a first name."
+    if (generatedIdentity && !nameParts.last.trim()) nameIssues.lastName = "Enter a last name."
+    if (Object.keys(nameIssues).length) { setFieldErrors(nameIssues); setError("Enter the required name details."); return }
+    if (draft.phone && !/^\d{11}$/.test(draft.phone)) { const message = "Contact number must contain exactly 11 digits."; setFieldErrors({ phone: message }); setError(message); return }
 
     const err = clientOnly
       ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())
@@ -627,6 +649,20 @@ export function AccountForm({
           ? "This email is already in use. Select the existing client instead."
           : ""
       : accountError(requiresClientEmail ? { ...submittedDraft, email: draft.email.trim() } : submittedDraft, state, generatedIdentity)
+    if (err) {
+      const issues: Record<string, string> = {}
+      if (/email/i.test(err)) {
+        issues.email = err
+        setEmailError(err)
+      } else if (/specialization|discipline/i.test(err)) {
+        issues[draft.role === "opm" ? "projectTypes" : "specializations"] = err
+      } else if (/linked project/i.test(err)) {
+        issues.linkedProjects = err
+      } else if (/name/i.test(err)) {
+        issues.name = err
+      }
+      setFieldErrors(issues)
+    }
     setError(err)
     if (!err) try {
       savingRef.current = true
@@ -678,7 +714,7 @@ export function AccountForm({
     )
   }
   return (
-    <form onSubmit={submit} noValidate={requiresClientEmail} aria-busy={saving}>
+    <form onSubmit={submit} noValidate aria-busy={saving}>
       <fieldset disabled={saving || uploadingCredential} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         {!clientOnly && (
@@ -703,10 +739,10 @@ export function AccountForm({
           </Field>
         )}
         {generatedIdentity ? <>
-          <Field label="First name *"><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
+          <Field label="First name *" error={fieldErrors.firstName}><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
           <Field label="Middle name"><input autoComplete="additional-name" value={nameParts.middle} onChange={e => updateName("middle", e.target.value)} placeholder="Middle name (optional)" /></Field>
-          <Field label="Last name *"><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
-        </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"}>
+          <Field label="Last name *" error={fieldErrors.lastName}><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
+        </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"} error={fieldErrors.name}>
           <input
             required
             value={draft.name}
@@ -714,7 +750,7 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        {!generatedIdentity && <Field label="Email address *" error={requiresClientEmail ? emailError : undefined} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
+        {!generatedIdentity && <Field label="Email address *" error={emailError || fieldErrors.email} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
           <input
             required
             type="email"
@@ -723,13 +759,13 @@ export function AccountForm({
             value={draft.email}
             onChange={(e) => {
               patch({ email: e.target.value })
-              if (emailError) setEmailError(requiresClientEmail ? clientEmailError(e.target.value) : "")
-              setError("")
+              clearValidation()
+              setEmailError(requiresClientEmail ? clientEmailError(e.target.value) : "")
             }}
             placeholder={requiresClientEmail ? "lastname.firstname@10builders.com" : "name@company.com"}
           />
         </Field>}
-        <Field label="Contact number">
+        <Field label="Contact number" error={fieldErrors.phone}>
           <input
             value={draft.phone}
             type="tel" inputMode="numeric" maxLength={11} pattern="[0-9]{11}" title="Enter exactly 11 digits" onChange={(e) => patch({ phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
@@ -747,13 +783,14 @@ export function AccountForm({
           </Field>
         )}
       </div>
-      {registeringEngineer && <RegistrationCredentials value={credentialDraft} onChange={setCredentialDraft} onBusy={setUploadingCredential} onError={setError} />}
+      {registeringEngineer && <RegistrationCredentials value={credentialDraft} errors={credentialErrors} onChange={value => { setCredentialDraft(value); clearValidation() }} onBusy={setUploadingCredential} onError={setError} />}
       {!clientOnly && draft.role === "spm" && !registeringEngineer && !draft.hasCredentialSpecializations && (
         <section className="form-section">
           <h3>
             Areas of specialization <span>Choose 1–3</span>
           </h3>
           {chips(ENGINEER_SPECIALIZATIONS, draft.scope, "scope", 3)}
+          {fieldErrors.specializations && <p className="field-error" role="alert">{fieldErrors.specializations}</p>}
           {draft.scope.filter(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag)).map(tag=><p key={tag}>Legacy tag requiring review: {tag} <Button onClick={()=>patch({scope:draft.scope.filter(t=>t!==tag)})}>Remove legacy tag</Button></p>)}
           <p>Specializations do not replace a verified professional credential. Fire Protection, Facade and Acoustic mappings require company validation before granting eligibility.</p>
         </section>
@@ -769,9 +806,10 @@ export function AccountForm({
             "projectTypes",
             2,
           )}
+          {fieldErrors.projectTypes && <p className="field-error" role="alert">{fieldErrors.projectTypes}</p>}
         </section>
       )}
-      {!clientOnly && ["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} onChange={experienceByType => { patch({ experienceByType }); setError("") }} />}
+      {!clientOnly && ["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} validationError={experienceError} onChange={experienceByType => { patch({ experienceByType }) }} />}
       {draft.role === "client" && !clientOnly && (
         <section className="form-section">
           <h3>
@@ -795,7 +833,7 @@ export function AccountForm({
           ))}
         </section>
       )}
-      {registeringEngineer && <RegistrationVerification value={credentialDraft} onChange={setCredentialDraft} />}
+      {registeringEngineer && <RegistrationVerification value={credentialDraft} noteError={verificationNoteError} onChange={value => { setCredentialDraft(value); clearValidation() }} />}
       {!account && !clientOnly && (
         <section className="form-section">
           <h3>Temporary credentials</h3>
@@ -819,7 +857,7 @@ export function AccountForm({
         </div>
       )}
       {error && (
-        <p role="alert" className="error">
+        <p role="alert" aria-live="polite" className="error">
           {error}
         </p>
       )}

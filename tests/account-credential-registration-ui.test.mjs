@@ -34,6 +34,7 @@ test("SPM and OPM credentials default to pending and require explicit supported 
     assert.ok(headings.indexOf("Admin verification") > headings.indexOf("Project experience"))
     assert.equal(field('Credential decision'),null,'Account creation must not offer pending versus verified decisions')
     await enter("First name *", "Juan"); await enter("Last name *", "Cruz")
+    assert.equal(document.querySelector('form').noValidate, true, 'React displays its own validation rather than allowing browser validation to silently block submit')
     await enter("Residential experience (years)", "0")
     await click(role === "spm" ? "Civil" : "Residential")
     const choice = text => [...document.querySelectorAll('.account-choice-chips button')].find(button=>button.textContent.trim()===text)
@@ -44,6 +45,8 @@ test("SPM and OPM credentials default to pending and require explicit supported 
       await click('Structural'); await click('Geotechnical')
     }
     await submit(); assert.equal(saved.length, 0)
+    assert.ok(document.querySelector('.credential-record select[aria-invalid="true"]'), 'missing profession has a field-level error')
+    assert.ok([...document.querySelectorAll('[role="alert"]')].some(node => node.textContent.includes('Select a licensed profession.')))
     await enter("Licensed profession *", "Civil Engineer")
     await enter("License number exactly as printed *", "0001234")
     await enter("Expiry date *", "2099-01-01")
@@ -62,6 +65,7 @@ test("SPM and OPM credentials default to pending and require explicit supported 
     assert.equal(saved.length, 1);assert.equal(saved[0].credentialDecision,'pending','Uploading and saving do not automatically verify credentials');saved.length=0
     await React.act(() => document.querySelector('input[type="checkbox"]').click())
     await submit(); assert.equal(saved.length,0,'A review note is still required')
+    assert.ok(field('Verification note *').getAttribute('aria-invalid'), 'missing verification note has a field-level error')
     await enter("Verification note *", "Reviewed supporting evidence.")
     await submit(); assert.equal(saved.length,1)
     assert.equal(saved[0].credentialDecision,'verified')

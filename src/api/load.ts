@@ -71,7 +71,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     "/workspace/reconcile-phase-handoffs", {method:"POST",json:{}})
   const [projectData, subcontractors, notifications, workspace] = await Promise.all([
     api<Omit<ProjectParts,"clientId"|"register">[]>("/workspace/project-data"),
-    optional(apiList<Dto>("/subcontractors"), []),
+    me.role === "client" ? Promise.resolve([] as Dto[]) : optional(apiList<Dto>("/subcontractors"), []),
     apiList<Dto>("/notifications"),
     api<Dto>("/workspace"),
   ])

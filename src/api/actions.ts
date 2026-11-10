@@ -253,10 +253,26 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
     if (existing && account.status !== previous?.status && ["active", "suspended", "invited"].includes(account.status))
         await api("/accounts/" + id + "/status", { method: "PATCH", json: { status: account.status } });
     const { initialCredentials, credentialDecision, credentialReviewNote, credentialEvidenceReviewed, ...workspaceAccount } = account;
-    await api("/accounts/" + id + "/workspace", {
-        method: "PUT", json: { ...workspaceAccount, email: saved.email || account.email },
-    });
-    return { id, email: saved.email || account.email, password: saved.temp_password || password };
+    const result = { id, email: saved.email || account.email, password: saved.temp_password || password }
+    try {
+        await api("/accounts/" + id + "/workspace", {
+            method: "PUT", json: { ...workspaceAccount, email: result.email },
+        });
+    } catch (error) {
+        throw new PartialAccountSave(result, existing, error instanceof Error ? error.message : "Workspace details could not be saved.")
+    }
+    return result;
+}
+export class PartialAccountSave extends Error {
+    account: { id: string; email: string; password?: string }
+    existing: boolean
+    constructor(account: { id: string; email: string; password?: string }, existing: boolean, reason: string) {
+        super(existing
+            ? `Account changes were saved, but workspace details could not be saved: ${reason}`
+            : `Account created, but workspace details could not be saved: ${reason}. Reopen the account from Team to retry; do not create it again.`)
+        this.account = account
+        this.existing = existing
+    }
 }
 export async function createCompany(company: Company) {
     return await post("/subcontractors/registrations", company);

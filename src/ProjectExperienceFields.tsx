@@ -2,7 +2,7 @@ import { useId, useState } from "react"
 import { EXPERIENCE_PROJECT_TYPES, experienceMonths, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import "./project-experience-fields.css"
 
-export default function ProjectExperienceFields({ value, onChange }: { value?: EngineerExperience; onChange: (value: EngineerExperience) => void }) {
+export default function ProjectExperienceFields({ value, onChange, validationError }: { value?: EngineerExperience; onChange: (value: EngineerExperience) => void; validationError?: string }) {
   const prefix = useId()
   const [parts, setParts] = useState(() => Object.fromEntries(EXPERIENCE_PROJECT_TYPES.map(type => {
     const recorded = Object.prototype.hasOwnProperty.call(value || {}, type), total = experienceMonths(value, type)
@@ -21,9 +21,10 @@ export default function ProjectExperienceFields({ value, onChange }: { value?: E
     }
     onChange(experience)
   }
-  return <section className="form-section project-experience-fields">
-    <h3>Project experience</h3>
+  return <section className="form-section project-experience-fields" aria-labelledby={`${prefix}-heading`} aria-describedby={validationError ? `${prefix}-required` : undefined}>
+    <h3 id={`${prefix}-heading`}>Project experience</h3>
     <p id={`${prefix}-help`}>Use 0 years and 0 months for no experience. Leave both blank if not recorded.</p>
+    {validationError && <p id={`${prefix}-required`} className="field-error" role="alert">{validationError}</p>}
     {EXPERIENCE_PROJECT_TYPES.map((type, index) => {
       const row = parts[type], invalid = !valid(row.years, row.months)
       return <div className="experience-duration-row" key={type}>

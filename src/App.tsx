@@ -59,7 +59,7 @@ import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
-import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, sendApiWorkflow } from "./api/actions"
+import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, PartialAccountSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { applyRefreshSetting, isStale, startPolling } from "./refresh-interval"
@@ -842,10 +842,26 @@ function AppInner() {
     try{
       const exists=stateRef.current.accounts.some(a=>a.id===account.id)
       const saved=await saveApiAccount(account,exists,password)
-      await reloadWorkspace();setDialog(undefined)
+      setDialog(undefined)
       if(!exists&&saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:account.role,credentialDecision:account.credentialDecision})
+      try { await reloadWorkspace() }
+      catch (error) {
+        setToast(exists
+          ? `Account saved, but the team list could not refresh: ${(error as Error).message}`
+          : `Account created, but the team list could not refresh: ${(error as Error).message}`)
+        return
+      }
       setToast(exists?"Account updated":"Account created")
-    }catch(error){setToast((error as Error).message);throw error}
+    }catch(error){
+      if(error instanceof PartialAccountSave && !error.existing){
+        setDialog(undefined)
+        if(error.account.password)setCredentials({name:account.name,email:error.account.email,password:error.account.password,role:account.role,credentialDecision:account.credentialDecision})
+        setToast(error.message)
+        await reloadWorkspace().catch(()=>undefined)
+        return
+      }
+      setToast((error as Error).message);throw error
+    }
   }
   async function saveClient(account:Account) {
     const saved=await saveApiAccount(account,false)

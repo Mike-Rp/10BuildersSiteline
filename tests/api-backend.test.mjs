@@ -951,7 +951,11 @@ test("the frontend loads each role's data through the real backend", { skip: !av
       assert.ok(part.overallProgress===null||typeof part.overallProgress==='number')
     }
     const clientUser=await login("f.uy@aldenheights-hoa.com","Password@123",true)
-    const clientState=await loadState(clientUser)
+    const originalFetch=globalThis.fetch, requested=[]
+    globalThis.fetch=async(input,init)=>{const url=String(input);requested.push(url);return originalFetch(input,init)}
+    let clientState
+    try { clientState=await loadState(clientUser) } finally { globalThis.fetch=originalFetch }
+    assert.ok(!requested.some(url=>url.includes('/subcontractors')), 'Client workspace does not request staff-only subcontractor data')
     assert.ok(clientState.projects.every(p=>!("verifiedProgress" in p)))
     for(const p of clientState.projects)assert.equal(p.overallProgress,raw.find(row=>row.list.id===p.id).overallProgress)
     for(const p of clientProjectViews(clientState,clientUser.id))assert.equal(p.overallProgress,raw.find(row=>row.list.id===p.id).overallProgress)

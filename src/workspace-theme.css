@@ -256,3 +256,25 @@
     padding-inline: 8px;
   }
 }
+
+/* Keep pager controls clear of card edges across role workspaces. */
+#root .app-shell :is(.pagination, .history-pagination, .spm-history-pagination,
+  .as-pagination, .ao-pager, .report-summary-pagination, .client-search-pages) {
+  box-sizing: border-box;
+  min-width: 0;
+  padding-bottom: 16px;
+  margin-bottom: 8px;
+}
+#root .app-shell .pagination { padding-inline: 8px; }
+#root .app-shell :is(.history-pagination, .spm-history-pagination) { padding-inline: 16px; }
+#root .app-shell .as-pagination { padding: 20px 16px 16px; }
+#root .app-shell .ao-pager { padding: 16px 20px; }
+#root .app-shell .report-summary-pagination,
+#root .app-shell .client-search-pages { padding: 12px 16px 16px; }
+@media (max-width: 640px) {
+  #root .app-shell .pagination-pages > .button:not(.pagination-page) {
+    min-width: 0;
+    padding-inline: 6px;
+    white-space: normal;
+  }
+}
