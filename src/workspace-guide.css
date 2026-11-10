@@ -13,3 +13,18 @@
 .workspace-guide-controls { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .workspace-guide-content progress { width:100%; height:8px; accent-color:var(--primary, #193c60); }
 .workspace-guide-trigger:focus-visible,.workspace-guide-topics button:focus-visible { outline:3px solid #4383ce; outline-offset:2px; }
+.contextual-tour { position:fixed; inset:0; z-index:10050; pointer-events:none; color:#19334f; }
+.tour-shade { position:absolute; background:rgba(20,43,72,.48); pointer-events:auto; }
+.tour-spotlight { position:fixed; border:3px solid #6cabff; border-radius:10px; box-shadow:0 0 0 3px rgba(255,255,255,.85); pointer-events:none; }
+.tour-tooltip { position:fixed; width:min(440px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; box-sizing:border-box; background:#fff; border:1px solid #c8d8e9; border-radius:16px; box-shadow:0 12px 40px #142b4840; padding:22px; pointer-events:auto; display:flex; flex-direction:column; gap:16px; outline:none; }
+.tour-tooltip h3,.tour-tooltip p { margin:0; }
+.tour-tooltip h3 { font-size:21px; }
+.tour-tooltip p { line-height:1.6; }
+.tour-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.tour-heading small { color:#526985; }
+.tour-unavailable { background:#fff5dd; border-radius:8px; padding:12px; font-size:14px; }
+.tour-topics { background:none; border:0; border-top:1px solid #d4dfec; padding:14px 0 0; text-align:left; color:#245ca0; text-decoration:underline; cursor:pointer; }
+.tour-pointer { position:absolute; width:12px; height:12px; background:#fff; transform:rotate(45deg); pointer-events:none; }
+.tour-pointer.below { top:-7px; border-top:1px solid #c8d8e9; border-left:1px solid #c8d8e9; }
+.tour-pointer.above { bottom:-7px; border-bottom:1px solid #c8d8e9; border-right:1px solid #c8d8e9; }
+@media(max-width:540px) { .tour-tooltip { padding:16px; gap:12px; } .tour-tooltip h3 { font-size:18px; } }

@@ -8,6 +8,16 @@ test("guide supports first visit, skipping, role topics, navigation and replay",
   for (const name of ["window", "document", "HTMLElement", "Node", "localStorage", "KeyboardEvent"])
     Object.defineProperty(globalThis, name, { value: dom.window[name], configurable: true })
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  globalThis.innerWidth = 1280
+  globalThis.innerHeight = 900
+  globalThis.MutationObserver = dom.window.MutationObserver
+  dom.window.HTMLElement.prototype.scrollIntoView = () => {}
+  dom.window.HTMLElement.prototype.getClientRects = function () { return this.hidden ? [] : [this.getBoundingClientRect()] }
+  dom.window.HTMLElement.prototype.getBoundingClientRect = function () { return { left: 300, top: 100, width: 180, height: 44, right: 480, bottom: 144, x: 300, y: 100, toJSON() {} } }
+  const search = document.createElement("section")
+  search.className = "active-sites"
+  search.innerHTML = '<input placeholder="Search by project name…"><button>Open phase workspace</button>'
+  document.body.append(search)
   const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
   const React = await import("react")
   const { createRoot } = await import("react-dom/client")
@@ -37,8 +47,19 @@ test("guide supports first visit, skipping, role topics, navigation and replay",
     await click("Next")
     assert.match(document.body.textContent, /Step 2 of 4/)
     await click("Back")
-    await click("Open Active sites")
     assert.equal(destination, "Active sites")
+    assert.ok(document.querySelector(".tour-spotlight"), "actual control is highlighted")
+    assert.ok(document.querySelector(".tour-tooltip"), "guide stays open after navigation")
+    await click("Next")
+    assert.match(document.querySelector(".tour-tooltip").textContent, /This button opens your assigned phase/)
+    await click("Next")
+    assert.match(document.querySelector(".tour-tooltip").textContent, /not currently available/)
+    const attachment = document.createElement("button")
+    attachment.textContent = "Add attachments"
+    await React.act(async () => document.body.append(attachment))
+    assert.ok(document.querySelector(".tour-spotlight"), "control added by a form is found without restarting")
+    assert.doesNotMatch(document.querySelector(".tour-tooltip").textContent, /not currently available/)
+    await click("Exit tour")
     assert.equal(document.querySelector('[role="dialog"]'), null)
     for (const role of ["admin", "opm", "spm", "client"]) {
       assert.ok(guideTopics(role).length > 1)
