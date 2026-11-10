@@ -1,3 +1,4 @@
+import WorkspaceGuide from "./WorkspaceGuide"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import EngineerResponsibilities from './EngineerResponsibilities'
 import { useActionMessage } from "./ActionFeedback"
@@ -3789,6 +3790,7 @@ export default function RoleWorkspace({
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <WorkspaceGuide key={actor.id} actor={actor} enabled={!paused && !extensionDemo} onNavigate={next => { navigation.closeMobile(); navigate(next) }} />
           <div className="sidebar-person">
             <button className="topbar-avatar avatar" aria-label="View my profile" disabled={extensionDemo} onClick={() => setProfileOpen(true)}>{initials(actor.name)}</button>
             <span>

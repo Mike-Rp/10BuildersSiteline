@@ -1,3 +1,4 @@
+import WorkspaceGuide from "./WorkspaceGuide"
 import { resolveAdminSearchDestination, type AdminSearchDestination } from "./admin-search-destination"
 import type { WorkspaceResult } from "./admin-workspace-search"
 import "./admin-search-destination.css"
@@ -3104,11 +3105,7 @@ function AppInner() {
         <CollapsibleSidebarNav items={NAV} page={page} counts={navigationCounts} onNavigate={navigate} />
 
         <div className="sidebar-bottom">
-          <button onClick={() => { navigation.closeMobile(); setDialog({ kind: "help" }) }}>
-            <Icon name="doc" size={18} />
-            Workspace guide
-            <Icon name="arrow" size={15} />
-          </button>
+          <WorkspaceGuide key={actor.id} actor={actor} enabled={!signedOut} onNavigate={next => { navigation.closeMobile(); navigate(next) }} />
           <div className="sidebar-person">
             <span className="avatar">{initials(admin.name)}</span>
             <span>
@@ -3412,37 +3409,6 @@ function AppInner() {
           onClose={() => setDialog(undefined)}
           onOpen={(kind, id) => setDialog({ kind, id })}
           onPreview={previewDoc} onSelect={openSearchResult} />
-      )}
-      {dialog?.kind === "help" && (
-        <Modal
-          title="Welcome to your workspace"
-          onClose={() => setDialog(undefined)}
-        >
-          <div className="help-content">
-            <Icon name="building" size={36} />
-            <h3>One clear view of construction operations.</h3>
-            <p>
-              Start a project in Project intake, review allocation eligibility,
-              attach signed agreements and hand off to the Office PM. Open
-              Active sites for monitoring, or manage people and records under
-              Resources.
-            </p>
-            <h4>Records and access</h4>
-            <p>
-              Records and uploads are saved through the server to the database.
-              Access follows your account role and project assignments.
-            </p>
-            <p>
-              Other roles cannot be impersonated or accepted on behalf of from
-              this Administrator workspace.
-            </p>
-          </div>
-          <div className="modal-actions">
-            <Button variant="primary" onClick={() => setDialog(undefined)}>
-              Explore workspace
-            </Button>
-          </div>
-        </Modal>
       )}
       {monthlySummaryOpen && <MonthlySummaryDialog onClose={() => setMonthlySummaryOpen(false)} />}
       {reportProjectId && <MonthlyReport projects={state.projects} initialProjectId={reportProjectId} onClose={()=>setReportProjectId("")} />}

@@ -1,3 +1,4 @@
+import WorkspaceGuide from "./WorkspaceGuide"
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { LoadingRoleProvider } from "./LoadingSkeleton"
@@ -652,6 +653,7 @@ export default function ClientPortal({
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <WorkspaceGuide key={actor.id} actor={{ ...actor, role: "client" }} enabled={!paused} onNavigate={next => { navigation.closeMobile(); navigate(next) }} />
           <div className="sidebar-person">
             <span className="avatar">{initials(actor.name)}</span>
             <span>
