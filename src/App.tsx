@@ -867,7 +867,7 @@ function AppInner() {
   async function saveClient(account:Account) {
     const saved=await saveApiAccount(account,false)
     const loaded=await reloadWorkspace()
-    if(saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:"client"})
+    if(saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:"client",viewOnlyLoginLink:true})
     return loaded.accounts.find(a=>a.id===saved.id)!
   }
   async function addProject(project:Project) {

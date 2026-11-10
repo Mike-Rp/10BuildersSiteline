@@ -10,6 +10,7 @@ export type CreatedAccountDetails = {
   password: string
   role: Role
   credentialDecision?: "pending" | "verified"
+  viewOnlyLoginLink?: boolean
 }
 
 export default function AccountSignInDetails({ details, onClose }: { details: CreatedAccountDetails; onClose: () => void }) {
@@ -19,7 +20,7 @@ export default function AccountSignInDetails({ details, onClose }: { details: Cr
   const manual = useRef<HTMLTextAreaElement>(null)
   const inputs = useRef<Record<string, HTMLInputElement | null>>({})
   const rows = [
-    { label: "Site Login Link", value: url, button: "Copy Link" },
+    ...(!details.viewOnlyLoginLink ? [{ label: "Site Login Link", value: url, button: "Copy Link" }] : []),
     { label: details.role === "client" ? "Email Address" : "Work Email", value: details.email, button: "Copy Email" },
     { label: "Temporary Password", value: details.password, button: "Copy Password" },
   ]
@@ -45,6 +46,10 @@ export default function AccountSignInDetails({ details, onClose }: { details: Cr
       <p className="account-created-success"><Icon name="check" size={20} />Account created successfully</p>
       <div className="created-account-identity"><span className="avatar">{initials(details.name)}</span><h3>{details.name}</h3><Badge>{ROLE_NAMES[details.role]}</Badge></div>
       {details.credentialDecision && <p className="created-account-note">{details.credentialDecision === "verified" ? "Credentials verified. Account activation and allocation eligibility checks still apply." : "Credentials are awaiting Admin verification."}</p>}
+      {details.viewOnlyLoginLink && <div className="created-account-field">
+        <label htmlFor="created-login-link-view">Site Login Link</label>
+        <div><input id="created-login-link-view" readOnly value={url} autoComplete="off" spellCheck={false} /></div>
+      </div>}
       {rows.map(row => <div className="created-account-field" key={row.label}>
         <label htmlFor={`created-${row.button.replace(/ /g, "-")}`}>{row.label}</label>
         <div><input id={`created-${row.button.replace(/ /g, "-")}`} ref={element => { inputs.current[row.label] = element }} readOnly value={row.value} onFocus={event => event.currentTarget.select()} autoComplete="off" spellCheck={false} />
