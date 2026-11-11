@@ -734,7 +734,7 @@ function AppInner() {
       if ((user as {temp_password_issued?:boolean}).temp_password_issued) {
         setPasswordChangeRequired(true)
         const account = stubAccount(user.id, user.full_name || "", user.role)
-        setState({ ...emptyState, accounts: [account] })
+        setState({ ...emptyState(), accounts: [account] })
         return account
       }
       setPasswordChangeRequired(false)
