@@ -541,11 +541,34 @@ test("only the active dropdown stage accepts reports; completed and future stage
   for (const [index, stage] of updateUtility.STAGES.entries()) {
     const state = setup();
     const res = response();
-    await controller.submitPhaseUpdate(request(spm, { stage }), res);
+    await controller.submitPhaseUpdate(request(spm, { stage, note: "Site report." }), res);
     assert.equal(res.statusCode, index === 3 ? 201 : index < 3 ? 409 : 422, stage);
     assert.equal(state.update?.selected_stage_id ?? null, index === 3 ? index + 1 : null);
     assert.equal(state.p.current_stage_id, 4);
   }
+});
+
+test("an update with nothing in it is refused and saves nothing, while a note, an attachment or an uploaded file is enough", async () => {
+  for (const body of [{}, { note: "" }, { note: "   \t " }, { stage_id: 4 }, { file_ids: [], issue_categories: [], submitted_item_ids: [] }]) {
+    const state = setup();
+    const res = response();
+    await controller.submitPhaseUpdate(request(spm, body), res);
+    assert.equal(res.statusCode, 422, JSON.stringify(body));
+    assert.match(res.body.message, /field notes or an attachment/i);
+    assert.ok(!state.update, "no update was saved for the Office PM to confirm");
+  }
+  const noted = setup();
+  const withNote = response();
+  await controller.submitPhaseUpdate(request(spm, { note: "Concrete delivered." }), withNote);
+  assert.equal(withNote.statusCode, 201);
+  assert.equal(noted.update.note, "Concrete delivered.");
+  const uploaded = setup();
+  const upload = request(spm, {});
+  upload.file = { originalname: "site.pdf", buffer: Buffer.from("%PDF-test") };
+  const withFile = response();
+  await controller.submitPhaseUpdate(upload, withFile);
+  assert.equal(withFile.statusCode, 201, "a report file alone is enough");
+  assert.ok(uploaded.update);
 });
 
 test("one update saves notes, a site report, issue chips, and file-free checklist submissions", async () => {
@@ -598,7 +621,7 @@ test("confirming a report from another stage cannot change workflow position", a
 
 test("SPMs cannot confirm their own updates", async () => {
   const state = setup();
-  await controller.submitPhaseUpdate(request(), response());
+  await controller.submitPhaseUpdate(request(spm, { note: "Site update." }), response());
   const res = response();
   await updateController.approvePhaseUpdate(request(spm, {}, { updateId: "42" }), res);
   assert.equal(res.statusCode, 403);
@@ -607,7 +630,7 @@ test("SPMs cannot confirm their own updates", async () => {
 
 test("a second OPM confirmation cannot duplicate history", async () => {
   const state = setup();
-  await controller.submitPhaseUpdate(request(), response());
+  await controller.submitPhaseUpdate(request(spm, { note: "Site update." }), response());
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), response());
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
@@ -631,7 +654,7 @@ test("OPM report rejection keeps activity review decisions independent", async (
 
 test("an update with a stale prior stage cannot be confirmed", async () => {
   const state = setup();
-  await controller.submitPhaseUpdate(request(), response());
+  await controller.submitPhaseUpdate(request(spm, { note: "Site update." }), response());
   state.p.current_stage_id = 5;
   const res = response();
   await updateController.approvePhaseUpdate(request(opm, {}, { updateId: "42" }), res);
@@ -642,7 +665,7 @@ test("an update with a stale prior stage cannot be confirmed", async () => {
 
 test("only one update per SPM phase workspace may await OPM confirmation", async () => {
   const state = setup();
-  await controller.submitPhaseUpdate(request(), response());
+  await controller.submitPhaseUpdate(request(spm, { note: "Site update." }), response());
   const res = response();
   await controller.submitPhaseUpdate(request(), res);
   assert.equal(res.statusCode, 409);

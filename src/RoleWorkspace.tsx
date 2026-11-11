@@ -1939,7 +1939,7 @@ export default function RoleWorkspace({
                 label={
                   issueChoices.length>0
                     ? "Explain the issue *"
-                    : "Field notes (optional)"
+                    : "Field notes"
                 }
               >
                 <textarea
@@ -1953,7 +1953,7 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={saving || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
+                  disabled={saving || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))||(!issueChoices.length&&!note.trim()&&!evidence)}
                   onClick={async () => {
                     if (
                       await act(
@@ -1982,6 +1982,9 @@ export default function RoleWorkspace({
                     : "Submit progress update"}
                 </Button>
               </div>
+              {!issueChoices.length && !note.trim() && !evidence && !work.pendingUpdate && (
+                <p className="role-muted" id="progress-update-hint">Add field notes or an attachment to send an update.</p>
+              )}
             </section>
           </>
         )}

@@ -220,3 +220,36 @@ async function withUi(run) {
     for (const [key, descriptor] of previous) descriptor ? Object.defineProperty(globalThis, key, descriptor) : delete globalThis[key]
   }
 }
+
+test("Submit progress update stays disabled until there are field notes, and then sends exactly what was typed", async () => {
+  await withUi(async ({ React, root, server, w, click, button }) => {
+    const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
+    const state = activeFixture(), actor = state.accounts.find(account => account.id === "a4")
+    actor.expiry = "2099-01-01"
+    const requests = []
+    await React.act(() => root.render(React.createElement(Workspace, {
+      state, actor, onCommand(command) { requests.push(command); return Promise.resolve({ ok: true }) },
+      onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {},
+    })))
+    await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Active sites"))
+    await click(button("Open phase workspace"))
+    const submit = () => button("Submit progress update")
+    const notes = () => document.querySelector('[placeholder="Report the current conditions, observations, or a site issue."]')
+    assert.equal(submit().disabled, true, "an empty update cannot be sent")
+    assert.match(document.getElementById("progress-update-hint").textContent, /field notes or an attachment/)
+    await click(submit())
+    assert.equal(requests.length, 0, "clicking the disabled button sends nothing")
+    await input(React, w, notes(), "   ")
+    assert.equal(submit().disabled, true, "spaces are not a note")
+    await input(React, w, notes(), "Foundation forms are in place.")
+    assert.equal(submit().disabled, false)
+    assert.equal(document.getElementById("progress-update-hint"), null, "the hint goes away once there is something to send")
+    await click(submit())
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0].type, "submit_progress")
+    assert.equal(requests[0].note, "Foundation forms are in place.")
+    await React.act(async () => {})
+    assert.equal(notes().value, "", "the form is cleared after a successful send")
+    assert.equal(submit().disabled, true, "and cannot be sent again empty")
+  })
+})
