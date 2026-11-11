@@ -9,6 +9,10 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
+import { recordArchiveEvent } from "../archive/audit.utility.js";
+
+// Lifecycle states an intake may be corrected and resubmitted from. Active and archived projects are closed to intake edits.
+const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 
 export const createIntake = async (req, res) => {
   try {
@@ -40,27 +44,30 @@ export const createIntake = async (req, res) => {
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
-      // A repeat of the same submission returns the project it already created instead of inserting another.
-      const idemKey = intakeId ?? req.body?.draft_project_id ?? null;
-      if (idemKey) {
-        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [idemKey]);
+      // A repeat of a new submission returns the project it already created instead of inserting another.
+      // A resubmission (draft_project_id) is a correction and is never treated as a duplicate.
+      if (intakeId && !req.body?.draft_project_id) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [intakeId]);
         const prior = await client.query(
           `SELECT p.id,p.name,p.lifecycle_status FROM projects p
             WHERE p.id=$1 AND COALESCE(p.is_deleted,false)=false AND p.lifecycle_status NOT IN ('draft','suggested_allocation','confirmed')
-              AND EXISTS (SELECT 1 FROM assignment_confirmations c WHERE c.project_id=p.id AND c.role_context='opm')`, [idemKey]);
+              AND EXISTS (SELECT 1 FROM assignment_confirmations c WHERE c.project_id=p.id AND c.role_context='opm')`, [intakeId]);
         if (prior.rowCount) {
           const confirmation = await client.query(
             `SELECT id,project_id,target_user_id,status FROM assignment_confirmations
-              WHERE project_id=$1 AND role_context='opm' ORDER BY created_at LIMIT 1`, [idemKey]);
+              WHERE project_id=$1 AND role_context='opm' AND target_user_id=(SELECT suggested_opm_id FROM projects WHERE id=$1)
+              ORDER BY created_at DESC LIMIT 1`, [intakeId]);
           return {project: prior.rows[0], confirmation: confirmation.rows[0], duplicate: true};
         }
       }
       let draft=null;
       if (req.body.draft_project_id) {
-        const found=await client.query("SELECT id,client_name,lifecycle_status,project_type_id,to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [req.body.draft_project_id]);
+        const found=await client.query("SELECT id,client_name,lifecycle_status,project_type_id,suggested_opm_id,to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
         if(!found.rowCount) throw Object.assign(new Error("Draft not found."),{status:404});
         draft=found.rows[0];
-        if(!["draft","suggested_allocation","confirmed"].includes(draft.lifecycle_status)) throw Object.assign(new Error("This intake has already been submitted."),{status:409});
+        // Corrections are accepted until the project is active; the OPM review restarts from the resubmission.
+        if(!RESUBMITTABLE.includes(draft.lifecycle_status)) throw Object.assign(new Error("This project is already active or archived and can no longer be resubmitted."),{status:409});
       }
       let selectedClient=client_user_id;
       if(!selectedClient && draft) {
@@ -144,11 +151,33 @@ export const createIntake = async (req, res) => {
         await client.query("DELETE FROM user_client_project_links WHERE project_id=$1 AND user_id<>$2",[project.id,selectedClient]);
         await client.query("INSERT INTO user_client_project_links (user_id,project_id,created_by,updated_by) VALUES ($1,$2,$3,$3) ON CONFLICT (user_id,project_id) DO NOTHING",[selectedClient,project.id,actor.id]);
       }
+      // A resubmission supersedes every open Office PM confirmation, in the same transaction as the
+      // fresh pending one, so the previous OPM can no longer accept and the replacement can. Declined
+      // and expired confirmations stay as recorded; superseded ones are linked for the audit trail.
+      let supersededId = null;
+      if (draft) {
+        const open = await client.query(
+          `SELECT id,target_user_id,status FROM assignment_confirmations
+            WHERE project_id=$1 AND role_context='opm' AND status IN ('pending','accepted') ORDER BY created_at DESC FOR UPDATE`, [project.id]);
+        for (const previous of open.rows) {
+          await client.query("UPDATE assignment_confirmations SET status='reassigned',updated_by=$2,updated_at=now() WHERE id=$1", [previous.id, actor.id]);
+          await recordArchiveEvent(client, actor.id, "assignment_confirmations", previous.id, "opm_confirmation_superseded", {
+            project_id: project.id, previous_status: previous.status, previous_opm_id: previous.target_user_id,
+            replacement_opm_id: suggested_opm_id, previous_lifecycle_status: draft.lifecycle_status, reason: "intake_resubmitted" });
+        }
+        supersededId = open.rows[0]?.id ?? null;
+        // Oversight that came from a superseded acceptance ends; it returns when the fresh confirmation is accepted.
+        await client.query(
+          `UPDATE project_engineers SET unassigned_at=now(),updated_by=$2,updated_at=now()
+            WHERE project_id=$1 AND project_role_label='Office PM (oversight)' AND unassigned_at IS NULL`, [project.id, actor.id]);
+        await recordArchiveEvent(client, actor.id, "projects", project.id, "intake_resubmitted", {
+          project_id: project.id, previous_lifecycle_status: draft.lifecycle_status, previous_opm_id: draft.suggested_opm_id, opm_id: suggested_opm_id });
+      }
       const confirmation = await client.query(`INSERT INTO assignment_confirmations
-        (project_id,target_user_id,role_context,match_score,status,created_by)
-        VALUES ($1,$2,'opm',$3,'pending',$4)
+        (project_id,target_user_id,role_context,match_score,status,reassigned_from_id,created_by)
+        VALUES ($1,$2,'opm',$3,'pending',$5,$4)
         RETURNING id,project_id,target_user_id,status`,
-        [project.id,suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,actor.id]);
+        [project.id,suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,actor.id,supersededId]);
       return {project, confirmation:confirmation.rows[0]};
     });
     if (result.duplicate) return responseOk(res, 'Project was already submitted.', 1, {project: result.project, confirmation: result.confirmation});

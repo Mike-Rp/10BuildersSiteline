@@ -703,11 +703,23 @@ test(
       await assert.rejects(api(`/projects/${id}/engineer-responsibilities/${first.id}`,{method:'POST',json:{action:'accept'}}),/Wait for OPM/)
       session=await as(accounts.find(a=>a.id===project.opmId).email)
       await sendApiWorkflow(session.state,session.actor,{type:'accept_opm',projectId:id})
+      // SPM-DASH-004: direct responsibility requests follow the same sequence as the workspace:
+      // six registered documents first, then the Lead Site PM before any other engineer.
+      const leadPerson=(await db.query('select spm_user_id from project_phase_team where project_id=$1 and is_lead',[id])).rows[0].spm_user_id
+      const otherPerson=[personA,personB].find(person=>person!==leadPerson)
+      assert.ok(otherPerson,'the fixture has a supporting engineer besides the lead')
+      session=await as(accounts.find(a=>a.id===otherPerson).email)
+      const otherRow=(await api(`/projects/${id}/engineer-responsibilities`)).rows.find(row=>row.user_id===otherPerson&&row.status==='pending')
+      await assert.rejects(api(`/projects/${id}/engineer-responsibilities/${otherRow.id}`,{method:'POST',json:{action:'accept'}}),e=>e.status===409&&/documents/.test(e.message),'responsibility acceptance waits for the six registered documents')
+      session=await as(accounts.find(a=>a.id===project.opmId).email)
       for(let index=0;index<6;index++){
         const fileId=randomUUID();await uploadFile(fileId,new File(['%PDF-1.4\nRegistered record'],'record.pdf',{type:'application/pdf'}));session.state=await loadState(session.user)
         await sendApiWorkflow(session.state,session.actor,{type:'upload_registered',projectId:id,docIndex:index,doc:{id:fileId,name:'record.pdf',uploaded:true}})
       }
-      for(const person of [personA,personB]){
+      session=await as(accounts.find(a=>a.id===otherPerson).email)
+      await assert.rejects(api(`/projects/${id}/engineer-responsibilities/${otherRow.id}`,{method:'POST',json:{action:'accept'}}),e=>e.status===409&&/Lead Site PM/.test(e.message),'the Lead Site PM accepts before other engineers')
+      assert.equal((await db.query('select status from project_phase_responsibilities where id=$1',[otherRow.id])).rows[0].status,'pending','a refused acceptance changes nothing')
+      for(const person of [leadPerson,otherPerson]){
         session=await as(accounts.find(a=>a.id===person).email)
         assert.ok(session.state.projects.find(p=>p.id===id).team.some(row=>row.engineers?.some(e=>e.accountId===person)),'supporting engineers load their responsibilities')
         await sendApiWorkflow(session.state,session.actor,{type:'accept_assignment',projectId:id})

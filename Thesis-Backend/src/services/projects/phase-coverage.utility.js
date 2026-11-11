@@ -2,7 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
-import { phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js";
+import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js";
 
 // Pure check: every required phase has exactly one row with a valid engineer that is confirmed.
 // `required` comes only from the authoritative workflow; `rows` are the saved assignment rows.
@@ -60,7 +60,7 @@ export async function loadPhaseCoverage(db, projectId) {
     const requiredTags=(await db.query('select d.code from projects p join project_stage_discipline_links l on l.project_type_id=p.project_type_id join disciplines d on d.id=l.discipline_id where p.id=$1 and l.project_stage_id=$2',[projectId,phase.project_stage_id])).rows.map(r=>r.code);
     const coveredTags = new Set(assigned.filter(r=>r.status==='confirmed'&&r.engineer_valid).flatMap(r=>r.assigned_disciplines||[]));
     const quota = phaseCoverageQuota(requiredTags);
-    if(!assigned.length || assigned.length > 3 && requiredTags.length >= 5 || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;result.unconfirmed.push(phase.code+' specialization responsibilities');}
+    if(!assigned.length || assigned.length > MAX_ENGINEERS_PER_PHASE || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;result.unconfirmed.push(phase.code+' specialization responsibilities');}
    }
   }
   return result;

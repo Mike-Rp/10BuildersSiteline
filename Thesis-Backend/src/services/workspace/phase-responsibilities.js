@@ -5,6 +5,7 @@ import {
   isUuid,
 } from "../../common/utilities/access.utility.js"
 import { responsibilitiesInstalled } from "../projects/phase-responsibilities.utility.js"
+import { assertAcceptancePrerequisites } from "../projects/assignment-prerequisites.utility.js"
 import {
   prepareEngineerAssignments,
   engineerCommitments,
@@ -166,6 +167,8 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             "The response deadline has passed. Ask Admin for reassignment.",
           )
         if (action === "accept") {
+          // Same gate as phase-team acceptance: OPM accepted, six documents, Lead Site PM first.
+          await assertAcceptancePrerequisites(db, p, user)
           await assertEligibleManager(db, user.id, "spm")
           await prepareEngineerAssignments(
             db,

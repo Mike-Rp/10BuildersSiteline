@@ -13,8 +13,13 @@ import { LICENSE_ELIGIBILITY_SQL, assertEligibleManager } from "../../common/uti
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError } from "../../common/utilities/access.utility.js";
 
+// Roles that prepare or revise a project team. Recommendations name engineers, so a
+// signed-in intake role is required and Site PM or client sessions are refused.
+const RECOMMENDATION_ROLES = ['admin', 'opm'];
+
 export const getRecommendations = async (req, res) => {
   try {
+    if (!(await requireUser(req, res, RECOMMENDATION_ROLES))) return;
     const { project_type, floor_area_sqm, floor_count } = req.query;
     if (!project_type || !Number.isFinite(Number(floor_area_sqm)) || Number(floor_area_sqm) <= 0 ||
         !Number.isInteger(Number(floor_count)) || Number(floor_count) <= 0) {
@@ -54,6 +59,7 @@ export const getRecommendations = async (req, res) => {
 
 export const rerunRecommendations = async (req, res) => {
   try {
+    if (!(await requireUser(req, res, RECOMMENDATION_ROLES))) return;
     const { project_type, floor_area_sqm, floor_count } = req.query;
     if (!project_type || !Number.isFinite(Number(floor_area_sqm)) || Number(floor_area_sqm) <= 0 ||
         !Number.isInteger(Number(floor_count)) || Number(floor_count) <= 0) {
@@ -92,6 +98,7 @@ export const rerunRecommendations = async (req, res) => {
 
 export const swapOpm = async (req, res) => {
   try {
+    if (!(await requireUser(req, res, RECOMMENDATION_ROLES))) return;
     const { project_type } = req.query;
 
     const suggested_opm = await getOpm(project_type, true);
@@ -309,7 +316,7 @@ const getSpm = async (project_type) => {
         candidates.push({id:person.id,qualifiedTags});
       }
       const result=allocatePhaseCoverage(required,candidates);
-      suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,missing_specializations:result.missing});
+      suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 

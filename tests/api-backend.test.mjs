@@ -112,6 +112,8 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     setToken("")
     const role = (await db.query("select r.code from users u join roles r on r.id=u.role_id where lower(u.email::text)=lower($1)", [email])).rows[0]?.code
     const user = await login(email, "Password@123", true, role === "admin" ? "admin" : role === "client" ? "client" : "staff") // test role switches explicitly replace the earlier session
+    // A temporary password unlocks only the reset flow (SHR-NOT-008): fixture accounts keep their password and clear the flag first.
+    if (user.temp_password_issued) await api("/auth/reset-password", { method: "POST", json: { password: "Password@123" } })
     return { user, state: await loadState(user) }
   }
   const names = (state) => state.projects.map((p) => p.name).sort()

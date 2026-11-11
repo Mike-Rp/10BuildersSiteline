@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { loadPhaseCoverage } from "../projects/phase-coverage.utility.js";
+import { assertAcceptancePrerequisites } from "../projects/assignment-prerequisites.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isUuid, isBigintId, isSmallintId, paging,
@@ -74,7 +75,7 @@ export const acceptConfirmation = async (req, res) => {
       await assertLicenseActive(user, client);
       const owner=await client.query("SELECT project_id FROM assignment_confirmations WHERE id=$1 AND target_user_id=$2",[id,user.id]);
       if(!owner.rowCount) throw new HttpError(404,"Confirmation not found.");
-      const p=await client.query("SELECT id,lifecycle_status FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[owner.rows[0].project_id]);
+      const p=await client.query("SELECT id,lifecycle_status,suggested_opm_id FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[owner.rows[0].project_id]);
       if(!p.rowCount || p.rows[0].lifecycle_status==="archived") throw new HttpError(409,"Archived projects are read-only.");
 
       const found = await client.query(
@@ -87,6 +88,9 @@ export const acceptConfirmation = async (req, res) => {
       if (found.rowCount === 0) throw new HttpError(404, "Confirmation not found.");
       const conf = found.rows[0];
       if (conf.status !== "pending") throw new HttpError(409, `Confirmation is already ${conf.status}.`);
+      // Only the currently assigned Office PM can accept an intake; a superseded confirmation never can.
+      if (conf.role_context === "opm" && p.rows[0].suggested_opm_id !== user.id)
+        throw new HttpError(409, "This intake was reassigned to another Office PM.", "OPM_CONFIRMATION_SUPERSEDED");
 
       const updated = await client.query(
         `UPDATE assignment_confirmations
@@ -311,6 +315,8 @@ const respondToPhase = (newStatus) => async (req, res) => {
       if (row.response_deadline_at && new Date(row.response_deadline_at) < new Date()) {
         throw new HttpError(409, "The response deadline has passed; ask an admin to reassign.");
       }
+      // Acceptance follows the workspace sequence even for direct API requests.
+      if (newStatus === "confirmed") await assertAcceptancePrerequisites(client, project.rows[0], user);
 
       let scopedTeam=[];
       if(newStatus==='confirmed') {

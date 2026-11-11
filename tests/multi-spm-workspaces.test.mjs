@@ -61,6 +61,8 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
  await db.query("insert into project_phase_responsibilities(project_id,project_stage_id,user_id,assigned_disciplines,status) values($1,$2,$3,array['Structural'],'confirmed')",[projectId,stages[0].id,b.id])
  await db.query("insert into project_phase_responsibilities(project_id,project_stage_id,user_id,assigned_disciplines,status) values($1,$2,$3,array['Structural'],'confirmed')",[projectId,stages[1].id,c.id])
  await db.query("insert into project_engineers(project_id,user_id,project_role_label) values($1,$2,'Site PM'),($1,$3,'Site PM')",[projectId,a.id,b.id])
+ // An active project has its six registered documents; replacement engineers cannot accept without them (SPM-DASH-004).
+ await db.query("insert into project_documents(project_id,document_type_id,status) select $1,id,'uploaded' from document_types where code=any($2::text[])",[projectId,['notice_to_proceed','building_permit','owner_contract','registered_plans','environmental_certificate','budget_boq']])
  await db.query("insert into project_engineers(project_id,user_id,project_role_label) values($1,$2,'Site PM')",[projectId,c.id])
  const checklist=await readChecklist(db,projectId,stages[0].id)
  const itemIds=[...new Set(checklist.items.map(i=>String(i.id)))]

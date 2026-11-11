@@ -421,6 +421,9 @@ function confirmationClient(queries, teamRows) {
     if (sql.startsWith("SELECT s.id,s.code")) return result([{id:4,code:'Structure'}]);
     if (sql.startsWith("SELECT id, status, response_deadline_at")) return result([{ id: "1", status: "pending", response_deadline_at: null }]);
     if (sql.startsWith("UPDATE project_phase_team")) return result([{ stage_id: 4, status: "confirmed" }]);
+    // Acceptance prerequisites: six registered documents are uploaded and the acting SPM holds the lead row.
+    if (sql.startsWith("SELECT count(DISTINCT t.code)::int AS n FROM project_documents")) return result([{ n: 6 }]);
+    if (sql.startsWith("SELECT spm_user_id, status, is_lead FROM project_phase_team")) return result([{ spm_user_id: spm.id, status: "pending", is_lead: true }]);
     if (sql.startsWith("SELECT 1 FROM project_phase_team")) return result([]);
     if (sql.startsWith("SELECT w.project_stage_id,s.code")) return result(COMMERCIAL);
     if (sql.startsWith("SELECT jsonb_array_length")) return result([{ n: COMMERCIAL.length }]);

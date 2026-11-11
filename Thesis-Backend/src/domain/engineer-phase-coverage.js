@@ -43,10 +43,14 @@ function allocate(required, candidates) {
   return { engineers, missing, complete: missing.length === 0 }
 }
 
+// Minimum specialty coverage for every phase: at least half of the unique required
+// tags, rounded up (1→1, 2→1, 3→2, 4→2, 5→3, 6→3). Full coverage is still preferred.
 export function phaseCoverageQuota(required) {
   const count = [...new Set(required || [])].length
-  return count >= 5 ? Math.ceil(count / 2) : count
+  return Math.ceil(count / 2)
 }
+
+export const MAX_ENGINEERS_PER_PHASE = 3
 
 function combinations(values, size, visit, start = 0, selected = []) {
   if (selected.length === size) return visit(selected)
@@ -57,13 +61,15 @@ function combinations(values, size, visit, start = 0, selected = []) {
   return undefined
 }
 
-// For large phases, prefer complete coverage with two engineers, then three.
-// If neither team can cover every tag, retain the best two-person team that meets
-// the half-coverage quota, then try three. Qualification-equivalent candidates
-// are interchangeable for coverage, so keep the best ranked candidate per scope.
+// Every phase is staffed by at most three engineers. The smallest team that covers
+// every tag wins; otherwise the team covering the most tags, which the caller then
+// judges against the half-coverage quota. Qualification-equivalent candidates are
+// interchangeable for coverage, so keep the best ranked candidate per scope.
 export function allocatePhaseCoverage(required, candidates) {
   const tags = [...new Set(required || [])]
-  if (tags.length < 5) return allocate(tags, candidates)
+  const quota = phaseCoverageQuota(tags)
+  const empty = { engineers: [], missing: tags, complete: tags.length === 0, covered: 0, quota, quotaMet: quota === 0 }
+  if (!tags.length) return empty
 
   const profiles = new Map()
   for (const person of candidates) {
@@ -83,18 +89,12 @@ export function allocatePhaseCoverage(required, candidates) {
     })
     return best
   }
-  for (const size of [2, 3]) {
-    if (ranked.length < size) continue
-    const full = bestTeam(size)
-    if (full?.complete) return full
+  let best
+  for (let size = 1; size <= Math.min(MAX_ENGINEERS_PER_PHASE, ranked.length); size++) {
+    const team = bestTeam(size)
+    if (team && (!best || team.covered > best.covered)) best = team
+    if (best?.complete) break
   }
-
-  const quota = phaseCoverageQuota(tags)
-  for (const size of [2, 3, 1]) {
-    if (ranked.length < size) continue
-    const best = bestTeam(size)
-    if (best?.covered >= quota) return best
-  }
-  const best = bestTeam(Math.min(3, ranked.length))
-  return best || { engineers: [], missing: tags, complete: false, covered: 0 }
+  if (!best) return empty
+  return { ...best, quota, quotaMet: best.covered >= quota }
 }

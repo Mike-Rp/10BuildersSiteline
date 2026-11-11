@@ -65,6 +65,12 @@ export const deleteProject = async (req, res) => {
     if (!isUuid(req.params.id)) return sendError(res, "Invalid project id.", 400);
     await withTransaction(async client => {
       const p = await phaseProject(client, user, req.params.id);
+      // Removal eligibility is decided before any record changes. Active work is never removed by an
+      // ordinary deletion request: it must finish Closeout and be archived through the archive flow.
+      if (p.lifecycle_status === "active")
+        throw new HttpError(409, "Active projects cannot be deleted. Complete Closeout and archive the project instead.", "PROJECT_ACTIVE");
+      if (p.lifecycle_status === "archived")
+        throw new HttpError(409, "This project is already archived.", "PROJECT_ARCHIVED");
       await client.query(
         `UPDATE projects SET is_deleted = true, deleted_at = now(), deleted_by = $2, lifecycle_status = 'archived',
           archived_at = COALESCE(archived_at, now()), updated_by = $2, updated_at = now()

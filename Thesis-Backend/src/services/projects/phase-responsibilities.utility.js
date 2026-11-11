@@ -2,7 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js"
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js"
 import { prepareEngineerAssignments } from "./engineer-commitments.utility.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
-import { phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
+import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
 
 export async function responsibilitiesInstalled(db) {
   return (
@@ -36,7 +36,7 @@ export async function preparePhaseResponsibilities(
         [typeId, phase.stage],
       )
     ).rows.map((r) => r.code)
-    if (required.length >= 5 && phase.engineers.length > 3)
+    if (phase.engineers.length > MAX_ENGINEERS_PER_PHASE)
       throw new HttpError(422, `Assign no more than three engineers to ${phase.stage}.`)
     const used = new Set(),
       people = new Set()

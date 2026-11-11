@@ -65,6 +65,24 @@ export const paging = (req, defaultLimit = 20, maxLimit = 100) => ({
   offset: Math.max(0, parseInt(req.query.offset, 10) || ((Math.max(1,Number(req.query.page)||1)-1)*Math.min(maxLimit,Math.max(1,Number(req.query.limit ?? req.query.pageSize)||defaultLimit)))),
 });
 
+export const PASSWORD_CHANGE_REQUIRED_MESSAGE = "Replace your temporary password before continuing.";
+
+// The requests a temporary-password session may make: read its own session, replace the
+// password, keep or end the session. Nothing else until the password is replaced.
+const PASSWORD_CHANGE_ROUTES = [
+  { methods: ["GET"], path: /\/auth\/me$/ },
+  { methods: ["GET", "POST"], path: /\/auth\/(session|activity)$/ },
+  { methods: ["POST"], path: /\/auth\/reset-password$/ },
+  { methods: ["POST"], path: /\/auth\/admin\/change-password$/ },
+  { methods: ["POST", "DELETE"], path: /\/auth\/logout$/ },
+  { methods: ["PUT", "PATCH", "DELETE"], path: /\/auth$/ },
+];
+export const passwordChangeAllowed = (req) => {
+  const url = (req.originalUrl || req.url || "").split("?")[0].replace(/\/+$/, "");
+  const method = String(req.method || "GET").toUpperCase();
+  return PASSWORD_CHANGE_ROUTES.some((route) => route.methods.includes(method) && route.path.test(url));
+};
+
 const extractToken = (req) => {
   const header = req.headers?.authorization;
   if (!header || typeof header !== "string") return null;
@@ -84,7 +102,7 @@ export const getCurrentUser = async (req) => {
   }
 
   const result = await execute(
-    `SELECT u.id, u.full_name, r.code AS role
+    `SELECT u.id, u.full_name, r.code AS role, COALESCE(u.temp_password_issued, false) AS temp_password_issued
        FROM users_token t
        JOIN users u ON u.id = t.user_id
        JOIN roles r ON r.id = u.role_id
@@ -97,9 +115,13 @@ export const getCurrentUser = async (req) => {
     [token]
   );
   if (result.rowCount > 0) {
-    const user = result.rows[0];
+    const { temp_password_issued: temporaryPassword, ...user } = result.rows[0];
     const timing = await readSessionTiming({query:execute}, payload);
     if (timing.expired) throw new HttpError(401, "Your session expired due to inactivity. Please sign in again.", "SESSION_INACTIVE");
+    // A temporary password only unlocks the steps needed to replace it. Every other
+    // operation waits, whatever the role, until the account owner chooses a password.
+    if (temporaryPassword && !passwordChangeAllowed(req))
+      throw new HttpError(403, PASSWORD_CHANGE_REQUIRED_MESSAGE, "PASSWORD_CHANGE_REQUIRED");
     if (["opm", "spm"].includes(user.role)) {
       const current = (await execute("select license_expiry::text as expiry from user_licenses where user_id=$1 and superseded_at is null order by (to_jsonb(user_licenses)->>'verification_status'='verified') desc nulls last, license_expiry desc, created_at desc,id desc limit 1", [user.id])).rows[0];
       const policy = licenseAccessPolicy(current?.expiry);
