@@ -78,6 +78,7 @@ import {
   api,
   ApiError,
   getToken,
+  setPasswordChangeRequired,
   setToken,
   SESSION_REPLACED_EVENT,
   LICENSE_RENEWAL_ONLY_EVENT,
@@ -730,6 +731,13 @@ function AppInner() {
     setReadinessAvailable(false)
     try {
       setMustResetPassword(!!(user as {temp_password_issued?:boolean}).temp_password_issued)
+      if ((user as {temp_password_issued?:boolean}).temp_password_issued) {
+        setPasswordChangeRequired(true)
+        const account = stubAccount(user.id, user.full_name || "", user.role)
+        setState({ ...emptyState, accounts: [account] })
+        return account
+      }
+      setPasswordChangeRequired(false)
       const loaded = await loadApiState(user)
       if (getToken() !== requestToken || version !== sessionLoadVersion.current) {
         throw new ApiError("Your session has changed. Sign in again.", 401)
@@ -2983,7 +2991,7 @@ function AppInner() {
     )
   if (signedOut || !actor.id)
     return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
-  if(mustResetPassword)return <PasswordReset onComplete={()=>setMustResetPassword(false)} onCancel={endSession} />
+  if(mustResetPassword)return <PasswordReset onComplete={()=>{setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (

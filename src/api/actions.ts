@@ -278,6 +278,7 @@ export async function createCompany(company: Company) {
     return await post("/subcontractors/registrations", company);
 }
 export async function saveApiProject(project: Project, existing: boolean) {
+    if (existing) project = { ...project, opmAccepted: false, team: project.team.map(row => ({ ...row, status: "pending", engineers: row.engineers?.map(engineer => ({ ...engineer, status: "pending" })) })), workflow: project.workflow ? { ...project.workflow, acceptedAt: undefined } : undefined };
     const result = await post("/projects/intake", {
         name: project.name, project_type: project.type, floor_area_sqm: Number(project.area.replace(/,/g, "")),
         floor_count: Number(project.floors), target_start_date: project.start, client_user_id: project.clientId,

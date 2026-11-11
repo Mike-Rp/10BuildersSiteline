@@ -16,6 +16,8 @@ const TOKEN_KEY = "siteline-api-token"
 export const LICENSE_RENEWAL_ONLY_EVENT = "siteline-license-renewal-only"
 export const SESSION_REPLACED_EVENT = "siteline-session-replaced"
 let memoryToken = ""
+let passwordChangeRequired = false
+export function setPasswordChangeRequired(required: boolean) { passwordChangeRequired = required }
 
 export function getToken(): string {
   try {
@@ -26,6 +28,7 @@ export function getToken(): string {
 }
 export function setToken(token: string) {
   if (!token || token !== getToken()) dismissActionResult()
+  if (!token) passwordChangeRequired = false
   memoryToken = token
   try {
     if (token) sessionStorage.setItem(TOKEN_KEY, token)
@@ -68,6 +71,9 @@ async function request<T>(
   if (!base) throw new ApiError("The API address is not configured.", 0)
   const headers = new Headers(init.headers)
   const token = getToken()
+  if (!token && path.startsWith("/projects/recommendations")) throw new ApiError("Sign in to view personnel recommendations.", 401)
+  if (passwordChangeRequired && !["/auth/me", "/auth/reset-password", "/auth"].includes(path)) throw new ApiError("Replace your temporary password before continuing.", 403)
+  if ((init.method || "GET").toUpperCase() === "DELETE" && /^\/projects\/[^/?]+$/.test(path)) throw new ApiError("Project deletion is unavailable. Preserve the project record and use the archive workflow.", 403)
   if (token) headers.set("Authorization", `Bearer ${token}`)
   if (
     init.body &&
@@ -85,8 +91,8 @@ async function request<T>(
         const error = await response.clone().json().catch(() => undefined)
         signal.throwIfAborted()
         setToken("")
-        if (["SESSION_REPLACED", "SESSION_INACTIVE"].includes(error?.error?.code) && typeof window !== "undefined") {
-          window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error.error.message }))
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new window.CustomEvent(SESSION_REPLACED_EVENT, { detail: error?.error?.message || "Your session expired. Sign in again." }))
         }
       }
       if (response.status === 403 && token && getToken() === token) {

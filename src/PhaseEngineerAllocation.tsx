@@ -5,8 +5,9 @@ import { Button, Modal } from "./ui"
 import "./phase-engineers.css"
 import {
   allocatePhaseCoverage,
-  phaseCoverageQuota,
 } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
+
+import { phaseCoverageQuota } from "./phase-coverage-policy"
 
 type Row = Project["team"][number]
 export function recommendPhaseEngineers(
@@ -38,7 +39,7 @@ export function phaseCoverageMeetsQuota(row: Row, tags: string[]) {
   const covered = tags.length - phaseCoverageMissing(row, tags).length
   return (
     covered >= phaseCoverageQuota(tags) &&
-    (tags.length < 5 || (row.engineers?.length || 0) <= 3)
+    (row.engineers?.length || 0) <= 3
   )
 }
 export default function PhaseEngineerAllocation({
@@ -66,7 +67,7 @@ export default function PhaseEngineerAllocation({
     selected: string
     search: string
   }>()
-  const limitReached = required.length >= 5 && engineers.length >= 3
+  const limitReached = engineers.length >= 3
   function update(list: NonNullable<Row["engineers"]>) {
     onChange({
       ...row,
@@ -129,7 +130,7 @@ export default function PhaseEngineerAllocation({
         <strong>{row.phase}</strong>
         <span className={quotaMet ? "coverage-ready" : "coverage-missing"}>
           {required.length - missing.length} of {required.length} areas covered
-          {required.length >= 5 ? ` · minimum ${quota}` : ""}
+          {` · minimum ${quota} (50%)`}
         </span>
       </div>
       <div className="tag-list">
@@ -265,12 +266,12 @@ export default function PhaseEngineerAllocation({
         <p role="status">
           {quotaMet
             ? `Minimum coverage quota met. Still uncovered: ${missing.join(", ")}.`
-            : `Uncovered areas: ${missing.join(", ")}. For phases with 5–6 areas, cover at least ${quota}; otherwise cover every required area.`}
+            : `Uncovered areas: ${missing.join(", ")}. Cover at least ${quota} required areas (50%, rounded up).`}
         </p>
       )}
       <p className="role-muted">
         Aim for full coverage whenever eligible engineers are available. Each
-        engineer can cover up to three areas. For phases with 5–6 areas, the
+        engineer can cover up to three areas. For every phase, the
         minimum quota is half the areas, with at most three engineers. Engineers
         may cover succeeding phases within this project; existing project
         commitments and eligibility checks still apply.
