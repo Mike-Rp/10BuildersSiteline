@@ -488,6 +488,10 @@ export function peopleFromProjects(
   add(me)
   for (const p of list) {
     const detail = details.get(p.id) || {}
+    for (const contact of (detail.site_pm_contacts || []) as Dto[]) {
+      const account = byId.get(contact.id) ?? stubAccount(contact.id, contact.full_name, "spm")
+      byId.set(contact.id, { ...account, name: contact.full_name, email: contact.email ?? "", phone: contact.phone ?? "" })
+    }
     for (const t of (detail.phase_team || []).filter((t: Dto) => t.spm_user_id))
       add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
     if (detail.opm_assignment?.target_user_id)

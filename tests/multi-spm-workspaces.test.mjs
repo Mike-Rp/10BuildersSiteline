@@ -12,7 +12,7 @@ import {installCredentialFixture} from './helpers/credential-fixture.mjs'
 import {readChecklist} from '../Thesis-Backend/src/services/progress/phase.utility.js'
 import {readVerifiedProgress} from '../Thesis-Backend/src/services/progress/verified.utility.js'
 import {pendingChecklistFor,canWorkPhase} from '../src/workflows.ts'
-import {mapProject} from '../src/api/adapter.ts'
+import {mapProject, peopleFromProjects, stubAccount} from '../src/api/adapter.ts'
 
 const read=p=>fs.readFileSync(new URL(p,import.meta.url),'utf8')
 const freePort=()=>new Promise(resolve=>{const s=net.createServer().listen(0,'127.0.0.1',()=>{const {port}=s.address();s.close(()=>resolve(port))})})
@@ -44,7 +44,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
  const preserved=(await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows
  await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'));await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'))
  assert.deepEqual((await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows,preserved)
- const users=(await pg.query("select u.id,u.email,r.code as role from users u join roles r on r.id=u.role_id where u.status='active' order by u.id")).rows
+ const users=(await pg.query("select u.id,u.full_name,u.email,u.phone,r.code as role from users u join roles r on r.id=u.role_id where u.status='active' order by u.id")).rows
  const [a,b,c]=users.filter(u=>u.role==='spm'), admin=users.find(u=>u.role==='admin')
  const source=(await pg.query("select * from projects where lifecycle_status='active' limit 1")).rows[0]
  const opm=users.find(u=>u.id===source.suggested_opm_id)
@@ -86,6 +86,22 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   assert.ok(user.token)
  }
  const root='/projects/'+projectId
+ await t.test('the assigned Office PM receives work contacts for each phase engineer',async()=>{
+  const part=(await call(opm,'/workspace/project-data')).find(project=>project.list.id===projectId)
+  assert.ok(part.detail.phase_team.every(row=>row.spm_user_id===a.id))
+  const expected=[a,b,c].map(({id,full_name,email,phone})=>({id,full_name,email,phone}))
+  assert.deepEqual(new Map(part.detail.site_pm_contacts.map(contact=>[contact.id,contact])),new Map(expected.map(contact=>[contact.id,contact])))
+  const {accounts}=peopleFromProjects(stubAccount(opm.id,opm.full_name,'opm'),[part.list],new Map([[part.list.id,part.detail]]))
+  for(const person of expected) {
+   const contact=accounts.find(account=>account.id===person.id)
+   assert.equal(contact.name,person.full_name)
+   assert.equal(contact.email,person.email)
+   assert.equal(contact.phone,person.phone??'')
+  }
+  const spmPart=(await call(b,'/workspace/project-data')).find(project=>project.list.id===projectId)
+  assert.ok(spmPart)
+  assert.ok(!Object.hasOwn(spmPart.detail,'site_pm_contacts'))
+ })
  const aPhotoId=randomUUID()
  async function upload(user,stage=stages[0]){const form=new FormData();form.set('file',new Blob(['%PDF-test'],{type:'application/pdf'}),'evidence.pdf');form.set('stage_id',stage.id);return call(user,root+'/phase-files',{method:'POST',body:form,status:201})}
  const [a1,a2,b1]=await Promise.all([upload(a),upload(a),upload(b)])

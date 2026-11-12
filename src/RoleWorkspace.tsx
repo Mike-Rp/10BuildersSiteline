@@ -716,14 +716,15 @@ export default function RoleWorkspace({
             {showContacts ? <div className="site-pm-roster-contacts">
               {(t.engineers?.length ? t.engineers.map(engineer => engineer.accountId) : t.accountId ? [t.accountId] : []).filter((id, index, ids) => ids.indexOf(id) === index).map(id => {
                 const engineer = t.engineers?.find(person => person.accountId === id)
+                const name = state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
                 const status = engineer?.status || t.status
                 const deadline = engineer?.responseDeadline
                 const overdue = status === "pending" && !!deadline && Date.parse(deadline) <= urgencyNow
                 return <div className="site-pm-roster-contact" key={id}>
-                  <span>{actorName(id)}{deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</span>
+                  <span>{name}{deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</span>
                   <Status value={overdue ? "response overdue" : status} />
-                  <Button icon="users" aria-label={`View contact details for ${actorName(id)} in ${t.phase}`} onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>View Contact Details</Button>
-                  {status !== "confirmed" && p.status !== "completed" && <Button aria-label={`Review reassignment for ${actorName(id)} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Review Reassignment</Button>}
+                  <Button icon="users" aria-label={`View contact details for ${name} in ${t.phase}`} onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>View Contact Details</Button>
+                  {status !== "confirmed" && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Review Reassignment</Button>}
                 </div>
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}

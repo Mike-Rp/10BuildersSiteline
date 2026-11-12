@@ -15,7 +15,19 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
   globalThis.fetch=async(url,options)=>{
     requests.push({url,method:options.method||'GET',body:options.body&&JSON.parse(options.body)})
     if(options.method==='POST')return await new Promise(resolve=>{resolvePost=()=>resolve(new Response(JSON.stringify(fail?{error:{message:'Candidate is no longer eligible.'}}:{data:{saved:true}}),{status:fail?409:200,headers:{'Content-Type':'application/json'}}));finish=resolvePost})
-    return new Response(JSON.stringify({data:mode==='missing'?{available:false,message:'Apply database migration 023 to enable suggested reassignment.'}:{available:true,canReassign:true,version:'offer-v1',name:'Juan Dela Cruz',phase:'Design',userId:'old',tags:['Civil','Structural'],status:'pending',deadline:'2020-01-01T00:00:00Z',message:mode==='empty'?'No eligible replacement covers this responsibility scope.':'Eligibility is checked again when you confirm.',candidates:mode==='empty'?[]:[{id:'new-a',name:'Mika Reyes',tags:['Civil','Structural']},{id:'new-b',name:'Faith Fajardo',tags:['Civil','Structural']}]}}),{status:200,headers:{'Content-Type':'application/json'}})
+    const waiting = mode === 'waiting'
+    const candidates = waiting || mode === 'empty' ? [] : [
+      { id: 'new-a', name: 'Mika Reyes', tags: ['Civil', 'Structural'] },
+      { id: 'new-b', name: 'Faith Fajardo', tags: ['Civil', 'Structural'] },
+    ]
+    const data = mode === 'missing'
+      ? { available: false, message: 'Apply database migration 023 to enable suggested reassignment.' }
+      : { available: true, canReassign: !waiting, version: 'offer-v1', name: 'Juan Dela Cruz', phase: 'Design', userId: 'old',
+          tags: ['Civil', 'Structural'], status: 'pending', deadline: waiting ? '2099-01-01T00:00:00Z' : '2020-01-01T00:00:00Z',
+          message: waiting ? 'Reassignment becomes available when the Site PM declines or the response deadline passes.'
+            : mode === 'empty' ? 'No eligible replacement covers this responsibility scope.' : 'Eligibility is checked again when you confirm.',
+          candidates }
+    return new Response(JSON.stringify({data}),{status:200,headers:{'Content-Type':'application/json'}})
   }
   const server=await createServer({cacheDir:`node_modules/.vite-tests/suggested-reassignment-${process.pid}`,server:{middlewareMode:true,hmr:false,watch:null},appType:'custom',logLevel:'silent',optimizeDeps:{noDiscovery:true,include:[]}})
   const {default:React,act}=await import('react'),{createRoot}=await import('react-dom/client')
@@ -25,7 +37,12 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
     const {default:Popup}=await server.ssrLoadModule('/src/SuggestedReassignment.tsx')
     const render=async key=>act(async()=>{root.render(React.createElement(Popup,{key,project:{id:'p1',name:'STI Santa Rosa'},phase:'Design',userId:'old',onClose:()=>{closed++},onSaved:async()=>{saved++}}));await tick()})
     const button=text=>[...document.querySelectorAll('button')].find(element=>element.textContent===text)
-    await render('normal')
+    mode='waiting';await render('waiting')
+    assert.match(document.querySelector('[role="dialog"]').textContent,/Awaiting acceptance/)
+    assert.match(document.querySelector('[role="dialog"]').textContent,/declines or the response deadline passes/)
+    assert.equal(button('Confirm Reassignment'),undefined)
+    mode='normal'
+    await act(async()=>{button('Refresh Suggestions').click();await tick()})
     assert.match(document.querySelector('[role="dialog"]').textContent,/Response overdue/)
     assert.equal(document.querySelectorAll('input[type="radio"]').length,2)
     assert.equal(button('Confirm Reassignment').disabled,true)
@@ -46,11 +63,11 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
     await act(async()=>{finish();await tick()})
     assert.equal(saved,1);assert.equal(closed,1)
     mode='empty';await render('empty')
-    assert.equal(button('Confirm Reassignment').disabled,true)
+    assert.equal(button('Confirm Reassignment'),undefined)
     assert.match(document.querySelector('[role="dialog"]').textContent,/No eligible replacement/)
     mode='missing';await render('missing')
     assert.match(document.querySelector('[role="dialog"]').textContent,/migration 023/)
-    assert.equal(button('Confirm Reassignment').disabled,true)
+    assert.equal(button('Confirm Reassignment'),undefined)
   } finally {
     await act(()=>root.unmount());await server.close();dom.window.close()
     for(const [key,descriptor]of previous)descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key]
