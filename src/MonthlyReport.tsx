@@ -6,6 +6,8 @@ import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type M
 import "./monthly-report.css"
 import ReportProjectSearch from "./ReportProjectSearch"
 import ReportExportActions, { type ReportExportFormat } from "./ReportExportActions"
+import ReportPdfRecovery from "./ReportPdfRecovery"
+import { createReportPdfSafely, PdfExporterLoadError } from "./report-pdf-loader"
 
 export default function MonthlyReport({projects,initialProjectId,initialMonth,onClose,allowProjectChange=true,onProjectChange}:{projects:{id:string;name:string}[];initialProjectId:string;initialMonth?:string;onClose:()=>void;allowProjectChange?:boolean;onProjectChange?:(id:string)=>void}) {
   const [projectId,setProjectId]=useState(initialProjectId)
@@ -13,10 +15,11 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
   const [month,setMonth]=useState(()=>initialMonth||currentReportMonth())
   const [data,setData]=useState<{report:Report;snapshot:string}>()
   const [loading,setLoading]=useState(false),[error,setError]=useState(""),[refresh,setRefresh]=useState(0),[exporting,setExporting]=useState(false)
+  const [pdfNeedsReload,setPdfNeedsReload]=useState(false)
   const revision=useRef(0),printFrame=useRef<HTMLIFrameElement|null>(null)
   useEffect(()=>()=>{revision.current++;printFrame.current?.remove()},[])
   useEffect(()=>{
-    let active=true;revision.current++;setData(undefined);setError("")
+    let active=true;revision.current++;setData(undefined);setError("");setPdfNeedsReload(false)
     if(!projectId||!/^\d{4}-\d{2}$/.test(month)||month>currentReportMonth()){setLoading(false);return}
     setLoading(true)
     api<{report:Report;snapshot:string}>(`/projects/${projectId}/monthly-report?month=${encodeURIComponent(month)}`)
@@ -25,14 +28,13 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
   },[projectId,month,refresh])
   async function exportReport(format:ReportExportFormat) {
     if(!data||exporting)return
-    const current=revision.current;setExporting(true);setError("")
+    const current=revision.current;setExporting(true);setError("");setPdfNeedsReload(false)
     try {
       const result=await api<{csv?:string;report?:Report}>(`/projects/${data.report.project.id}/monthly-report/export`,{method:"POST",json:{snapshot:data.snapshot,format:format==="pdf"?"print":format}})
       if(current!==revision.current)return
       if(format==="csv")downloadBlob(new Blob([result.csv||""],{type:"text/csv;charset=utf-8"}),`${data.report.project.name.replace(/[\\/:*?"<>|]/g,"-")} — ${data.report.period.month}.csv`)
       else if(format==="pdf" && result.report){
-        const {createReportPdf}=await import("./report-pdf")
-        const blob=await createReportPdf(monthlyPrintDocument(result.report))
+        const blob=await createReportPdfSafely(monthlyPrintDocument(result.report))
         if(current!==revision.current)return
         downloadBlob(blob,`${data.report.project.name.replace(/[\\/:*?"<>|]/g,"-")} — ${data.report.period.month}.pdf`)
       }
@@ -43,7 +45,7 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
         frame.onload=()=>{if(!printed&&frame.contentDocument?.title==="Monthly Project Progress Summary"){printed=true;frame.contentWindow?.focus();frame.contentWindow?.print()}}
         frame.srcdoc=monthlyPrintDocument(result.report)
       }
-    }catch(reason){setError((reason as Error).message)}finally{setExporting(false)}
+    }catch(reason){if(current===revision.current){if(reason instanceof PdfExporterLoadError)setPdfNeedsReload(true);else setError((reason as Error).message)}}finally{setExporting(false)}
   }
   const report=data?.report,pending=report?.pending
   return <Modal title="Monthly Project Progress Summary" subtitle={report?.project.name||projects.find(p=>p.id===projectId)?.name} wide onClose={onClose}>
@@ -60,6 +62,7 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
       {month>currentReportMonth()&&<p role="alert" className="error">Future reporting months are unavailable.</p>}
       {loading&&<p role="status">Loading monthly report…</p>}
       {error&&<p role="alert" className="error">{error}</p>}
+      {pdfNeedsReload&&<ReportPdfRecovery />}
       {report&&<>
         <p className="role-muted">{report.project.type} · {report.period.monthToDate?"Month to date":"Month-end snapshot"} · {report.period.timezone}</p>
         <p className="role-muted">{reportDate(report.period.start)} → {reportDate(report.period.cutoff)} (exclusive)<br/>Generated {reportDate(report.period.generatedAt)}</p>

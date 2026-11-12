@@ -12,6 +12,8 @@ import {
 } from "./monthly-summary"
 import "./reports.css"
 import ReportExportActions, { type ReportExportFormat } from "./ReportExportActions"
+import ReportPdfRecovery from "./ReportPdfRecovery"
+import { createReportPdfSafely, PdfExporterLoadError } from "./report-pdf-loader"
 
 function SummaryCard({ label, total, value, note, icon }: { label: string; total?: SummaryTotal; value?: number; note?: string; icon: string }) {
   return <article className="metric-card report-summary-card">
@@ -31,12 +33,13 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
   const [filters, setFilters] = useState<SummaryFilters>(SUMMARY_FILTERS)
   const [projectPage, setProjectPage] = useState(1)
   const [exporting, setExporting] = useState(false), [exportError, setExportError] = useState("")
+  const [pdfNeedsReload, setPdfNeedsReload] = useState(false)
   const [detail, setDetail] = useState<{ id: string; month: string }>()
   const revision = useRef(0), printFrame = useRef<HTMLIFrameElement | null>(null)
   const future = month > currentReportMonth(), validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month)
   useEffect(() => () => { revision.current++; printFrame.current?.remove() }, [])
   useEffect(() => {
-    let active = true; revision.current++; setData(undefined); setError(""); setExportError("")
+    let active = true; revision.current++; setData(undefined); setError(""); setExportError(""); setPdfNeedsReload(false)
     if (!validMonth || future) { setLoading(false); return }
     setLoading(true)
     api<{ summary: MonthlySummary; snapshot: string }>(`/reports/monthly-summary?month=${encodeURIComponent(month)}`)
@@ -60,14 +63,13 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
 
   async function exportSummary(format: ReportExportFormat) {
     if (!data || !view || exporting) return
-    const current = revision.current; setExporting(true); setExportError("")
+    const current = revision.current; setExporting(true); setExportError(""); setPdfNeedsReload(false)
     try {
       const result = await api<{ csv?: string; summary?: MonthlySummary; view?: SummaryView }>("/reports/monthly-summary/export", { method: "POST", json: { snapshot: data.snapshot, format: format === "pdf" ? "print" : format, filters: view.filters } })
       if (current !== revision.current) return
       if (format === "csv") downloadBlob(new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" }), `10BuildLine monthly summary — ${data.summary.period.month}.csv`)
       else if (format === "pdf" && result.summary && result.view) {
-        const { createReportPdf } = await import("./report-pdf")
-        const blob = await createReportPdf(summaryPrintDocument(result.summary, result.view), true)
+        const blob = await createReportPdfSafely(summaryPrintDocument(result.summary, result.view), true)
         if (current !== revision.current) return
         downloadBlob(blob, `10BuildLine monthly summary — ${data.summary.period.month}.pdf`)
       }
@@ -78,7 +80,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
         frame.onload = () => { if (!printed && frame.contentDocument?.title === SUMMARY_PRINT_TITLE) { printed = true; frame.contentWindow?.focus(); frame.contentWindow?.print() } }
         frame.srcdoc = summaryPrintDocument(result.summary, result.view)
       }
-    } catch (reason) { setExportError((reason as Error).message) } finally { setExporting(false) }
+    } catch (reason) { if (current === revision.current) { if (reason instanceof PdfExporterLoadError) setPdfNeedsReload(true); else setExportError((reason as Error).message) } } finally { setExporting(false) }
   }
 
   return <>
@@ -95,6 +97,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
       {!validMonth && <p role="alert" className="error">Select a reporting month.</p>}
       {future && <p role="alert" className="error">Future reporting months are unavailable. Select the current month or an earlier one.</p>}
       {exportError && <p role="alert" className="error">{exportError}</p>}
+      {pdfNeedsReload && <ReportPdfRecovery />}
       {loading && <SkeletonRows rows={4} label="Loading monthly summary" />}
       {error && <div className="report-summary-error" role="alert"><p className="error">{error}</p><Button onClick={() => setRefresh(n => n + 1)}>Try again</Button></div>}
       {summary && view && <>

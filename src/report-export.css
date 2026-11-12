@@ -7,3 +7,5 @@
   .report-export-actions select { width: 100%; }
   .report-export-actions > .button { flex: 1 1 140px; }
 }
+.report-pdf-recovery { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--warning-border); border-radius: 10px; background: var(--amber-soft); overflow-wrap: anywhere; }
+.report-pdf-recovery > .button { justify-self: start; }
