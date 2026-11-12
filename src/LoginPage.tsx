@@ -1,10 +1,10 @@
 import { api, ApiError } from "./api/client"
-import { useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import type { Role } from "./model"
 import type { LoginPortal } from "./login-portal"
 import { Button, Field, Icon, Modal } from "./ui"
-import { SIGN_IN_MESSAGES, validateSignInFields } from "./signInPolicy"
+import { SIGN_IN_MESSAGES, validateSignInFields, lockoutDeadline, formatCountdown, localAttemptStore } from "./signInPolicy"
 import "./login-page.css"
 import LoginBanner from "./LoginBanner"
 import {AdminRecoveryForm} from './AdminAccountSecurity'
@@ -45,6 +45,27 @@ export default function LoginPage({
   const [touched, setTouched] = useState({ email: false, password: false })
   const [submitted, setSubmitted] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
+  // Live lockout countdown. The deadline comes from the same browser-local store that enforces the lockout.
+  const [lockedUntil, setLockedUntil] = useState(0)
+  const [now, setNow] = useState(Date.now())
+  const remaining = Math.max(0, lockedUntil - now)
+  useEffect(() => {
+    if (!lockedUntil) return
+    const tick = () => {
+      const current = Date.now()
+      setNow(current)
+      if (current >= lockedUntil) { setLockedUntil(0); setError("") }
+    }
+    tick()
+    const timer = setInterval(tick, 250)
+    return () => clearInterval(timer)
+  }, [lockedUntil])
+  // A reload or a typed email that is still locked shows the countdown right away.
+  useEffect(() => {
+    const deadline = lockoutDeadline(localAttemptStore(), email)
+    setNow(Date.now())
+    setLockedUntil(deadline)
+  }, [email])
   const admin = portal === "admin"
   const staff = portal === "staff"
   const internal = admin || staff
@@ -79,6 +100,8 @@ export default function LoginPage({
         return
       }
       setDeviceChoice(false)
+      const deadline = lockoutDeadline(localAttemptStore(), email)
+      if (deadline) { setNow(Date.now()); setLockedUntil(deadline); return }
       setError(
         reason instanceof Error
           ? reason.message
@@ -238,7 +261,12 @@ export default function LoginPage({
               <p className="login-help">
                 <a href="#password-reset" onClick={event => { event.preventDefault(); if(admin){setAdminRecoveryOpen(true);return} setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
               </p>
-              {error && (
+              {remaining > 0 ? (
+                <div className="login-error" role="alert">
+                  <Icon name="alert" size={18} />
+                  <span>Too many attempts. Try again in <strong aria-live="off">{formatCountdown(remaining)}</strong> (minutes:seconds).</span>
+                </div>
+              ) : error && (
                 <div className="login-error" role="alert">
                   <Icon name="alert" size={18} />
                   <span>{error}</span>
@@ -247,7 +275,7 @@ export default function LoginPage({
               <Button
                 type="submit"
                 variant="primary full-width login-submit"
-                disabled={loading || checkingSession}
+                disabled={loading || checkingSession || remaining > 0}
               >
                 {checkingSession
                   ? "Checking session…"

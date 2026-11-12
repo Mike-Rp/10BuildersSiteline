@@ -7,7 +7,6 @@ import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import {validateSpecializations,requireCredentialTags} from '../licenses/credential-specializations.utility.js';
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
-import { activeClaim } from "./reset-follow-up.utility.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "./experience.utility.js";
@@ -437,8 +436,6 @@ export const regeneratePassword = async (req, res) => {
           ? `This reset was already completed${doneBy ? ` by ${doneBy}` : ""} on ${new Date(done.completedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}. Refresh the requests.`
           : "This reset request has changed or was already completed. Refresh the requests.");
       }
-      const held = activeClaim(resetMeta);
-      if (held && held.by !== actor.id) throw new HttpError(409, `${held.byName} is handling this request. It reopens to every administrator when their hold runs out.`);
       const tempPassword = makeTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(

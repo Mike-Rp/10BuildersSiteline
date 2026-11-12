@@ -700,7 +700,6 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const seen=(await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id)
     assert.ok(seen.claimed_by_name&&seen.claimed_by_me===false,'the other Admin sees who is handling it')
     await assert.rejects(api(claimUrl+'claim',claimBody),/already handling/)
-    await assert.rejects(api("/accounts/"+saved.id+"/regenerate-password",{method:"POST",json:{adminPassword:"Password@123",requestedAt:pendingRequest.requested_at}}),/is handling this request/,'a taken request is locked to the Admin who took it')
     await assert.rejects(api(claimUrl+'release',claimBody),/404/,'there is no release once a request is taken')
     await asUser('santos.juan@10builders.com')
     await assert.rejects(api(claimUrl+'release',claimBody),/404/,'not even the Admin who took it can release it')
