@@ -881,7 +881,7 @@ export function documentAccess(
   } else {
     const ownEvidence = Object.entries(work.checklist).some(
       ([phase, items]) =>
-        p.team.some((t) => t.phase === phase && t.accountId === actor.id) &&
+        p.team.some((t) => t.phase === phase && (t.accountId === actor.id || t.engineers?.some((e) => e.accountId === actor.id))) &&
         items.some((item) => item.doc?.id === doc.id),
     )
     const canView =
