@@ -22,6 +22,7 @@ export type SiteCard = {
   start: string
   end?: string
   lead?: string
+  clientNames?: string[]
   needsReview?: boolean
   currentPhaseStatus?: CurrentPhaseStatus
 }
@@ -320,6 +321,7 @@ export default function ActiveSites({
                 </div>
               </div>
               <h2>{p.name}</h2>
+              {p.clientNames && <p className="as-client"><Icon name="users" size={16} /><span>{p.clientNames.length ? <>{p.clientNames.length > 1 ? "Clients" : "Client"}: <strong>{p.clientNames.join(", ")}</strong></> : "No linked client account"}</span></p>}
               <p className="as-phase">{p.phase || "Phase not recorded"}</p>
               <div className="as-schedule"><ScheduleStatusBadge project={p} today={reportingDate} /></div>
               {showDelayNotice && <DelayedProjectNotice project={p} today={reportingDate} />}
@@ -369,7 +371,7 @@ export default function ActiveSites({
         <thead><tr><th>Project</th><th>Current phase</th><th>Schedule status</th><th>Target completion</th><th>Details</th></tr></thead>
         <tbody>{visible.map(p => {
           const schedule = projectScheduleStatus(p, reportingDate)
-          return <tr key={p.id} className={focusedId === p.id ? "search-result-highlight" : undefined}><th scope="row">{p.name}</th><td><div className="as-current-phase-status"><Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} /><span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span></div></td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
+          return <tr key={p.id} className={focusedId === p.id ? "search-result-highlight" : undefined}><th scope="row">{p.name}{p.clientNames && <span className="as-list-client">{p.clientNames.length ? `${p.clientNames.length > 1 ? "Clients" : "Client"}: ${p.clientNames.join(", ")}` : "No linked client account"}</span>}</th><td><div className="as-current-phase-status"><Icon name={p.currentPhaseStatus === "On hold" || p.currentPhaseStatus === "Rework required" || p.currentPhaseStatus === "Delayed" ? "alert" : p.currentPhaseStatus === "Awaiting review" ? "clock" : p.currentPhaseStatus === "Ready for handoff" || p.currentPhaseStatus === "Completed" ? "check" : p.currentPhaseStatus === "Ongoing" ? "trend" : "building"} size={16} /><span>Current phase: {p.phase || "Phase not recorded"} · {p.currentPhaseStatus || "Status unavailable"}</span></div></td><td><ScheduleStatusBadge project={p} today={reportingDate} />{schedule.status === "Delayed" && <span className="as-overdue">{schedule.daysOverdue} {schedule.daysOverdue === 1 ? "day" : "days"} overdue</span>}</td><td>{schedule.targetEndDate ? dateLabel(schedule.targetEndDate) : "No target date"}</td><td><Button onClick={() => open(p.id)} aria-label={`View project details: ${p.name}`}>View details</Button></td></tr>
         })}</tbody>
       </table></div></div>}
       {!visible.length && (

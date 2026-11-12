@@ -21,6 +21,7 @@ import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
 import RestrictedRenewalPage from "./RestrictedRenewalPage";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
+import { projectClientNames } from "./project-clients"
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
@@ -1630,6 +1631,7 @@ function AppInner() {
             return {
               ...p,
               lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              clientNames: projectClientNames(p, state.accounts),
               needsReview: hasPendingSiteReview(p),
               currentPhaseStatus: currentPhaseStatus({
                 projectStatus: p.status,

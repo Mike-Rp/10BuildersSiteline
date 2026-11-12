@@ -7,6 +7,7 @@ import OverallProjectProgress from "./OverallProjectProgress"
 import PhaseTimeline from "./PhaseTimeline"
 import ScheduleStatusBadge, { useScheduleToday } from "./ScheduleStatus"
 import "./project-monitoring.css"
+import { projectClientNames } from "./project-clients"
 
 function ProjectPhoto({ docs, onOpen }: {docs:Doc[];onOpen:(doc:Doc)=>void}) {
   const [index,setIndex]=useState(0)
@@ -49,8 +50,7 @@ export default function ProjectMonitoringOverview({ project:p, state, onPreview,
   const selected=work.selections?.find(row=>row.status==='accepted')
   const company=selected?state.companies.find(row=>row.id===selected.companyId):undefined
   const updates=[...p.history].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,3)
-  const clients=p.clientAccounts ?? state.accounts.filter(account=>account.id===p.clientId && account.role==='client' && !account.id.startsWith('client:'))
-  const clientNames=clients.map(client=>client.name.trim()).filter(Boolean)
+  const clientNames=projectClientNames(p,state.accounts)
   return <section className="project-monitoring" aria-label={`${p.name} monitoring overview`}>
     <header className="monitor-heading">
       <div><span className="eyebrow">{p.type}</span><h2>{p.name}</h2>

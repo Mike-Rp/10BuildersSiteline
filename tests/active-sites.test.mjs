@@ -8,6 +8,7 @@ import { createServer } from "vite"
 
 import React, { act } from "react"
 import { hasPendingSiteReview } from "../src/active-sites-review.ts"
+import { projectClientNames } from "../src/project-clients.ts"
 
 test("Active Sites filters before pagination, resets pages, sorts, and opens only supplied projects", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" })
@@ -55,6 +56,7 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       progress: i * 5,
       currentPhaseStatus: "Ongoing",
       start: "2025-01-01",
+      ...(i === 0 ? {clientNames: ["Maria Santos", "Juan Santos"]} : i === 1 ? {clientNames: []} : {}),
       end: `2027-01-${String(i + 1).padStart(2, "0")}`,
     }))
 
@@ -86,6 +88,12 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       })
 
     assert.equal(cards().length, 9)
+    assert.match(cards()[0].querySelector(".as-client").textContent, /Clients: Maria Santos, Juan Santos/)
+    assert.match(cards()[1].querySelector(".as-client").textContent, /No linked client account/)
+    assert.equal(cards()[2].querySelector(".as-client"), null, "client identities are not inferred from global state")
+    await act(() => button("List").click())
+    assert.match(document.querySelector(".as-list-client").textContent, /Maria Santos, Juan Santos/)
+    await act(() => button("Cards").click())
     assert.equal(document.querySelector(".as-card img"), null)
 
     assert.equal(document.querySelector(".as-summary strong").textContent, "15")
@@ -351,6 +359,15 @@ test("Active Sites filters before pagination, resets pages, sorts, and opens onl
       else delete globalThis[key]
     }
   }
+})
+
+test("project client names use linked records and never substitute an unrelated or synthetic client", () => {
+  const accounts=[{id:"known",role:"client",name:"Saved Client"},{id:"other",role:"client",name:"Other Client"},{id:"client:stub",role:"client",name:"Unverified Name"}]
+  assert.deepEqual(projectClientNames({clientId:"known"},accounts),["Saved Client"])
+  assert.deepEqual(projectClientNames({clientId:"known",clientAccounts:[]},accounts),[])
+  assert.deepEqual(projectClientNames({clientId:"missing"},accounts),[])
+  assert.deepEqual(projectClientNames({clientId:"client:stub"},accounts),[])
+  assert.deepEqual(projectClientNames({clientId:"known",clientAccounts:[{id:"linked",name:"Linked Client"}]},accounts),["Linked Client"])
 })
 
 

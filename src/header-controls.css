@@ -23,3 +23,50 @@
   outline: 3px solid #315a85;
   outline-offset: 3px;
 }
+
+/* Touch browsers can retain :hover after a tap. Keep every state readable,
+   including devices that report both a mouse and a touchscreen. */
+@media (hover: none), (pointer: coarse) {
+  #root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar):is(:hover, :active, [aria-expanded="true"]):not(:disabled) {
+    background: #dceaf6;
+    color: #193b59;
+    border-color: #8ba8c2;
+  }
+}
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button) > svg {
+  color: inherit;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+/* Use viewport edges across all three workspaces, independent of the bell's
+   position and older role-specific right offsets. */
+@media (max-width: 1000px) {
+  #root .app-shell .topbar .notification-popover {
+    position: fixed;
+    inset: 88px 12px auto auto;
+    width: min(410px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 100px);
+    max-height: calc(100dvh - 100px);
+    overflow: hidden;
+  }
+  #root .app-shell .notification-popover .popover-heading {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 14px;
+  }
+  #root .app-shell .notification-popover .activity-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-height: 300px) {
+  #root .app-shell .topbar .notification-popover {
+    position: fixed;
+    inset: 8px 12px auto auto;
+    width: min(410px, calc(100vw - 24px));
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+}

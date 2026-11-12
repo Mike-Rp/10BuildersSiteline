@@ -15,6 +15,7 @@ import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import ExecutiveSummary from "./ExecutiveSummary"
 import PageTitlePanel from "./PageTitlePanel"
 import ProjectClientDetails from "./ProjectClientDetails"
+import { projectClientNames } from "./project-clients"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
 import { CompanyProjectPhases } from "./AllocationDirectory"
@@ -2147,6 +2148,7 @@ export default function RoleWorkspace({
             projects={projects.map(p => ({
               ...p,
               lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              clientNames: projectClientNames(p, state.accounts),
               needsReview: false,
               currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
             }))}
@@ -2178,6 +2180,7 @@ export default function RoleWorkspace({
         {((!isOpm && activeSitesView === "sites") || (isOpm && (extensionDemo || activeSitesView === "sites"))) && <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
+          clientNames: projectClientNames(p, state.accounts),
           needsReview: hasPendingSiteReview(p),
           currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
@@ -3353,7 +3356,7 @@ export default function RoleWorkspace({
     return (
       <>
         <ExtensionWorkflow actor={actor} projectId={p.id} />
-        <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} />
+        <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} showClient />
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
