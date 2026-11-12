@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import {currentReportMonth} from "../src/monthly-report.ts"
+import {currentReportMonth,monthlyPrintDocument} from "../src/monthly-report.ts"
 
 test("monthly report modal keeps parent context, hides client staff fields, rejects stale loads and exports the preview snapshot",async()=>{
   const {JSDOM}=await import("jsdom"),{createServer}=await import("vite"),{default:React,act}=await import("react")
@@ -66,6 +66,19 @@ test("monthly report modal keeps parent context, hides client staff fields, reje
     await act(()=>root.render(React.createElement(MonthlyReport,{projects:[{id:'p1',name:'First Project'},{id:'p2',name:'Second Project'}],initialProjectId:'p1',allowProjectChange:false,onClose(){}})))
     assert.equal(document.querySelector('.report-project-search'),null)
     assert.ok(![...document.querySelectorAll('.monthly-report button')].some(b=>b.textContent==='Change project'))
+    await act(()=>pending.at(-1)(Response.json({data:{report:{...report,createdAfterPeriod:true},snapshot:'before-creation'}})))
+    assert.match(document.querySelector('.monthly-report-not-applicable').textContent,/Not applicable for this month/)
+    assert.equal(document.querySelector('.monthly-report-metrics'),null)
+    assert.equal(document.querySelector('.monthly-report-limitation'),null)
+    assert.equal(document.querySelector('.report-export-actions'),null,'No export controls for a period before the project existed')
+    assert.doesNotMatch(monthlyPrintDocument({...report,createdAfterPeriod:true}),/Unavailable|Opening verified progress|Phases completed during period/)
+    assert.match(monthlyPrintDocument({...report,createdAfterPeriod:true}),/Not applicable for this month/)
+    await act(()=>[...document.querySelectorAll('.monthly-report button')].find(b=>b.textContent==='Refresh').click())
+    await act(()=>pending.at(-1)(Response.json({data:{report:{...report,createdAfterPeriod:false},snapshot:'applicable'}})))
+    assert.equal(document.querySelector('.monthly-report-not-applicable'),null)
+    assert.ok(document.querySelector('.monthly-report-metrics'))
+    assert.match(document.querySelector('.monthly-report-limitation').textContent,/historical approval or scope records are incomplete/,'Genuinely missing historical data stays unavailable')
+    assert.ok(document.querySelector('.report-export-actions'))
   }finally{
     await act(()=>root.unmount());await server.close();dom.window.close();URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke
     for(const [key,descriptor] of saved)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key]

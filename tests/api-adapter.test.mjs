@@ -150,6 +150,15 @@ test("other roles learn about people from the project: team, Office PM and clien
   assert.equal(peopleFromProjects(asClient, [base], new Map()).clientIds.get("p1"), "c", "a client's own projects link to their account")
 })
 
+test("client-safe Office PM contact maps independently of stripped internal assignment fields", () => {
+  const {suggested_opm_id,...clientList}=base
+  const project=mapProject(parts({list:clientList,detail:{office_pm_contact:{id:"assigned-opm",full_name:"  Lea Santos  ",email:"not-projected@example.test"}}}))
+  assert.equal(project.opmId,"assigned-opm")
+  assert.deepEqual(project.officePmContact,{name:"Lea Santos"})
+  assert.equal(mapProject(parts({list:clientList})).officePmContact,undefined)
+  assert.equal(mapProject(parts({list:clientList,detail:{opm_assignment:{target_user_id:"opm-assignment",name:"Lea"}}})).opmId,"opm-assignment")
+})
+
 test("companies and notifications map their key fields", () => {
   const c = mapCompany({ id: "c1", company_name: "Cordova", directory_status: "declined", contact_person: { name: "Alexis" }, contact_email: "a@b.c", crew_count: 3, availability: "committed", assigned_projects: ["Rosaria Business Park"], committed_until: "2026-12-01" }, new Map([["rosaria business park", "p1"]]))
   assert.equal(c.status, "rejected")

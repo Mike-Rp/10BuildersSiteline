@@ -38,8 +38,8 @@ function ProjectPhoto({ docs, onOpen }: {docs:Doc[];onOpen:(doc:Doc)=>void}) {
 }
 
 /** Staff summary uses already-authorized project data; all editing stays in existing controls. */
-export default function ProjectMonitoringOverview({ project:p, state, onPreview }: {
-  project:Project;state:State;onPreview:(doc:Doc)=>void
+export default function ProjectMonitoringOverview({ project:p, state, onPreview, showClient = false }: {
+  project:Project;state:State;onPreview:(doc:Doc)=>void;showClient?:boolean
 }) {
   const work=workflowFor(p),today=useScheduleToday()
   // Client visibility is the persisted result of OPM approval. Older approved
@@ -49,13 +49,17 @@ export default function ProjectMonitoringOverview({ project:p, state, onPreview 
   const selected=work.selections?.find(row=>row.status==='accepted')
   const company=selected?state.companies.find(row=>row.id===selected.companyId):undefined
   const updates=[...p.history].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,3)
+  const clients=p.clientAccounts ?? state.accounts.filter(account=>account.id===p.clientId && account.role==='client' && !account.id.startsWith('client:'))
+  const clientNames=clients.map(client=>client.name.trim()).filter(Boolean)
   return <section className="project-monitoring" aria-label={`${p.name} monitoring overview`}>
     <header className="monitor-heading">
-      <div><span className="eyebrow">{p.type}</span><h2>{p.name}</h2><div className="monitor-badges"><Badge tone={p.status==='active'||p.status==='completed'?'green':'amber'}>{p.status==='completed'?'Completed':p.status==='active'?'Active':p.status.replace(/_/g,' ')}</Badge><Badge tone="blue">Current phase: {p.phase}</Badge><ScheduleStatusBadge project={p} today={today}/></div></div>
+      <div><span className="eyebrow">{p.type}</span><h2>{p.name}</h2>
+        {showClient && <p className="monitor-client" aria-label="Linked project clients"><Icon name="users" size={17}/><span>{clientNames.length ? <>{clientNames.length>1?'Clients':'Client'}: <strong>{clientNames.join(', ')}</strong></> : 'No linked client account'}</span></p>}
+        <div className="monitor-badges"><Badge tone={p.status==='active'||p.status==='completed'?'green':'amber'}>{p.status==='completed'?'Completed':p.status==='active'?'Active':p.status.replace(/_/g,' ')}</Badge><Badge tone="blue">Current phase: {p.phase}</Badge><ScheduleStatusBadge project={p} today={today}/></div></div>
       <div className="monitor-totals"><OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress}/><div className="monitor-target"><small>Target completion</small><strong>{p.end?dateLabel(p.end):'Not set'}</strong></div></div>
     </header>
     <div className="monitor-grid">
-      <section className="monitor-card"><h3><Icon name="building" size={20}/>Project overview</h3><ProjectPhoto docs={photos} onOpen={onPreview}/><dl className="monitor-facts"><div><dt>Floor area</dt><dd>{p.area} sqm</dd></div><div><dt>Target start</dt><dd>{dateLabel(p.start)}</dd></div><div><dt>Floors</dt><dd>{p.floors}</dd></div>{p.location && <div><dt>Location</dt><dd>{p.location}</dd></div>}</dl><h4>Recent project records</h4>{updates.length?<ul className="monitor-updates">{updates.map((row,i)=><li key={row.id||i}><p>{row.text}</p><small>{dateLabel(row.date)}</small></li>)}</ul>:<p className="monitor-muted">No project updates recorded yet.</p>}</section>
+      <section className="monitor-card"><h3><Icon name="building" size={20}/>Project overview</h3><ProjectPhoto docs={photos} onOpen={onPreview}/><dl className="monitor-facts"><div><dt>Floor area</dt><dd>{p.area} sqm</dd></div><div><dt>Target start</dt><dd>{dateLabel(p.start)}</dd></div><div><dt>Floors</dt><dd>{p.floors}</dd></div></dl><h4>Recent project records</h4>{updates.length?<ul className="monitor-updates">{updates.map((row,i)=><li key={row.id||i}><p>{row.text}</p><small>{dateLabel(row.date)}</small></li>)}</ul>:<p className="monitor-muted">No project updates recorded yet.</p>}</section>
       <section className="monitor-card monitor-phases"><h3><Icon name="check" size={20}/>Construction phases</h3><PhaseTimeline phase={p.phase} phases={projectPhaseNames(p)} completed={p.status==='completed'} detailed/><p className="monitor-note">Phase sequence is separate from approved overall progress. Some activities may overlap; existing sign-off rules still apply.</p></section>
       <div className="monitor-side">
         <section className="monitor-card"><h3><Icon name="users" size={20}/>Assigned team</h3>{people.length?people.map(account=><div className="monitor-person" key={account.id}><span className="avatar">{initials(account.name)}</span><div><strong>{account.name}</strong><small>{account.role==='opm'?'Office Project Manager':'Site Project Manager'}</small></div></div>):<p className="monitor-muted">No personnel assigned.</p>}</section>

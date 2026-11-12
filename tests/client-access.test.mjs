@@ -17,6 +17,22 @@ import {
   execute,
 } from "./fixtures.mjs"
 
+test("client contacts use explicit project contact, preserve legacy assignments and do not guess a missing Office PM", () => {
+  const state=initialState()
+  const project=state.projects.find(p=>p.id==="p1")
+  const office=state.accounts.find(a=>a.id===project.opmId)
+  const name=()=>clientProjectViews(state,"a9")[0].contacts.find(c=>c.role==="Office Project Manager").name
+  assert.equal(name(),office.name)
+  project.officePmContact={name:"Project-specific Office PM"}
+  project.opmId=""
+  assert.equal(name(),"Project-specific Office PM")
+  delete project.officePmContact
+  assert.equal(name(),"Office PM contact unavailable","Other Office PM accounts must not be guessed")
+  project.opmId=state.accounts.find(a=>a.role==="spm").id
+  assert.equal(name(),"Office PM contact unavailable","A Site PM must not be labelled as the Office PM")
+  assert.deepEqual(clientProjectViews(state,"unrelated-client"),[])
+})
+
 test("Client projects require active account, matching assigned client, scope and project activation", () => {
   const state = initialState()
   assert.deepEqual(

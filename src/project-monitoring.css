@@ -55,3 +55,6 @@
 #root .monitor-phases .construction-phase-timeline li small { font-size: 11px; display: block; line-height: 1.5; }
 @media(max-width:1100px) { #root .monitor-grid { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); } #root .monitor-side { grid-column: 1/-1; grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width:700px) { #root .modal:has(.project-monitoring) { width: calc(100vw - 16px); } #root .monitor-grid,#root .monitor-side { display: grid; grid-template-columns: minmax(0,1fr); } #root .monitor-totals { grid-template-columns: minmax(0,1fr); } #root .monitor-target { padding: 10px 0 0; border-left: 0; border-top: 1px solid #e1eaf2; } #root .monitor-card { padding: 16px; } }
+#root .monitor-client { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px; color: var(--color-muted); font-size: 14px; line-height: 1.5; }
+#root .monitor-client svg { flex-shrink: 0; margin-top: 2px; }
+#root .monitor-client > span { min-width: 0; overflow-wrap: anywhere; }

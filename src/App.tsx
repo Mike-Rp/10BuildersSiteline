@@ -2513,12 +2513,12 @@ function AppInner() {
               {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
             </span>
             <h3>{p.name}</h3>
-            <p>{p.location || "Project location not specified"}</p>
+
           </div>
           <Status status={p.status} />
         </div>
         </>}
-        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} />}
+        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} showClient />}
         {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
@@ -2735,9 +2735,9 @@ function AppInner() {
                 </strong>
               </div>
               {a.role !== "admin" && <div>
-                <small>WORKLOAD</small>
+                <small>{a.role === "client" ? "ACTIVE PROJECTS" : "WORKLOAD"}</small>
                 <strong>
-                  {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
+                  {a.role === "client" ? projects.filter(project => project.status === "active").length : a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
                 </strong>
               </div>}
             </div>

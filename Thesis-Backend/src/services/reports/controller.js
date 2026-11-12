@@ -82,7 +82,11 @@ export async function exportMonthlyReport(req,res) {
     if(!["csv","print"].includes(req.body?.format))throw new HttpError(400,"Choose CSV or print export.");
     await withTransaction(async db=>{
       await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
-      await authorizedProject(db,user,req.params.id);
+      const project=await authorizedProject(db,user,req.params.id);
+      // Check the signed preview and the authoritative creation date, including
+      // snapshots produced before createdAfterPeriod was included in the payload.
+      if(report.createdAfterPeriod || new Date(project.created_at)>=new Date(report.period.cutoff))
+        throw new HttpError(422,"This report is not applicable for the selected month because the project had not been created. Choose a month from project creation onward.");
       if(user.role==="spm"){
         // A revoked phase assignment cannot keep access through an old signed snapshot.
         const stages=(await db.query(`select s.code from project_phase_team t join project_stages s on s.id=t.project_stage_id

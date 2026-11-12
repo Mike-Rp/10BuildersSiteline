@@ -35,7 +35,7 @@ export function adminWorkspaceIndex(state: State, projectStatuses: Record<string
     const status = projectStatuses[project.status] || friendlyStatus(project.status)
     results.push({ id: project.id, category: "projects", name: project.name,
       subtitle: `${project.type} · ${status}`, status: project.status, type: project.type,
-      text: `${project.name} ${project.type} ${status} ${project.location} ${project.phase}` })
+      text: `${project.name} ${project.type} ${status} ${project.phase}` })
     for (const category of projectDocumentIndex(project)) for (const folder of category.folders)
       for (const { doc } of folder.files) addDocument(doc, "Project", project.name, { kind: "project", id: project.id, categoryId: category.id, folderId: folder.id })
   }

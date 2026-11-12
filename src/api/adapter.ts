@@ -332,7 +332,11 @@ export function mapProject(parts: ProjectParts): Project {
     note:rework.reason,issues:rework.issue_categories||[],priorPhase:list.current_stage,priorProgress:Number(list.current_pct||0),
     requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0),
     ...(reworkAttachments.length ? { attachments: reworkAttachments, evidence: reworkAttachments[0] } : {})}
+  // Public project contact contract; never infer a name from an unrelated account.
+  const officePmName = typeof detail.office_pm_contact?.full_name === "string"
+    ? detail.office_pm_contact.full_name.trim() : ""
   const project: Project = {
+    ...(officePmName ? { officePmContact: { name: officePmName } } : {}),
     ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
     ...(parts.verifiedProgress ? { verifiedProgress: parts.verifiedProgress } : {}),
     ...(parts.overallProgress !== undefined ? { overallProgress: parts.overallProgress } : {}),
@@ -354,7 +358,7 @@ export function mapProject(parts: ProjectParts): Project {
       id: client.id, name: client.full_name, email: client.email || "", phone: client.phone || "", contactPerson: client.contact_person || "",
     }))} : {}),
     status,
-    opmId: list.suggested_opm_id || "",
+    opmId: detail.office_pm_contact?.id || detail.opm_assignment?.target_user_id || list.suggested_opm_id || "",
     ...(list.progress_weighting ? { progressWeighting: list.progress_weighting } : {}),
     team,
     phase: list.current_stage || team[0]?.phase || "Mobilization",

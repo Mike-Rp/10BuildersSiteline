@@ -155,7 +155,7 @@ export function clientProjectViews(
     )
     .map((p) => {
       const work = workflowFor(p)
-      const office = state.accounts.find((a) => a.id === p.opmId)
+      const office = state.accounts.find((a) => a.id === p.opmId && a.role === "opm")
       const lead = state.accounts.find((a) => a.id === leadId(p))
       const phaseAssignment = p.team.find(member => member.phase === p.phase)
       const assignedSpm = state.accounts.find(account => account.id === phaseAssignment?.accountId)
@@ -190,7 +190,7 @@ export function clientProjectViews(
         completedAt: work.completedAt,
         contacts: [
           {
-            name: office?.name || "Office PM not on file",
+            name: p.officePmContact?.name || office?.name || "Office PM contact unavailable",
             role: "Office Project Manager",
           },
           {

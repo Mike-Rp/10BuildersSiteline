@@ -1450,9 +1450,9 @@ export default function RoleWorkspace({
         <div className="assignment-card-top">
           <div>
             <h3>{p.name}</h3>
-            <p className="assignment-location">
+            <p className="assignment-project-type">
               <Icon name="building" size={16} />
-              {p.location || "Location not set"} · {p.type}
+              {p.type}
             </p>
           </div>
           <Badge

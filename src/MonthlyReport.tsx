@@ -27,7 +27,7 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
     return()=>{active=false}
   },[projectId,month,refresh])
   async function exportReport(format:ReportExportFormat) {
-    if(!data||exporting)return
+    if(!data||exporting||data.report.createdAfterPeriod)return
     const current=revision.current;setExporting(true);setError("");setPdfNeedsReload(false)
     try {
       const result=await api<{csv?:string;report?:Report}>(`/projects/${data.report.project.id}/monthly-report/export`,{method:"POST",json:{snapshot:data.snapshot,format:format==="pdf"?"print":format}})
@@ -66,7 +66,13 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
       {report&&<>
         <p className="role-muted">{report.project.type} · {report.period.monthToDate?"Month to date":"Month-end snapshot"} · {report.period.timezone}</p>
         <p className="role-muted">{reportDate(report.period.start)} → {reportDate(report.period.cutoff)} (exclusive)<br/>Generated {reportDate(report.period.generatedAt)}</p>
-        {report.createdAfterPeriod&&<p className="notice">This project was created after the selected reporting period.</p>}
+        {report.createdAfterPeriod ? <section className="monthly-report-not-applicable" role="status">
+          <h3>Not applicable for this month</h3>
+          <p>This project was created after the selected reporting period. Monthly progress and phase completions do not apply to this period.</p>
+          <h4>Choose a month within the project period</h4>
+          <p>Select a month from project creation onward to view verified progress and phases completed during that month.</p>
+          <p className="role-muted">Project Overview shows current progress. This report covers only the selected historical month.</p>
+        </section> : <>
         {report.limitations.map(text=><p className="monthly-report-limitation" key={text}>{text}</p>)}
         <div className="monthly-report-metrics">
           <section><h3>Verified progress</h3><strong>{report.opening.percentage===null?"Unavailable":`${report.opening.percentage.toFixed(1)}%`} → {report.closing.percentage===null?"Unavailable":`${report.closing.percentage.toFixed(1)}%`}</strong><p className="role-muted">Opening → closing</p></section>
@@ -89,8 +95,9 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
         </tbody></table></div>
         {!(report.projection==="client"?report.updates?.length:report.activity?.length)&&<p>No activity records are available for this period.</p>}
         <p className="role-muted">Historical coverage starts {report.coverageFrom?reportDate(report.coverageFrom):"when reporting history is installed"}. Download PDF saves a file directly; Print opens your browser’s print dialog.</p>
+        </>}
       </>}
-      <div className="modal-actions"><Button onClick={onClose}>Close</Button><ReportExportActions disabled={!data||loading} busy={exporting} onExport={format=>void exportReport(format)} /></div>
+      <div className="modal-actions"><Button onClick={onClose}>Close</Button>{!report?.createdAfterPeriod && <ReportExportActions disabled={!data||loading} busy={exporting} onExport={format=>void exportReport(format)} />}</div>
     </div>
   </Modal>
 }

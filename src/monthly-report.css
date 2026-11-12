@@ -13,3 +13,5 @@
 .monthly-report th { background:var(--surface-subtle); }
 .monthly-print-frame { position:fixed; width:1px; height:1px; left:-10000px; border:0; }
 @media(max-width:600px) { .monthly-report .modal-actions { flex-wrap:wrap; } .monthly-report .modal-actions button { flex:1; } }
+.monthly-report-not-applicable { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--green-soft); overflow-wrap: anywhere; }
+.monthly-report-not-applicable h4 { margin-top: 6px; }
