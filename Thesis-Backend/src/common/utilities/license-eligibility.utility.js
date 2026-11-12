@@ -27,7 +27,28 @@ export async function assertEligibleManager(client, userId, role) {
     FOR UPDATE OF u
   `, [userId, role]);
   if (check.rowCount !== 1) {
-    const error = new Error(`Selected ${role.toUpperCase()} is inactive, missing a verified current PRC license, or has a license expiring within 30 days.`);
+    // Name the person and the specific reason, so a team save that fails on someone already assigned is not blamed on the newly selected engineer.
+    let who = "", why = "";
+    try {
+      const d = (await client.query(`
+        SELECT u.full_name, u.status, coalesce(u.is_deleted,false) AS deleted,
+          EXISTS (SELECT 1 FROM workspace_account_metadata m WHERE m.user_id=u.id AND m.metadata->>'assignmentHold'='true') AS hold,
+          EXISTS (SELECT 1 FROM engineer_qualified_scopes s WHERE s.user_id=u.id) AS scoped,
+          (SELECT max(l.license_expiry - (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date) FROM public.user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL AND to_jsonb(l)->>'verification_status'='verified') AS days_left
+        FROM public.users u WHERE u.id=$1`, [userId])).rows[0];
+      if (d) {
+        who = d.full_name;
+        why = d.status !== "active" || d.deleted ? "the account is not active"
+          : d.hold ? "the account has an assignment hold"
+          : role === "spm" && !d.scoped ? "no verified discipline qualifications on record"
+          : d.days_left === null ? "no verified current PRC license"
+          : d.days_left <= 30 ? `the PRC license expires in ${d.days_left} days (within 30 days from today)`
+          : "the PRC license record is incomplete (verification, profession, number or uploaded file)";
+      }
+    } catch { /* keep the generic message */ }
+    const error = new Error(who
+      ? `${who} cannot be assigned as ${role.toUpperCase()}: ${why}.`
+      : `Selected ${role.toUpperCase()} is inactive, missing a verified current PRC license, or has a license expiring within 30 days.`);
     error.status = 422;
     throw error;
   }

@@ -48,6 +48,21 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
   const [historyError,setHistoryError]=useState("")
   const [fileUrl,setFileUrl]=useState("")
   const [fileLoading,setFileLoading]=useState(!!doc)
+  const files=docs||[]
+  const position=doc?files.findIndex(file=>file.id===doc.id):-1
+  const step=(direction:-1|1)=>{const next=files[position+direction];if(next)setSelectedId(next.id)}
+  useEffect(()=>{
+    if(files.length<2)return
+    const onKey=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null
+      // Arrow keys keep their normal meaning inside the review note and other fields.
+      if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return
+      if(target&&(["INPUT","TEXTAREA","SELECT"].includes(target.tagName)||target.isContentEditable))return
+      event.preventDefault();step(event.key==="ArrowLeft"?-1:1)
+    }
+    document.addEventListener("keydown",onKey)
+    return ()=>document.removeEventListener("keydown",onKey)
+  })
   useEffect(()=>{
     let active=true
     api<Preview>(`/projects/${projectId}/evidence/${evidenceId}/review-preview`)
@@ -72,11 +87,16 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
     <section className="evidence-review-preview" aria-label="Submitted evidence preview">
       {!!docs?.length && <div className="attachment-actions">{docs.map(file=><Button key={file.id} onClick={()=>setSelectedId(file.id)}>{file.name}</Button>)}</div>}
       <div className="evidence-review-preview-heading"><Icon name="doc"/><strong>{doc?.label || "Submitted evidence"}</strong></div>
-      {fileUrl && doc?.name && /\.(png|jpe?g|gif|webp)$/i.test(doc.name)
-        ? <img src={fileUrl} alt={doc.label} />
-        : fileUrl
-          ? <object data={`${fileUrl}#toolbar=0&navpanes=0`} type="application/pdf" aria-label={doc?.name || "Submitted evidence"}><p>Preview is unavailable in this browser.</p></object>
-          : <div className="evidence-review-preview-empty" role="status">{fileLoading ? "Loading submitted evidence…" : "Evidence preview is unavailable. You can still review the submission details."}</div>}
+      <div className="evidence-review-stage">
+        {files.length>1 && <button type="button" className="evidence-nav evidence-nav-prev" aria-label="Previous attachment" disabled={position<=0} onClick={()=>step(-1)}>‹</button>}
+        {fileUrl && doc?.name && /\.(png|jpe?g|gif|webp)$/i.test(doc.name)
+          ? <img src={fileUrl} alt={doc.label} />
+          : fileUrl
+            ? <object data={`${fileUrl}#toolbar=0&navpanes=0`} type="application/pdf" aria-label={doc?.name || "Submitted evidence"}><p>Preview is unavailable in this browser.</p></object>
+            : <div className="evidence-review-preview-empty" role="status">{fileLoading ? "Loading submitted evidence…" : "Evidence preview is unavailable. You can still review the submission details."}</div>}
+        {files.length>1 && <button type="button" className="evidence-nav evidence-nav-next" aria-label="Next attachment" disabled={position>=files.length-1} onClick={()=>step(1)}>›</button>}
+      </div>
+      {files.length>1 && <p className="evidence-nav-count" role="status" aria-live="polite">Attachment {position+1} of {files.length} · use ← → to switch</p>}
       {fileUrl && <a className="evidence-download" href={fileUrl} download={doc?.name}><Icon name="download"/>Download attachment</a>}
     </section>
     <section className="evidence-review-decision">

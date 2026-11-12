@@ -226,10 +226,26 @@ export function teamCoverageGaps(p: CoverageProject, backendPhases?: BackendPhas
     .filter(([, list]) => list.length)
     .map(([label, list]) => `${label}: ${list.join(", ")}`)
 }
+// A phase may have several engineers. The phase is ready only when every one of them has confirmed.
+export function phaseEngineerSummary(row: Project["team"][number]) {
+  const people = row.engineers && row.engineers.length > 1 ? row.engineers : undefined
+  if (!people) return { multiple: false, total: 1, confirmed: row.status === "confirmed" ? 1 : 0, waiting: row.status === "confirmed" ? 0 : 1, status: row.status }
+  const confirmed = people.filter((e) => e.status === "confirmed").length
+  const status = confirmed === people.length ? "confirmed" : people.some((e) => e.status === "declined") ? "declined" : "pending"
+  return { multiple: true, total: people.length, confirmed, waiting: people.length - confirmed, status } as const
+}
+export function waitingLabel(waiting: number) {
+  return waiting === 1 ? "1 more awaiting confirmation" : `${waiting} more awaiting confirmation`
+}
 export function teamConfirmed(p: Project) {
   return (
     p.team.length > 0 &&
-    p.team.every((row) => !!row.accountId && row.status === "confirmed")
+    p.team.every(
+      (row) =>
+        !!row.accountId &&
+        row.status === "confirmed" &&
+        (row.engineers || []).every((e) => e.status === "confirmed"),
+    )
   )
 }
 export function allocationReady(p: Project) {

@@ -2417,7 +2417,12 @@ function AppInner() {
               })()}
               <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === p.opmId)?.expiry} projectEnd={p.end} />
               <div className="phase-assignments">
-                {p.team.map((t) => (
+                {p.team.map((t) => {
+                  // A phase can have several engineers; the phase is confirmed only when every one of them is.
+                  const people = t.engineers && t.engineers.length > 1 ? t.engineers : undefined
+                  const confirmedCount = people?.filter((e) => e.status === "confirmed").length ?? 0
+                  const phaseStatus = !people ? t.status : people.every((e) => e.status === "confirmed") ? "confirmed" : people.some((e) => e.status === "declined") ? "declined" : "pending"
+                  return (
                   <div key={t.phase}>
                     <span>
                       <strong>{t.phase}</strong>
@@ -2428,12 +2433,40 @@ function AppInner() {
                             "Any discipline"}
                       </small>
                     </span>
-                    <span>
-                      {t.accountId ? nameFor(t.accountId) : "Unassigned"}
-                      <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
+                    {people ? (
+                      <span className="phase-engineer-list">
+                        <small>{people.length} engineers in this phase</small>
+                        {people.map((e) => (
+                          <span className="phase-engineer-row" key={e.accountId}>
+                            <span>
+                              <strong>{nameFor(e.accountId)}</strong>
+                              <small>{e.assignedDisciplines.join(", ") || "Any discipline"}</small>
+                              <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
+                            </span>
+                            <Status status={e.status} />
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span>
+                        {t.accountId ? nameFor(t.accountId) : "Unassigned"}
+                        <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
+                      </span>
+                    )}
+                    <span className="phase-status-cell">
+                      <Status status={t.accountId ? phaseStatus : "unassigned"} />
+                      {people && confirmedCount < people.length && <small>{people.length - confirmedCount === 1 ? "1 more awaiting confirmation" : `${people.length - confirmedCount} more awaiting confirmation`}</small>}
                     </span>
-                    <Status status={t.accountId ? t.status : "unassigned"} />
-                    {t.status !== "confirmed" && p.status !== "completed" ? (
+                    {people ? (
+                      phaseStatus === "confirmed" || p.status === "completed" ? (
+                        <span className="locked-label">
+                          <Icon name="shield" size={14} />
+                          Locked
+                        </span>
+                      ) : (
+                        <span className="locked-label">Awaiting engineers</span>
+                      )
+                    ) : phaseStatus !== "confirmed" && p.status !== "completed" ? (
                       <select
                         aria-label={`Reassign ${t.phase}`}
                         value=""
@@ -2463,7 +2496,8 @@ function AppInner() {
                       return li && li.daysToExpiry !== null && li.daysToExpiry <= 33 && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
                     })()}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
     )

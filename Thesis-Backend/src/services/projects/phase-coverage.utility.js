@@ -60,7 +60,12 @@ export async function loadPhaseCoverage(db, projectId) {
     const requiredTags=(await db.query('select d.code from projects p join project_stage_discipline_links l on l.project_type_id=p.project_type_id join disciplines d on d.id=l.discipline_id where p.id=$1 and l.project_stage_id=$2',[projectId,phase.project_stage_id])).rows.map(r=>r.code);
     const coveredTags = new Set(assigned.filter(r=>r.status==='confirmed'&&r.engineer_valid).flatMap(r=>r.assigned_disciplines||[]));
     const quota = phaseCoverageQuota(requiredTags);
-    if(!assigned.length || assigned.length > MAX_ENGINEERS_PER_PHASE || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;result.unconfirmed.push(phase.code+' specialization responsibilities');}
+    if(!assigned.length || assigned.length > MAX_ENGINEERS_PER_PHASE || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;
+     // Name who is still outstanding so the admin can see why a phase with some confirmations is not ready.
+     const waiting=assigned.filter(r=>r.status!=='confirmed'||!r.engineer_valid);
+     let names='';
+     if(waiting.length){try{names=(await db.query('select full_name from users where id=any($1::uuid[]) order by full_name',[waiting.map(r=>r.user_id)])).rows.map(r=>r.full_name).join(', ')}catch{names=''}}
+     result.unconfirmed.push(phase.code+' specialization responsibilities'+(names?` (waiting for ${names})`:''));}
    }
   }
   return result;

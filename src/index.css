@@ -542,6 +542,10 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .phase-assignments small { display: block; font-size: 14px; color: var(--color-muted); }
 .phase-assignments select { min-height: 35px; padding: 7px; font-size: 14px; }
 .phase-assignments .badge { justify-self: start; }
+.phase-engineer-list { display: flex; flex-direction: column; gap: 8px; }
+.phase-engineer-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); }
+.phase-engineer-row strong { font-weight: 600; }
+.phase-status-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .locked-label { display: flex; gap: 5px; align-items: center; font-size: 14px; color: var(--color-muted); justify-content: flex-end; }
 .history-row { display: flex; align-items: center; gap: 12px; padding: 20px 0; }
 .history-row > span { color: var(--color-muted); background: var(--surface-subtle); border-radius: 50%; padding: 7px; }
@@ -1158,6 +1162,12 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .evidence-review-preview { min-width: 0; border: 1px solid var(--color-line); border-radius: 8px; overflow: hidden; background: #f3f6fa; }
 .evidence-review-preview-heading { display: flex; align-items: center; gap: 9px; padding: 12px 14px; background: white; border-bottom: 1px solid var(--color-line); }
 .evidence-review-preview img, .evidence-review-preview object { display: block; width: 100%; height: min(62vh, 620px); object-fit: contain; background: #e9eef4; }
+.evidence-review-stage { position: relative; }
+.evidence-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(23, 43, 77, .88); color: #fff; font-size: 32px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.evidence-nav:hover:not(:disabled), .evidence-nav:focus-visible { background: #315A85; }
+.evidence-nav:disabled { opacity: .35; cursor: not-allowed; }
+.evidence-nav-prev { left: 10px; } .evidence-nav-next { right: 10px; }
+.evidence-nav-count { margin: 0; padding: 8px 14px; text-align: center; font-size: 14px; color: var(--color-muted); background: #fff; border-top: 1px solid var(--color-line); }
 .evidence-review-preview-empty { min-height: 260px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--color-muted); }
 .evidence-review-decision { min-width: 0; }
 .evidence-review-decision h3 { margin: 0 0 8px; }

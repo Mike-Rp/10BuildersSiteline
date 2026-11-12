@@ -134,6 +134,8 @@ import {
   registeredCount,
   REVIEW_MS,
   teamConfirmed,
+  phaseEngineerSummary,
+  waitingLabel,
   visibleEvents,
   workflowFor,
   type WorkflowCommand,
@@ -698,7 +700,9 @@ export default function RoleWorkspace({
   function assignmentRoster(p: Project, allowReassign = false, showContacts = false) {
     return (
       <div className="role-roster">
-        {p.team.map((t) => (
+        {p.team.map((t) => {
+          const summary = phaseEngineerSummary(t)
+          return (
           <div key={t.phase}>
             <div>
               <strong>{t.phase}</strong>
@@ -723,9 +727,14 @@ export default function RoleWorkspace({
                 </div>
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}
-            </div> : <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>}
-            {!showContacts && <Status value={t.accountId ? t.status : "unassigned"} />}
-            {allowReassign && !showContacts &&
+            </div> : summary.multiple
+              ? <span>{t.engineers!.map((e) => actorName(e.accountId)).join(", ")}</span>
+              : <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>}
+            {!showContacts && <span className="phase-status-cell">
+              <Status value={t.accountId ? summary.status : "unassigned"} />
+              {summary.multiple && summary.waiting > 0 && <small>{waitingLabel(summary.waiting)}</small>}
+            </span>}
+            {allowReassign && !showContacts && !summary.multiple &&
               t.status !== "confirmed" &&
               p.status !== "completed" && (
                 <select
@@ -756,7 +765,8 @@ export default function RoleWorkspace({
                 </select>
               )}
           </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
