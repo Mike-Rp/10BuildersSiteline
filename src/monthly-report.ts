@@ -2,7 +2,7 @@ export type ReportBalance={earned:number|null;total:number|null;percentage:numbe
 export type MonthlyReport={
   project:{id:string;name:string;type:string;status:string}
   period:{month:string;timezone:string;start:string;end:string;cutoff:string;monthToDate:boolean;generatedAt:string}
-  coverageFrom:string|null;opening:ReportBalance;closing:ReportBalance;netChange:number|null
+  coverageFrom:string|null;partialFrom?:string|null;opening:ReportBalance;closing:ReportBalance;netChange:number|null
   projection:"staff"|"site"|"client";scopeLabel?:string;limitations:string[];createdAfterPeriod:boolean
   completedPhases:{id:string;phase:string;date:string;stillComplete:boolean}[]|null
   approvals?:{events:number;distinctActivities:number;earned:number}|null

@@ -56,9 +56,13 @@ const scopeSignature=state=>JSON.stringify({workflow:reportWorkflow(state).map(w
   items:(state.project_phase_checklist_items||[]).filter(i=>i.required!==false).map(i=>[String(i.id),String(i.project_stage_id),i.required,Number(i.weight)]).sort()});
 const phaseName=(state,id)=>(state.project_stages||[]).find(s=>String(s.id)===String(id))?.code||"Project";
 
+export const PARTIAL_COVERAGE="Partial month: figures cover only the period since reporting history began.";
 export function buildMonthlyReport({baseline,events=[],period,project,role,visiblePhaseIds=[]}) {
   const coverage=baseline?new Date(baseline.covered_from).toISOString():null;
-  const covered=!!coverage&&coverage<=period.start;
+  // Tracking began inside the month: report from that moment and say so, never invent earlier history.
+  const partialFrom=coverage&&coverage>period.start&&coverage<period.cutoff?coverage:null;
+  const covered=!!coverage&&(coverage<=period.start||!!partialFrom);
+  const tracking=partialFrom?{...period,start:partialFrom}:period;
   const state=structuredClone(baseline?.data||{});
   const rows=events.filter(e=>new Date(e.occurred_at).toISOString()>=coverage).sort((a,b)=>new Date(a.occurred_at)-new Date(b.occurred_at)||Number(a.id)-Number(b.id));
   let opening=unavailable(),closing=unavailable(),awarded=0,withdrawn=0,scopeDelta=0,scopeChanges=0,approvalEvents=0,withdrawals=0;
@@ -77,7 +81,7 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
   const transactions=[...grouped.values()].sort((a,b)=>a.at.localeCompare(b.at)||Number(a.events.at(-1).id)-Number(b.events.at(-1).id));
   for(const transaction of transactions) {
     if(transaction.at>=period.cutoff)break;
-    if(transaction.at>=period.start&&!openingSet){if(covered)opening=reportBalance(state).project;openingSet=true;}
+    if(transaction.at>=tracking.start&&!openingSet){if(covered)opening=reportBalance(state).project;openingSet=true;}
     const before=reportBalance(state),beforeScope=scopeSignature(state);
     for(const event of transaction.events) {
       if(event.project_id===null && event.source_table==="project_type_stages") {
@@ -85,7 +89,7 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
         if(String(row.project_type_id)!==String(state.projects?.[0]?.project_type_id))continue;
       }
       const prior=reportBalance(state),priorScope=scopeSignature(state);
-      const tracked=inPeriod(transaction.at,period)&&covered;
+      const tracked=inPeriod(transaction.at,tracking)&&covered;
       const oldEvidence=event.before_row,newEvidence=event.after_row;
       applyReportEvent(state,event);
       const next=reportBalance(state);
@@ -103,7 +107,7 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
         if(newEvidence.entry_type==="handoff")activity.push({date:transaction.at,phase:phaseName(state,newEvidence.project_stage_id),kind:"handoff",record:"Workflow handoff recorded",change:null});
       }
     }
-    if(inPeriod(transaction.at,period)&&covered){
+    if(inPeriod(transaction.at,tracking)&&covered){
       const after=reportBalance(state);
       for(const phase of after.phases)if(phase.percentage===100&&before.phases.find(p=>p.id===phase.id)?.percentage!==100)completions.set(phase.id,{phase:phase.name,date:transaction.at,id:phase.id});
       if(beforeScope!==scopeSignature(state))activity.push({date:transaction.at,phase:"Project",kind:"scope",record:"Required checklist scope revised",change:null});
@@ -121,9 +125,9 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
     reports:(state.project_phase_updates||[]).filter(r=>r.status==="pending"&&phaseVisible(r.selected_stage_id)).length,
     rework:(state.pending_rework_requests||[]).filter(r=>r.status==="pending"&&phaseVisible(r.project_stage_id)).length,
   }:null;
-  const result={project:{id:project.id,name:project.name,type:project.type,status:project.status},period,coverageFrom:coverage,
+  const result={project:{id:project.id,name:project.name,type:project.type,status:project.status},period,coverageFrom:coverage,partialFrom,
     opening,closing,netChange:opening.percentage!==null&&closing.percentage!==null&&opening.total===closing.total&&!scopeChanges?closing.percentage-opening.percentage:null,
-    completedPhases,limitations:covered&&opening.percentage!==null&&closing.percentage!==null&&!incompleteBalances?[]:[HISTORY_UNAVAILABLE],createdAfterPeriod:new Date(project.created_at)>=new Date(period.cutoff)};
+    completedPhases,limitations:covered&&opening.percentage!==null&&closing.percentage!==null&&!incompleteBalances?(partialFrom?[PARTIAL_COVERAGE]:[]):[HISTORY_UNAVAILABLE],createdAfterPeriod:new Date(project.created_at)>=new Date(period.cutoff)};
   if(role==="client")return {...result,projection:"client",updates:(state.project_progress_history||[]).filter(h=>h.is_client_visible===true&&["update","handoff"].includes(h.entry_type)&&h.recorded_at&&inPeriod(new Date(h.recorded_at).toISOString(),period)).map(h=>({date:new Date(h.recorded_at).toISOString(),phase:phaseName(state,h.project_stage_id),record:"Shared project update",text:h.note||""}))};
   const detailRestricted=role==="spm";
   return {...result,projection:detailRestricted?"site":"staff",scopeLabel:detailRestricted?"Project progress; activity details and pending reviews limited to your assigned phases.":"All authorized project activity.",

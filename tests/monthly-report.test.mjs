@@ -58,8 +58,11 @@ test("scope revisions, historical pending queues and coverage gaps are not fabri
   assert.equal(report.movement.scopeChanges,1)
   b.covered_from="2026-10-05T00:00:00Z"
   const gap=buildMonthlyReport({baseline:b,events,period:period(),project,role:"admin"})
-  assert.equal(gap.opening.percentage,null);assert.equal(gap.approvals,null);assert.equal(gap.pending,null)
-  assert.ok(gap.limitations.includes(HISTORY_UNAVAILABLE))
+  assert.equal(gap.partialFrom,"2026-10-05T00:00:00.000Z");assert.ok(gap.limitations.length===1&&!gap.limitations.includes(HISTORY_UNAVAILABLE))
+  b.covered_from="2026-10-31T00:00:00Z"
+  const before=buildMonthlyReport({baseline:b,events,period:{...period(),start:"2026-09-01T00:00:00.000Z",cutoff:"2026-10-01T00:00:00.000Z"},project,role:"admin"})
+  assert.equal(before.opening.percentage,null);assert.equal(before.approvals,null);assert.equal(before.pending,null)
+  assert.ok(before.limitations.includes(HISTORY_UNAVAILABLE))
   const missing=buildMonthlyReport({period:period(),project,role:"client"})
   assert.equal(missing.closing.percentage,null)
   assert.equal(reportBalance({...source(),project_phase_checklists:[]}).project.percentage,null)

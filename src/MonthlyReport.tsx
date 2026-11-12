@@ -94,7 +94,7 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
           {(report.projection==="client"?report.updates||[]:report.activity||[]).map((row,i)=><tr key={i}><td>{reportDate(row.date)}</td><td>{row.phase}</td><td>{"text" in row?row.text:row.record}</td></tr>)}
         </tbody></table></div>
         {!(report.projection==="client"?report.updates?.length:report.activity?.length)&&<p>No activity records are available for this period.</p>}
-        <p className="role-muted">Historical coverage starts {report.coverageFrom?reportDate(report.coverageFrom):"when reporting history is installed"}. Download PDF saves a file directly; Print opens your browser’s print dialog.</p>
+        <p className="role-muted">Historical coverage starts {report.coverageFrom?reportDate(report.coverageFrom):"when reporting history is installed"}. {report.partialFrom?<strong> Partial month: figures cover {reportDate(report.partialFrom)} onward only.</strong>:null} Download PDF saves a file directly; Print opens your browser’s print dialog.</p>
         </>}
       </>}
       <div className="modal-actions"><Button onClick={onClose}>Close</Button>{!report?.createdAfterPeriod && <ReportExportActions disabled={!data||loading} busy={exporting} onExport={format=>void exportReport(format)} />}</div>

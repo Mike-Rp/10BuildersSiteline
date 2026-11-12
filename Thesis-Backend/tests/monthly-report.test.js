@@ -1,6 +1,6 @@
 import {test,mock} from "node:test";
 import assert from "node:assert/strict";
-import {HISTORY_UNAVAILABLE} from "../src/domain/monthly-report.js";
+import {HISTORY_UNAVAILABLE,PARTIAL_COVERAGE} from "../src/domain/monthly-report.js";
 import {reportCsv} from "../src/domain/report-export.js";
 
 const project={id:"p",name:"Green Cross Department",created_at:"2026-11-06T08:06:25.925Z",status:"archived",type:"Commercial"};
@@ -47,6 +47,7 @@ test("GET and snapshot exports preserve missing, partial and valid historical co
     const {report,snapshot}=res.body;
     assert.equal(report.period.start,"2026-10-31T16:00:00.000Z");
     if(coverage==="valid"){assert.equal(report.opening.percentage,0);assert.deepEqual(report.limitations,[]);}
+    else if(coverage==="late baseline"){assert.equal(report.opening.percentage,0);assert.equal(report.partialFrom,"2026-11-08T00:00:00.000Z");assert.deepEqual(report.limitations,[PARTIAL_COVERAGE]);}
     else {assert.equal(report.opening.percentage,null);assert.equal(report.approvals,null);assert.ok(report.limitations.includes(HISTORY_UNAVAILABLE));}
     assert.equal(report.closing.percentage,["valid","late baseline"].includes(coverage)?0:null);
     fixture.events=[];fixture.baseline=null; // Export must use the original signed result.
