@@ -1,4 +1,5 @@
 import WorkspaceGuide from "./WorkspaceGuide"
+import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
 import EngineerResponsibilities from './EngineerResponsibilities'
 import { useActionMessage } from "./ActionFeedback"
@@ -2240,7 +2241,7 @@ export default function RoleWorkspace({
                   <div className="active-site-review-heading"><strong>Progress update</strong><Status value={update.escalated ? "escalated — review required" : "pending review"} /></div>
                   <div className="submission-meta"><span>Submitted by {actorName(update.authorId)}</span><span>{new Date(update.submittedAt).toLocaleString()}</span></div>
                   <p className="submission-note">{update.note || "No additional note provided."}</p>
-                  {submissionDocs(update).length > 0 && <div className="report-attachments"><h4>Attachments ({submissionDocs(update).length})</h4><ul>{submissionDocs(update).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  {submissionDocs(update).length > 0 && <div className="report-attachments"><h4>Attachments ({submissionDocs(update).length})</h4><ul>{submissionDocs(update).map(doc => <li key={doc.id}><AttachmentPreview doc={doc} onOpen={() => showDoc(project, doc)} /><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
                   <p className="role-muted">Approving records this progress note. It does not approve checklist evidence or change phase progress.</p>
                   <div className="role-actions"><Button variant="primary" icon="check" disabled={saving} onClick={() => void act({ type: "approve_update", projectId: project.id, expectedVersion: update.version }, "Progress note approved and added to visible history.")}>Approve progress note</Button><Button variant="danger-ghost" disabled={saving} onClick={() => setReportReject({ projectId: project.id, projectName: project.name, expectedVersion: update.version })}>Reject report</Button></div>
                 </div>}
@@ -2249,7 +2250,7 @@ export default function RoleWorkspace({
                   <div className="submission-meta"><span>Submitted by {actorName(rework.authorId)}</span><span>{new Date(rework.submittedAt).toLocaleString()}</span></div>
                   {rework.issues.length > 0 && <div className="tag-list subsection">{rework.issues.map(issue => <span key={issue}>{issue}</span>)}</div>}
                   <p className="submission-note">{rework.note || "No additional note provided."}</p>
-                  {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><AttachmentPreview doc={doc} onOpen={() => showDoc(project, doc)} /><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
                   <p className="role-muted">Review the affected activities and progress impact before confirming targeted rework.</p>
                   <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework impact</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
                 </div>}

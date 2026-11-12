@@ -320,9 +320,18 @@ export function mapProject(parts: ProjectParts): Project {
   workflow.pendingUpdate=workflow.pendingUpdates[0]
 
   const rework=parts.overview?.issues?.find((i:Dto)=>i.status==="pending")
+  const reworkAttachments: Doc[] = (Array.isArray(rework?.files) ? rework.files : []).map((f: Dto): Doc => {
+    register(f.id, "/api/v1/projects/" + id + "/phase-files/" + f.id)
+    return {
+      id: String(f.id), label: "Site issue attachment", name: f.name || "Attachment", uploaded: true, clientVisible: false,
+      owner: "Site PM", date: day(rework.submitted_at),
+      size: f.byte_size == null ? undefined : Number(f.byte_size), mime: f.content_type || undefined,
+    }
+  })
   if(rework)workflow.pendingRework={id:rework.id,version:1,authorId:rework.submitted_by||"",submittedAt:iso(rework.submitted_at),
     note:rework.reason,issues:rework.issue_categories||[],priorPhase:list.current_stage,priorProgress:Number(list.current_pct||0),
-    requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0)}
+    requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0),
+    ...(reworkAttachments.length ? { attachments: reworkAttachments, evidence: reworkAttachments[0] } : {})}
   const project: Project = {
     ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
     ...(parts.verifiedProgress ? { verifiedProgress: parts.verifiedProgress } : {}),

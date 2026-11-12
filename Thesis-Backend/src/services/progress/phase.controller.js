@@ -60,9 +60,13 @@ export const getPhaseOverview = async (req, res) => {
           WHERE l.project_type_id = $1 AND l.project_stage_id = $2 ORDER BY d.code`,
         [p.project_type_id, selected.id]);
       const issues = await client.query(
-        `SELECT id, reason, issue_categories, phase_update_id, status, submitted_by, submitted_at, resolved_at, resolution_note
-           FROM pending_rework_requests WHERE project_id = $1 AND project_stage_id = $2
-          ORDER BY submitted_at DESC, id DESC`, [p.id, selected.id]);
+        `SELECT r.id, r.reason, r.issue_categories, r.phase_update_id, r.status, r.submitted_by, r.submitted_at, r.resolved_at, r.resolution_note,
+           (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'name', f.original_name, 'content_type', f.content_type,
+             'byte_size', f.byte_size) ORDER BY f.uploaded_at, f.id), '[]'::jsonb)
+            FROM project_phase_submission_files sf JOIN project_phase_files f ON f.id = sf.file_id AND f.project_id = r.project_id
+            WHERE sf.update_id = r.phase_update_id) AS files
+           FROM pending_rework_requests r WHERE r.project_id = $1 AND r.project_stage_id = $2
+          ORDER BY r.submitted_at DESC, r.id DESC`, [p.id, selected.id]);
       const files = await client.query(
         `SELECT f.id, f.original_name, f.content_type, f.byte_size, f.uploaded_at, f.uploaded_by
            FROM project_phase_files f
