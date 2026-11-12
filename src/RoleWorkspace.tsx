@@ -1972,11 +1972,12 @@ export default function RoleWorkspace({
                 label={
                   issueChoices.length>0
                     ? "Explain the issue *"
-                    : "Field notes"
+                    : "Field notes *"
                 }
               >
                 <textarea
                   rows={3}
+                  required
                   value={note}
                   disabled={saving}
                   onChange={(e) => setNote(e.target.value)}
@@ -1986,8 +1987,9 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={saving || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))||(!issueChoices.length&&!note.trim()&&!evidence)}
+                  disabled={saving || !note.trim() || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&!affectedActivities.length)}
                   onClick={async () => {
+                    if (!note.trim()) { setError("Enter field notes before submitting an update."); return }
                     if (
                       await act(
                         {
@@ -2015,8 +2017,8 @@ export default function RoleWorkspace({
                     : "Submit progress update"}
                 </Button>
               </div>
-              {!issueChoices.length && !note.trim() && !evidence && !work.pendingUpdate && (
-                <p className="role-muted" id="progress-update-hint">Add field notes or an attachment to send an update.</p>
+              {!issueChoices.length && !note.trim() && !work.pendingUpdate && (
+                <p className="role-muted" id="progress-update-hint">Field notes are required. Attachments are optional and do not replace field notes.</p>
               )}
             </section>
           </>

@@ -260,16 +260,17 @@ test("QA/QC requires current owner evidence and human approval before phase hand
   })
   assert.ok(workflowFor(project(state)).pendingUpdate)
 })
-test("a progress update needs field notes or an attachment, so an empty one never reaches the Office PM", () => {
+test("a progress update requires field notes even when evidence is attached", () => {
   const state = activeProject()
   for (const command of [{}, { note: "" }, { note: "   \t " }, { issues: [] }]) {
-    assert.throws(() => run(state, "a4", { type: "submit_progress", ...command }), /field notes or an attachment/, JSON.stringify(command))
+    assert.throws(() => run(state, "a4", { type: "submit_progress", ...command }), /field notes/i, JSON.stringify(command))
   }
   assert.equal(workflowFor(project(state)).pendingUpdate, undefined, "nothing was queued")
+  assert.throws(() => run(state, "a4", { type: "submit_progress", note: "  ", evidence: { id: "e1", uploaded: true } }), /field notes/i, "Attachments cannot replace required field notes")
   const noted = run(state, "a4", { type: "submit_progress", note: "Rebar delivered." })
   assert.equal(workflowFor(project(noted)).pendingUpdate.note, "Rebar delivered.")
-  const attached = run(state, "a4", { type: "submit_progress", evidence: { id: "e1", label: "General field evidence", name: "site.png", uploaded: true, owner: "x", date: "2026-11-12", size: 10, mime: "image/png", clientVisible: false } })
-  assert.ok(workflowFor(project(attached)).pendingUpdate, "an attachment alone is enough")
+  const attached = run(state, "a4", { type: "submit_progress", note: "Site evidence attached for review.", evidence: { id: "e1", label: "General field evidence", name: "site.png", uploaded: true, owner: "x", date: "2026-11-12", size: 10, mime: "image/png", clientVisible: false } })
+  assert.ok(workflowFor(project(attached)).pendingUpdate, "notes with an attachment are accepted")
 })
 test("rejected QA evidence becomes missing, can be resubmitted, and rejects stale reviews", () => {
   let state = activeProject()

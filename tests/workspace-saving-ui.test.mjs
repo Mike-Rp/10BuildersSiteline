@@ -80,7 +80,7 @@ test("workspace saves prevent duplicate requests, retain failed notes, and allow
     })))
     const feedback = await server.ssrLoadModule("/src/action-feedback.ts")
     feedback.dismissActionResult()
-    await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Active sites"))
+    await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
     await click(button("Open phase workspace"))
     let save = button("Add diary note")
     assert.equal(save.disabled, true, "Empty notes should not submit")
@@ -231,12 +231,12 @@ test("Submit progress update stays disabled until there are field notes, and the
       state, actor, onCommand(command) { requests.push(command); return Promise.resolve({ ok: true }) },
       onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {},
     })))
-    await click([...document.querySelectorAll(".sidebar button")].find(el => el.textContent.trim() === "Active sites"))
+    await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
     await click(button("Open phase workspace"))
     const submit = () => button("Submit progress update")
     const notes = () => document.querySelector('[placeholder="Report the current conditions, observations, or a site issue."]')
     assert.equal(submit().disabled, true, "an empty update cannot be sent")
-    assert.match(document.getElementById("progress-update-hint").textContent, /field notes or an attachment/)
+    assert.match(document.getElementById("progress-update-hint").textContent, /field notes/i)
     await click(submit())
     assert.equal(requests.length, 0, "clicking the disabled button sends nothing")
     await input(React, w, notes(), "   ")

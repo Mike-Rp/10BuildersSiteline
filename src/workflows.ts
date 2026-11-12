@@ -1666,8 +1666,8 @@ export function applyWorkflow(
         "A rework flag is already awaiting Office PM review.",
       )
       assert(
-        issues.length || command.note?.trim() || command.evidence,
-        "Add field notes or an attachment before submitting an update.",
+        command.note?.trim(),
+        "Enter field notes before submitting an update.",
       )
       if (command.evidence) requireDoc(command.evidence)
       assert(
