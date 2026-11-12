@@ -4,7 +4,7 @@ import { Badge, Button, Field } from "./ui"
 import { Upload } from "./panels"
 import { DOC_LABELS, type Project } from "./model"
 import type { WorkflowCommand } from "./workflows"
-import { suggestCompanyPair } from "./allocation-suggestion"
+import { suggestCompanyPair, alternateForemen } from "./allocation-suggestion"
 import "./phase-allocation.css"
 import { startPolling } from "./refresh-interval"
 
@@ -221,7 +221,7 @@ export default function PhaseAllocationPanel({
         </Badge>
       </div>
       <p>
-        One foreman per phase. A company uses one project commitment even when
+        One foreman per phase, alternating between the company's two foremen automatically (you can still change any phase). A company uses one project commitment even when
         both foremen are assigned. Maximum two open project commitments per
         company.
       </p>
@@ -353,11 +353,14 @@ export default function PhaseAllocationPanel({
                 }
                 setRoster([suggested.id])
                 setRows(
-                  remaining.map((p) => ({
-                    phase: p.name,
-                    companyId: suggested.id,
-                    foremanId: "",
-                  })),
+                  alternateForemen(
+                    remaining.map((p) => ({
+                      phase: p.name,
+                      companyId: suggested.id,
+                      foremanId: "",
+                    })),
+                    suggested,
+                  ),
                 )
               }}
             >
@@ -382,11 +385,14 @@ export default function PhaseAllocationPanel({
                 setRoster((ids) => [...new Set([...ids, companyChoice])])
                 if (roster.length === 0)
                   setRows((current) =>
-                    current.map((r) => ({
-                      ...r,
-                      companyId: companyChoice,
-                      foremanId: "",
-                    })),
+                    alternateForemen(
+                      current.map((r) => ({
+                        ...r,
+                        companyId: companyChoice,
+                        foremanId: "",
+                      })),
+                      company(companyChoice),
+                    ),
                   )
                 setCompanyChoice("")
               }}

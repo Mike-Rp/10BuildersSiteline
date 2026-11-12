@@ -43,3 +43,21 @@ export function suggestCompanyPair(
 function compare(a: [number, number, string], b: [number, number, string]) {
   return a[0] - b[0] || a[1] - b[1] || a[2].localeCompare(b[2])
 }
+
+/**
+ * Auto-assigns the responsible foreman for every phase the company owns, alternating between its
+ * two least-loaded foremen in phase order (A, B, A, B...). A company with one foreman uses that foreman.
+ * Phases owned by another company, or not yet assigned, are left unchanged.
+ */
+export function alternateForemen<R extends { phase: string; companyId: string; foremanId: string }>(
+  rows: R[],
+  company: { id: string; foremen: { id: string; otherProjectCount?: number }[] } | undefined,
+): R[] {
+  if (!company) return rows
+  const pool = [...company.foremen]
+    .sort((a, b) => (a.otherProjectCount || 0) - (b.otherProjectCount || 0))
+    .slice(0, 2)
+  if (!pool.length) return rows
+  let turn = 0
+  return rows.map((row) => row.companyId === company.id ? { ...row, foremanId: pool[turn++ % pool.length].id } : row)
+}

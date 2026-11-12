@@ -38,3 +38,15 @@ test("the pair with fewer existing commitments is preferred", () => {
   const pair = suggestCompanyPair([company("busy-civil", civil, 1), company("free-civil", civil, 0), company("mep", mep, 0)], phases)
   assert.deepEqual([...pair.companyIds].sort(), ["free-civil", "mep"])
 })
+
+import { alternateForemen } from "../src/allocation-suggestion.ts"
+import assertStrict from "node:assert/strict"
+import testAlt from "node:test"
+testAlt("one company's foremen alternate per phase", () => {
+  const company = { id: "c1", foremen: [{ id: "f1" }, { id: "f2", otherProjectCount: 1 }, { id: "f3" }] }
+  const rows = ["A", "B", "C", "D", "E"].map(phase => ({ phase, companyId: "c1", foremanId: "" }))
+  assertStrict.deepEqual(alternateForemen(rows, company).map(r => r.foremanId), ["f1", "f3", "f1", "f3", "f1"])
+  assertStrict.deepEqual(alternateForemen(rows, { id: "c1", foremen: [{ id: "solo" }] }).map(r => r.foremanId), ["solo", "solo", "solo", "solo", "solo"])
+  const mixed = [{ phase: "A", companyId: "c2", foremanId: "" }, ...rows]
+  assertStrict.equal(alternateForemen(mixed, company)[0].foremanId, "")
+})
