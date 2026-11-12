@@ -215,7 +215,7 @@ const STATUS: Record<string, string> = {
   deactivated: "Deactivated",
   archived: "Archived",
 }
-function Status({ status }: { status: string }) {
+function Status({ status, pendingLabel }: { status: string; pendingLabel?: string }) {
   return (
     <Badge
       tone={
@@ -248,7 +248,7 @@ function Status({ status }: { status: string }) {
               : ""
       }
     >
-      {STATUS[status] || status.replace(/_/g, " ")}
+      {(status === "pending" && pendingLabel) || STATUS[status] || status.replace(/_/g, " ")}
     </Badge>
   )
 }
@@ -2443,7 +2443,7 @@ function AppInner() {
                               <small>{e.assignedDisciplines.join(", ") || "Any discipline"}</small>
                               <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
                             </span>
-                            <Status status={e.status} />
+                            <Status status={e.status} pendingLabel="Awaiting Site PM" />
                           </span>
                         ))}
                       </span>
@@ -2454,7 +2454,7 @@ function AppInner() {
                       </span>
                     )}
                     <span className="phase-status-cell">
-                      <Status status={t.accountId ? phaseStatus : "unassigned"} />
+                      <Status status={t.accountId ? phaseStatus : "unassigned"} pendingLabel="Awaiting Site PM" />
                       {people && confirmedCount < people.length && <small>{people.length - confirmedCount === 1 ? "1 more awaiting confirmation" : `${people.length - confirmedCount} more awaiting confirmation`}</small>}
                     </span>
                     {people ? (
