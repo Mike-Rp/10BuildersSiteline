@@ -1,5 +1,6 @@
 import DatePicker from "./DatePicker"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
+import "./credential-entry.css"
 import { api,downloadBlob } from "./api/client"
 import {
   submitOwnRenewal,
@@ -90,6 +91,7 @@ export default function EngineerCredentials({
   const [revokeId,setRevokeId]=useState<string>()
   const [revocationNote,setRevocationNote]=useState("")
   const [newTags,setNewTags]=useState<string[]>([])
+  const credentialFileId = useId()
   const running = useRef(false)
   async function refresh() {
     const next = await api<Summary>("/licenses/credentials/" + userId)
@@ -224,12 +226,12 @@ export default function EngineerCredentials({
             )}
           </div>
           {!readOnly && <>
-          <h4>{admin ? "Save a credential or renewal" : "Submit license renewal"}</h4>
-          <p>
+          <h4 className="credential-entry-heading">{admin ? "Save a credential or renewal" : "Submit license renewal"}</h4>
+          <p className="credential-entry-description">
             {admin ? "Saving records this credential as Pending Verification. Review its supporting evidence separately before verifying it." : "Each profession is submitted and verified separately. Submission does not restore eligibility."}
           </p>
           <form
-            className={admin ? "form-grid" : "form-grid license-renewal-form"}
+            className={`form-grid credential-entry-form${admin ? "" : " license-renewal-form"}`}
             onSubmit={(e) => {
               e.preventDefault()
               const issue = licenseNumberError(number)
@@ -278,18 +280,29 @@ export default function EngineerCredentials({
                 onValueChange={date => setExpiry(date)}
               />
             </Field>
-            <Field label="Supporting credential document">
+            <div className="field credential-entry-file">
+              <label htmlFor={credentialFileId}>Supporting credential document</label>
+              <div className="credential-entry-upload">
+              <label className="button credential-entry-choose" htmlFor={credentialFileId}>Choose file</label>
               <input
+                id={credentialFileId}
+                className="credential-entry-file-input"
+                aria-describedby={`${credentialFileId}-name ${credentialFileId}-help`}
                 required
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setFile(e.target.files?.[0])}
               />
-            </Field>
-            {admin&&<fieldset className="credential-specializations"><legend>Areas of specialization for this credential · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${newTags.includes(tag)?'selected':''}`} aria-pressed={newTags.includes(tag)} disabled={!newTags.includes(tag)&&newTags.length>=3} onClick={()=>setNewTags(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div></fieldset>}
+              <span id={`${credentialFileId}-name`} className="credential-entry-filename">{file?.name || "No file selected"}</span>
+              <small id={`${credentialFileId}-help`}>PDF, JPG or PNG</small>
+              </div>
+            </div>
+            {admin&&<fieldset className="credential-specializations"><legend>Areas of specialization for this credential · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${newTags.includes(tag)?'selected':''}`} aria-pressed={newTags.includes(tag)} disabled={!newTags.includes(tag)&&newTags.length>=3} onClick={()=>setNewTags(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p className="credential-entry-selection-count">{newTags.length} of 3 selected</p></fieldset>}
+            <div className="credential-entry-actions">
             <Button disabled={busy} type="submit" variant="primary">
               {busy ? "Saving…" : admin ? "Save credential" : "Submit license renewal"}
             </Button>
+            </div>
           </form>
           </>}
           {data.submissions.length > 0 && <section className="credential-subsection">
