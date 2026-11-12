@@ -732,6 +732,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
+    assert.equal((await api('/auth/me')).workspace_guide_seen,false,'the welcome guide has not been seen yet')
+    await api('/auth/me/workspace-guide-seen',{method:'POST'})
+    assert.equal((await api('/auth/me')).workspace_guide_seen,true,'seen is stored on the account, not the browser')
   })
 
   await t.test("first-login reset and employee resignation persist and revoke access",async()=>{

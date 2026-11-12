@@ -3,6 +3,7 @@ import ContextualTour, { type TourStep } from "./ContextualTour"
 import { createPortal } from "react-dom"
 import { Button, Icon, Modal } from "./ui"
 import "./workspace-guide.css"
+import { api, getToken } from "./api/client"
 
 type Role = "admin" | "opm" | "spm" | "client"
 type Step = TourStep
@@ -77,7 +78,28 @@ export default function WorkspaceGuide({ actor, onNavigate, enabled = true }: {
   const current = topic.steps[index]
   useEffect(() => {
     if (!enabled) { setView(null); return }
-    try { if (!localStorage.getItem(key)) setView("welcome") } catch { setView("welcome") }
+    let active = true
+    let local = false
+    try { local = !!localStorage.getItem(key) } catch { /* storage blocked: rely on the account record */ }
+    const markSeen = () => { try { localStorage.setItem(key, "seen") } catch { /* optional */ } void api("/auth/me/workspace-guide-seen", { method: "POST" }).catch(() => undefined) }
+    // The welcome appears once per account, on any browser or device. The account record decides; this browser's copy
+    // only covers accounts that saw the guide before the record existed and the case where the server cannot be reached.
+    // Without an API session (demo or offline) only this browser's record is available.
+    if (!getToken()) {
+      if (!local) { setView("welcome"); try { localStorage.setItem(key, "seen") } catch { /* optional */ } }
+      return () => { active = false }
+    }
+    api<{ workspace_guide_seen?: boolean }>("/auth/me").then(me => {
+      if (!active) return
+      if (me.workspace_guide_seen) { try { localStorage.setItem(key, "seen") } catch { /* optional */ } return }
+      if (local) { markSeen(); return }
+      setView("welcome"); markSeen()
+    }).catch(() => {
+      if (!active || local) return
+      setView("welcome")
+      try { localStorage.setItem(key, "seen") } catch { /* optional */ }
+    })
+    return () => { active = false }
   }, [key, enabled])
   function remember() { try { localStorage.setItem(key, "seen") } catch { /* Guide remains usable without storage. */ } }
   function close() { remember(); setView(null) }

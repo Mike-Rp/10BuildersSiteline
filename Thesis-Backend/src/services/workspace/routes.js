@@ -207,7 +207,12 @@ router.post("/auth/logout", logout);
 router.get("/auth/session", sessionStatus);
 router.post("/auth/activity", sessionStatus);
 router.post("/auth/reset-password", requireLogin, reset);
-router.get("/auth/me", endpoint(null, async (db, user) => (await db.query("select u.id,u.full_name,u.email,r.code as role,u.status,u.temp_password_issued from users u join roles r on r.id=u.role_id where u.id=$1", [user.id])).rows[0]));
+router.get("/auth/me", endpoint(null, async (db, user) => (await db.query("select u.id,u.full_name,u.email,r.code as role,u.status,u.temp_password_issued,coalesce((select m.metadata->>'workspaceGuideSeen'='true' from workspace_account_metadata m where m.user_id=u.id),false) as workspace_guide_seen from users u join roles r on r.id=u.role_id where u.id=$1", [user.id])).rows[0]));
+// The first-login welcome guide is shown once per account, on any browser or device.
+router.post("/auth/me/workspace-guide-seen", endpoint(null, async (db, user) => {
+    await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('workspaceGuideSeen',true)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||jsonb_build_object('workspaceGuideSeen',true)", [user.id]);
+    return { workspace_guide_seen: true };
+}));
 router.get("/subcontractors", getSubcontractors);
 router.post("/subcontractors", createSubcontractor);
 router.use(phases);
