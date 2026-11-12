@@ -24,6 +24,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
 export const DEDICATED_MIGRATIONS = Object.freeze({
   "028-storage-backed-files.sql": "Apply explicitly before using private Storage-backed files",
   "029-backup-monitoring.sql": "Additive metadata tables: apply explicitly before enabling backup monitoring; see docs/BACKUPS.md",
+  "030-foundation-progress-weighting.sql": "Additive column: existing projects stay on the legacy calculation; new projects weight Foundation at 15%",
   "004-verified-activity-progress.sql": "Recovery only: review its prerequisites and apply explicitly",
   "004-verified-activity-values.sql": "Reviewed local dry run: scripts/migrate-verified-progress.js",
   "005-targeted-rework.sql": "Reviewed local dry run: scripts/migrate-targeted-rework.js",

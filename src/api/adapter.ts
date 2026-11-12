@@ -346,6 +346,7 @@ export function mapProject(parts: ProjectParts): Project {
     }))} : {}),
     status,
     opmId: list.suggested_opm_id || "",
+    ...(list.progress_weighting ? { progressWeighting: list.progress_weighting } : {}),
     team,
     phase: list.current_stage || team[0]?.phase || "Mobilization",
     // The backend derives % from approved checklist items; an archived project is finished.
@@ -498,7 +499,7 @@ export function peopleFromProjects(
         ),
       )
     else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id))
-      add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
+      add(stubAccount(p.suggested_opm_id, p.suggested_opm_name || "Office PM", "opm"))
     const clientName: string = p.client_name || ""
     if (Array.isArray(detail.client_accounts)) {
       const linked = detail.client_accounts as Dto[]

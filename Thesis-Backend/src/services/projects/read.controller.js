@@ -24,7 +24,7 @@ export const LIST_SELECT = `
   (SELECT max(h.recorded_at) FROM project_progress_history h WHERE h.project_id = p.id
     AND h.project_stage_id = p.current_stage_id AND h.entry_type <> 'issue') AS last_progress_updated_at,
   p.crew_required, p.crew_assigned,
-  p.lifecycle_status, p.suggested_opm_id, p.suggested_opm_match_score,
+  p.lifecycle_status, p.suggested_opm_id, (SELECT u.full_name FROM users u WHERE u.id = p.suggested_opm_id) AS suggested_opm_name, to_jsonb(p)->>'progress_weighting' AS progress_weighting, p.suggested_opm_match_score,
   p.headcount_suggested, p.headcount_tier, p.archived_at, p.created_at, p.updated_at`;
  
 export const LIST_FROM = `
@@ -65,7 +65,7 @@ export async function projectListFrom(db) {
 }
  
 export const stripInternal = (row) => {
-  const { suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
+  const { suggested_opm_id, suggested_opm_name, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
   return rest;
 };
  

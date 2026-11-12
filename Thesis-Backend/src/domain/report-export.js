@@ -1,6 +1,6 @@
 import { summaryMetrics } from "./monthly-summary.js";
 
-export const fraction=balance=>balance?.percentage==null?"Unavailable":`${balance.earned} / ${balance.total} (${balance.percentage.toFixed(1)}%)`;
+export const fraction=balance=>balance?.percentage==null?"Unavailable":`${Number(balance.earned.toFixed(1))} / ${balance.total} (${balance.percentage.toFixed(1)}%)`;
 export function reportRows(report) {
   const rows=[
     ["10BuildLine — Monthly Project Progress Summary"],

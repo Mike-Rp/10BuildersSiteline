@@ -35,9 +35,12 @@ async function preview(db,review,body){
   if(linked.some(id=>!phase.activities.some(item=>item.id===id)))throw new HttpError(409,"The linked activity scope changed.");
   const impact=reworkImpact([phase],[phase.id],ids);
   if(impact.reason)throw new HttpError(409,impact.reason);
-  const overall=(await readVerifiedProgress(db,[project.id])).get(project.id).project;
+  const verified=(await readVerifiedProgress(db,[project.id])).get(project.id);
+  const overall=verified.project;
   const withdrawn=impact.before.earned-impact.after.earned;
-  const after=overall.percentage===null ? overall : {...overall,earned:overall.earned-withdrawn,percentage:(overall.earned-withdrawn)/overall.total*100};
+  // Withdrawn activity points reduce the project by that phase's project weight, not one-for-one.
+  const projectWithdrawn=withdrawn*(verified.scales?.[String(project.current_stage_id)]??1);
+  const after=overall.percentage===null ? overall : {...overall,earned:Number((overall.earned-projectWithdrawn).toFixed(9)),percentage:Number(((overall.earned-projectWithdrawn)/overall.total*100).toFixed(9))};
   const aggregate=(await readChecklist(db,project.id,project.current_stage_id)).verified;
   const phaseAfter=aggregate.percentage===null ? aggregate : {...aggregate,earned:aggregate.earned-withdrawn,percentage:(aggregate.earned-withdrawn)/aggregate.total*100};
   const before={phase:aggregate,project:overall},next={phase:phaseAfter,project:after};

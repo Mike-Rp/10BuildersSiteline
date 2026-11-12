@@ -49,7 +49,7 @@ export function reportBalance(state) {
   const expected=new Set(workflow.map(w=>String(w.project_stage_id)));
   const additional=[...(state.project_phase_checklists||[]),...(state.project_phase_team||[])].map(r=>String(r.project_stage_id));
   if(project.current_stage_id)additional.push(String(project.current_stage_id));
-  return {project:additional.some(id=>!expected.has(id))?unavailable():projectProgress(phases,[...expected]),phases:phases.map(p=>({id:p.id,name:p.name,...phaseProgress(p)}))};
+  return {project:additional.some(id=>!expected.has(id))?unavailable():projectProgress(phases,[...expected],{weighting:project.progress_weighting||null}),phases:phases.map(p=>({id:p.id,name:p.name,...phaseProgress(p)}))};
 }
 const inPeriod=(at,period)=>at>=period.start&&at<period.cutoff;
 const scopeSignature=state=>JSON.stringify({workflow:reportWorkflow(state).map(w=>[String(w.project_stage_id),w.sort_order]).sort(),

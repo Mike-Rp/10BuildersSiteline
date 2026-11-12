@@ -4,6 +4,7 @@ import {
   isProjectOpmOrAdmin,
   isUuid,
 } from "../../common/utilities/access.utility.js"
+import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
 import { responsibilitiesInstalled } from "../projects/phase-responsibilities.utility.js"
 import { assertAcceptancePrerequisites } from "../projects/assignment-prerequisites.utility.js"
 import {
@@ -27,13 +28,16 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
       const p = await project(db, user, req.params.id)
       if (!(await responsibilitiesInstalled(db)))
         return { available: false, rows: [] }
-      const rows = (
+      const allRows = (
         await db.query(
-          `select r.*,s.code as phase,u.full_name as name from project_phase_responsibilities r join project_stages s on s.id=r.project_stage_id join users u on u.id=r.user_id where r.project_id=$1 order by r.project_stage_id,r.id`,
+          `select r.*,s.code as phase,u.full_name as name from project_phase_responsibilities r join project_stages s on s.id=r.project_stage_id join users u on u.id=r.user_id left join (${projectWorkflowSql}) flow on flow.project_id=r.project_id and flow.project_stage_id=r.project_stage_id where r.project_id=$1 order by flow.sort_order nulls last,r.project_stage_id,r.id`,
           [p.id],
         )
       ).rows
       const canReview = await isProjectOpmOrAdmin(user, p.id, db)
+      // An engineer's own workspace lists only that engineer's responsibilities, one per phase. Other
+      // engineers' notes and evidence stay with the Office PM and Administrator who review them.
+      const rows = canReview ? allRows : allRows.filter((row) => String(row.user_id) === String(user.id))
       for (const row of rows) {
         row.complete = row.completion_status === "approved"
         const checklist=await readChecklist(db,p.id,row.project_stage_id,{userId:row.user_id});

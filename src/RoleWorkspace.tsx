@@ -1746,14 +1746,24 @@ export default function RoleWorkspace({
           projectPhaseNames(p).indexOf(t.phase) <=
             projectPhaseNames(p).indexOf(p.phase),
       )
+      // Phases still ahead of the project: this engineer's work starts when the project reaches them.
+      const order = projectPhaseNames(p), currentIndex = order.indexOf(p.phase)
+      const upcoming = p.team
+        .filter((t) => (t.accountId === actor.id || t.engineers?.some((e) => e.accountId === actor.id)) && order.indexOf(t.phase) > currentIndex)
+        .sort((x, y) => order.indexOf(x.phase) - order.indexOf(y.phase))
+      const owner = phaseOwner(p)
+      const where = `The project is in ${p.phase}${owner && owner !== actor.id ? `, handled by ${actorName(owner)}` : ""}.`
+      const next = upcoming.length ? ` Your next phase is ${upcoming[0].phase}${upcoming.length > 1 ? ` (and ${upcoming.length - 1} more after it)` : ""}; your workspace opens when it becomes active.` : ""
       return (
         <div className="role-card-content">
           <div className="notice">
             <Icon name="shield" />
             <p>
               {past.length
-                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is now read-only. Other assigned SPMs may continue their work.`
-                : `Your workspace remains locked until your assigned phase becomes active.`}
+                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is read-only. ${where}${next}`
+                : upcoming.length
+                  ? `${where}${next}`
+                  : `Your workspace remains locked until your assigned phase becomes active.`}
             </p>
           </div>
           {past.map((t) => (

@@ -18,7 +18,7 @@ export function currentReportMonth(date=new Date()) {
   return `${parts.year}-${parts.month}`
 }
 export const reportDate=(date:string)=>new Intl.DateTimeFormat("en-PH",{timeZone:REPORT_TIMEZONE,dateStyle:"medium",timeStyle:"short"}).format(new Date(date))
-export const reportFraction=(balance:ReportBalance)=>balance.percentage===null?"Unavailable":`${balance.earned} / ${balance.total} · ${balance.percentage.toFixed(1)}%`
+export const reportFraction=(balance:ReportBalance)=>balance.percentage===null?"Unavailable":`${Number(balance.earned!.toFixed(1))} / ${balance.total} · ${balance.percentage.toFixed(1)}%`
 const escapeHtml=(value:unknown)=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")
 export function monthlyPrintDocument(report:MonthlyReport) {
   const table=(head:string[],rows:unknown[][])=>`<table><thead><tr>${head.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`

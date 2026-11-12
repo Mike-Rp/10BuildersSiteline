@@ -26,7 +26,7 @@ type EvidenceVersion = {
 }
 const measure = (value: ProgressTotals) => value.earned === null || value.total === null
   ? "Unavailable"
-  : `${value.earned} / ${value.total} points`
+  : `${Number(value.earned.toFixed(1))} / ${value.total} points`
 
 export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs,onClose,onConfirm}: {
   projectId: string

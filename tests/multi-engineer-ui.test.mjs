@@ -122,6 +122,15 @@ test("phase cards cover all areas and engineer response statuses stay consistent
           status: "pending",
           completion_status: "unfinished",
         },
+        {
+          id: "2",
+          user_id: "b",
+          name: "Rix",
+          phase: "Design",
+          assigned_disciplines: ["Plumbing"],
+          status: "confirmed",
+          completion_status: "unfinished",
+        },
       ],
     }
     const writes = []
@@ -166,6 +175,8 @@ test("phase cards cover all areas and engineer response statuses stay consistent
     }
     await render({ id: "a", role: "spm" }, "engineer")
     assert.match(document.body.textContent, /Reserved — awaiting acceptance/)
+    assert.match(document.body.textContent, /Mika · Design/)
+    assert.doesNotMatch(document.body.textContent, /Rix/, "an engineer's workspace lists only their own responsibilities")
     await act(() => button("Accept responsibility").click())
     assert.equal(writes[0].action, "accept")
     assert.match(document.body.textContent, /Committed to a project/)
@@ -179,6 +190,7 @@ test("phase cards cover all areas and engineer response statuses stay consistent
     context.rows[0].completion_status = "submitted"
     context.rows[0].completion_note = "All assigned work completed."
     await render({ id: "admin", role: "admin" }, "reviewer")
+    assert.match(document.body.textContent, /Rix · Design/, "reviewers still see every engineer in the phase")
     assert.ok(button("Approve completion"))
     assert.equal(button("Return for correction").disabled, true)
     await act(() => button("Approve completion").click())

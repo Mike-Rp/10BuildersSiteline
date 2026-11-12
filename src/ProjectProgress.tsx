@@ -13,6 +13,7 @@ type ProgressView = {
   phase: string
   phases: string[]
   checklistProgress?: PhaseProgress[]
+  progressWeighting?: string
 }
 
 export default function ProjectProgress({ project, reportingDate = localToday() }: {
@@ -32,7 +33,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     const frame = requestAnimationFrame(() => { saved.element.scrollTop = saved.top })
     return () => cancelAnimationFrame(frame)
   }, [open])
-  const actual = overallChecklistProgress(project.phases, project.checklistProgress)
+  const actual = overallChecklistProgress(project.phases, project.checklistProgress, project.progressWeighting)
   const phaseRows = constructionPhaseRows(project.phases, project.checklistProgress)
   const planned = plannedCompletion(project.start, project.end, reportingDate)
   const gap = progressGap(actual.percentage, planned)

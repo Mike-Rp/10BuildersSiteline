@@ -276,6 +276,8 @@ export type Project = {
   checklistProgress?: PhaseProgress[]
   verifiedProgress?: import("./project-progress").VerifiedProgress
   overallProgress?: number | null
+  // 'foundation_15' on projects configured after the Foundation weighting rule; absent or 'legacy' keeps the old calculation.
+  progressWeighting?: string
   id: string
   name: string
   type: string

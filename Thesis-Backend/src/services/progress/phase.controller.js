@@ -205,14 +205,17 @@ async function reviewableEvidence(client,user,projectId,evidenceId) {
 
 async function evidenceReviewPreview(client,p,evidence) {
   const checklist=await readChecklist(client,p.id,evidence.project_stage_id);
-  const project=(await readVerifiedProgress(client,[p.id])).get(p.id).project;
+  const overall=(await readVerifiedProgress(client,[p.id])).get(p.id);
+  const project=overall.project;
   const phase=checklist.verified;
   const credited=checklist.items.filter(item=>String(item.evidence_id)===String(evidence.id)&&item.required).length;
   const added=credited*evidence.weight;
-  const advance=before=>before.percentage===null ? before : {
-    earned:before.earned+added,total:before.total,percentage:(before.earned+added)/before.total*100,reason:null,
+  // Project totals use the project's weighting; the phase keeps its own activity points.
+  const projectAdded=added*(overall.scales?.[String(evidence.project_stage_id)]??1);
+  const advance=(before,gain)=>before.percentage===null ? before : {
+    earned:Number((before.earned+gain).toFixed(9)),total:before.total,percentage:Number(((before.earned+gain)/before.total*100).toFixed(9)),reason:null,
   };
-  const before={phase,project},after={phase:advance(phase),project:advance(project)};
+  const before={phase,project},after={phase:advance(phase,added),project:advance(project,projectAdded)};
   const review_token=createHash("sha256").update(JSON.stringify({id:evidence.id,before,weight:evidence.weight,required:evidence.required,credited})).digest("hex");
   return {evidence_id:String(evidence.id),item_id:String(evidence.checklist_item_id),phase_name:evidence.phase_name,
     activity:evidence.activity_title,submitted_by_name:evidence.submitted_by_name,submitted_at:evidence.submitted_at,submission_note:evidence.submission_note,before,after,review_token};
