@@ -156,7 +156,12 @@ export async function getProjectData(req,res) {
     left join project_stages prior on prior.id=u.prior_stage_id
     where u.project_id=any($1::uuid[]) and u.status='pending' order by u.id desc`,[ids])).rows:[];
    const issues=staff?(await db.query(`select r.project_id,r.id,r.reason,r.issue_categories,r.phase_update_id,r.status,
-    r.submitted_by,r.submitted_at,r.resolved_at,r.resolution_note from pending_rework_requests r
+    r.submitted_by,r.submitted_at,r.resolved_at,r.resolution_note,
+    (select coalesce(jsonb_agg(jsonb_build_object('id',f.id,'name',f.original_name,'content_type',f.content_type,'byte_size',f.byte_size) order by f.uploaded_at,f.id),'[]'::jsonb)
+      from project_phase_files f where f.project_id=r.project_id and (
+        f.id in (select sf.file_id from project_phase_submission_files sf where sf.update_id=r.phase_update_id)
+        or f.id in (select uf.file_id from project_phase_update_files uf where uf.history_id=r.resulting_history_id))) as files
+    from pending_rework_requests r
     join projects p on p.id=r.project_id and p.current_stage_id=r.project_stage_id
     where r.project_id=any($1::uuid[]) order by r.submitted_at desc,r.id desc`,[ids])).rows:[];
    const assignments=(await db.query(`select a.project_id,a.id,a.subcontractor_id,s.company_name as subcontractor_name,

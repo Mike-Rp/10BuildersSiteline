@@ -271,3 +271,19 @@ test("a report without attachments, or with a malformed list, shows none", () =>
     assert.equal(update.evidence, undefined)
   }
 })
+
+test("a pending site issue carries its photo to the Office PM review card", () => {
+  const overview = {
+    stages: [], checklist: { items: [] }, review_queue: [], pending_update: null,
+    issues: [{
+      id: "i1", status: "pending", reason: "error", issue_categories: ["failed_inspection"],
+      submitted_by: "s1", submitted_at: "2026-11-12T07:55:24Z",
+      files: [{ id: "f1", name: "crack.png", content_type: "image/png", byte_size: 1200 }],
+    }],
+  }
+  const project = mapProject(parts({ overview }))
+  const issue = project.workflow.pendingRework
+  assert.equal(issue.attachments.length, 1)
+  assert.equal(issue.attachments[0].name, "crack.png")
+  assert.equal(issue.evidence.id, "f1")
+})
