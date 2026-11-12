@@ -612,7 +612,18 @@ export default function RoleWorkspace({
       navigate("Active sites")
       if (isOpm) setActiveSitesView("updates")
       requestAnimationFrame(() => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center" }))
-    } else if (priority.target === "assignment") { navigate("Assignments"); setAssignmentId(project.id) }
+    } else if (priority.target === "photos") {
+      navigate("Active sites")
+      setActiveSitesView("uploads")
+      requestAnimationFrame(() => document.getElementById("active-sites-photo-review")?.scrollIntoView({ block: "start" }))
+    } else if (priority.target === "confirm") {
+      navigate("Confirmation queue")
+      setIntakeView("action")
+      updateListQuery(`${actor.role}:confirmations`, q => ({ ...q, search: project.name, filters: {}, page: 1 }))
+    } else if (priority.target === "assignment" || priority.target === "coordinate") {
+      navigate("Assignments")
+      setDialog({ kind: "project", projectId: project.id })
+    }
     else if (priority.target === "responses") { openSiteResponses(); setDialog({ kind: "project", projectId: project.id }) }
     else if (priority.target === "documents") openDocuments(project)
     else { navigate("Active sites"); setDialog({ kind: "project", projectId: project.id }) }
@@ -620,10 +631,10 @@ export default function RoleWorkspace({
   function urgentBanner() {
     const items = staffUrgentItems(state, actor, page, urgencyNow)
     const checklistOnly = items.length > 0 && items.every(item => item.target === "qa")
-    return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : isOpm ? "Priority items need your attention" : "Your response needs attention"}
+    return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : "Priority items need your attention"}
       description={checklistOnly ? `${items.length} ${items.length === 1 ? "project has" : "projects have"} submitted checklist evidence awaiting your approval.` : undefined}
       label="Priority action items"
-      actionLabel={checklistOnly ? "Review approvals" : isOpm ? "Open priority item" : "Review assignment"} onOpen={openUrgentItem}
+      actionLabel={checklistOnly ? "Review approvals" : "Open priority item"} onOpen={openUrgentItem}
       onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
   }
   async function showDoc(p: Project, doc: Doc) {

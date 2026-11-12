@@ -73,7 +73,8 @@ test("assignment alerts respect ownership, response gates, stored soft/hard dead
   pending.workflow.deadline.hard = date(1)
   assert.match(staffUrgentItems(state, site, "Dashboard", now)[0].status, /Hard response deadline passed/)
   pending.team[1].status = "confirmed"
-  assert.deepEqual(staffUrgentItems(state, site, "Dashboard", now), [])
+  assert.ok(!staffUrgentItems(state, site, "Dashboard", now).some(item => item.target === "assignment"))
+  assert.ok(staffUrgentItems(state, site, "Dashboard", now).some(item => item.target === "coordinate"), "Lead coordination becomes actionable after acceptance")
   pending.team[1].status = "pending"
   pending.workflow.deadline.expired = true
   assert.deepEqual(staffUrgentItems(state, office, "Dashboard", now), [])
@@ -99,4 +100,42 @@ test("Admin priorities reuse current license, blocked-handoff and review records
   const items = overview.items.map(adminBannerItem)
   assert.ok(sortUrgentItems(items).find(item => item.urgency === "blocked"))
   assert.equal(new Set(items.map(item => item.key)).size, items.length)
+})
+
+test("new intake acceptance, photo review and undated Site PM tasks appear only for their responsible account", () => {
+  const {state,office,site,project}=fixture()
+  office.expiry=site.expiry="2099-01-01"
+  state.projects=[project("accept",{status:"pending",opmAccepted:false}),project("photos")]
+  state.projects[1].workflow.photos=[{id:"pending",photoReviewStatus:"pending"},{id:"released",photoReviewStatus:"approved"}]
+  assert.ok(staffUrgentItems(state,office,"Confirmation queue",now).some(item=>item.target==="confirm"))
+  const photoTask=staffUrgentItems(state,office,"Active sites",now).find(item=>item.target==="photos")
+  assert.match(photoTask.detail,/1 site photo needs/)
+  assert.ok(!staffUrgentItems(state,site,"Dashboard",now).some(item=>["photos","confirm"].includes(item.target)))
+  state.projects[0].opmAccepted=true
+  assert.ok(!staffUrgentItems(state,office,"Dashboard",now).some(item=>item.target==="confirm"))
+  state.projects[1].workflow.photos[0].photoReviewStatus="rejected"
+  assert.ok(!staffUrgentItems(state,office,"Active sites",now).some(item=>item.target==="photos"))
+
+  const response=project("undated",{status:"pending",opmAccepted:true})
+  response.team[1].status="pending"
+  state.projects=[response]
+  const tasks=staffUrgentItems(state,site,"Active sites",now)
+  assert.equal(tasks.filter(item=>item.target==="assignment").length,1)
+  assert.equal(tasks[0].urgency,"attention")
+  assert.equal(tasks[0].due,undefined)
+  response.opmAccepted=false
+  assert.equal(staffUrgentItems(state,site,"Active sites",now).length,0,"Blocked responses are not presented as available actions")
+})
+
+test("Lead coordination follows intake prerequisites and Admin drafts appear without waiting-only intakes", () => {
+  const {state,site,project}=fixture()
+  site.expiry="2099-01-01"
+  const pending=project("coordination",{status:"pending",opmAccepted:true})
+  state.projects=[pending]
+  assert.ok(staffUrgentItems(state,site,"Active sites",now).some(item=>item.target==="coordinate"))
+  pending.opmAccepted=false
+  assert.ok(!staffUrgentItems(state,site,"Dashboard",now).some(item=>item.target==="coordinate"))
+  state.projects=[project("draft",{status:"draft"}),project("waiting",{status:"pending",opmAccepted:false})]
+  const priorities=adminPriorityItems(adminDashboardOverview(state,now).items,"Project intake")
+  assert.deepEqual(priorities.map(item=>item.id),["draft"])
 })

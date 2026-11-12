@@ -1,5 +1,4 @@
 import { adminDashboardOverview } from "./admin-dashboard.ts"
-import { hasPendingSiteReview } from "./active-sites-review.ts"
 import { intakeGuidance, intakeViewCounts, isIntake } from "./intake-guidance.ts"
 import type { Account, State } from "./model.ts"
 import { checklistFor, officePmStage, ownedProjects, workflowFor } from "./workflows.ts"
@@ -7,7 +6,7 @@ import { checklistFor, officePmStage, ownedProjects, workflowFor } from "./workf
 export type NavigationAttention = Record<string, { count: number; description: string }>
 
 // Current authorized work, independent of notification read/mute state.
-// Counts are records except Rework & approvals, whose existing queue counts review items.
+// Tracking counts include waiting records. Office PM Active sites counts review items.
 export function navigationAttention(state: State, actor: Account): NavigationAttention {
   if (actor.role === "client") return {}
   if (actor.role === "admin") {
@@ -27,16 +26,20 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
     const stages = projects.map(project => officePmStage(project))
     return {
       "Confirmation queue": {
-        count: stages.filter(stage => stage.kind === "action" && (stage.reason === "confirm" || stage.reason === "reassign")).length,
-        description: "projects requiring your confirmation or Site PM reassignment",
+        count: projects.filter(project => isIntake(project) ||
+          (project.status === "active" && project.team.some(row => row.engineers?.length
+            ? row.engineers.some(engineer => engineer.status !== "confirmed") : row.status !== "confirmed"))).length,
+        description: "projects in intake or with outstanding Site PM responses, including waiting records",
       },
       Documents: { count: stages.filter(stage => stage.kind === "action" && stage.reason === "documents").length, description: "projects requiring your intake documents" },
-      "Rework & approvals": {
+      "Active sites": {
         count: active.reduce((total, project) => {
           const work = workflowFor(project)
-          return total + Number(Boolean(work.pendingUpdate)) + Number(Boolean(work.pendingRework)) + checklistFor(project).filter(item => item.status === "submitted").length
+          const blocked = project.handoffReadiness?.state === "blocked" && project.handoffReadiness.reason &&
+            ["current_assignment", "next_assignment", "next_scope"].includes(project.handoffReadiness.reasonCode || "")
+          return total + Number(Boolean(blocked)) + Number(Boolean(work.pendingUpdate)) + Number(Boolean(work.pendingRework)) + checklistFor(project).filter(item => item.status === "submitted").length + (work.photos || []).filter(photo => photo.photoReviewStatus === "pending").length
         }, 0),
-        description: "pending progress, site issue, and QA/QC reviews",
+        description: "pending progress, site issue, QA/QC, site photo reviews, and assignment or scope blockers",
       },
     }
   }
@@ -47,6 +50,6 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
       count: projects.length,
       description: "projects in your assignments",
     },
-    "Active sites": { count: active.filter(hasPendingSiteReview).length, description: "assigned projects awaiting Office PM review" },
+    "Active sites": { count: projects.length, description: "projects in your assignments, including upcoming and waiting records" },
   }
 }
