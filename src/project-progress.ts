@@ -10,11 +10,17 @@ const phaseStatuses: ConstructionPhaseStatus[] = ["Not Started", "Ongoing", "Pen
 
 export function constructionPhaseRows(phases: string[], source?: PhaseProgress[]) {
   return phases.map((name, position) => {
-    const required = standardActivities(position, phases.length).length
+    const standardRequired = standardActivities(position, phases.length).length
     const matches = source?.filter(row => row.name === name) || []
     const row = matches.length === 1 ? matches[0] : undefined
     // An older API's aggregate totals cannot establish which requirements were approved.
-    const valid = row?.required === required && Number.isSafeInteger(row.approved) && row.approved >= 0 && row.approved <= required
+    const explicitStatus = !!row?.status && phaseStatuses.includes(row.status)
+    // Multi-engineer phases contain one standard checklist per engineer. Only
+    // accept those larger totals with an explicit, configured server status.
+    const validScope = row?.required === standardRequired || (row?.configured === true && explicitStatus &&
+      Number.isSafeInteger(row.required) && row.required > 0 && row.required % standardRequired === 0)
+    const valid = validScope && !!row && Number.isSafeInteger(row.approved) && row.approved >= 0 && row.approved <= row.required
+    const required = valid ? row!.required : standardRequired
     const approved = valid ? row!.approved : 0
     let status: ConstructionPhaseStatus = valid && row?.status && phaseStatuses.includes(row.status)
       ? row.status : approved > 0 ? "Ongoing" : "Not Started"

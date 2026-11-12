@@ -71,7 +71,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     <Button icon="activity" onClick={event => showBreakdown(event.currentTarget)} aria-haspopup="dialog">View phase breakdown</Button>
     {open && createPortal(<Modal wide title="Progress by construction phase" subtitle={project.name} onClose={() => setOpen(false)}>
       <div className="project-progress pp-breakdown">
-        <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase.</p>
+        <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase, per assigned engineer. Multi-engineer phases show the combined totals.</p>
         {phaseRows.length ? <div className="pp-table-scroll"><table className="pp-table">
           <thead><tr><th scope="col">Construction Phase</th><th scope="col">Approved Activities</th><th scope="col">Phase Status</th></tr></thead>
           <tbody>{phaseRows.map(row => <tr key={row.name}>

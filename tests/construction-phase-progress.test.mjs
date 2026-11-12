@@ -52,6 +52,20 @@ test("browser rows use phase totals with absent or legacy aggregates and never i
   assert.equal(constructionPhaseRows(phases,[{...legacy[0],required:3,approved:3}])[1].status,"Ongoing")
 })
 
+test("multi-engineer Design approvals keep combined counts and server completion status", () => {
+  const phases=["Mobilization","Design","Foundation","Structure"]
+  const items=["engineer-a","engineer-b","engineer-c"].flatMap(workspaceUserId=>activities("approved").map(item=>({...item,workspaceUserId})))
+  const totals=constructionPhaseProgress(1,phases.length,items)
+  const source=[{id:"design",name:"Design",configured:true,...totals}]
+  const design=constructionPhaseRows(phases,source)[1]
+  assert.equal(design.required,9)
+  assert.equal(design.approved,9)
+  assert.equal(design.status,"Completed")
+  assert.equal(constructionPhaseRows(phases,[{...source[0],approved:6,status:"Ongoing"}])[1].status,"Ongoing")
+  assert.equal(constructionPhaseRows(phases,[{...source[0],status:"On Hold"}])[1].status,"On Hold")
+  assert.equal(constructionPhaseRows(phases,[{...source[0],status:undefined}])[1].approved,0,"Unqualified legacy aggregates cannot prove completion")
+})
+
 test("database summaries, reconciliation, holds and sequential locks survive fresh reads for all project types", {timeout:60000}, async t => {
   const db=new PGlite({extensions:{citext}})
   t.after(()=>db.close())
