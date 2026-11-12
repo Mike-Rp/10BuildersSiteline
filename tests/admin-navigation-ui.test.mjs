@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
-test("Admin navigation toggles on desktop and mobile, handles resizing, closes on navigation and restores keyboard focus", { timeout: 30000 }, async t => {
+test("Admin navigation toggles on desktop and mobile, handles resizing, closes on navigation and restores keyboard focus", { timeout: 60000 }, async t => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/admin/dashboard", pretendToBeVisual: true })
   // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
   { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }

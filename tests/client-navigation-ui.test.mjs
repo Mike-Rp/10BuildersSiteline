@@ -18,7 +18,8 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
   const listeners = new Set()
   const media = { matches: false, media: "(max-width: 1000px)", addEventListener(type, listener) { if (type === "change") listeners.add(listener) }, removeEventListener(type, listener) { listeners.delete(listener) } }
   w.matchMedia = () => media
-  w.scrollTo = () => {}
+  const scrollCalls = []
+  w.scrollTo = options => { scrollCalls.push(options); Object.defineProperty(w, "scrollY", { value: options.top, configurable: true }) }
   w.HTMLElement.prototype.scrollIntoView = () => {}
   const network = []
   t.mock.method(globalThis, "fetch", async url => { network.push(String(url)); throw Error("Navigation must not access the backend") })
@@ -35,6 +36,14 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     const sidebar = () => document.getElementById("client-navigation")
     const click = async element => { assert.ok(!!element, "Navigation control must exist"); assert.equal(element.hidden,false,"Hidden controls must not be used"); await act(() => element.click()) }
     const resize = async width => act(() => { Object.defineProperty(w, "innerWidth", { value: width, configurable: true }); media.matches = width <= 1000; for (const listener of listeners) listener({ matches: media.matches }) })
+    await click(sidebar().querySelector('[aria-label="Project Overview"]'))
+    Object.defineProperty(w, "scrollY", { value: 1400, configurable: true })
+    const callsBeforeHistory = scrollCalls.length
+    await click([...document.querySelectorAll('main button')].find(button => button.textContent.includes("View progress history")))
+    assert.match(document.querySelector("main h1").textContent, /Progress History/)
+    assert.equal(w.scrollY, 0, "Overview shortcut opens progress history at the top")
+    assert.equal(scrollCalls.length, callsBeforeHistory + 1)
+    assert.deepEqual(scrollCalls.at(-1), { top: 0, left: 0, behavior: "instant" })
     assert.equal(toggle().getAttribute("aria-controls"), "client-navigation")
     assert.equal(toggle().getAttribute("aria-expanded"), "true")
     assert.ok(!toggle().classList.contains("mobile-menu"), "toggle must remain visible on desktop")

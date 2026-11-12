@@ -16,6 +16,7 @@ test("Office and Site PM navigation alternates controls across every module on d
   const listeners = new Set()
   const media = {matches:false,addEventListener(type,listener){if(type === "change")listeners.add(listener)},removeEventListener(type,listener){listeners.delete(listener)}}
   w.matchMedia = () => media
+  w.scrollTo = () => {}
   w.HTMLElement.prototype.scrollIntoView = () => {}
   const server = await createServer({cacheDir:`node_modules/.vite-tests/role-navigation-${process.pid}`,server:{middlewareMode:true,hmr:false,watch:null},appType:"custom",logLevel:"silent",optimizeDeps:{noDiscovery:true,include:[]}})
   const { default:React, act } = await import("react")

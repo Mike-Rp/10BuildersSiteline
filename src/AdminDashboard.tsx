@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import PasswordResetRequestPanel from "./PasswordResetRequestPanel"
 import type { PasswordResetRequest } from "./PasswordResetRequests"
 import { overdueCount } from "./password-reset-wait"
@@ -96,7 +97,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
           {overview.items.length ? "Choose another category to see other follow-up items." : "No pending requests, license alerts, project reviews, or intake follow-up in your current records."}
         </Empty>}
         <footer className="ao-pager"><span role="status">{filtered.length ? `${(current - 1) * 6 + 1}–${Math.min(current * 6, filtered.length)} of ${filtered.length} items` : "0 items"}</span>
-          {pages > 1 && <div><Button disabled={current === 1} onClick={() => setPage(current - 1)}>Previous</Button><span>Page {current} of {pages}</span><Button disabled={current === pages} onClick={() => setPage(current + 1)}>Next</Button></div>}
+          {pages > 1 && <div><Button disabled={current === 1} onClick={(event) => { setPage(current - 1); scrollListAfterChange(event.currentTarget) }}>Previous</Button><span>Page {current} of {pages}</span><Button disabled={current === pages} onClick={(event) => { setPage(current + 1); scrollListAfterChange(event.currentTarget) }}>Next</Button></div>}
         </footer>
       </section>
       <section className="ao-panel ao-activity" aria-labelledby="ao-activity-title">

@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import { useEffect, useId, useRef, useState } from "react"
 import type { Account } from "./model"
 import { Button, Icon } from "./ui"
@@ -105,9 +106,9 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
       </div>)}
       {!matches.length && <p className="client-search-empty">No clients found. Try another name or email, or create a client account below.</p>}
       {matches.length > 3 && <div className="client-search-pages">
-        <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} aria-label="Previous client results">Previous</Button>
+        <Button disabled={currentPage === 0} onClick={(event) => { setPage(currentPage - 1); scrollListAfterChange(event.currentTarget) }} aria-label="Previous client results">Previous</Button>
         <span>Page {currentPage + 1} of {pages}</span>
-        <Button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)} aria-label="Next client results">Next</Button>
+        <Button disabled={currentPage === pages - 1} onClick={(event) => { setPage(currentPage + 1); scrollListAfterChange(event.currentTarget) }} aria-label="Next client results">Next</Button>
       </div>}
     </div>}
   </div>

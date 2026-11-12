@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { api } from "./api/client"
 import MonthlyReport from "./MonthlyReport"
@@ -160,7 +161,7 @@ export default function Reports({ embedded = false }: { embedded?: boolean }) {
             </div>}
           {view.rows.length > projectsPerPage && <nav className="report-summary-pagination" aria-label="Monthly report project pages">
             <span role="status">Projects {(currentProjectPage - 1) * projectsPerPage + 1}–{Math.min(currentProjectPage * projectsPerPage, view.rows.length)} of {view.rows.length}</span>
-            <div><Button disabled={currentProjectPage === 1} onClick={() => setProjectPage(currentProjectPage - 1)}>Previous</Button><span>Page {currentProjectPage} of {projectPageCount}</span><Button disabled={currentProjectPage === projectPageCount} onClick={() => setProjectPage(currentProjectPage + 1)}>Next</Button></div>
+            <div><Button disabled={currentProjectPage === 1} onClick={(event) => { setProjectPage(currentProjectPage - 1); scrollListAfterChange(event.currentTarget) }}>Previous</Button><span>Page {currentProjectPage} of {projectPageCount}</span><Button disabled={currentProjectPage === projectPageCount} onClick={(event) => { setProjectPage(currentProjectPage + 1); scrollListAfterChange(event.currentTarget) }}>Next</Button></div>
           </nav>}
         </>}
       </>}

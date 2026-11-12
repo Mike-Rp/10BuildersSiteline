@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import WorkspaceGuide from "./WorkspaceGuide"
 import { resolveAdminSearchDestination, type AdminSearchDestination } from "./admin-search-destination"
 import type { WorkspaceResult } from "./admin-workspace-search"
@@ -2593,9 +2594,9 @@ function AppInner() {
                 </div>
               )) : <p className="role-muted">No project progress or review history yet.</p>}
               {projectHistory.length > 3 && <div className="history-pagination" aria-label="Project history pagination">
-                <Button disabled={projectHistoryPage <= 1} onClick={() => setProjectHistoryPage(page => Math.max(1, page - 1))}>Previous</Button>
+                <Button disabled={projectHistoryPage <= 1} onClick={(event) => { setProjectHistoryPage(page => Math.max(1, page - 1)); scrollListAfterChange(event.currentTarget) }}>Previous</Button>
                 <span>Page {projectHistoryPage} of {historyPageCount}</span>
-                <Button disabled={projectHistoryPage >= historyPageCount} onClick={() => setProjectHistoryPage(page => Math.min(historyPageCount, page + 1))}>Next</Button>
+                <Button disabled={projectHistoryPage >= historyPageCount} onClick={(event) => { setProjectHistoryPage(page => Math.min(historyPageCount, page + 1)); scrollListAfterChange(event.currentTarget) }}>Next</Button>
               </div>}
             </section>
             {p.status === "active" && (

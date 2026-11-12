@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import OverallProjectProgress from "./OverallProjectProgress"
 import type { VerifiedProgress } from "./project-progress"
 import { progressLabel } from "./project-progress"
@@ -394,12 +395,12 @@ export default function ActiveSites({
           · Page {current} of {pages}
         </span>
         <div>
-          <Button disabled={current === 1} onClick={() => setPage(current - 1)}>
+          <Button disabled={current === 1} onClick={(event) => { setPage(current - 1); scrollListAfterChange(event.currentTarget) }}>
             Previous
           </Button>
           <Button
             disabled={current === pages}
-            onClick={() => setPage(current + 1)}
+            onClick={(event) => { setPage(current + 1); scrollListAfterChange(event.currentTarget) }}
           >
             Next
           </Button>
