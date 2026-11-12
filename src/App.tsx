@@ -1296,15 +1296,6 @@ function AppInner() {
         })),
         test: (e, value) => e.type === value,
       },
-      {
-        id: "person",
-        label: "Person",
-        allLabel: "Everyone",
-        options: optionsFrom(
-          state.events.map((e) => (e.actorId ? nameFor(e.actorId) : "")),
-        ),
-        test: (e, value) => !!e.actorId && nameFor(e.actorId) === value,
-      },
       ...dateFilters<Event>((e) => e.date, "Date"),
     ],
   })
