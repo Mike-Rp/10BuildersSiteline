@@ -208,6 +208,27 @@ test("a wrong secret or an unreachable website never stops the backup itself", a
   } finally { await site.close(); await rm(root, { recursive: true, force: true }); }
 });
 
+test("the request check does nothing when the website cannot be reached, so it never starts a backup every few minutes", async () => {
+  const site = await website();
+  const { root, config } = await setup();
+  try {
+    const down = createWorkerClient({ baseUrl: "http://127.0.0.1:1/api/v1", secret: SECRET, attempts: 1 });
+    const fake = fakeRun();
+    for (let check = 0; check < 3; check++) {
+      const hooks = createReportingHooks(config, { mode: "poll", worker: down, countDbFiles: async () => 344 });
+      const status = await runBackup(config, { run: fake, storage: fakeStorage(), quietSkip: true, ...hooks }, new Date(2026, 10, 12, 8, 10 + check * 5));
+      assert.equal(status.status, "skipped", `check ${check + 1}`);
+    }
+    assert.deepEqual(await readdir(join(root, "database")).catch(() => []), [], "no backup was made by any check");
+    assert.equal(await readFile(join(root, "logs", "status.json"), "utf8").catch(() => "none"), "none", "and no status was written");
+    // The nightly run is different: it still backs up when the website is down.
+    const hooks = createReportingHooks(config, { mode: "scheduled", worker: down, countDbFiles: async () => 344 });
+    const nightly = await runBackup(config, { run: fake, storage: fakeStorage(), ...hooks }, NOW);
+    assert.equal(nightly.status, "partial");
+    assert.ok((await readdir(join(root, "database"))).some((n) => n.endsWith(".dump.enc")));
+  } finally { await site.close(); await rm(root, { recursive: true, force: true }); }
+});
+
 test("a result that could not be sent is kept and delivered first at the next run, and a crashed run is reported as interrupted", async () => {
   const site = await website();
   const { root, config } = await setup();

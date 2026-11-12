@@ -317,8 +317,9 @@ test("two backups cannot run at once, and a stale lock from a crashed run is cle
     await utimes(lock, NOW, NOW);
     const fake = fakeRun();
     const blocked = await runBackup(config, { run: fake.run, storage: fakeStorage({}) }, NOW);
-    assert.equal(blocked.status, "failed");
-    assert.match(blocked.errors.join(" "), /already running/);
+    assert.equal(blocked.status, "skipped", "overlapping is not a failure, so Task Scheduler does not report one");
+    assert.match(blocked.skipReason, /already running/);
+    assert.deepEqual(blocked.errors, []);
     assert.equal(fake.calls.length, 0, "pg_dump was not started");
     assert.ok(await exists(lock), "the other run's lock is left alone");
     const old = new Date(NOW.getTime() - 7 * 60 * 60 * 1000); // seven hours before the run being tested

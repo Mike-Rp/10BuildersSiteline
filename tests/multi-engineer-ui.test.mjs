@@ -8,6 +8,8 @@ test("phase cards cover all areas and engineer response statuses stay consistent
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" }),
     saved = new Map(),
     originalFetch = globalThis.fetch
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   for (const [key, value] of Object.entries({
     window: dom.window,
     document: dom.window.document,
@@ -139,13 +141,23 @@ test("phase cards cover all areas and engineer response statuses stay consistent
       }
       return Response.json({ data: context })
     }
+    // A project that is ready for the engineer to accept: assigned, OPM accepted, six documents, lead confirmed.
+    const { DOC_LABELS } = await server.ssrLoadModule("/src/model.ts")
+    const readyProject = {
+      id: "project",
+      status: "active",
+      phase: "Design",
+      opmAccepted: true,
+      team: [{ phase: "Mobilization", accountId: "a", status: "confirmed" }],
+      docs: DOC_LABELS.slice(0, 6).map((label) => ({ label, uploaded: true })),
+    }
     async function render(actor, key) {
       await act(async () => {
         root.render(
           React.createElement(Responsibilities, {
             key,
             actor,
-            project: { id: "project" },
+            project: readyProject,
             onReload() {},
           }),
         )

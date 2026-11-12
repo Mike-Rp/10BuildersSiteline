@@ -104,8 +104,14 @@ export default function SitePhotoGallery({ photos, onApprove, onReject }: {
       </div>
       <div className="modal-actions site-photo-review-actions">
         {canReview && !selected.clientVisible && selected.photoReviewStatus !== "rejected" && <div className="site-photo-review-decisions" role="group" aria-label="Photo review decision">
-          <Button aria-pressed={!reject} variant={!reject ? "primary" : undefined} disabled={saving} onClick={() => setReject(false)}>Approve for client</Button>
-          <Button aria-pressed={reject} variant={reject ? "danger-ghost" : undefined} disabled={saving} onClick={() => setReject(true)}>Reject as unrelated</Button>
+          <label className={`photo-decision-check${!reject ? " checked" : ""}`}>
+            <input type="checkbox" checked={!reject} disabled={saving} onChange={() => setReject(false)} />
+            <span>Approve for client <small>(photo becomes visible to the client)</small></span>
+          </label>
+          <label className={`photo-decision-check danger${reject ? " checked" : ""}`}>
+            <input type="checkbox" checked={reject} disabled={saving} onChange={() => setReject(true)} />
+            <span>Reject as unrelated <small>(returned to the Site PM)</small></span>
+          </label>
         </div>}
         <Button disabled={saving} onClick={() => setSelected(undefined)}>Close</Button>
         {canReview && !selected.clientVisible && selected.photoReviewStatus !== "rejected" && <Button variant="primary" disabled={saving || (reject && !note.trim())} onClick={() => void submitDecision()}>

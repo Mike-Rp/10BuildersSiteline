@@ -43,6 +43,7 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
   const [note,setNote]=useState("")
   const [busy,setBusy]=useState(false)
   const [reject,setReject]=useState(false)
+  const [asking,setAsking]=useState(false)
   const [history,setHistory]=useState<EvidenceVersion[]>()
   const [historyError,setHistoryError]=useState("")
   const [fileUrl,setFileUrl]=useState("")
@@ -76,7 +77,7 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
         : fileUrl
           ? <object data={`${fileUrl}#toolbar=0&navpanes=0`} type="application/pdf" aria-label={doc?.name || "Submitted evidence"}><p>Preview is unavailable in this browser.</p></object>
           : <div className="evidence-review-preview-empty" role="status">{fileLoading ? "Loading submitted evidence…" : "Evidence preview is unavailable. You can still review the submission details."}</div>}
-      {fileUrl && <a href={fileUrl} download={doc?.name}>Download attachment</a>}
+      {fileUrl && <a className="evidence-download" href={fileUrl} download={doc?.name}><Icon name="download"/>Download attachment</a>}
     </section>
     <section className="evidence-review-decision">
     <h3>{preview?.activity || doc?.label || "Submitted evidence"}</h3>
@@ -105,28 +106,46 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
           {preview.before.phase.reason && <p>{preview.before.phase.reason}</p>}
         </div>
       </div>
+      <div className="evidence-decision-choice">
+        <span className="evidence-decision-label" id="evidence-decision-label">Your decision</span>
+        <div className="evidence-review-choice" role="radiogroup" aria-labelledby="evidence-decision-label"
+          onKeyDown={event=>{if(!busy&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)){event.preventDefault();setReject(value=>!value)}}}>
+          <button type="button" role="radio" aria-checked={!reject} tabIndex={!reject?0:-1} disabled={busy}
+            className={`evidence-choice approve${!reject?" selected":""}`} onClick={()=>setReject(false)}><Icon name="check" size={18}/>Approve</button>
+          <button type="button" role="radio" aria-checked={reject} tabIndex={reject?0:-1} disabled={busy}
+            className={`evidence-choice reject${reject?" selected":""}`} onClick={()=>setReject(true)}><Icon name="close" size={18}/>Reject</button>
+        </div>
+        <small className="evidence-decision-hint">Choosing a decision does not save it. {reject ? "Enter a reason, then confirm the rejection." : "Confirm the approval when you are ready."}</small>
+      </div>
       <Field label={reject ? "Reason for rejection *" : "Review note (optional)"}>
         <textarea rows={3} value={note} maxLength={10000} onChange={event=>setNote(event.target.value)} />
       </Field>
     </>}
     <div className="modal-actions">
-      <div className="evidence-review-choice" role="group" aria-label="Evidence decision">
-        <Button aria-pressed={!reject} variant={!reject ? "primary" : undefined} disabled={busy} onClick={()=>setReject(false)}>Approve</Button>
-        <Button aria-pressed={reject} variant={reject ? "danger-ghost" : undefined} disabled={busy} onClick={()=>setReject(true)}>Reject</Button>
-      </div>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
-      <Button variant="primary" disabled={!preview || busy || (reject && !note.trim())} onClick={async()=>{
-        if(!preview)return
-        setBusy(true)
-        try {
-          if(await onConfirm(preview.review_token,note.trim(),reject))onClose()
-          else {setPreview(undefined);setError("Review was not saved. Close this panel and reopen the activity to refresh its current state.")}
-        }
-        catch(error){setError((error as Error).message)}
-        finally{setBusy(false)}
-      }}>{busy ? "Saving…" : reject ? "Confirm rejection" : "Confirm approval"}</Button>
+      <Button variant={reject ? "danger" : "primary"} disabled={!preview || busy || (reject && !note.trim())} onClick={()=>setAsking(true)}>{busy ? "Saving…" : reject ? "Confirm rejection" : "Confirm approval"}</Button>
     </div>
     </section>
     </div>
+    {asking && preview && <Modal title={reject ? "Reject evidence?" : "Approve evidence?"} onClose={()=>{if(!busy)setAsking(false)}}>
+      {reject
+        ? <>
+            <p>Reject <strong>{preview.activity}</strong>? The submitter will see your reason, and phase progress stays unchanged.</p>
+            <blockquote className="evidence-confirm-reason">{note.trim()}</blockquote>
+          </>
+        : <p>Approve <strong>{preview.activity}</strong>? This counts toward phase progress: {measure(preview.before.phase)} → {measure(preview.after.phase)}.{preview.after.phase.percentage === 100 ? " The phase checklist will be complete." : ""}</p>}
+      <div className="modal-actions">
+        <Button disabled={busy} onClick={()=>setAsking(false)}>No</Button>
+        <Button variant={reject ? "danger" : "primary"} disabled={busy} onClick={async()=>{
+          setBusy(true)
+          try {
+            if(await onConfirm(preview.review_token,note.trim(),reject))onClose()
+            else {setAsking(false);setPreview(undefined);setError("Review was not saved. Close this panel and reopen the activity to refresh its current state.")}
+          }
+          catch(error){setAsking(false);setError((error as Error).message)}
+          finally{setBusy(false)}
+        }}>{busy ? "Saving…" : "Yes"}</Button>
+      </div>
+    </Modal>}
   </Modal>
 }

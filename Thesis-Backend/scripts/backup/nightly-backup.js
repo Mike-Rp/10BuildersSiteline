@@ -141,9 +141,11 @@ export async function runBackup(config, deps = {}, now = new Date()) {
 
   const release = await acquireLock(config.root, now);
   if (!release) {
-    status.errors.push("Another backup is already running.");
+    // Overlapping with a backup that is already running is not a failure: nothing was lost and the other run continues.
+    status.status = "skipped";
+    status.skipReason = "Another backup is already running.";
     status.finishedAt = new Date().toISOString();
-    await log("Skipped: another backup is already running.");
+    if (!deps.quietSkip) await log("Skipped: another backup is already running.");
     return status;
   }
   let proceed = true;
@@ -152,6 +154,7 @@ export async function runBackup(config, deps = {}, now = new Date()) {
   if (!proceed) {
     await release();
     status.status = "skipped";
+    status.skipReason = "No backup was due, or another run is already open on the website.";
     status.finishedAt = new Date().toISOString();
     if (!deps.quietSkip) await log("Skipped: no backup was due or another run is already open on the website.");
     return status;
@@ -335,7 +338,7 @@ async function main() {
   const hooks = createReportingHooks(config, { mode, worker });
   const status = await runBackup(config, { ...hooks, quietSkip: mode === "poll" });
   if (status.status === "skipped") {
-    if (mode !== "poll") console.log("Nothing to do: no backup was due, or another run is already open on the website.");
+    if (mode !== "poll") console.log(`Nothing to do: ${status.skipReason}`);
     finish(0);
     return;
   }

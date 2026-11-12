@@ -10,6 +10,8 @@ import { buildMonthlySummary } from "../Thesis-Backend/src/domain/monthly-summar
 
 test("Office and Site PM dashboards keep scoped summaries and open monthly reports with nested project details", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   const w = dom.window, previous = new Map(), requests = []
   let reportRole = "opm"
   const report = () => buildMonthlyReport({ project: { id: "p4", name: "Authorized project", type: "Commercial", status: "active", created_at: "2020-01-01T00:00:00Z" }, baseline: null, events: [], period: reportPeriod(currentReportMonth()), role: reportRole })

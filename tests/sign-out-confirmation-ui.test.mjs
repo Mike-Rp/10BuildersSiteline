@@ -60,6 +60,7 @@ test("all roles confirm manual sign-out on desktop and mobile; cancellation neve
         user = { id: `signout-${role}`, role, full_name: `Test ${role}`, email: `${role}@example.invalid`, status: "active", date_added: "2026-01-01" }
         // Restore a workspace refresh, rather than an explicit sign-in page.
         const home = role === "client" ? "/client/overview" : `/${role}/dashboard`
+        w.localStorage.setItem(`10buildline:workspace-guide:v1:${user.id}:${role}`,'seen') // first-visit tour would block swipes
         w.history.replaceState(null, "", `/${role}`)
         const token = `test.${Buffer.from(JSON.stringify({ sub: user.id, details: { id: user.id, role } })).toString("base64url")}.test`
         client.setToken(token)

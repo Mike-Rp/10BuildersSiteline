@@ -299,6 +299,8 @@ test("license, certification and intake routes enforce login, roles and safe SQL
     const saved=await call("PUT",`/accounts/${id}/workspace`,{token:admin,headers:json,body:JSON.stringify({docs:[],license:"PRC-NEW-1",expiry:"2030-01-01"})})
     assert.equal(saved.status,200)
     assert.equal((await db.query("select count(*)::int as n from user_licenses where user_id=$1",[id])).rows[0].n,0)
+    // A temporary password only unlocks password replacement, so model an owner who has already chosen a password.
+    await db.query("update users set temp_password_issued=false where id=$1",[id])
     const own=await signIn("new.spm@10builders.com","Temp@12345678");assert.ok(own.token)
     const summary=await call("GET",`/licenses/credentials/${id}`,{token:own.token});assert.equal(summary.status,200)
     assert.equal((await summary.json()).data.eligibleForNewAssignment,false)

@@ -454,6 +454,8 @@ function AppInner() {
     changeRoute(loginPath(portal), true, { loginPortal: portal, returnTo: routePath })
   }, [signedOut, checkingSession, restoreError, routePath])
   const [restoreAttempt, setRestoreAttempt] = useState(0)
+  // After a temporary-password replacement the app restores the session at the module that was requested.
+  const resumePath = useRef("")
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
   useEffect(() => {
@@ -498,7 +500,13 @@ function AppInner() {
     sessionRestore.current.run(token, () =>
       api<Parameters<typeof startApiSession>[0]>("/auth/me").then(user => {
         if (getToken() !== token) throw new ApiError("Your session has changed. Sign in again.", 401)
-        return startApiSession(user)
+        const resume = resumePath.current
+        resumePath.current = ""
+        if (resume) window.history.replaceState({ ...(window.history.state || {}), returnTo: resume }, "", window.location.pathname)
+        return startApiSession(user, !!resume).then(account => {
+          if (resume) setRoutePath(navigateToWorkspace(account.role, true))
+          return account
+        })
       }),
     )
       .then((account) => {
@@ -2991,7 +2999,7 @@ function AppInner() {
     )
   if (signedOut || !actor.id)
     return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
-  if(mustResetPassword)return <PasswordReset onComplete={()=>{setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
+  if(mustResetPassword)return <PasswordReset onComplete={()=>{resumePath.current=window.location.pathname;setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (
