@@ -3226,11 +3226,13 @@ function AppInner() {
                 icon="bell"
                 variant="icon-button notification-button"
                 aria-label={`Notifications, ${unread} unread`}
-                onClick={() => setNotifications(!notifications)}
+                aria-expanded={notifications}
+                aria-controls="admin-notifications"
+                onClick={() => setNotifications(open => !open)}
               />
               {unread > 0 && <span className="notification-dot" />}
               {notifications && (
-                <div className="notification-popover">
+                <div id="admin-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>
                       Notifications <span>{unread}</span>

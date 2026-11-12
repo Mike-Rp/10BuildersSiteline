@@ -49,6 +49,12 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     assert.ok(!toggle().classList.contains("mobile-menu"), "toggle must remain visible on desktop")
     for (const width of [1920, 1366, 1024]) {
       await resize(width)
+      const bell = document.querySelector('.notification-container > button')
+      for (const open of [true, false, true, false]) {
+        await click(bell)
+        assert.equal(bell.getAttribute('aria-expanded'), String(open))
+        assert.equal(!!document.getElementById('client-notifications'), open)
+      }
       assert.equal(toggle().getAttribute("aria-label"), "Collapse Client navigation")
       assert.equal(toggle().hidden,true,"Open sidebar shows only its internal close control")
       const close = sidebar().querySelector('.brand .client-nav-close')
@@ -72,6 +78,12 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     }
     for (const width of [1000, 900, 768, 390, 320]) {
       await resize(width)
+      const bell = document.querySelector('.notification-container > button')
+      for (const open of [true, false, true, false]) {
+        await click(bell)
+        assert.equal(bell.getAttribute('aria-expanded'), String(open))
+        assert.equal(!!document.getElementById('client-notifications'), open)
+      }
       assert.equal(toggle().getAttribute("aria-label"), "Open Client navigation")
       await click(toggle())
       assert.equal(toggle().getAttribute("aria-expanded"), "true")

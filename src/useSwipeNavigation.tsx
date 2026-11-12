@@ -12,7 +12,7 @@ type Options = {
 }
 type Destination = { page: string; identity: string; from: string }
 type Gesture = { id: number; x: number; y: number; started: number; page: string; identity: string; direction: number; target: Element }
-const excluded = "input,textarea,select,a,form,[contenteditable]:not([contenteditable=false]),[role=slider],[role=tablist],[aria-roledescription=carousel],[data-no-swipe],nav,aside,.notification-container"
+const excluded = "input,textarea,select,a,form,[contenteditable]:not([contenteditable=false]),[role=slider],[role=tablist],[aria-roledescription=carousel],[data-no-swipe],nav,aside,.topbar,.notification-container"
 const hasDialog = () => !!document.querySelector('[role="dialog"],dialog[open],[aria-modal="true"]')
 const horizontalScroller = (target: EventTarget | null) => {
   let el=target as HTMLElement | null
@@ -127,7 +127,6 @@ export default function useSwipeNavigation(options: Options) {
     const navigateDirection=(dx:number,from:string,identity:string,target:Element,suppress=true)=>{
       const current=latest.current,dashboard=current.dashboard || "Dashboard"
       if(!current.enabled || current.blocked || hasDialog() || from!==current.page || identity!==current.identity)return
-      if(suppress && target.closest('button,[role="button"]'))rememberClick(target)
       let destination: Destination | undefined
       const mobile=window.matchMedia?.('(max-width: 1000px)').matches ?? window.innerWidth<=1000
       if(mobile) {
@@ -137,6 +136,7 @@ export default function useSwipeNavigation(options: Options) {
       }
       else if(current.page===dashboard && previous.current?.identity===identity && current.allowedPages.includes(previous.current.page))destination={identity,from,page:previous.current.page}
       if(!destination)return
+      if(suppress && target.closest('button,[role="button"]'))rememberClick(target)
       for(const el of dirty.current.keys())if(!el.isConnected || !surface.contains(el) || valueOf(el as HTMLInputElement)===dirty.current.get(el))dirty.current.delete(el)
       if(dirty.current.size)setPending(destination);else execute(destination)
     }

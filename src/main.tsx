@@ -7,6 +7,7 @@ import "./construction-daylight.css"
 import "./workspace-theme.css"
 import "./admin-ui-refinements.css"
 import "./admin-navigation.css"
+import "./header-controls.css"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -23,6 +23,7 @@ test('workspace swipes validate intent, protect edits and never change browser h
       return React.createElement(React.Fragment,null,
         React.createElement('div',{ref:swipe.ref},
           React.createElement('h1',null,page),React.createElement('div',{'data-canvas':true},'Swipe here'),
+          React.createElement('header',{className:'topbar'},React.createElement('button',{onClick:()=>moves.push('header-click')},'Header action')),
           React.createElement('form',null,React.createElement('textarea',{'aria-label':'Draft note',defaultValue:''})),
           React.createElement('div',{'data-horizontal':true,style:{overflowX:'auto'}},React.createElement('span',null,'Scrollable content')),
           React.createElement('div',{'aria-roledescription':'carousel'},'Carousel'),
@@ -74,6 +75,26 @@ test('workspace swipes validate intent, protect edits and never change browser h
       const scroller=document.querySelector('[data-horizontal]');Object.defineProperties(scroller,{scrollWidth:{value:400},clientWidth:{value:100}})
       const {move}=await swipe('right',{target:scroller.querySelector('span')});assert.equal(move.defaultPrevented,false);assert.equal(page(),'Documents')
       await swipe('right',{start:5});assert.equal(page(),'Documents','native browser owns edge swipe; no custom duplicate navigation')
+    })
+    await t.test('header gestures never navigate or suppress the next intentional tap',async()=>{
+      await render()
+      const button=document.querySelector('.topbar button')
+      for(const options of [{dx:150},{dx:110,dy:120}]) {
+        const {move}=await swipe('right',{target:button,...options})
+        assert.equal(move.defaultPrevented,false)
+        assert.equal(page(),'Documents')
+        const before=moves.filter(value=>value==='header-click').length
+        await act(()=>button.click())
+        assert.equal(moves.filter(value=>value==='header-click').length,before+1)
+      }
+    })
+    await t.test('a swipe with no destination does not swallow the next button click',async()=>{
+      await render()
+      const button=[...document.querySelectorAll('button')].find(button=>button.textContent==='Open Team')
+      await swipe('left',{target:button})
+      assert.equal(page(),'Documents')
+      await act(()=>button.click())
+      assert.equal(page(),'Team')
     })
     await t.test('open dialogs block swipes; unsaved edits require explicit leave confirmation',async()=>{
       await render({overlay:true});await swipe();assert.equal(page(),'Documents')

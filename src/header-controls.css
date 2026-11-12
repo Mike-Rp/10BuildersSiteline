@@ -1,0 +1,25 @@
+/* Header feedback follows real open state; touch hover never latches a dark fill. */
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar),
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar):hover:not(:disabled) {
+  background: #edf5fc;
+  color: #193b59;
+  border-color: var(--color-line);
+  touch-action: manipulation;
+}
+@media (hover: hover) and (pointer: fine) {
+  #root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar):hover:not(:disabled) {
+    background: #193b59;
+    color: #fff;
+    border-color: #193b59;
+  }
+}
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar):active:not(:disabled),
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar)[aria-expanded="true"]:not(:disabled) {
+  background: #193b59;
+  color: #fff;
+  border-color: #193b59;
+}
+#root .app-shell .topbar :is(button.sidebar-toggle, .notification-container > button.button, button.topbar-avatar):focus-visible {
+  outline: 3px solid #315a85;
+  outline-offset: 3px;
+}

@@ -702,11 +702,13 @@ export default function ClientPortal({
                 icon="bell"
                 variant="icon-button"
                 aria-label={`Client notifications, ${unread} unread`}
-                onClick={() => setBell(!bell)}
+                aria-expanded={bell}
+                aria-controls="client-notifications"
+                onClick={() => setBell(open => !open)}
               />
               {unread > 0 && <span className="notification-dot" />}
               {bell && (
-                <div className="notification-popover">
+                <div id="client-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>Project updates</h3>
                     <Button

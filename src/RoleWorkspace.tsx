@@ -3864,11 +3864,13 @@ export default function RoleWorkspace({
                 icon="bell"
                 variant="icon-button"
                 aria-label={`Notifications, ${unread} unread`}
-                onClick={() => setBell(!bell)}
+                aria-expanded={bell}
+                aria-controls="staff-notifications"
+                onClick={() => setBell(open => !open)}
               />
               {unread > 0 && <i className="notification-dot" />}
               {bell && (
-                <div className="notification-popover">
+                <div id="staff-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>Your notifications</h3>
                     <Button

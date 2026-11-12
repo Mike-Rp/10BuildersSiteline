@@ -40,6 +40,12 @@ test("Office and Site PM navigation alternates controls across every module on d
       const modules=[...sidebar.querySelectorAll('nav .nav-item')].map(button=>button.getAttribute('aria-label'))
       for (const compact of [false,true]) {
         await resize(compact)
+        const bell = document.querySelector('.notification-container > button')
+        for (const open of [true,false,true,false]) {
+          await click(bell)
+          assert.equal(bell.getAttribute('aria-expanded'),String(open))
+          assert.equal(!!document.getElementById('staff-notifications'),open)
+        }
         for (const label of modules) {
           if(!menu.hidden)await click(menu)
           assert.equal(menu.hidden,true)
