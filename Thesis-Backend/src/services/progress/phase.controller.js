@@ -4,7 +4,7 @@ import { maybeCloseProject } from "../archive/policy.js";
 import { createHash } from "node:crypto";
 import { readVerifiedProgress } from "./verified.utility.js";
 import { verifiedComplete } from "./lifecycle.utility.js";
-import { transitionPhase } from "./handoff.utility.js";
+import { transitionPhase, autoApproveCompletions } from "./handoff.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
@@ -268,6 +268,7 @@ const reviewEvidence = decision => async (req, res) => {
         {entryType:"checklist_review",updateProject:decision==="approved",isIssue:decision==="rejected"});
       const projectArchived=decision==="approved" && Number(p.current_stage_id)===Number(selected.current_stage_id)
         ? await maybeCloseProject(client,p,user.id) : false;
+      if (decision === "approved" && Number(p.current_stage_id) === Number(evidence.project_stage_id)) await autoApproveCompletions(client, p, user.id);
       const handoff = decision === "approved" && user.role === "opm" && !projectArchived &&
         Number(p.current_stage_id) === Number(evidence.project_stage_id) && verifiedComplete(checklist.verified)
         ? await transitionPhase(client, p, user.id) : undefined;

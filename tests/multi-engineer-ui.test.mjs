@@ -181,20 +181,14 @@ test("phase cards cover all areas and engineer response statuses stay consistent
     assert.equal(writes[0].action, "accept")
     assert.match(document.body.textContent, /Committed to a project/)
     assert.equal(button("Accept responsibility"), undefined)
-    assert.equal(
-      button("Approve completion"),
-      undefined,
-      "engineers cannot approve their own completion",
-    )
+    assert.equal(button("Approve completion"), undefined, "completion is automatic, so there is no manual completion review")
     context.canReview = true
-    context.rows[0].completion_status = "submitted"
-    context.rows[0].completion_note = "All assigned work completed."
+    context.rows[0].completion_status = "approved"
+    context.rows[0].complete = true
     await render({ id: "admin", role: "admin" }, "reviewer")
     assert.match(document.body.textContent, /Rix · Design/, "reviewers still see every engineer in the phase")
-    assert.ok(button("Approve completion"))
-    assert.equal(button("Return for correction").disabled, true)
-    await act(() => button("Approve completion").click())
-    assert.equal(writes.at(-1).action, "approve_completion")
+    assert.equal(button("Approve completion"), undefined)
+    assert.equal(button("Return for correction"), undefined)
     assert.match(document.body.textContent, /Responsibilities completed/)
   } finally {
     await act(() => root.unmount())

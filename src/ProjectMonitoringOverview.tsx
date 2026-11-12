@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { dateLabel, initials, projectPhaseNames, type Doc, type Project, type State } from "./model"
 import { workflowFor } from "./workflows"
 import { downloadApiFile } from "./api/client"
@@ -11,27 +11,41 @@ import { projectClientNames } from "./project-clients"
 
 function ProjectPhoto({ docs, onOpen }: {docs:Doc[];onOpen:(doc:Doc)=>void}) {
   const [index,setIndex]=useState(0)
-  useEffect(()=>setIndex(0),[docs.map(doc=>doc.id).join("|")])
+  const ids=docs.map(doc=>doc.id).join("|")
+  useEffect(()=>setIndex(0),[ids])
   const doc=docs[index]
-  const [image,setImage]=useState<{id:string;url:string}>()
+  // Photos live only in memory while this carousel is mounted. `urls` holds finished downloads,
+  // `pending` shares an in-flight request, and a failed request is forgotten so it can be retried.
+  const urls=useRef(new Map<string,string>()),pending=useRef(new Map<string,Promise<void>>()),current=useRef(new Set<string>()),alive=useRef(true)
+  const [,refresh]=useState(0)
   useEffect(()=>{
-    if(!doc)return
-    let active=true,url=""
-    void downloadApiFile(doc.id).then(blob=>{
-      if(!active || !blob || !/^image\/(png|jpeg)$/.test(blob.type))return
-      url=URL.createObjectURL(blob);setImage({id:doc.id,url})
-    }).catch(()=>{})
-    return ()=>{active=false;if(url)URL.revokeObjectURL(url)}
+    alive.current=true
+    const cache=urls.current
+    return ()=>{alive.current=false;cache.forEach(url=>URL.revokeObjectURL(url));cache.clear()}
+  },[])
+  useEffect(()=>{
+    current.current=new Set(docs.map(item=>item.id))
+    for(const [id,url] of urls.current)if(!current.current.has(id)){URL.revokeObjectURL(url);urls.current.delete(id)}
+  },[ids])
+  useEffect(()=>{
+    if(!doc||urls.current.has(doc.id)||pending.current.has(doc.id))return
+    const id=doc.id
+    const request=downloadApiFile(id).then(blob=>{
+      if(!alive.current||!current.current.has(id)||!blob||!/^image\/(png|jpeg)$/.test(blob.type))return
+      urls.current.set(id,URL.createObjectURL(blob));refresh(n=>n+1)
+    }).catch(()=>{}).finally(()=>{pending.current.delete(id);if(alive.current)refresh(n=>n+1)})
+    pending.current.set(id,request)
   },[doc?.id])
   useEffect(()=>{
     if(docs.length<2)return
     const timer=window.setInterval(()=>setIndex(current=>(current+1)%docs.length),5000)
     return ()=>window.clearInterval(timer)
-  },[docs.length,docs.map(item=>item.id).join("|")])
+  },[docs.length,ids])
   if(!doc)return <div className="monitor-photo-empty"><Icon name="building" size={40}/><p>No OPM-approved site photos yet.</p></div>
+  const image=urls.current.get(doc.id)
   return <div className="monitor-photo-roulette">
     <button type="button" className="monitor-photo" onClick={()=>onOpen(doc)}>
-      {image?.id===doc.id ? <img src={image.url} alt={doc.name}/> : <span className="monitor-photo-empty"><Icon name="doc" size={32}/>View photograph</span>}
+      {image ? <img src={image} alt={doc.name}/> : <span className="monitor-photo-empty"><Icon name="doc" size={32}/>View photograph</span>}
       <span>{doc.name}<small>OPM approved · {dateLabel(doc.date)}</small></span>
     </button>
     {docs.length>1&&<div className="monitor-photo-controls"><button type="button" aria-label="Previous approved photo" onClick={()=>setIndex(i=>(i-1+docs.length)%docs.length)}>‹</button><span>{index+1} / {docs.length}</span><button type="button" aria-label="Next approved photo" onClick={()=>setIndex(i=>(i+1)%docs.length)}>›</button></div>}
@@ -59,7 +73,7 @@ export default function ProjectMonitoringOverview({ project:p, state, onPreview,
       <div className="monitor-totals"><OverallProjectProgress name={p.name} verifiedProgress={p.verifiedProgress}/><div className="monitor-target"><small>Target completion</small><strong>{p.end?dateLabel(p.end):'Not set'}</strong></div></div>
     </header>
     <div className="monitor-grid">
-      <section className="monitor-card"><h3><Icon name="building" size={20}/>Project overview</h3><ProjectPhoto docs={photos} onOpen={onPreview}/><dl className="monitor-facts"><div><dt>Floor area</dt><dd>{p.area} sqm</dd></div><div><dt>Target start</dt><dd>{dateLabel(p.start)}</dd></div><div><dt>Floors</dt><dd>{p.floors}</dd></div></dl><h4>Recent project records</h4>{updates.length?<ul className="monitor-updates">{updates.map((row,i)=><li key={row.id||i}><p>{row.text}</p><small>{dateLabel(row.date)}</small></li>)}</ul>:<p className="monitor-muted">No project updates recorded yet.</p>}</section>
+      <section className="monitor-card"><h3><Icon name="building" size={20}/>Project overview</h3><ProjectPhoto key={p.id} docs={photos} onOpen={onPreview}/><dl className="monitor-facts"><div><dt>Floor area</dt><dd>{p.area} sqm</dd></div><div><dt>Target start</dt><dd>{dateLabel(p.start)}</dd></div><div><dt>Floors</dt><dd>{p.floors}</dd></div></dl><h4>Recent project records</h4>{updates.length?<ul className="monitor-updates">{updates.map((row,i)=><li key={row.id||i}><p>{row.text}</p><small>{dateLabel(row.date)}</small></li>)}</ul>:<p className="monitor-muted">No project updates recorded yet.</p>}</section>
       <section className="monitor-card monitor-phases"><h3><Icon name="check" size={20}/>Construction phases</h3><PhaseTimeline phase={p.phase} phases={projectPhaseNames(p)} completed={p.status==='completed'} detailed/><p className="monitor-note">Phase sequence is separate from approved overall progress. Some activities may overlap; existing sign-off rules still apply.</p></section>
       <div className="monitor-side">
         <section className="monitor-card"><h3><Icon name="users" size={20}/>Assigned team</h3>{people.length?people.map(account=><div className="monitor-person" key={account.id}><span className="avatar">{initials(account.name)}</span><div><strong>{account.name}</strong><small>{account.role==='opm'?'Office Project Manager':'Site Project Manager'}</small></div></div>):<p className="monitor-muted">No personnel assigned.</p>}</section>

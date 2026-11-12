@@ -34,7 +34,24 @@ export async function assessPhaseHandoff(db, project, { initialize = false } = {
   return { state: "ready", phase, upcoming };
 }
 
+
+// Completion no longer needs a separate submit/approve step: once every required checklist item
+// of an engineer is approved by the Office PM (and nothing of theirs is pending), their workspace is complete.
+export async function autoApproveCompletions(db, project, actorId = null) {
+  if (project.lifecycle_status !== "active" || !(await responsibilitiesInstalled(db))) return;
+  const rows = (await db.query("select id,user_id from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and status='confirmed' and completion_status<>'approved'", [project.id, project.current_stage_id])).rows;
+  for (const row of rows) {
+    const checklist = await readChecklist(db, project.id, project.current_stage_id, { userId: row.user_id });
+    if (!checklist.construction?.complete) continue;
+    const pending = await db.query(`select 1 from project_phase_updates where project_id=$1 and selected_stage_id=$2 and submitted_by=$3 and status='pending'
+      union all select 1 from pending_rework_requests where project_id=$1 and project_stage_id=$2 and submitted_by=$3 and status='pending' limit 1`, [project.id, project.current_stage_id, row.user_id]);
+    if (pending.rowCount) continue;
+    await db.query("update project_phase_responsibilities set completion_status='approved',reviewed_by=$2,reviewed_at=now(),review_note=$3 where id=$1",
+      [row.id, actorId, "Automatically completed: all required checklist items approved."]);
+  }
+}
 export async function transitionPhase(db, project, actorId) {
+  await autoApproveCompletions(db, project, actorId);
   // Preserve the mutation endpoint's existing conflict precedence even when
   // work is incomplete. The dashboard only escalates otherwise-complete work.
   if (await blockingReviews(db, project.id)) return { advanced: false, reason: "Resolve pending rework, progress and subcontractor reviews before advancing this phase.", code: 409 };

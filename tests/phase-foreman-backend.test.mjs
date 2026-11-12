@@ -754,9 +754,7 @@ test(
        await api('/projects/'+id+'/evidence/'+item.id+'/approve',{method:'POST',json:{expected_review_token:preview.review_token}})
       }
       session=await as('karlo.espiritu@10builders.com')
-      await respond('submit_completion',{note:'Civil and Geotechnical responsibilities completed.',fileId:proof.id})
-      await assert.rejects(respond('approve_completion'),/Only Admin|Office PM/,'engineers cannot approve their own completion')
-      await admin();await respond('approve_completion')
+      // The Office PM's approval of the last item completes this engineer's responsibilities automatically.
       session=await as('karlo.espiritu@10builders.com');data=await api(`/projects/${id}/engineer-responsibilities`)
       assert.equal(data.rows.find(r=>String(r.id)===String(first.id)).completion_status,'approved')
       assert.equal(data.availabilityLabel,'Committed to a project','unfinished succeeding phases retain the project commitment')
@@ -765,7 +763,6 @@ test(
       data=await api(`/projects/${id}/engineer-responsibilities`)
       assert.equal(data.availabilityLabel,'Available for allocation')
       assert.equal((await api(`/projects/${id}`)).lifecycle_status,'active','the overall project can remain ongoing')
-      assert.ok((await db.query("select id from audit_log where table_name='project_phase_responsibilities' and new_values->>'_archive_event'='approve_completion'")).rowCount)
     })
     await t.test('suggested reassignment rechecks eligibility, closes old offers and preserves peer deadlines', async()=>{
       await db.exec(read('../Thesis-Backend/migrations/023-engineer-reassignment-offers.sql'))

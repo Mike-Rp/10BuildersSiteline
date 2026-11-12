@@ -20,7 +20,6 @@ import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
 import { CompanyProjectPhases } from "./AllocationDirectory"
 import { api } from "./api/client"
-import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
 import UrgentActionBanner, { useUrgencyNow } from "./UrgentActionBanner"
@@ -1798,15 +1797,6 @@ export default function RoleWorkspace({
     }
     return (
       <div className="role-card-content">
-        {work.handoff && (
-          <div className="notice">
-            <Icon name="check" />
-            <p>
-              Handoff complete: {work.handoff.from} → {work.handoff.to}. Your
-              confirmed phase is now active.
-            </p>
-          </div>
-        )}
         {work.updateRequested && (
           <div className="notice">
             <Icon name="bell" />
@@ -3463,7 +3453,6 @@ export default function RoleWorkspace({
         <section className="detail-section">
           <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
-        <PhaseHandoff project={p} actor={actor} />
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>

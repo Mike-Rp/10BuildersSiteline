@@ -845,9 +845,7 @@ function AppInner() {
     try{
       const response = await sendApiWorkflow(stateRef.current,actor,command)
       await reloadWorkspace()
-      const message = response?.handoff?.advanced ? `Activity approved. ${response.handoff.current_stage} automatically activated for its assigned Site PM.`
-        : response?.handoff?.reason ? `Activity approved. Phase remains open: ${response.handoff.reason}`
-        : undefined
+      const message = undefined
       return {ok:true, message}
     }catch(error){
       return {ok:false,error:(error as Error).message}

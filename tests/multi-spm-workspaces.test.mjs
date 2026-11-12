@@ -162,8 +162,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   await call(b,root+'/engineer-responsibilities/'+ar.id,{method:'POST',json:{action:'submit_completion',note:'Not mine',fileId:b1.id},status:403})
   await call(a,root+'/engineer-responsibilities/'+ar.id,{method:'POST',json:{action:'submit_completion',note:'Too early',fileId:a1.id},status:409})
   for(const id of itemIds.slice(1)) {const ev=await call(a,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:[a1.id,a2.id]},status:201});await approve(ev)}
-  await complete(a,ar,'submit_completion',a1.id)
-  await complete(opm,ar,'approve_completion')
+  // Approval of the last item completes this engineer's workspace automatically.
   assert.equal((await call(a,root+'/phase-overview')).can_submit,false)
   assert.equal((await call(b,root+'/phase-overview')).can_submit,true)
   const p=(await pg.query('select current_stage_id from projects where id=$1',[projectId])).rows[0]
@@ -198,7 +197,6 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const correction=await call(b,root+'/checklist-items/'+itemIds[0]+'/submit',{method:'POST',json:{file_ids:[corrected.id]},status:201})
   await approve(correction)
   for(const id of itemIds.slice(1)){const ev=await call(b,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:[b1.id]},status:201});await approve(ev)}
-  await complete(b,br,'submit_completion',b1.id);await complete(opm,br,'approve_completion')
   assert.equal((await pg.query('select current_stage_id from projects where id=$1',[projectId])).rows[0].current_stage_id,stages[1].id)
   const totals=(await readVerifiedProgress(db,[projectId])).get(projectId)
   assert.equal(totals.phases.find(p=>p.id===String(stages[0].id)).percentage,100)
