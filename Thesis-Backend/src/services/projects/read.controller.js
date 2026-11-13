@@ -180,8 +180,14 @@ export const getProjectById = async (req, res) => {
     ]);
  
     const base = user.role === "client" ? stripInternal(project.rows[0]) : project.rows[0];
+    // Client-safe contact: the project's Office PM by name only. Staff also get the id.
+    const opmName = project.rows[0].suggested_opm_name?.trim();
+    const officePmContact = opmName
+      ? { full_name: opmName, ...(user.role === "client" ? {} : { id: project.rows[0].suggested_opm_id }) }
+      : null;
     return sendOk(res, "Resource retrieved successfully.", 1, {
       ...base,
+      office_pm_contact: officePmContact,
       engineers: engineers.rows,
       phase_team: phaseTeam.rows,
       subcontractors: subcontractors.rows,

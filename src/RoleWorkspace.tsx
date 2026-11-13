@@ -1,7 +1,6 @@
 import WorkspaceGuide from "./WorkspaceGuide"
 import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
-import EngineerResponsibilities from './EngineerResponsibilities'
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
@@ -3350,7 +3349,6 @@ export default function RoleWorkspace({
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
-        {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={onReload}/>}
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
@@ -3970,7 +3968,6 @@ export default function RoleWorkspace({
         >
           <DelayedProjectNotice project={phaseWorkspaceProject} today={scheduleToday} />
           {progressForm(phaseWorkspaceProject)}
-          {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={phaseWorkspaceProject} actor={actor} onReload={onReload}/>}
         </Modal>
       )}
       {dialog?.kind === "changes" && detail && (

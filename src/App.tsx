@@ -5,7 +5,6 @@ import type { WorkspaceResult } from "./admin-workspace-search"
 import "./admin-search-destination.css"
 import AdminWorkspaceSearch from "./AdminWorkspaceSearch"
 import { requiresRenewalOnlyAccess } from "./renewal-only";
-import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminProjectDocuments from "./AdminProjectDocuments"
 import "./company-created-notice.css"
 import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
@@ -2523,7 +2522,6 @@ function AppInner() {
         {!docsOnly && (
           <>
             <ProjectScheduleDetails project={p} today={scheduleToday} />
-            {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
             {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
             {p.status !== "active" && p.status !== "completed" && (
@@ -3326,7 +3324,6 @@ function AppInner() {
         <IntakeRecord state={state} project={selectedProject} actor={actor} onOpenActive={() => { navigate("Active sites"); setDialog({ kind: "project", id: selectedProject.id }) }} />
         {!isIntakeHistory(selectedProject) && <>
           {projectAssignments(selectedProject)}
-          {state.multiEngineerAllocationAvailable && <EngineerResponsibilities project={selectedProject} actor={actor} onReload={reloadWorkspace} />}
         </>}
       </Modal>}
       {(dialog?.kind === "project" || dialog?.kind === "project-docs") &&
