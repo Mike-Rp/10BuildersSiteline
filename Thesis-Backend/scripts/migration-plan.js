@@ -22,6 +22,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({
+  "031-project-inquiries.sql": "Apply after 014-mixed-use-project-scope.sql to enable the inquiry workflow",
   "028-storage-backed-files.sql": "Apply explicitly before using private Storage-backed files",
   "029-backup-monitoring.sql": "Additive metadata tables: apply explicitly before enabling backup monitoring; see docs/BACKUPS.md",
   "030-foundation-progress-weighting.sql": "Additive column: existing projects stay on the legacy calculation; new projects weight Foundation at 15%",

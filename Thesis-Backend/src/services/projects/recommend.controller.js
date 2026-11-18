@@ -78,7 +78,7 @@ export const rerunRecommendations = async (req, res) => {
       tier = 'Medium tier base';
     }
 
-    const suggested_opm = await getOpm(project_type, true);
+    const suggested_opm = await getOpm(project_type);
     const suggested_spms = await getSpm(project_type, true);
 
     const suggested_allocation = {
@@ -101,7 +101,7 @@ export const swapOpm = async (req, res) => {
     if (!(await requireUser(req, res, RECOMMENDATION_ROLES))) return;
     const { project_type } = req.query;
 
-    const suggested_opm = await getOpm(project_type, true);
+    const suggested_opm = await getOpm(project_type);
 
     responseOk(res, 'Resource retrieved successfully.', 1, suggested_opm);
 
@@ -155,7 +155,7 @@ export const updatePhaseTeam = async (req, res) => {
   }
 };
 
-export const getOpm = async (project_type) => {
+export const getOpm = async (project_type, excludedId = null, db = {query: execute}) => {
 
   const query = `
       WITH search_params AS (
@@ -200,13 +200,13 @@ export const getOpm = async (project_type) => {
         availability AS "MAIN.availability",
         experience_years AS "MAIN.experience_years"
       FROM ranked_users
-      WHERE matching_count > 0 and availability = 'available'
+      WHERE matching_count > 0 and availability = 'available' AND id IS DISTINCT FROM $2::uuid
       ORDER BY
         matching_count DESC,
         experience_years DESC,
         total_user_tags ASC, full_name ASC, id ASC
     `;
-  const result = await execute(query, [project_type]);
+  const result = await db.query(query, [project_type, excludedId]);
 
   if (result.rowCount === 0) {
     return null;
@@ -217,7 +217,17 @@ export const getOpm = async (project_type) => {
   return mapSingle(result.rows[randomIndex], 'id');
 }
 
-const getSpm = async (project_type) => {
+export async function scheduleConflicts(db, ids, {start,end}) {
+  const rows = (await db.query(`SELECT DISTINCT e.user_id FROM project_engineers e
+    JOIN projects p ON p.id=e.project_id
+    WHERE e.user_id=ANY($1::uuid[]) AND e.unassigned_at IS NULL
+      AND NOT coalesce(p.is_deleted,false) AND p.lifecycle_status IN ('spm_review','active')
+      AND (p.target_start_date IS NULL OR p.target_start_date <= $3::date)
+      AND (p.target_end_date IS NULL OR p.target_end_date >= $2::date)`,[ids,start,end])).rows;
+  return new Set(rows.map(row => row.user_id));
+}
+
+export const getSpm = async (project_type, phases, candidateMap, schedule) => {
   const db={query:execute}; const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
   const typeId=(await execute('select id from project_types where code=$1',[project_type])).rows[0]?.id;
@@ -243,6 +253,7 @@ const getSpm = async (project_type) => {
   const suggestedSpms = [];
 
   for (const row of matrix_result.rows) {
+    if (phases && !phases.includes(row.code)) continue;
     const spm_result = await execute(
       `
         WITH search_params AS (
@@ -296,6 +307,10 @@ const getSpm = async (project_type) => {
     );
 
     let details = mapMultiple(spm_result.rows, 'id');
+    if (schedule && details.length) {
+      const blocked = await scheduleConflicts(db, details.map(person => person.id), schedule);
+      details = details.filter(person => !blocked.has(person.id));
+    }
     if(scoped) {
       const available=[];
       for(const candidate of details) {
@@ -315,11 +330,13 @@ const getSpm = async (project_type) => {
         const qualifiedTags=(await execute('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=$1 and d.id=any($2::int[])',[person.id,row.disciplines.map(Number)])).rows.map(r=>r.code);
         candidates.push({id:person.id,qualifiedTags});
       }
+      if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name}));
       const result=allocatePhaseCoverage(required,candidates);
       suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 
+    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines || []}));
     if (details.length > 0) {
       suggestedSpms.push({
         id: row.project_stage_id,

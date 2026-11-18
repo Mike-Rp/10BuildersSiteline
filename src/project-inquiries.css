@@ -1,0 +1,19 @@
+.project-inquiries { display: grid; gap: 18px; max-width: 1100px; margin-inline: auto; }
+.project-inquiries header, .inquiry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.project-inquiries header h1 { flex: 1; }
+.project-inquiries form, .inquiry-record, .inquiry-body { display: grid; gap: 16px; min-width: 0; }
+.inquiry-body { border: 0; padding: 0; margin: 0; }
+.inquiry-record, .project-inquiries form, .inquiry-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 18px; background: var(--color-surface); }
+.inquiry-fields, .inquiry-types, .inquiry-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; }
+.inquiry-fields dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.inquiry-fields dt { color: var(--color-muted); }
+.project-inquiries label { display: grid; gap: 6px; }
+.project-inquiries :is(input:not([type=radio],[type=checkbox]),select,textarea) { width: 100%; border: 1px solid var(--color-border); padding: 8px 10px; border-radius: 8px; background: var(--color-surface); }
+.inquiry-types label, .inquiry-list button { padding: 14px; border: 1px solid var(--color-border); border-radius: 10px; text-align: left; background: var(--color-surface); }
+.inquiry-types label { grid-template-columns: auto 1fr; align-items: center; cursor: pointer; }
+.inquiry-types label :is(strong,span) { grid-column: 1 / -1; }
+.inquiry-types label.selected, .inquiry-list button[aria-pressed=true] { border-color: var(--color-primary); background: #edf4ff; }
+.inquiry-list button { display: grid; gap: 4px; }
+.project-inquiries label.inquiry-check { display: flex; align-items: center; padding: 7px 0; }
+.inquiry-card > * + * { margin-top: 8px; }
+.project-inquiries [role=alert] { color: #98282b; }

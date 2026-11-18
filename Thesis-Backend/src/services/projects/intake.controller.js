@@ -1,3 +1,8 @@
+import { inquiryDetails, inquiryPhases, confirmedPhases, estimateInquiry, notifyInquiry, validSchedule, assertInquiryUpload } from "./inquiries.js";
+import { scheduleConflicts } from "./recommend.controller.js";
+import { businessDeadline } from "../archive/audit.utility.js";
+import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
+import { HttpError } from "../../common/utilities/access.utility.js";
 import { saveEngineerScopes } from "./engineer-commitments.utility.js";
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
@@ -16,8 +21,10 @@ const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm",
 
 export const createIntake = async (req, res) => {
   try {
-    const actor = await requireUser(req, res, ['admin']);
+    const inquiryId = req.body?.inquiry_id;
+    const actor = await requireUser(req, res, inquiryId ? ['opm'] : ['admin']);
     if (!actor) return;
+    if (inquiryId && (!isUuid(inquiryId) || req.body.draft_project_id)) throw new HttpError(422, "Invalid inquiry intake.");
     if (req.body?.client_subcon_company !== undefined) {
       try { normalizeClientCompany(req.body.client_subcon_company); }
       catch (error) { return responseError(res, error.message, 400); }
@@ -44,6 +51,23 @@ export const createIntake = async (req, res) => {
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
+      let inquiry, intake, phases, deadline;
+      if (inquiryId) {
+        inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
+        if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
+        if (inquiry.project_id) {
+          const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
+          return {project: prior, duplicate: true};
+        }
+        if (inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
+        const details = inquiryDetails({...req.body, consultation: inquiry.details.consultation});
+        const { target_end_date: end, estimated_budget: budget, contract_file_id: contract } = req.body;
+        if (!validSchedule(target_start_date,end) || !Number.isFinite(Number(budget)) || Number(budget) <= 0 || !isUuid(contract))
+          throw new HttpError(422, "Enter valid project dates and budget, and upload the signed agreement.");
+        phases = confirmedPhases(await inquiryPhases(client,project_type),req.body.phases);
+        intake = {...details, estimated_budget:Number(budget), size:estimateInquiry(details,target_start_date).size};
+        deadline = businessDeadline((await client.query("SELECT now() AS now")).rows[0].now);
+      }
       // A repeat of a new submission returns the project it already created instead of inserting another.
       // A resubmission (draft_project_id) is a correction and is never treated as a duplicate.
       if (intakeId && !req.body?.draft_project_id) {
@@ -63,9 +87,10 @@ export const createIntake = async (req, res) => {
       let draft=null;
       if (req.body.draft_project_id) {
         await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [req.body.draft_project_id]);
-        const found=await client.query("SELECT id,client_name,lifecycle_status,project_type_id,suggested_opm_id,to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
+        const found=await client.query("SELECT id,client_name,lifecycle_status,project_type_id,suggested_opm_id,to_jsonb(projects)->>'inquiry_intake' AS inquiry_intake,to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[req.body.draft_project_id]);
         if(!found.rowCount) throw Object.assign(new Error("Draft not found."),{status:404});
         draft=found.rows[0];
+        if (draft.inquiry_intake) throw new HttpError(409, "Manage this inquiry project in the assigned Office PM workspace.");
         // Corrections are accepted until the project is active; the OPM review restarts from the resubmission.
         if(!RESUBMITTABLE.includes(draft.lifecycle_status)) throw Object.assign(new Error("This project is already active or archived and can no longer be resubmitted."),{status:409});
       }
@@ -95,7 +120,7 @@ export const createIntake = async (req, res) => {
       } else if (draft && phaseScope) {
         throw Object.assign(new Error("Existing projects retain their original phase scope."),{status:409});
       }
-      await validatePhaseTeam(client,projectType.rows[0].id,phase_team,draft?.phase_scope ? {projectId:draft.id} : {phaseNames:phaseScope?.phases});
+      await validatePhaseTeam(client,projectType.rows[0].id,phase_team,draft?.phase_scope ? {projectId:draft.id} : {phaseNames:phases ?? phaseScope?.phases});
       if(draft) {
         const accepted=await client.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND status='confirmed' LIMIT 1",[draft.id]);
         if(accepted.rowCount) throw Object.assign(new Error("Allocation is locked after an SPM accepts."),{status:409});
@@ -111,6 +136,11 @@ export const createIntake = async (req, res) => {
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
       await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true});
+      if (inquiry) {
+        const ids = [...new Set(phase_team.flatMap(row => [row.user_id,...(row.engineers || []).map(person => person.user_id)]))];
+        if ((await scheduleConflicts(client,ids,{start:target_start_date,end:req.body.target_end_date})).size)
+          throw new HttpError(409,"A selected Site PM has a conflicting project schedule. Refresh the allocation.");
+      }
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
@@ -127,10 +157,24 @@ export const createIntake = async (req, res) => {
         FROM project_types pt WHERE pt.code = $2
         RETURNING id, name, lifecycle_status`,
         [name,project_type,company,floor_area_sqm,floor_count,target_start_date,
-         suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id,intakeId]);
+         suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,headcount_suggested ?? null,tier,Number(crew_required),actor.id,inquiry ? null : intakeId]);
       if (!inserted.rowCount) throw Object.assign(new Error('Invalid project_type.'), {status:422});
       const project = inserted.rows[0];
-      if (phaseScope && !draft) {
+      if (inquiry) {
+        await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
+          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+        project.lifecycle_status = "spm_review";
+        for (const [code,fileId] of [["owner_contract",req.body.contract_file_id],["registered_plans",req.body.plans_file_id]]) {
+          if (!fileId && code === "registered_plans") continue;
+          await assertInquiryUpload(client, actor.id, fileId, true);
+          await linkProjectFile(client, project.id, fileId);
+          const document = await client.query(`INSERT INTO project_documents(project_id,document_type_id,status,file_ref,uploaded_by,uploaded_at)
+            SELECT $1,id,'uploaded',$2,$3,now() FROM document_types WHERE code=$4`, [project.id,"db://"+fileId,actor.id,code]);
+          if (!document.rowCount) throw new HttpError(422,"Project document type is not configured.");
+        }
+        await client.query("INSERT INTO project_engineers(id,project_id,user_id,project_role_label,assigned_at,created_by,updated_by) VALUES(gen_random_uuid(),$1,$2,'Office PM (oversight)',now(),$2,$2)",[project.id,actor.id]);
+      }
+      if (phaseScope && !draft && !inquiry) {
         phaseScope={...phaseScope,confirmedBy:actor.id,confirmedAt:new Date().toISOString()};
         await client.query("UPDATE projects SET phase_scope=$2::jsonb WHERE id=$1",[project.id,JSON.stringify(phaseScope)]);
         await client.query(`INSERT INTO audit_log(table_name,record_id,operation,changed_by,new_values)
@@ -141,15 +185,21 @@ export const createIntake = async (req, res) => {
         const r = await client.query(`INSERT INTO project_phase_team
           (project_id, project_stage_id, spm_user_id, is_lead, status,
            response_deadline_at, created_by, updated_by)
-          SELECT $1, ps.id, $3, $4, 'pending', NULL, $5, $5
+          SELECT $1, ps.id, $3, $4, 'pending', $6, $5, $5
           FROM project_stages ps WHERE ps.code = $2 RETURNING project_stage_id`,
-          [project.id,phase.stage,phase.user_id,phaseScope ? index===0 : phase.is_lead ?? false,actor.id]);
+          [project.id,phase.stage,phase.user_id,inquiry || phaseScope ? index===0 : phase.is_lead ?? false,actor.id,deadline ?? null]);
         if (!r.rowCount) throw Object.assign(new Error(`Unknown stage: ${phase.stage}`), {status:422});
       }
       await saveEngineerScopes(client,project.id,phase_team,actor.id);
       if(selectedClient) {
         await client.query("DELETE FROM user_client_project_links WHERE project_id=$1 AND user_id<>$2",[project.id,selectedClient]);
         await client.query("INSERT INTO user_client_project_links (user_id,project_id,created_by,updated_by) VALUES ($1,$2,$3,$3) ON CONFLICT (user_id,project_id) DO NOTHING",[selectedClient,project.id,actor.id]);
+      }
+      if (inquiry) {
+        await client.query("UPDATE project_inquiries SET status='converted',project_id=$2,updated_at=now() WHERE id=$1",[inquiry.id,project.id]);
+        const recipients = new Set(phase_team.flatMap(row => [row.user_id, ...(row.engineers || []).map(person => person.user_id)]));
+        for (const recipient of recipients) await notifyInquiry(client,actor.id,recipient,"Site PM assignment offer",name,project.id);
+        return {project};
       }
       // A resubmission supersedes every open Office PM confirmation, in the same transaction as the
       // fresh pending one, so the previous OPM can no longer accept and the replacement can. Declined
@@ -181,7 +231,7 @@ export const createIntake = async (req, res) => {
       return {project, confirmation:confirmation.rows[0]};
     });
     if (result.duplicate) return responseOk(res, 'Project was already submitted.', 1, {project: result.project, confirmation: result.confirmation});
-    return responseOk(res, 'Project and pending OPM confirmation created.', 1, result);
+    return responseOk(res, inquiryId ? 'Project created and Site PM offers sent.' : 'Project and pending OPM confirmation created.', 1, result);
   } catch (error) {
     if (error.status) return responseError(res, error.message, error.status);
     return handleError(res, error);

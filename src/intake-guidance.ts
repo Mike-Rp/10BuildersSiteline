@@ -1,5 +1,5 @@
 import { licenseState, type Account, type Project, type State } from "./model.ts"
-import { activationChecks, assignmentBlock, isAssigned, leadConfirmed, leadId, registeredComplete, teamConfirmed } from "./workflows.ts"
+import { activationChecks, assignmentBlock, assignmentDocumentsMissing, isAssigned, leadConfirmed, leadId, registeredComplete, teamConfirmed } from "./workflows.ts"
 import { requiredCompanies, tradeAllocationEnabled } from "./subcontractor-allocation.ts"
 
 export type IntakeView = "all" | "action" | "waiting"
@@ -46,8 +46,9 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!p.opmId) return step("Office PM unassigned", "Unassigned", "Review the intake record; an Office PM assignment is missing.", false, "view", "View details")
   if (!p.opmAccepted) return step("Office PM acceptance", person(p.opmId, "Office PM"),
     "Office PM must review and accept the assignment or request changes.", actor.role === "opm", "confirm", "Review assignment")
-  if (!registeredComplete(p)) return step("Required documents", person(p.opmId, "Office PM"),
-    "Office PM must complete the six required documents before Site PM acceptance.", actor.role === "opm", "documents", "Open required documents")
+  if (assignmentDocumentsMissing(p).length) return step("Required documents", person(p.opmId, "Office PM"),
+    p.inquiryOrigin ? "Upload the signed contract and registered plans before Site PM acceptance." : "Office PM must complete the six required documents before Site PM acceptance.",
+    actor.role === "opm", "documents", "Open required documents")
   const ownPending = p.team.filter(row => row.accountId === actor.id && row.status === "pending")
   if (actor.role === "spm" && ownPending.length && !assignmentBlock(p, actor.id))
     return step(actor.id === lead ? "Lead Site PM acceptance" : "Site PM confirmations", person(actor.id, "Site PM"),
@@ -59,7 +60,7 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!p.team.length || !lead) return step("Phase assignments incomplete", "Unassigned",
     "The stored phase team is incomplete. Review the intake details before continuing.", false, "view", "View details")
   if (!leadConfirmed(p)) return step("Lead Site PM acceptance", person(lead, "Lead Site PM"),
-    "The project Lead must accept Mobilization before the remaining Site PMs can respond.",
+    "The project Lead must accept before the remaining Site PMs can respond.",
     actor.role === "spm" && actor.id === lead && !assignmentBlock(p, actor.id) && p.team.some(row => row.accountId === actor.id && row.status === "pending"), "assignment", "Review assignment")
   if (!teamConfirmed(p)) {
     const pending = p.team.filter(row => row.status !== "confirmed")
@@ -67,6 +68,8 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
       `Awaiting phase responses: ${pending.map(row => row.phase).join(", ")}.`,
       actor.role === "spm" && pending.some(row => row.accountId === actor.id && row.status === "pending") && !assignmentBlock(p, actor.id), "assignment", "Review assignment")
   }
+  if (!registeredComplete(p)) return step("Required documents", person(p.opmId, "Office PM"),
+    "Upload the remaining required documents before project activation.", actor.role === "opm", "documents", "Open required documents")
   const checks = activationChecks(state, p)
   const clientReady = checks.find(check => check.id === "client")?.passed === true
   // Client readiness is also a gate on signed-agreement upload, not just activation.

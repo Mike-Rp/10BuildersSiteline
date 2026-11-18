@@ -471,13 +471,20 @@ export function activationChecks(state: State, p: Project) {
     },
   ]
 }
+export function assignmentDocumentsMissing(p: Project) {
+  const labels = p.inquiryOrigin ? [DOC_LABELS[2],DOC_LABELS[3]] : DOC_LABELS.slice(0,6);
+  return labels.filter(label => !p.docs.some(doc => doc.label === label && doc.uploaded));
+}
 export function assignmentBlock(p: Project, actorId: string) {
   if (!isAssigned(p, actorId)) return "This project is not assigned to you."
   if (!p.opmAccepted) return "Waiting for the assigned Office PM to accept."
-  if (!registeredComplete(p))
+  if (p.inquiryOrigin) {
+    const missing = assignmentDocumentsMissing(p);
+    if (missing.length) return `Waiting for Office PM documents: ${missing.join(", ")}.`;
+  } else if (!registeredComplete(p))
     return `Waiting for Office PM documents: ${registeredCount(p)} of 6 uploaded.`
   if (actorId !== leadId(p) && !leadConfirmed(p))
-    return "The Lead Site PM must accept Mobilization first."
+    return "The Lead Site PM must accept first."
   if (
     ["changes_requested", "declined", "completed", "expired"].includes(p.status)
   )

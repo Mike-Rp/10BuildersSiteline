@@ -267,6 +267,7 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  inquiryOrigin?: boolean
   phaseScope?: import("../Thesis-Backend/src/domain/mixed-use-scope.js").MixedUseScope
   subcontractorAllocationVersion?: number
   subcontractorAllocation?: import("./subcontractor-allocation").SavedAllocation

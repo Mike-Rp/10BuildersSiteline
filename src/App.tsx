@@ -68,6 +68,7 @@ import { applyRefreshSetting, isStale, startPolling } from "./refresh-interval"
 import { flushSync } from "react-dom"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
+import ProjectInquiries from "./ProjectInquiries"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
@@ -1600,6 +1601,7 @@ function AppInner() {
     )
   }
   function renderPage() {
+    if (page === "Project inquiries") return <ProjectInquiries key={actor.id} role="admin" onReload={reloadWorkspace} />
     if (page === "Activity log") return <>
       {pageHeading("Activity log")}
       <Panel title="Workspace activity" subtitle="Browse the activity available to your account.">

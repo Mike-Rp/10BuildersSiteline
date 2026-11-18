@@ -1,3 +1,4 @@
+import ProjectInquiries from "./ProjectInquiries"
 import WorkspaceGuide from "./WorkspaceGuide"
 import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
@@ -120,6 +121,7 @@ import {
   allocationReady,
   activeSubcontractors,
   assignmentBlock,
+  assignmentDocumentsMissing,
   checklistFor,
   pendingChecklistFor,
   ISSUES,
@@ -200,6 +202,7 @@ function Status({ value }: { value: string }) {
   )
 }
 const OPM_NAV = [
+  ["Project inquiries", "plus"],
   ["Dashboard", "grid"],
   ["Confirmation queue", "check"],
   ["Documents", "folder"],
@@ -681,7 +684,7 @@ export default function RoleWorkspace({
   function timeline(p: Project) {
     const step = !p.opmAccepted
       ? 0
-      : !registeredComplete(p)
+      : assignmentDocumentsMissing(p).length
         ? 1
         : !leadConfirmed(p)
           ? 2
@@ -692,7 +695,7 @@ export default function RoleWorkspace({
       <ol className="role-intake-timeline">
         {[
           "Office PM accepts",
-          "Six documents",
+          p.inquiryOrigin ? "Review documents" : "Six documents",
           "Lead Site PM",
           "Remaining Site PMs",
           "Subcontractor allocation",
@@ -1268,6 +1271,14 @@ export default function RoleWorkspace({
         <div className="role-card-content">
           <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
+          {p.inquiryOrigin && <>
+            <ProjectScheduleDetails project={p} today={scheduleToday} />
+            <h3>Assignment documents</h3>
+            <ul>{DOC_LABELS.slice(0,6).map(label => {
+              const doc = p.docs.find(item => item.label === label && item.uploaded)
+              return <li key={label}>{doc ? <Button variant="ghost" onClick={() => showDoc(p,doc)}>{label} · Available</Button> : `${label} · Pending`}</li>
+            })}</ul>
+          </>}
           {pending.length > 0 && (
             <>
               {isIntake(p)
@@ -3630,6 +3641,7 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
+    if (isOpm && page === "Project inquiries") return <ProjectInquiries key={actor.id} role="opm" onReload={onReload} />
     switch (page) {
       case "Dashboard":
         return dashboard()
