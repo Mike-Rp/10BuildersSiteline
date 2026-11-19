@@ -273,8 +273,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [decisionNote, setDecisionNote] = useState("")
   const [contract, setContract] = useState<File>()
   const [contractPreview, setContractPreview] = useState("")
-  const [plans, setPlans] = useState<File>()
-  const [uploads, setUploads] = useState<{ contract?: string; plans?: string }>({})
+  const [contractFileId, setContractFileId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const row = rows?.find(item => item.id === selected)
@@ -327,8 +326,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setEnd("")
     setBudget("")
     setContract(undefined)
-    setPlans(undefined)
-    setUploads({})
+    setContractFileId(undefined)
     setError("")
     setStep(1)
     setAddingEngineer(false)
@@ -381,36 +379,28 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     })
   }
   async function allocate() {
-    const saved = await uploadIntakeDocuments();
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...details, target_start_date: start, target_end_date: end, phases, estimated_budget: budget, contract_file_id: saved.contract })
+    const fileId = await uploadIntakeContract()
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...details, target_start_date: start, target_end_date: end, phases, estimated_budget: budget, contract_file_id: fileId })
     setPlanning(result)
     setTeam(result.team || [])
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
     setAddingEngineer(false)
     setStep(3)
   }
-  async function uploadIntakeDocuments() {
-    const saved = { ...uploads }
-    if (!saved.contract && contract) {
-      const id = crypto.randomUUID()
-      await uploadFile(id, contract)
-      saved.contract = id
-      setUploads({ ...saved })
-    }
-    if (!saved.plans && plans) {
-      const id = crypto.randomUUID()
-      await uploadFile(id, plans)
-      saved.plans = id
-      setUploads({ ...saved })
-    }
-    return saved
+  async function uploadIntakeContract() {
+    if (contractFileId) return contractFileId
+    if (!contract) throw new Error("Attach the signed client contract agreement.")
+    const id = crypto.randomUUID()
+    await uploadFile(id, contract)
+    setContractFileId(id)
+    return id
   }
   async function submit() {
-    const saved = await uploadIntakeDocuments()
+    const fileId = await uploadIntakeContract()
     await post("/projects/intake", {
       ...details, inquiry_id: selected, suggested_opm_id: row?.opm_id, target_start_date: start,
-      target_end_date: end, estimated_budget: budget, contract_file_id: saved.contract,
-      plans_file_id: saved.plans, phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
+      target_end_date: end, estimated_budget: budget, contract_file_id: fileId,
+      phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
     })
     await refresh()
     setDialog(undefined)
@@ -716,10 +706,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
               <label>Overall end date<input type="date" min={start} value={end} onChange={event => { setEnd(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
               <label>Estimated budget (₱)<input type="number" min="0.01" step="0.01" required value={budget} onChange={event => { setBudget(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
             </div></FormSection>
-            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement and any registered plans."><div className="inquiry-fields">
-              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" required={!contract} onChange={event => { setContract(event.target.files?.[0]); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})); setUploads(previous => ({...previous,contract:undefined})) }} /></label>
-              <label>Registered plans<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={event => { setPlans(event.target.files?.[0]); setUploads(previous => ({...previous,plans:undefined})) }} />{plans && <small>{plans.name}</small>}</label>
-            </div>
+            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement.">
+              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" required={!contract} onChange={event => { setContract(event.target.files?.[0]); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})); setContractFileId(undefined) }} /></label>
             {contract && contractPreview && <div className="inquiry-sent-notice inquiry-contract-preview">
               <span className="inquiry-list-icon"><Icon name="doc" /></span>
               <div><strong>{contract.name}</strong><small>Contract attached</small></div>
