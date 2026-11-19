@@ -60,6 +60,32 @@ function adminInquiryStatus(row: Inquiry) {
   return statusLabel(row) || "Status unavailable"
 }
 
+const adminInquiryActions: Record<string, string> = {
+  "Saved for later": "Start automatic matching",
+  "No eligible OPM": "Retry automatic matching",
+  "Returned to Admin": "Retry automatic matching",
+  "Client withdrew": "Mark inquiry dropped",
+}
+
+const inquiryWaiting: Record<string, string> = {
+  offered: "Waiting for Office PM response",
+  consulting: "Waiting for the client’s decision",
+  approved: "Waiting for project intake",
+}
+
+const inquiryMilestones = ["Inquiry submitted", "Office PM review", "Client proposal", "Project assessment", "Project intake"]
+
+function inquiryMilestone(item: Inquiry) {
+  switch (item.status) {
+    case "draft": return 0
+    case "offered":
+    case "returned": return 1
+    case "consulting": return 2
+    case "approved": return item.workflow?.assessment || item.project_status === "spm_review" ? 4 : 3
+    default: return null
+  }
+}
+
 function FormSection({ title, icon, description, children }: { title: string; icon?: string; description?: string; children: ReactNode }) {
   return <section className="inquiry-form-section">
     {icon ? <header className="inquiry-section-heading">
@@ -302,6 +328,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [dialog, setDialog] = useState<"intake" | "details">()
   const [officePage, setOfficePage] = useState<OfficePage>()
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
+  const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
+  const [adminInquiryFilter, setAdminInquiryFilter] = useState<"all" | "action" | "waiting">("all")
   const [step, setStep] = useState(2)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
@@ -481,6 +509,14 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       admin ? inquiryReference(item) : ""]
       .some(value => String(value ?? "").toLowerCase().includes(query))
   const visibleRows = rows?.filter(matchesSearch)
+  const adminHistory = (rows ?? []).filter(item => ["converted", "dropped"].includes(item.status))
+  const adminCurrent = (rows ?? []).filter(item => !["converted", "dropped"].includes(item.status))
+  const adminActionCount = adminCurrent.filter(item => adminInquiryActions[adminInquiryStatus(item)]).length
+  const adminWaitingCount = adminCurrent.filter(item => inquiryWaiting[item.status]).length
+  const adminVisibleRows = (adminInquiryTab === "history" ? adminHistory : adminCurrent.filter(item =>
+    adminInquiryFilter === "all" ||
+    (adminInquiryFilter === "action" ? adminInquiryActions[adminInquiryStatus(item)] : inquiryWaiting[item.status])
+  )).filter(matchesSearch)
   const queueRows = visibleRows?.filter(item =>
     (queueView === "all" || officeAction(item.status)?.bucket === queueView) &&
     (!queueStatus || statusLabel(item) === queueStatus) &&
@@ -673,48 +709,59 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     {admin && <section className="inquiry-list-panel" aria-labelledby="existing-inquiries-heading">
       <div className="inquiry-list-heading">
         <div>
-          <h2 id="existing-inquiries-heading">Existing inquiries
-            {rows && <span className="inquiry-list-count" aria-label={`${rows.length} saved inquiries`}>{rows.length}</span>}
-          </h2>
-          <p>Open a saved record to review details and continue the workflow.</p>
+          <h2 id="existing-inquiries-heading">Project Inquiry Log</h2>
         </div>
         <div className="inquiry-list-search">
           <Icon name="search" size={17} />
           <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
         </div>
       </div>
-      {!!visibleRows?.length && <div className="inquiry-list-columns" aria-hidden="true">
-        <span>Project</span><span>Status</span><span>Last updated</span>
+      <div className="inquiry-log-controls" role="group" aria-label="Inquiry records">
+        <button type="button" className="button" aria-pressed={adminInquiryTab === "current"} onClick={() => setAdminInquiryTab("current")}>Current inquiries ({adminCurrent.length})</button>
+        <button type="button" className="button" aria-pressed={adminInquiryTab === "history"} onClick={() => setAdminInquiryTab("history")}>Inquiry history ({adminHistory.length})</button>
+      </div>
+      {adminInquiryTab === "current" && <div className="inquiry-log-controls" role="group" aria-label="Filter current inquiries">
+        <button type="button" className="button" aria-pressed={adminInquiryFilter === "all"} onClick={() => setAdminInquiryFilter("all")}>All inquiries ({adminCurrent.length})</button>
+        <button type="button" className="button" aria-pressed={adminInquiryFilter === "action"} onClick={() => setAdminInquiryFilter("action")}>Needs your action ({adminActionCount})</button>
+        <button type="button" className="button" aria-pressed={adminInquiryFilter === "waiting"} onClick={() => setAdminInquiryFilter("waiting")}>Waiting for others ({adminWaitingCount})</button>
       </div>}
-      {visibleRows?.length ? <ul className="inquiry-list">
-        {visibleRows.map(item => {
+      {adminVisibleRows.length ? <ul className="inquiry-log-cards">
+        {adminVisibleRows.map(item => {
           const name = item.details.name || "Untitled project"
           const status = adminInquiryStatus(item)
           const updated = item.updated_at && Number.isFinite(Date.parse(item.updated_at)) ? item.updated_at : undefined
           const updatedLabel = updated ? inquiryDate.format(new Date(updated)) : ""
-          return <li key={item.id}>
-            <button type="button" className="inquiry-list-row" disabled={busy}
-              aria-label={`View inquiry for ${name}, ${[item.details.client_name, status, updatedLabel && `last updated ${updatedLabel}`].filter(Boolean).join(", ")}`}
-              onClick={() => {
-                open(item)
-                setAdminPage("tracking")
-              }}>
-              <span className="inquiry-list-project">
-                <span className="inquiry-list-icon"><Icon name="building" /></span>
-                <span className="inquiry-list-name"><strong>{name}</strong>
-                  <small>{[item.details.client_name, inquiryReference(item)].filter(Boolean).join(" · ")}</small>
-                </span>
-              </span>
+          const nextAction = adminInquiryActions[status]
+          const waiting = inquiryWaiting[item.status]
+          const milestone = inquiryMilestone(item)
+          return <li key={item.id} className="inquiry-log-card">
+            <div className="inquiry-log-card-header">
+              <div className="inquiry-list-name"><h3>{name}</h3>
+                <small>{[item.details.client_name, item.details.project_type, inquiryReference(item)].filter(Boolean).join(" · ")}</small>
+              </div>
               <span className="inquiry-list-status" data-status={item.status}>{status}</span>
-              <span className="inquiry-list-updated">{updated
-                ? <time dateTime={updated}>{updatedLabel}</time>
-                : "—"}</span>
-              <span className="inquiry-list-action">View inquiry <Icon name="chevron" size={16} /></span>
-            </button>
+            </div>
+            {milestone !== null && <ol className="inquiry-log-progress" aria-label="Inquiry progress">
+              {inquiryMilestones.map((label, index) => <li key={label}
+                data-complete={index < milestone} aria-current={index === milestone ? "step" : undefined}>
+                <span aria-hidden="true">{index < milestone ? "✓" : ""}</span>{label}
+              </li>)}
+            </ol>}
+            <div className="inquiry-log-footer">
+              <div>
+                {adminInquiryTab === "current" && (nextAction || waiting) && <p>{nextAction || waiting}</p>}
+                {updated && <small>Updated <time dateTime={updated}>{updatedLabel}</time></small>}
+              </div>
+              <button type="button" className="button primary" disabled={busy} aria-label={`View inquiry for ${name}`}
+                onClick={() => { open(item); setAdminPage("tracking") }}>
+                View inquiry <Icon name="chevron" size={16} />
+              </button>
+            </div>
           </li>
         })}
       </ul> : <p className="inquiry-list-empty">
-        {rows?.length ? "No inquiries match your search." : rows ? "No project inquiries have been created yet." :
+        {rows ? query ? "No inquiries match your search." : adminInquiryTab === "history"
+          ? "No inquiries in history yet." : "No inquiries in this view." :
           error ? "Inquiries could not be loaded." : "Loading inquiries…"}
       </p>}
     </section>}
