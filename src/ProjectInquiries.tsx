@@ -2,16 +2,13 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
-import residential from "./assets/inquiry/residential.png"
-import commercial from "./assets/inquiry/commercial.png"
-import mixedUse from "./assets/inquiry/mixed-use.png"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
 import "./project-inquiries.css"
 
 const projectTypes = [
-  ["Residential", "home", "Houses, condos, and apartments.", residential],
-  ["Commercial", "building", "Offices, retail, and hotels.", commercial],
-  ["Mixed-Use", "mixed-building", "Residential and commercial spaces.", mixedUse],
+  ["Residential", "home", "Houses, condos, and apartments."],
+  ["Commercial", "building", "Offices, retail, and hotels."],
+  ["Mixed-Use", "mixed-building", "Residential and commercial spaces."],
 ] as const
 const fields = [
   ["client_name", "Client name", "text"], ["email", "Email", "email"], ["phone", "Phone", "tel"],
@@ -37,30 +34,37 @@ const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Sta
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 
-function FormSection({ title, icon, children }: { title: string; icon?: string; children: ReactNode }) {
-  return <section className="inquiry-form-section"><h3>{icon && <Icon name={icon} />}{title}</h3><div>{children}</div></section>
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="inquiry-form-section"><h3>{title}</h3><div>{children}</div></section>
 }
 
-function InquiryFields({ details, onChange, illustrated = false }: { details: Details; onChange: (key: string, value: string | number) => void; illustrated?: boolean }) {
+function InquiryFields({ details, onChange, standaloneTypeSection = false }: { details: Details; onChange: (key: string, value: string | number) => void; standaloneTypeSection?: boolean }) {
   const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => <label key={key}>{label}
         <input type={type} required value={details[key] ?? ""} min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
           onChange={event => onChange(key,event.target.value)} />
       </label>)
-  const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className={`inquiry-types ${illustrated ? "illustrated" : ""}`}>
-      {projectTypes.map(([type, icon, description, art]) => <label key={type} className={details.project_type === type ? "selected" : ""}>
-        <input type="radio" name="project-type" required checked={details.project_type === type} onChange={() => onChange("project_type",type)} />
-        {illustrated ? <img src={art} alt="" /> : <Icon name={icon} />}<strong>{type}</strong><span>{description}</span>
-      </label>)}
+  const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className={`inquiry-types ${standaloneTypeSection ? "inquiry-intake-style-types" : ""}`}>
+      {projectTypes.map(([type, icon, description]) => {
+        const selected = details.project_type === type
+        return <label key={type} className={`${standaloneTypeSection ? "button project-type-card" : ""} ${selected ? "selected" : ""}`}>
+          <input type="radio" name="project-type" required checked={selected} onChange={() => onChange("project_type",type)} />
+          {standaloneTypeSection ? <>
+            <span className="project-type-icon"><Icon name={type === "Commercial" ? "storefront" : icon} size={24} /></span>
+            <span className="project-type-copy"><strong>{type}</strong><span>{description}</span></span>
+            {selected && <span className="project-type-check"><Icon name="check" size={15} /></span>}
+          </> : <><Icon name={icon} /><strong>{type}</strong><span>{description}</span></>}
+        </label>
+      })}
     </div></fieldset>
   return <>
-    <FormSection title="Client information" icon={illustrated ? "users" : undefined}><div className="inquiry-fields">{renderFields(fields.slice(0, 3))}</div></FormSection>
-    <FormSection title="Project details" icon={illustrated ? "building" : undefined}>
+    <FormSection title="Client information"><div className="inquiry-fields">{renderFields(fields.slice(0, 3))}</div></FormSection>
+    <FormSection title="Project details">
       <div className="inquiry-fields inquiry-location">{renderFields(fields.slice(3, 5))}</div>
       <div className="inquiry-fields inquiry-measurements">{renderFields(fields.slice(5))}</div>
-      {!illustrated && types}
+      {!standaloneTypeSection && types}
     </FormSection>
-    {illustrated && <FormSection title="Project type" icon="home">{types}</FormSection>}
+    {standaloneTypeSection && <FormSection title="Project type">{types}</FormSection>}
   </>
 }
 
@@ -365,8 +369,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         })
       }}>
         <fieldset disabled={busy} className="inquiry-form-stack">
-          <InquiryFields details={details} onChange={change} illustrated />
-          <FormSection title="Consultation" icon="calendar"><label className="inquiry-consultation-field">Preferred consultation timing
+          <InquiryFields details={details} onChange={change} standaloneTypeSection />
+          <FormSection title="Consultation"><label className="inquiry-consultation-field">Preferred consultation timing
             <select value={details.consultation} onChange={event => change("consultation", Number(event.target.value))}>
               {timing.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
             </select>
