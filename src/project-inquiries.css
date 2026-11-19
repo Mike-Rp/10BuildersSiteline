@@ -246,8 +246,17 @@
 .inquiry-contract-preview small { display: block; }
 .inquiry-intake .inquiry-stepper { position: sticky; top: -1px; z-index: 1; background: var(--surface-subtle); padding: 0; }
 .inquiry-intake .inquiry-stepper li { background: transparent; color: var(--color-muted); border-radius: 0; border-bottom: 3px solid transparent; padding-block: 12px; }
-.inquiry-intake .inquiry-stepper li[aria-current=step] { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
-.inquiry-intake .inquiry-stepper li[aria-current=step] span { background: var(--color-primary); color: var(--color-surface); }
+#root .project-inquiries :is(
+  .office-workflow-nav > button[aria-current=step],
+  .inquiry-stepper > li[aria-current=step],
+  .inquiry-phase-nav > button[aria-pressed=true]
+) {
+  background: #123760;
+  color: #fff;
+  border-color: #123760;
+  font-weight: 700;
+}
+.inquiry-intake .inquiry-stepper li[aria-current=step] span { background: #fff; color: #123760; }
 .inquiry-intake .inquiry-stepper li[data-complete=true] span { background: #287453; color: white; }
 .inquiry-intake .inquiry-phase-grid { grid-template-columns: 1fr; }
 .inquiry-intake .inquiry-phase-option { min-height: 48px; align-items: center; padding: 10px; }
@@ -268,7 +277,6 @@
 
 .inquiry-stepper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); list-style: none; }
 .inquiry-stepper li { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 7px; border-radius: 7px; background: #edf3fa; font-weight: 600; }
-.inquiry-stepper li[aria-current=step] { background: #123760; color: #fff; }
 .inquiry-stepper li span { display: grid; place-items: center; flex: 0 0 24px; height: 24px; border-radius: 50%; background: #d6e5f5; color: #123760; }
 .inquiry-review { display: grid; grid-template-columns: minmax(175px, 1fr) minmax(0, 2.4fr); gap: 14px; align-items: start; }
 .inquiry-summary-card, .inquiry-summary-card dl, .inquiry-review-main { display: grid; gap: 10px; min-width: 0; }

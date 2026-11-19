@@ -134,7 +134,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     {page !== "pending" && page !== "received" && <nav className="office-workflow-nav" aria-label="Inquiry workflow">
       {([["accepted", "Accepted inquiry", true], ["proposal", "Client proposal", true], ["review", "Project information & budget", accepted],
         ["assessment", "Project assessment", accepted && Boolean(workflow?.budget && review)]] as const).map(([key, label, enabled]) =>
-        <button type="button" className={`button ${page === key ? "primary" : ""}`} key={key} disabled={busy || !enabled}
+        <button type="button" className="button" key={key} disabled={busy || !enabled}
           aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>{label}</button>)}
     </nav>}
     <header className="office-workflow-heading">

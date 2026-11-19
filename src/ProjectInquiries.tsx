@@ -792,7 +792,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           <div><h3>Build the project team</h3><p className="inquiry-muted">Review staffing by phase and assign qualified engineers to cover responsibilities.</p></div>
           <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
           <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
-            {phases.map(stage => <button key={stage} type="button" className={`button ${staffingPhase === stage ? "primary" : ""}`} aria-pressed={staffingPhase === stage} onClick={() => {
+            {phases.map(stage => <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage} onClick={() => {
               setStaffingPhase(stage)
               setAddingEngineer(false)
             }}>{stage}</button>)}
