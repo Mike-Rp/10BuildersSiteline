@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
@@ -6,6 +6,7 @@ import { IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
+import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import "./project-inquiries.css"
 
 const projectTypes = [
@@ -21,7 +22,7 @@ const fields = [
 ] as const
 type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
-type Inquiry = { id: string; details: Details; routing_history?: RoutingEvent[]; status: string; created_at?: string; updated_at?: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
+type Inquiry = OfficeRecord & { id: string; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
@@ -37,9 +38,9 @@ const statuses: Record<string,string> = {
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
 const officeActions = {
-  offered: { label: "Review request", dialog: "review", bucket: "action" },
-  consulting: { label: "Record client decision", dialog: "outcome", bucket: "waiting" },
-  approved: { label: "Open project intake", dialog: "intake", bucket: "action" },
+  offered: { label: "Review pending inquiry", bucket: "action" },
+  consulting: { label: "View accepted inquiry", bucket: "waiting" },
+  approved: { label: "Continue project assessment", bucket: "action" },
 } as const
 const officeAction = (status: string) => Object.prototype.hasOwnProperty.call(officeActions, status)
   ? officeActions[status as keyof typeof officeActions] : undefined
@@ -50,7 +51,7 @@ const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST",
 const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
 
 function inquiryReference(row: Inquiry) {
-  return `10BL-${row.created_at?.slice(0, 4) || row.updated_at?.slice(0, 4) || inquiryDay.format(new Date()).slice(0, 4)}-${row.id.replaceAll("-", "").slice(0, 12).toUpperCase()}`
+  return `10BL-${row.created_at?.slice(0, 4) || row.updated_at?.slice(0, 4) || inquiryDay.format(new Date()).slice(0, 4)}-${row.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`
 }
 
 function adminInquiryStatus(row: Inquiry) {
@@ -66,32 +67,6 @@ function FormSection({ title, icon, description, children }: { title: string; ic
     </header> : <h3>{title}</h3>}
     <div>{children}</div>
   </section>
-}
-
-function InquiryFields({ details, onChange }: { details: Details; onChange: (key: string, value: string | number) => void }) {
-  const field = (key: string, label: string, type = "text", required = true, maxLength?: number) => <label key={key}>{label}
-    <input type={type} required={required} maxLength={maxLength} value={details[key] ?? ""} min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
-      step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
-      onChange={event => onChange(key, event.target.value)} />
-  </label>
-  const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => field(key, label, type, key !== "land_area"))
-  const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className="inquiry-types">
-      {projectTypes.map(([type, icon, description]) => {
-        const selected = details.project_type === type
-        return <label key={type} className={selected ? "selected" : ""}>
-          <input type="radio" name="project-type" required checked={selected} onChange={() => onChange("project_type",type)} />
-          <Icon name={icon} /><strong>{type}</strong><span>{description}</span>
-        </label>
-      })}
-    </div></fieldset>
-  return <>
-    <FormSection title="Client information"><div className="inquiry-fields">{renderFields(fields.slice(0, 3))}</div></FormSection>
-    <FormSection title="Project details">
-      <div className="inquiry-fields inquiry-location">{renderFields(fields.slice(3, 5))}</div>
-      <div className="inquiry-fields inquiry-measurements">{renderFields(fields.slice(5))}</div>
-      {types}
-    </FormSection>
-  </>
 }
 
 function InquiryDetails({ details, includeClient = false }: { details: Details; includeClient?: boolean }) {
@@ -321,30 +296,30 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [queueType, setQueueType] = useState("")
   const recordHeading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState("")
-  const [dialog, setDialog] = useState<"review" | "outcome" | "intake" | "details">()
+  const [dialog, setDialog] = useState<"intake" | "details">()
+  const [officePage, setOfficePage] = useState<OfficePage>()
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(2)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
-  const [showProject, setShowProject] = useState(false)
   const stepperRef = useRef<HTMLOListElement>(null)
   const [details, setDetails] = useState<Details>({ consultation: 30 })
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
-  const [start, setStart] = useState("")
-  const [end, setEnd] = useState("")
-  const [budget, setBudget] = useState("")
-  const [reason, setReason] = useState("")
-  const [outcome, setOutcome] = useState<"approve" | "withdraw">()
-  const [decisionDate, setDecisionDate] = useState("")
-  const [decisionNote, setDecisionNote] = useState("")
   const [contract, setContract] = useState<File>()
   const [contractPreview, setContractPreview] = useState("")
   const [contractFileId, setContractFileId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const row = rows?.find(item => item.id === selected)
+  const start = row?.workflow?.review?.start
+  const end = row?.workflow?.review?.end
+  const budget = row?.workflow?.budget
+  const staffingInput = {
+    ...row?.details, target_start_date: start, target_end_date: end,
+    estimated_budget: budget, assessment_id: row?.workflow?.assessment?.id,
+  }
   const root = "/projects/inquiries"
   const change = (key: string, value: string | number) => {
     setDetails(previous => ({ ...previous, [key]: value }))
@@ -388,17 +363,10 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setPlanning(undefined)
     setTeam([])
     setPhases([])
-    setReason("")
-    setOutcome(undefined)
-    setDecisionDate("")
-    setDecisionNote("")
-    setStart(typeof item?.details.anticipated_start === "string" ? item.details.anticipated_start : "")
-    setEnd("")
-    setBudget("")
     setContract(undefined)
     setContractFileId(undefined)
     setError("")
-    setStep(1)
+    setStep(2)
     setAddingEngineer(false)
     setDialog(undefined)
   }
@@ -407,51 +375,57 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setDialog(undefined)
     setError("")
   }
-  async function decision(action: string) {
-    const updated = await post<Inquiry>(`${root}/${selected}/decision`, {
-      action, reason,
-      ...(action === "approve" || action === "withdraw" ? { decision_date: decisionDate, decision_note: decisionNote } : {}),
-    })
-    if (action === "approve") {
-      setRows(previous => previous?.map(item => item.id === updated.id ? { ...item, ...updated } : item))
-      setDetails({ ...updated.details })
-      setStep(1)
-      setDialog("intake")
+  function updateInquiry(updated: Inquiry) {
+    setRows(previous => previous?.map(item => item.id === updated.id ? { ...item, ...updated } : item))
+  }
+  function navigateOffice(page?: OfficePage) {
+    setError("")
+    setOfficePage(page)
+  }
+  async function decision(action: string, input?: Record<string, string>) {
+    const updated = await post<Inquiry>(`${root}/${selected}/decision`, { action, ...input })
+    if (action === "cancel") {
+      setRows(previous => previous?.filter(item => item.id !== selected))
+      navigateOffice()
     } else {
-      await refresh()
-      setDialog(undefined)
+      updateInquiry(updated)
+      if (action === "confirm") navigateOffice("received")
+      if (action === "approve") navigateOffice("review")
+      if (action === "withdraw") {
+        navigateOffice()
+        setDialog("details")
+      }
     }
     void onReload()
   }
-  function openOutcome() {
-    setOutcome(undefined)
-    setDecisionDate(inquiryDay.format(new Date()))
-    setDecisionNote("")
-    setReason("")
-    setDialog("outcome")
+  async function saveWorkflow(action: string, input: Record<string, unknown>) {
+    const updated = await post<Inquiry>(`${root}/${selected}/workflow`, { action, version: row?.workflow?.review?.version ?? 0, ...input })
+    updateInquiry(updated)
+    if (action === "review") {
+      setPlanning(undefined)
+      setPhases([])
+      setTeam([])
+    }
   }
   function openOfficeInquiry(item: Inquiry) {
-    if (item.id !== selected) open(item)
-    setError("")
-    setShowProject(false)
-    const action = officeAction(item.status)
-    if (action?.dialog === "outcome") openOutcome()
-    else setDialog(action?.dialog ?? "details")
+    open(item)
+    if (item.status === "offered") navigateOffice("pending")
+    else if (item.status === "consulting") navigateOffice("accepted")
+    else if (item.status === "approved") navigateOffice(item.workflow?.budget ? "assessment" : "review")
+    else setDialog("details")
   }
-  async function intakePreview(event: FormEvent) {
-    event.preventDefault()
-    await run(async () => {
-      const result = await post<Planning>(`${root}/${selected}/planning`, { ...details, target_start_date: start })
+  async function startStaffing() {
+    if (!planning) {
+      const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
-      setTeam([])
       setPhases(result.phases)
-      if (!end && result.estimate.end) setEnd(result.estimate.end)
-      setStep(2)
-    })
+    }
+    setStep(2)
+    setDialog("intake")
   }
   async function allocate(recheck = false) {
     const fileId = await uploadIntakeContract()
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...details, target_start_date: start, target_end_date: end, phases, estimated_budget: budget, contract_file_id: fileId })
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId })
     setPlanning(result)
     if (!recheck) setTeam(result.team || [])
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
@@ -469,15 +443,15 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   async function submit() {
     const fileId = await uploadIntakeContract()
     await post("/projects/intake", {
-      ...details, inquiry_id: selected, suggested_opm_id: row?.opm_id, target_start_date: start,
-      target_end_date: end, estimated_budget: budget, contract_file_id: fileId,
+      ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: fileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
     })
     await refresh()
     setDialog(undefined)
+    navigateOffice()
     void onReload()
   }
-  const canAllocate = !!contract && !!start && !!end && end >= start && Number(budget) > 0 && phases.length > 0
+  const canAllocate = !!contract && !!row?.workflow?.assessment && phases.length > 0
   const canSend = canAllocate && phases.every(stage => {
     const entry = team.find(item => item.stage === stage)
     if (!entry?.user_id) return false
@@ -636,6 +610,14 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     </section>
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
+    {officePage && row && !admin
+      ? <OfficeInquiryWorkflow key={`${row.id}:${officePage}`} row={row} page={officePage} reference={inquiryReference(row)}
+          consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
+          pendingCount={rows?.filter(item => item.status === "offered").length ?? 0}
+          navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
+          decide={(action, input) => void run(() => decision(action, input))}
+          save={(action, input) => void run(() => saveWorkflow(action, input))} />
+      : <>
     <header className="inquiries-page-heading">
       <div><h1>Project inquiries</h1>
         {admin && <p>Review saved inquiries or start a new project request.</p>}
@@ -666,14 +648,17 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       {queueRows?.length ? <div className="opm-inquiry-results">
         <table aria-label="Assigned project inquiries">
           <thead><tr><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead>
-          <tbody>{queueRows.map(item => <tr key={item.id}>
+          <tbody>{queueRows.map(item => {
+            const label = item.status === "approved" && !item.workflow?.budget
+              ? "Review project information" : officeAction(item.status)?.label ?? "View inquiry"
+            return <tr key={item.id}>
             <th scope="row">{item.details.name || "Untitled project"}<small>{item.details.project_type || "Project type unavailable"}</small></th>
             <td><span className="inquiry-list-status" data-status={item.status}>{statusLabel(item) || "Status unavailable"}</span></td>
             <td><button type="button" className="button" disabled={busy} onClick={() => openOfficeInquiry(item)}
-              aria-label={`${officeAction(item.status)?.label ?? "View inquiry"} for ${item.details.name || "Untitled project"}`}>
-              {officeAction(item.status)?.label ?? "View inquiry"} <Icon name="chevron" size={16} />
+              aria-label={`${label} for ${item.details.name || "Untitled project"}`}>
+              {label} <Icon name="chevron" size={16} />
             </button></td>
-          </tr>)}</tbody>
+          </tr>})}</tbody>
         </table>
       </div> : <div className="opm-inquiry-empty">
         <Icon name="folder" size={24} />
@@ -729,6 +714,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           error ? "Inquiries could not be loaded." : "Loading inquiries…"}
       </p>}
     </section>}
+    </>}
     {dialog === "details" && role === "opm" && row && <Modal title={String(row.details.name || "Inquiry details")} wide onClose={closeDialog}>
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
@@ -740,86 +726,9 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </div>
     </Modal>}
 
-    {dialog === "review" && role === "opm" && row?.status === "offered" && <Modal title="Review consultation request" wide onClose={closeDialog} footer={<>
-      <button className="button inquiry-decline" disabled={busy} onClick={() => void run(() => decision("cancel"))}>Decline request</button>
-      <button className="button primary" disabled={busy} onClick={() => void run(() => decision("confirm"))}>Accept consultation</button>
-    </>}>
-      <div className="inquiry-dialog-content inquiry-opm-review">
-        <div className="inquiry-sent-notice">
-          <span className="inquiry-list-icon"><Icon name="users" /></span>
-          <div><strong>You’ve been invited to consult on this project</strong><p>Review the inquiry and consultation details before accepting.</p></div>
-          {row.updated_at && Number.isFinite(Date.parse(row.updated_at)) && <time dateTime={row.updated_at}>Sent {inquiryDate.format(new Date(row.updated_at))}</time>}
-        </div>
-        <div className="inquiry-review-columns">
-          <FormSection title="Consultation scope" icon="doc" description="Provided by the Admin">
-            <dl className="inquiry-fields">
-              <div><dt>Preferred consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div>
-              {row.details.classification && <div><dt>Inquiry classification</dt><dd>{row.details.classification}</dd></div>}
-            </dl>
-            <p className="inquiry-muted">Review the project and discuss the proposal with the client after accepting.</p>
-          </FormSection>
-          <FormSection title={String(row.details.name)} icon="building" description="Project inquiry">
-            <dl className="inquiry-fields">
-              <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
-              <div><dt>Location</dt><dd>{row.details.address}</dd></div>
-              <div><dt>Type</dt><dd>{row.details.project_type}</dd></div>
-              <div><dt>Total floor area (m²)</dt><dd>{row.details.floor_area_sqm}</dd></div>
-            </dl>
-            <div className="inquiry-disclosure">
-              <button type="button" aria-expanded={showProject} aria-controls="opm-review-details" onClick={() => setShowProject(previous => !previous)}>
-                {showProject ? "Hide project details" : "View project details"}<Icon name="down" size={17} />
-              </button>
-              <div id="opm-review-details" hidden={!showProject}><InquiryDetails details={row.details} includeClient /></div>
-            </div>
-          </FormSection>
-        </div>
-        <p className="inquiry-sent-notice inquiry-accepted-notice">Accepting the consultation lets you record the client’s decision. Intake opens once the client accepts the proposal.</p>
-        {feedback}
-      </div>
-    </Modal>}
-
-    {dialog === "outcome" && role === "opm" && row?.status === "consulting" && <Modal title="Record client decision" onClose={closeDialog} footer={<>
-      <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
-      <button form="inquiry-outcome-form" type="submit" className="button primary" disabled={busy || !outcome || !decisionDate || (outcome === "withdraw" && !reason.trim())}>
-        {outcome === "approve" ? "Save and open intake" : "Save decision"}
-      </button>
-    </>}>
-      <form id="inquiry-outcome-form" className="inquiry-dialog-content inquiry-outcome" onSubmit={event => {
-        event.preventDefault()
-        if (!busy && outcome) void run(() => decision(outcome))
-      }}>
-        <div className="inquiry-sent-notice"><span className="inquiry-list-icon"><Icon name="doc" /></span>
-          <div><strong>Confirm the outcome with the client first</strong><p>Use this form to record the decision after your conversation outside 10BuildLine.</p></div>
-        </div>
-        <FormSection title={String(row.details.name)} icon="building" description={String(row.details.client_name)}>
-          {row.details.primary_contact && <p>Primary contact: {row.details.primary_contact}</p>}
-          <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
-          <details><summary>View project details</summary><InquiryDetails details={row.details} includeClient /></details>
-        </FormSection>
-        <fieldset disabled={busy} className="inquiry-form-stack">
-          <fieldset className="inquiry-routing-options inquiry-outcome-options">
-            <legend>Did the client accept the proposal?</legend>
-            <label><input type="radio" name="client-outcome" required checked={outcome === "approve"} onChange={() => setOutcome("approve")} />
-              <span><strong>Yes, client accepted</strong><small>Open project intake after saving the decision.</small></span>
-            </label>
-            <label><input type="radio" name="client-outcome" required checked={outcome === "withdraw"} onChange={() => setOutcome("withdraw")} />
-              <span><strong>No, client declined</strong><small>Return the outcome to Admin without starting intake.</small></span>
-            </label>
-          </fieldset>
-          {outcome && <>
-            <label>Decision confirmed on<input type="date" required max={inquiryDay.format(new Date())} value={decisionDate} onChange={event => setDecisionDate(event.target.value)} /></label>
-            {outcome === "withdraw" && <label>Reason the client declined<textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} rows={2} /></label>}
-            <label>Internal note (optional)<textarea maxLength={1000} value={decisionNote} onChange={event => setDecisionNote(event.target.value)} rows={3} /></label>
-          </>}
-        </fieldset>
-        {feedback}
-      </form>
-    </Modal>}
-
-    {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(details.name || row.details.name || "")} wide onClose={closeDialog} footer={<>
+    {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(row.details.name)} wide onClose={closeDialog} footer={<>
       <span className="inquiry-intake-progress">Step {step} of 3</span>
-      <button type="button" className="button" disabled={busy} onClick={step === 1 ? closeDialog : () => setStep(step - 1)}>{step === 1 ? "Close" : "Back"}</button>
-      {step === 1 && <button type="submit" form="inquiry-intake-form" className="button primary" disabled={busy}>Review project size and phases</button>}
+      <button type="button" className="button" disabled={busy} onClick={step === 2 ? closeDialog : () => setStep(2)}>{step === 2 ? "Back to assessment" : "Back"}</button>
       {step === 2 && <button className="button primary" disabled={busy || !canAllocate} onClick={() => {
         if (planning?.candidates) setStep(3)
         else void run(allocate)
@@ -828,42 +737,21 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
         <ol ref={stepperRef} className="inquiry-stepper" aria-label="Project intake steps">
-          {["Intake details", "Size & phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
+          {["Assessment", "Construction phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
             <span aria-hidden="true">{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span>{label}
           </li>)}
         </ol>
-        <form id="inquiry-intake-form" hidden={step !== 1} onSubmit={event => {
-          if (planning) { event.preventDefault(); setStep(2) }
-          else void intakePreview(event)
-        }}>
-          <fieldset disabled={busy || step !== 1} className="inquiry-form-stack">
-            <InquiryFields details={details} onChange={change} />
-            <FormSection title="Schedule and budget" icon="calendar"><div className="inquiry-fields">
-              <label>Target start date<input type="date" required value={start} onChange={event => { setStart(event.target.value); setPlanning(undefined); setTeam([]) }} /></label>
-              <label>Overall end date<input type="date" min={start} value={end} onChange={event => { setEnd(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
-              <label>Estimated budget (₱)<input type="number" min="0.01" step="0.01" required value={budget} onChange={event => { setBudget(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
-            </div></FormSection>
-            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement.">
-              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" required={!contract} onChange={event => { setContract(event.target.files?.[0]); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})); setContractFileId(undefined) }} /></label>
-            {contract && contractPreview && <div className="inquiry-sent-notice inquiry-contract-preview">
-              <span className="inquiry-list-icon"><Icon name="doc" /></span>
-              <div><strong>{contract.name}</strong><small>Contract attached</small></div>
-              <a className="button" href={contractPreview} target="_blank" rel="noopener noreferrer">View contract</a>
-            </div>}
-            </FormSection>
-          </fieldset>
-        </form>
         {step === 2 && planning && <fieldset className="inquiry-review" disabled={busy}>
           <aside className="inquiry-summary-card">
             <h3>Inquiry summary</h3>
-            {details.overview && <p>{details.overview}</p>}
+            {row.details.overview && <p>{row.details.overview}</p>}
             <span className="inquiry-pill">{statusLabel(row)}</span>
             <dl>
-              <div><dt>Client</dt><dd>{details.client_name}</dd></div>
-              <div><dt>Project type</dt><dd>{details.project_type}</dd></div>
-              <div><dt>Project address</dt><dd>{details.address}</dd></div>
-              <div><dt>Total floor area (m²)</dt><dd>{details.floor_area_sqm}</dd></div>
-              <div><dt>Number of floors</dt><dd>{details.floor_count}</dd></div>
+              <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
+              <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
+              <div><dt>Project address</dt><dd>{row.details.address}</dd></div>
+              <div><dt>Total floor area (m²)</dt><dd>{row.details.floor_area_sqm}</dd></div>
+              <div><dt>Number of floors</dt><dd>{row.details.floor_count}</dd></div>
               <div><dt>Target start</dt><dd>{start || "—"}</dd></div>
             </dl>
             <details><summary>View full inquiry</summary>
@@ -873,15 +761,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           </aside>
           <div className="inquiry-review-main">
             <div className="inquiry-fields inquiry-estimates">
-              <div className="inquiry-card"><h3>Suggested project size</h3><p>{planning.estimate.size || "Unavailable"}</p></div>
-              <div className="inquiry-card"><h3>Suggested overall end date</h3>
-                <p>{planning.estimate.end || "Enter the end date in Intake details."}</p>
-                {planning.estimate.end && end !== planning.estimate.end && <button className="button" type="button" onClick={() => {
-                  setEnd(planning.estimate.end || "")
-                  setTeam([])
-                  setPlanning({ ...planning, candidates: undefined })
-                }}>Use suggested date</button>}
-              </div>
+              <div className="inquiry-card"><h3>Assessed project size</h3><p>{planning.estimate.size}</p></div>
+              <div className="inquiry-card"><h3>Reviewed completion date</h3><p>{end}</p></div>
             </div>
             <h3>Construction phases</h3>
             <div className="inquiry-phase-grid">
@@ -893,7 +774,18 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
                 }} />{stage}
               </label>)}
             </div>
-            {!canAllocate && <p className="inquiry-muted">Enter a valid schedule and budget, attach the signed contract, and select at least one phase to continue.</p>}
+            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement.">
+              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={event => {
+                setContract(event.target.files?.[0])
+                setContractFileId(undefined)
+              }} /></label>
+              {contract && <div className="inquiry-sent-notice inquiry-contract-preview">
+                <span className="inquiry-list-icon"><Icon name="doc" /></span>
+                <div><strong>{contract.name}</strong><small>Contract attached</small></div>
+                {contractPreview && <a className="button" href={contractPreview} target="_blank" rel="noopener noreferrer">View contract</a>}
+              </div>}
+            </FormSection>
+            {!canAllocate && <p className="inquiry-muted">Attach the signed contract and select at least one phase to continue.</p>}
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
@@ -915,6 +807,6 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         {feedback}
       </div>
     </Modal>}
-    {!dialog && feedback}
+    {!dialog && !officePage && feedback}
   </section>
 }

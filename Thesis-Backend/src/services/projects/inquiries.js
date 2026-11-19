@@ -4,6 +4,8 @@ import { requireUser, handleError, HttpError, isUuid } from "../../common/utilit
 import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { getOpm, getSpm } from "./recommend.controller.js";
+import { randomUUID } from "node:crypto";
+import { assessInquiry, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -107,6 +109,7 @@ const transition = {
   confirm: ["opm", ["offered"], "consulting"],
   cancel: ["opm", ["offered"], "returned"],
   approve: ["opm", ["consulting"], "approved"],
+  revise: ["opm", ["consulting"], "consulting"],
   withdraw: ["opm", ["consulting"], "withdrawn"],
   drop: ["admin", ["withdrawn"], "dropped"],
 };
@@ -116,8 +119,25 @@ function recordRoutingEvent(details, event) {
 }
 
 function inquiryResponse(row, includeHistory = false) {
-  const { routing_history, ...details } = row.details;
-  return { ...row, details, ...(includeHistory && routing_history ? { routing_history } : {}) };
+  const { routing_history, opm_workflow, opm_match, ...details } = row.details;
+  return { ...row, details, ...(includeHistory
+    ? { routing_history }
+    : { workflow: opm_workflow, match: opm_match }) };
+}
+
+export function staffingAssessment(row, input) {
+  const workflow = row.details.opm_workflow;
+  const assessment = workflow?.assessment;
+  if (!assessment || input.assessment_id !== assessment.id)
+    throw new HttpError(409, "Complete the current project assessment before opening staffing.");
+  const original = inquiryDetails(row.details);
+  const submitted = inquiryDetails(input);
+  if (Object.keys(original).length !== Object.keys(submitted).length ||
+      Object.entries(original).some(([key, value]) => submitted[key] !== value) ||
+      input.target_start_date !== workflow.review.start || input.target_end_date !== workflow.review.end ||
+      Number(input.estimated_budget) !== workflow.budget)
+    throw new HttpError(409, "The assessed project information changed. Reopen staffing with the saved record.");
+  return assessment;
 }
 
 function excludedOpmIds(row) {
@@ -133,6 +153,8 @@ async function matchInquiry(db, row, actorId, requestedId) {
   recordRoutingEvent(details, candidate
     ? { kind: "offered", opm: candidate.full_name, opm_id: candidate.id }
     : { kind: "no_match" });
+  if (candidate) details.opm_match = { experience_years: candidate.experience_years, project_type: details.project_type };
+  else delete details.opm_match;
   const updated = (await db.query(
     "UPDATE project_inquiries SET status=$2,opm_id=$3,details=$4,updated_at=now() WHERE id=$1 RETURNING *",
     [row.id, candidate ? "offered" : row.status, candidate?.id ?? row.opm_id, JSON.stringify(details)],
@@ -190,7 +212,7 @@ export function mountInquiries(router) {
       if (!isUuid(req.body.opm_id)) throw new HttpError(422, "Select a valid OPM recommendation.");
       return inquiryResponse(await matchInquiry(db, row, actor.id, req.body.opm_id), true);
     }
-    if (status === "returned" || status === "consulting") {
+    if (status === "returned" || req.body.action === "confirm") {
       const name = (await db.query("SELECT full_name FROM users WHERE id=$1", [actor.id])).rows[0]?.full_name;
       recordRoutingEvent(details, { kind: status === "returned" ? "declined" : "accepted", opm: name, opm_id: actor.id });
     }
@@ -198,24 +220,104 @@ export function mountInquiries(router) {
       reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
       if (!reason || reason.length > 1000) throw new HttpError(422, "Enter a withdrawal reason of up to 1,000 characters.");
     }
-    if (status === "approved" || status === "withdrawn") {
+    if (status === "approved" || status === "withdrawn" || req.body.action === "revise") {
       const { decision_date, decision_note } = req.body;
       if (decision_date != null) {
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
         if (!validSchedule(decision_date, today)) throw new HttpError(422, "Enter a valid client decision date.");
-        details.client_decision_date = decision_date;
+        if (req.body.action !== "revise") details.client_decision_date = decision_date;
       }
       if (decision_note != null) {
         if (typeof decision_note !== "string" || decision_note.length > 1000)
           throw new HttpError(422, "Enter an internal note of up to 1,000 characters.");
-        if (decision_note.trim()) details.client_decision_note = decision_note.trim();
+        if (req.body.action !== "revise" && decision_note.trim()) details.client_decision_note = decision_note.trim();
+      }
+      if (req.body.action === "revise") {
+        if (!decision_date || !decision_note?.trim())
+          throw new HttpError(422, "Enter the discussion date and requested revisions.");
+        const workflow = details.opm_workflow ?? {};
+        details.opm_workflow = { ...workflow, revisions: [...(workflow.revisions ?? []), {
+          date: decision_date, note: decision_note.trim(), at: new Date().toISOString(), by: actor.id,
+        }] };
       }
     }
     const result = await db.query("UPDATE project_inquiries SET status=$2,reason=$3,details=$4,updated_at=now() WHERE id=$1 RETURNING *",
       [row.id, status, reason, JSON.stringify(details)]);
-    if (status === "returned") await notifyInquiry(db, actor.id, row.admin_id, "Inquiry returned", row.details.name);
+    if (status === "returned") {
+      const rematched = await matchInquiry(db, result.rows[0], actor.id);
+      if (rematched.status === "returned")
+        await notifyInquiry(db, actor.id, row.admin_id, "Inquiry returned", row.details.name);
+      return { id: row.id, status: "returned" };
+    }
     if (status === "withdrawn") await notifyInquiry(db, actor.id, row.admin_id, "Client withdrew", `${row.details.name}: ${reason}`);
     return inquiryResponse(result.rows[0], actor.role === "admin");
+  })));
+
+  router.post("/inquiries/:id/workflow", endpoint(["opm"], (req, actor) => withTransaction(async db => {
+    if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
+    const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE",
+      [req.params.id, actor.id])).rows[0];
+    if (!row) throw new HttpError(404, "Inquiry not found.");
+    if (row.status !== "approved") throw new HttpError(409, "Project review requires client proposal approval.");
+    const input = req.body ?? {};
+    const details = { ...row.details };
+    const workflow = { ...details.opm_workflow };
+    if ((workflow.review?.version ?? 0) !== input.version)
+      throw new HttpError(409, "The project record changed. Reopen the inquiry to load the latest version.");
+    const audit = { by: actor.id, at: new Date().toISOString() };
+    switch (input.action) {
+      case "review": {
+        if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
+        const before = inquiryDetails(details);
+        const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
+          consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
+        }) : before;
+        const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
+          .filter(key => before[key] !== after[key]).map(key => [key, { before: before[key] ?? null, after: after[key] ?? null }]));
+        for (const key of ["start", "end"]) {
+          const previous = workflow.review?.[key] ?? (key === "start" ? before.anticipated_start : undefined);
+          if (previous !== input[key]) changes[key] = { before: previous ?? null, after: input[key] };
+        }
+        const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+        if ((input.correction || (workflow.review && Object.keys(changes).length)) && (!reason || reason.length > 1000))
+          throw new HttpError(422, "Enter a modification reason of up to 1,000 characters.");
+        for (const key of Object.keys(before)) delete details[key];
+        Object.assign(details, after);
+        const version = (workflow.review?.version ?? 0) + 1;
+        workflow.review = { start: input.start, end: input.end, version, estimate: estimateInquiry(after, input.start) };
+        workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
+        delete workflow.assessment;
+        break;
+      }
+      case "budget": {
+        if (!workflow.review) throw new HttpError(409, "Confirm the project information before saving the budget.");
+        const amount = Number(input.amount);
+        if (!["number", "string"].includes(typeof input.amount) || !Number.isFinite(amount) ||
+            amount < 0.01 || amount > 999999999999.99 || Math.round(amount * 100) / 100 !== amount)
+          throw new HttpError(422, "Enter a positive PHP amount with at most two decimal places.");
+        if (amount !== workflow.budget) {
+          workflow.budget_history = [...(workflow.budget_history ?? []), { ...audit, amount }];
+          workflow.budget = amount;
+        }
+        break;
+      }
+      case "assessment": {
+        if (!workflow.review || !workflow.budget) throw new HttpError(409, "Confirm project information and save the approved budget first.");
+        if (!technicalOptions.includes(input.technical) || !arrangementOptions.includes(input.arrangement))
+          throw new HttpError(422, "Select the technical requirements and phase arrangement.");
+        const { estimate, start, end } = workflow.review;
+        if (workflow.assessment?.technical !== input.technical || workflow.assessment?.arrangement !== input.arrangement) {
+          workflow.assessment = { ...assessInquiry(details, estimate, start, end, input.technical, input.arrangement),
+            id: randomUUID(), completed_at: audit.at };
+        }
+        break;
+      }
+      default: throw new HttpError(422, "Select a valid project workflow action.");
+    }
+    details.opm_workflow = workflow;
+    const updated = (await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1 RETURNING *",
+      [row.id, JSON.stringify(details)])).rows[0];
+    return inquiryResponse(updated);
   })));
 
   router.post("/inquiries/:id/planning", endpoint(["opm"], async (req, actor) => {
@@ -225,7 +327,8 @@ export function mountInquiries(router) {
     if (!row) throw new HttpError(404, "Approved inquiry not found.");
     const details = inquiryDetails(req.body);
     const phases = await inquiryPhases({query: execute}, details.project_type);
-    const estimate = estimateInquiry(details, req.body.target_start_date);
+    const assessment = staffingAssessment(row, req.body);
+    const estimate = { size: assessment.size, end: assessment.suggestedEnd };
     if (!req.body.phases) return { phases, estimate };
     if (!validSchedule(req.body.target_start_date, req.body.target_end_date))
       throw new HttpError(422, "Enter the overall project start and end dates before allocating.");

@@ -1,4 +1,5 @@
-import { inquiryDetails, inquiryPhases, confirmedPhases, estimateInquiry, notifyInquiry, validSchedule, assertInquiryUpload } from "./inquiries.js";
+import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, validSchedule, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
+import { intakeSize } from "../../domain/inquiry-assessment.js";
 import { scheduleConflicts } from "./recommend.controller.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
@@ -41,8 +42,7 @@ export const createIntake = async (req, res) => {
       new Set(phase_team.map(p => p?.stage)).size !== phase_team.length) {
       return responseError(res, 'Missing or invalid project details.', 400);
     }
-    const tier = Number(floor_area_sqm) >= 50000 || Number(floor_count) >= 31 ? 'Large'
-      : Number(floor_area_sqm) >= 15000 || Number(floor_count) >= 30 ? 'Medium' : 'Small';
+    let tier = intakeSize(Number(floor_area_sqm), Number(floor_count));
     let phaseScope;
     if (req.body.phase_scope !== undefined) {
       if (project_type !== 'Mixed-Use') return responseError(res,'Project scope review is supported for Mixed-Use only.',422);
@@ -62,12 +62,14 @@ export const createIntake = async (req, res) => {
           return {project: prior, duplicate: true};
         }
         if (inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
+        const assessment = staffingAssessment(inquiry, req.body);
         const details = inquiryDetails({...req.body, consultation: inquiry.details.consultation});
         const { target_end_date: end, estimated_budget: budget, contract_file_id: contract } = req.body;
         if (!validSchedule(target_start_date,end) || !Number.isFinite(Number(budget)) || Number(budget) <= 0 || !isUuid(contract))
           throw new HttpError(422, "Enter valid project dates and budget, and upload the signed agreement.");
         phases = confirmedPhases(await inquiryPhases(client,project_type),req.body.phases);
-        intake = {...details, estimated_budget:Number(budget), size:estimateInquiry(details,target_start_date).size};
+        tier = assessment.size;
+        intake = {...details, estimated_budget:Number(budget), size:assessment.size, assessment};
         deadline = businessDeadline((await client.query("SELECT now() AS now")).rows[0].now);
       }
       // A repeat of a new submission returns the project it already created instead of inserting another.

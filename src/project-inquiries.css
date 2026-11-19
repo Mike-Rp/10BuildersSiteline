@@ -20,6 +20,53 @@
 .opm-inquiry-results td:last-child .button { text-align: left; }
 .opm-inquiry-results td:last-child svg { flex: 0 0 auto; }
 .opm-inquiry-empty { display: grid; justify-items: center; gap: 8px; padding: 24px; color: var(--color-muted); }
+.office-workflow { display: grid; gap: 18px; min-width: 0; }
+.office-workflow-back { justify-self: start; }
+.office-workflow-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); }
+.office-workflow-heading { display: flex; gap: 14px; justify-content: space-between; align-items: end; flex-wrap: wrap; }
+.office-workflow-heading h1 { font-size: clamp(1.85rem, 3.3vw, 2.65rem); line-height: 1.16; overflow-wrap: anywhere; margin-block: 4px; }
+.office-workflow-heading p, .office-workflow-card p { color: var(--color-muted); }
+.office-workflow-heading .inquiry-muted { font-size: .85rem; }
+.office-workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.office-workflow-grid.assessment { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.office-workflow-card { display: grid; gap: 14px; padding: clamp(14px, 2vw, 24px); border-color: var(--color-line); box-shadow: 0 2px 6px #172b4d09; }
+.office-workflow-card .inquiry-section-heading { padding-bottom: 10px; border-bottom: 1px solid var(--color-line); }
+.office-workflow-card h2 { font-size: 1.14rem; }
+.office-workflow-card .inquiry-list-icon { flex: 0 0 36px; }
+.office-workflow-card .inquiry-pill { justify-self: start; }
+.office-workflow-facts, .office-workflow-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr)); gap: 14px; min-width: 0; }
+.office-workflow-facts dt { margin-bottom: 3px; font-size: .82rem; }
+.office-workflow-facts dd { font-size: .92rem; }
+.office-workflow-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.office-workflow-form { display: grid; gap: 14px; min-width: 0; }
+.office-workflow-form label { font-size: .9rem; font-weight: 600; }
+.office-workflow-form :is(input, select, textarea) { min-height: 40px; font-weight: 400; }
+.office-workflow-form textarea { min-height: 80px; }
+.office-workflow-form :is(input, select):disabled { background: var(--surface-subtle); }
+.office-workflow-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+.office-workflow-action-bar { padding: 12px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--surface-subtle); }
+.office-workflow-notice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--color-line); border-radius: 10px; background: #eef5f9; }
+.office-workflow-notice svg { flex: 0 0 auto; margin-top: 2px; }
+.office-workflow-notice p { margin-top: 3px; color: inherit; font-size: .9rem; }
+.office-workflow-notice.success { background: #e8f4ed; border-color: #c0ddcb; color: #215941; }
+.office-workflow-notice.warning { background: #fff4e1; border-color: #ead0a8; color: #694419; }
+.office-workflow-result { display: grid; gap: 5px; border: 1px solid #bdd8dc; border-radius: 9px; background: #edf6f7; padding: 14px; }
+.office-workflow-result strong { color: var(--color-primary); font-size: 1.55rem; line-height: 1.15; }
+.office-workflow-result span { color: #236b68; font-size: .85rem; font-weight: 650; }
+.office-workflow-result p { font-size: .88rem; }
+.office-workflow-result.duration { text-align: center; padding-block: 22px; }
+.office-workflow-history { border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; background: var(--surface-subtle); }
+.office-workflow-history summary { cursor: pointer; font-weight: 600; }
+.office-workflow-history :is(ul, ol) { padding-inline-start: 20px; overflow-wrap: anywhere; }
+.office-workflow-error { background: #fff2f2; color: #9b292d; padding: 12px; border: 1px solid #e1b9ba; border-radius: 8px; }
+.office-workflow-received { display: grid; place-items: center; gap: 16px; min-height: 250px; align-content: center; }
+
+@media (max-width: 980px) {
+  .office-workflow-grid.assessment { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .office-workflow-grid, .office-workflow-fields { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 640px) {
   .opm-inquiry-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -199,7 +246,7 @@
 .inquiry-contract-preview small { display: block; }
 .inquiry-intake .inquiry-stepper { position: sticky; top: -1px; z-index: 1; background: var(--surface-subtle); padding: 0; }
 .inquiry-intake .inquiry-stepper li { background: transparent; color: var(--color-muted); border-radius: 0; border-bottom: 3px solid transparent; padding-block: 12px; }
-.inquiry-intake .inquiry-stepper li[aria-current=step] { color: var(--color-primary); border-color: var(--color-primary); }
+.inquiry-intake .inquiry-stepper li[aria-current=step] { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
 .inquiry-intake .inquiry-stepper li[aria-current=step] span { background: var(--color-primary); color: var(--color-surface); }
 .inquiry-intake .inquiry-stepper li[data-complete=true] span { background: #287453; color: white; }
 .inquiry-intake .inquiry-phase-grid { grid-template-columns: 1fr; }

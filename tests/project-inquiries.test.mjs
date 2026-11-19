@@ -103,11 +103,13 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const offered = (await call(root,{token:firstToken})).find(item=>item.id===cancelled.id)
   assert.equal(offered.details.classification,"Priority")
   assert.equal(offered.routing_history,undefined)
+  assert.equal(offered.match.project_type,"Residential")
   assert.equal((await decision(cancelled,firstToken,"cancel")).status,"returned")
-  const retried = await call(`${root}/${cancelled.id}/match`,{token:admin,json:{}})
+  const retried = (await call(root,{token:admin})).find(item=>item.id===cancelled.id)
   assert.deepEqual(retried.routing_history.slice(0,2).map(event=>event.kind),["offered","declined"])
   if (retried.status === "offered") assert.notEqual(retried.opm_id,cancelled.opm_id)
   else assert.equal(retried.routing_history.at(-1).kind,"no_match")
+  assert.equal((await call(root,{token:firstToken})).some(item=>item.id===cancelled.id),false)
   const withdrawn = await create()
   const second = await offer(withdrawn)
   assert.equal((await decision(withdrawn,second.token,"confirm")).status,"consulting")
@@ -122,10 +124,43 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const consulting = (await call(root,{token})).find(inquiry=>inquiry.id===row.id)
   assert.equal(consulting.status,"consulting")
   assert.deepEqual(consulting.details,details)
+  const workflowPath = `${root}/${row.id}/workflow`
+  const save = (action,version,input={},status=200) => call(workflowPath,{token,status,json:{action,version,...input}})
+  await save("review",0,{},409)
+  const revised = await decision(row,token,"revise",{decision_date:"2025-06-04",decision_note:"Confirm the floor area."})
+  assert.equal(revised.workflow.revisions[0].note,"Confirm the floor area.")
+  assert.equal(revised.status,"consulting")
   await decision(row,token,"approve")
   const planning = `${root}/${row.id}/planning`
   const intake = {...details,floor_area_sqm:200,target_start_date:"2027-01-12",target_end_date:"2027-04-12"}
-  const preview = await call(planning,{token,json:intake})
+  await call(planning,{token,status:409,json:intake})
+  await save("budget",0,{amount:4500000},409)
+  const schedule = {start:intake.target_start_date,end:intake.target_end_date}
+  const assessmentInput = {technical:"Several specialized systems",arrangement:"Partially overlapping phases"}
+  await save("review",0,schedule)
+  await save("assessment",1,assessmentInput,409)
+  await save("budget",1,{amount:4500000.001},422)
+  await save("budget",1,{amount:4500000})
+  const firstAssessment = (await save("assessment",1,assessmentInput)).workflow.assessment
+  const correction = {...schedule,correction:{floor_area_sqm:200}}
+  await save("review",1,correction,422)
+  const review = (await save("review",1,{...correction,reason:"Client confirmed the revised floor area."})).workflow
+  assert.equal(review.assessment,undefined)
+  assert.deepEqual(review.review_history.at(-1).changes.floor_area_sqm,{before:180,after:200})
+  await save("assessment",1,assessmentInput,409)
+  await call(planning,{token,status:409,json:{...intake,estimated_budget:4500000,assessment_id:firstAssessment.id}})
+  const assessed = (await save("assessment",2,assessmentInput)).workflow
+  assert.equal(assessed.assessment.durationDays,90)
+  assert.equal(assessed.assessment.size,"Small")
+  assert.equal(assessed.assessment.score,7)
+  assert.equal(assessed.budget_history[0].amount,4500000)
+  assert.equal((await save("assessment",2,assessmentInput)).workflow.assessment.id,assessed.assessment.id)
+  const adminRecord = (await call(root,{token:admin})).find(item=>item.id===row.id)
+  assert.equal(adminRecord.workflow,undefined)
+  assert.equal(adminRecord.details.opm_workflow,undefined)
+  const planInput = {...intake,estimated_budget:4500000,assessment_id:assessed.assessment.id}
+  await call(planning,{token,status:409,json:{...planInput,target_end_date:"2027-04-13"}})
+  const preview = await call(planning,{token,json:planInput})
   assert.deepEqual(preview.estimate,{size:"Small",end:"2027-04-12"})
   const phases = preview.phases.slice(0,1)
 
@@ -137,21 +172,21 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     return (await call("/files",{token,form})).id
   }
   const documents = {estimated_budget:4500000,contract_file_id:await upload("signed.pdf"),plans_file_id:await upload("plans.pdf")}
-  const recommended = await call(planning,{token,json:{...intake,...documents,phases}})
+  const recommended = await call(planning,{token,json:{...planInput,...documents,phases}})
   assert.deepEqual(recommended.team.map(item=>item.stage),phases)
   assert.ok(recommended.team[0].user_id)
   const eligibleIds = recommended.candidates[phases[0]].map(person => person.id)
   await db.query(`INSERT INTO workspace_account_metadata(user_id,metadata)
     SELECT id, '{"assignmentHold":true}'::jsonb FROM users WHERE id=ANY($1::uuid[])
     ON CONFLICT(user_id) DO UPDATE SET metadata=workspace_account_metadata.metadata||excluded.metadata`, [eligibleIds])
-  const blocked = await call(planning,{token,json:{...intake,...documents,phases}})
+  const blocked = await call(planning,{token,json:{...planInput,...documents,phases}})
   assert.deepEqual(blocked.candidates[phases[0]], [])
   assert.equal(blocked.candidateBlockers[phases[0]], "qualifications")
   await db.query("UPDATE workspace_account_metadata SET metadata=metadata-'assignmentHold' WHERE user_id=ANY($1::uuid[])", [eligibleIds])
-  const rechecked = await call(planning,{token,json:{...intake,...documents,phases}})
+  const rechecked = await call(planning,{token,json:{...planInput,...documents,phases}})
   assert.deepEqual(rechecked.candidates[phases[0]].map(person => person.id), eligibleIds)
   assert.equal(rechecked.candidateBlockers[phases[0]], undefined)
-  const payload = {...intake,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
+  const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{...recommended.team[0],stage:preview.phases[1]}]}})
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{stage:phases[0],user_id:manager.id}]}})
   const response = await call("/projects/intake",{token,json:payload})
