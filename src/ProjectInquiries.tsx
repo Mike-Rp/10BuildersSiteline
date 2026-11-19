@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
+import { IntakeTabs } from "./IntakeGuidance"
+import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import "./project-inquiries.css"
@@ -32,6 +34,13 @@ const statuses: Record<string,string> = {
 }
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
+const officeActions = {
+  offered: { label: "Review request", dialog: "review", bucket: "action" },
+  consulting: { label: "Record client decision", dialog: "outcome", bucket: "waiting" },
+  approved: { label: "Open project intake", dialog: "intake", bucket: "action" },
+} as const
+const officeAction = (status: string) => Object.prototype.hasOwnProperty.call(officeActions, status)
+  ? officeActions[status as keyof typeof officeActions] : undefined
 const inquiryDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "Asia/Manila" })
 const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" })
 
@@ -250,9 +259,12 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
 export default function ProjectInquiries({ role, onReload }: { role: "admin" | "opm"; onReload: () => unknown }) {
   const [rows, setRows] = useState<Inquiry[]>()
   const [search, setSearch] = useState("")
+  const [queueView, setQueueView] = useState<IntakeView>("all")
+  const [queueStatus, setQueueStatus] = useState("")
+  const [queueType, setQueueType] = useState("")
   const recordHeading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState("")
-  const [dialog, setDialog] = useState<"new" | "route" | "review" | "outcome" | "intake">()
+  const [dialog, setDialog] = useState<"new" | "route" | "review" | "outcome" | "intake" | "details">()
   const [step, setStep] = useState(1)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
@@ -367,6 +379,14 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setReason("")
     setDialog("outcome")
   }
+  function openOfficeInquiry(item: Inquiry) {
+    if (item.id !== selected) open(item)
+    setError("")
+    setShowProject(false)
+    const action = officeAction(item.status)
+    if (action?.dialog === "outcome") openOutcome()
+    else setDialog(action?.dialog ?? "details")
+  }
   async function intakePreview(event: FormEvent) {
     event.preventDefault()
     await run(async () => {
@@ -422,11 +442,23 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   </>
   const admin = role === "admin"
   const query = search.trim().toLowerCase()
-  const visibleRows = admin && query ? rows?.filter(item =>
+  const matchesSearch = (item: Inquiry) => !query ||
     [item.details.name, item.details.client_name, statusLabel(item)]
       .some(value => String(value ?? "").toLowerCase().includes(query))
-  ) : rows
-  return <section className={`project-inquiries${admin ? " admin-inquiries" : ""}`}>
+  const visibleRows = rows?.filter(matchesSearch)
+  const queueRows = visibleRows?.filter(item =>
+    (queueView === "all" || officeAction(item.status)?.bucket === queueView) &&
+    (!queueStatus || statusLabel(item) === queueStatus) &&
+    (!queueType || item.details.project_type === queueType)
+  )
+  const queueCounts = (rows ?? []).reduce((counts, item) => {
+    counts.all++
+    const bucket = officeAction(item.status)?.bucket
+    if (bucket) counts[bucket]++
+    return counts
+  }, { all: 0, action: 0, waiting: 0 })
+  const statusOptions = [...new Set([...(rows ?? []).map(statusLabel), queueStatus].filter(Boolean))]
+  return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
     <header className="inquiries-page-heading">
       <div><h1>Project inquiries</h1>
         {admin && <p>Review saved inquiries or start a new project request.</p>}
@@ -434,20 +466,58 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
       {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setMatchOnCreate(true); setDialog("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
     </header>
-    <section className="inquiry-list-panel" aria-labelledby="existing-inquiries-heading">
+    {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
+      <div className="confirmation-intake-filters">
+        <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries" waitingLabel="Waiting for client"
+          help="Needs your action includes requests to review and projects ready for intake. Waiting for client includes accepted consultations with no client decision recorded yet." />
+      </div>
+      <div className="opm-inquiry-filters">
+        <div className="inquiry-list-search">
+          <Icon name="search" size={17} />
+          <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
+        </div>
+        <label>Status<select value={queueStatus} onChange={event => setQueueStatus(event.target.value)}>
+          <option value="">All statuses</option>
+          {statusOptions.map(status => <option key={status}>{status}</option>)}
+        </select></label>
+        <label>Project type<select value={queueType} onChange={event => setQueueType(event.target.value)}>
+          <option value="">All types</option>
+          {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
+        </select></label>
+      </div>
+      {queueRows && <p className="inquiry-muted" role="status">{queueRows.length} {queueRows.length === 1 ? "inquiry" : "inquiries"}</p>}
+      {queueRows?.length ? <div className="opm-inquiry-results">
+        <table aria-label="Assigned project inquiries">
+          <thead><tr><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead>
+          <tbody>{queueRows.map(item => <tr key={item.id}>
+            <th scope="row">{item.details.name || "Untitled project"}<small>{item.details.project_type || "Project type unavailable"}</small></th>
+            <td><span className="inquiry-list-status" data-status={item.status}>{statusLabel(item) || "Status unavailable"}</span></td>
+            <td><button type="button" className="button" disabled={busy} onClick={() => openOfficeInquiry(item)}
+              aria-label={`${officeAction(item.status)?.label ?? "View inquiry"} for ${item.details.name || "Untitled project"}`}>
+              {officeAction(item.status)?.label ?? "View inquiry"} <Icon name="chevron" size={16} />
+            </button></td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <div className="opm-inquiry-empty">
+        <Icon name="folder" size={24} />
+        <p>{rows?.length ? "No inquiries match the current filters." : rows ? "No consultation requests yet." : error ? "Inquiries could not be loaded." : "Loading inquiries…"}</p>
+        {!!rows?.length && <button className="button" type="button" onClick={() => { setSearch(""); setQueueStatus(""); setQueueType(""); setQueueView("all") }}>Clear filters</button>}
+      </div>}
+    </section>}
+    {admin && <section className="inquiry-list-panel" aria-labelledby="existing-inquiries-heading">
       <div className="inquiry-list-heading">
         <div>
           <h2 id="existing-inquiries-heading">Existing inquiries
-            {admin && rows && <span className="inquiry-list-count" aria-label={`${rows.length} saved inquiries`}>{rows.length}</span>}
+            {rows && <span className="inquiry-list-count" aria-label={`${rows.length} saved inquiries`}>{rows.length}</span>}
           </h2>
-          {admin && <p>Open a saved record to review details and continue the workflow.</p>}
+          <p>Open a saved record to review details and continue the workflow.</p>
         </div>
-        {admin ? <div className="inquiry-list-search">
+        <div className="inquiry-list-search">
           <Icon name="search" size={17} />
           <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
-        </div> : rows && <span>{rows.length} {rows.length === 1 ? "inquiry" : "inquiries"}</span>}
+        </div>
       </div>
-      {admin && !!visibleRows?.length && <div className="inquiry-list-columns" aria-hidden="true">
+      {!!visibleRows?.length && <div className="inquiry-list-columns" aria-hidden="true">
         <span>Project</span><span>Status</span><span>Last updated</span>
       </div>}
       {visibleRows?.length ? <ul className="inquiry-list">
@@ -458,43 +528,40 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           const updatedLabel = updated ? inquiryDate.format(new Date(updated)) : ""
           return <li key={item.id}>
             <button type="button" className="inquiry-list-row" disabled={busy} aria-pressed={item.id === selected}
-              aria-label={`View inquiry for ${name}, ${[admin && item.details.client_name, status, admin && updatedLabel && `last updated ${updatedLabel}`].filter(Boolean).join(", ")}`}
+              aria-label={`View inquiry for ${name}, ${[item.details.client_name, status, updatedLabel && `last updated ${updatedLabel}`].filter(Boolean).join(", ")}`}
               onClick={() => {
                 open(item)
                 requestAnimationFrame(() => recordHeading.current?.focus())
               }}>
-              {admin ? <span className="inquiry-list-project">
+              <span className="inquiry-list-project">
                 <span className="inquiry-list-icon"><Icon name="building" /></span>
                 <span className="inquiry-list-name"><strong>{name}</strong>
                   {item.details.client_name && <small>{item.details.client_name}</small>}
                 </span>
-              </span> : <>
-                <span className="inquiry-list-icon"><Icon name="doc" /></span>
-                <strong className="inquiry-list-name">{name}</strong>
-              </>}
+              </span>
               <span className="inquiry-list-status" data-status={item.status}>{status}</span>
-              {admin && <span className="inquiry-list-updated">{updated
+              <span className="inquiry-list-updated">{updated
                 ? <time dateTime={updated}>{updatedLabel}</time>
-                : "—"}</span>}
+                : "—"}</span>
               <span className="inquiry-list-action">View inquiry <Icon name="chevron" size={16} /></span>
             </button>
           </li>
         })}
       </ul> : <p className="inquiry-list-empty">
-        {rows?.length ? "No inquiries match your search." : rows ? role === "opm" ? "No consultation requests yet." : "No project inquiries have been created yet." :
+        {rows?.length ? "No inquiries match your search." : rows ? "No project inquiries have been created yet." :
           error ? "Inquiries could not be loaded." : "Loading inquiries…"}
       </p>}
-    </section>
-    {row && <fieldset disabled={busy} className="inquiry-record">
-      {admin ? <div className="inquiry-record-heading">
+    </section>}
+    {admin && row && <fieldset disabled={busy} className="inquiry-record">
+      <div className="inquiry-record-heading">
         <div>
           <span className={`inquiry-pill ${row.status === "offered" ? "pending" : ""}`}>{statusLabel(row)}</span>
           <h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2>
           <p>{row.details.client_name}</p>
         </div>
         {row.status === "offered" && <button type="button" className="button" disabled>OPM selected</button>}
-      </div> : <><h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2><p>{statusLabel(row)}</p></>}
-      {admin && row.status === "offered" ? <div className="inquiry-sent-notice" role="status">
+      </div>
+      {row.status === "offered" ? <div className="inquiry-sent-notice" role="status">
         <span className="inquiry-list-icon"><Icon name="clock" /></span>
         <div>
           <strong>Consultation request sent</strong>
@@ -507,21 +574,22 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       {row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
       <InquiryDetails details={row.details} includeClient />
       <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
-      {role === "admin" && ["draft", "returned"].includes(row.status) && <div>
+      {["draft", "returned"].includes(row.status) && <div>
         <button className="button primary" onClick={() => void run(() => recommend(row.id))}>Find OPM</button>
       </div>}
-        {role === "admin" && row.status === "withdrawn" && <button className="button" onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button>}
-      {role === "opm" && row.status === "offered" && <div className="inquiry-actions">
-        <button className="button primary" onClick={() => { setShowProject(false); setDialog("review") }}>Review consultation request</button>
-      </div>}
-      {role === "opm" && row.status === "consulting" && <div className="inquiry-sent-notice inquiry-accepted-notice">
-        <span className="inquiry-list-icon"><Icon name="check" /></span>
-        <div><strong>Consultation accepted</strong><p>Discuss the proposal with the client outside 10BuildLine, then record their decision here.</p></div>
-        <button className="button primary" onClick={openOutcome}>Record client decision <Icon name="chevron" size={16} /></button>
-      </div>}
-
-      {role === "opm" && row.status === "approved" && <div><button className="button primary" onClick={() => setDialog("intake")}>Open project intake</button></div>}
+      {row.status === "withdrawn" && <button className="button" onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button>}
     </fieldset>}
+
+    {dialog === "details" && role === "opm" && row && <Modal title={String(row.details.name || "Inquiry details")} wide onClose={closeDialog}>
+      <div className="inquiry-dialog-content">
+        <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
+        <InquiryDetails details={row.details} includeClient />
+        <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
+        {row.reason && <p>Withdrawal reason: {row.reason}</p>}
+        {row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
+        {row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
+      </div>
+    </Modal>}
 
     {dialog === "review" && role === "opm" && row?.status === "offered" && <Modal title="Review consultation request" wide onClose={closeDialog} footer={<>
       <button className="button inquiry-decline" disabled={busy} onClick={() => void run(() => decision("cancel"))}>Decline request</button>
@@ -574,6 +642,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         <FormSection title={String(row.details.name)} icon="building" description={String(row.details.client_name)}>
           {row.details.primary_contact && <p>Primary contact: {row.details.primary_contact}</p>}
           <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
+          <details><summary>View project details</summary><InquiryDetails details={row.details} includeClient /></details>
         </FormSection>
         <fieldset disabled={busy} className="inquiry-form-stack">
           <fieldset className="inquiry-routing-options inquiry-outcome-options">
