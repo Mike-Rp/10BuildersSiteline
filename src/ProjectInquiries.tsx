@@ -556,17 +556,26 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   }, { all: 0, action: 0, waiting: 0 })
   const statusOptions = [...new Set([...(rows ?? []).map(statusLabel), queueStatus].filter(Boolean))]
   function renderAdminInquiryForm() {
-    const input = (key: string, label: string, type = "text", required = true, maxLength?: number) =>
+    const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
+      const value = String(details[key] ?? "")
+      const pattern = key === "phone" ? "09[0-9]{0,9}" : key === "email" ? "[^\\s@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined
+      const hint = key === "phone" ? "Enter up to 11 digits starting with 09." : "Use an @gmail.com address."
+      const invalid = Boolean(value && pattern && !new RegExp(`^(?:${pattern})$`).test(value))
+      const noticeId = `inquiry-${key}-notice`
+      return (
       <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-        <input type={type} value={details[key] ?? ""} required={required} maxLength={maxLength}
+        <input type={type} value={value} required={required} maxLength={maxLength}
           inputMode={key === "phone" ? "numeric" : undefined}
-          pattern={key === "phone" ? "09[0-9]{0,9}" : key === "email" ? "[^@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined}
-          title={key === "phone" ? "Enter up to 11 digits starting with 09." : key === "email" ? "Use an @gmail.com address." : undefined}
+          pattern={pattern} title={pattern ? hint : undefined}
+          aria-invalid={invalid || undefined} aria-describedby={invalid ? noticeId : undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           max={key === "floor_count" ? 32767 : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
           placeholder={required ? undefined : "Optional"} onChange={event => change(key, event.target.value)} />
+        {pattern && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{invalid ? hint : ""}</small>}
       </label>
+      )
+    }
     function close() {
       if (busy) return
       setError("")
@@ -610,6 +619,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
                     checked={details.project_type === type} onChange={() => change("project_type", type)} />
                   <span className="project-type-icon"><Icon name={icon} size={24} /></span>
                   <span className="project-type-copy"><strong>{type}</strong><span>{description}</span></span>
+                  {details.project_type === type && <span className="project-type-check" aria-hidden="true"><Icon name="check" size={15} /></span>}
                 </label>)}
               </div>
             </fieldset>
