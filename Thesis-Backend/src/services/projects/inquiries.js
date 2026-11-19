@@ -138,6 +138,7 @@ export function mountInquiries(router) {
     if (!from.includes(row.status)) throw new HttpError(409, "The inquiry has already moved to another step.");
     let opmId = row.opm_id;
     let reason = row.reason;
+    const details = { ...row.details };
     if (status === "offered") {
       const candidate = await getOpm(row.details.project_type, row.opm_id, db);
       if (!candidate || candidate.id !== req.body.opm_id) throw new HttpError(409, "Refresh the OPM recommendation before sending.");
@@ -147,8 +148,21 @@ export function mountInquiries(router) {
       reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
       if (!reason || reason.length > 1000) throw new HttpError(422, "Enter a withdrawal reason of up to 1,000 characters.");
     }
-    const result = await db.query("UPDATE project_inquiries SET status=$2,opm_id=$3,reason=$4,updated_at=now() WHERE id=$1 RETURNING *",
-      [row.id, status, opmId, reason]);
+    if (status === "approved" || status === "withdrawn") {
+      const { decision_date, decision_note } = req.body;
+      if (decision_date != null) {
+        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
+        if (!validSchedule(decision_date, today)) throw new HttpError(422, "Enter a valid client decision date.");
+        details.client_decision_date = decision_date;
+      }
+      if (decision_note != null) {
+        if (typeof decision_note !== "string" || decision_note.length > 1000)
+          throw new HttpError(422, "Enter an internal note of up to 1,000 characters.");
+        if (decision_note.trim()) details.client_decision_note = decision_note.trim();
+      }
+    }
+    const result = await db.query("UPDATE project_inquiries SET status=$2,opm_id=$3,reason=$4,details=$5,updated_at=now() WHERE id=$1 RETURNING *",
+      [row.id, status, opmId, reason, JSON.stringify(details)]);
     if (status === "offered") await notifyInquiry(db, actor.id, opmId, "Consultation request", row.details.name);
     if (status === "returned") await notifyInquiry(db, actor.id, row.admin_id, "Inquiry returned", row.details.name);
     if (status === "withdrawn") await notifyInquiry(db, actor.id, row.admin_id, "Client withdrew", `${row.details.name}: ${reason}`);

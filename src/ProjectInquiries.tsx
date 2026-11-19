@@ -32,6 +32,7 @@ const statuses: Record<string,string> = {
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
 const inquiryDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "Asia/Manila" })
+const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" })
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 
@@ -158,7 +159,13 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
     <div className="inquiry-staff-heading"><h3>{stage}</h3>
       {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} areas covered · minimum {quota} (50%)</span>}
     </div>
-    {missing.length > 0 && <p>Still needed: <strong>{missing.join(", ")}</strong></p>}
+    {missing.length > 0 && <p className="inquiry-coverage-warning"><strong>{missing.length} coverage {missing.length === 1 ? "gap" : "gaps"} in {stage}.</strong> Still needed: {missing.join(", ")}</p>}
+    <div className={`inquiry-staff-layout${required.length ? " with-coverage" : ""}`}>
+    <div className="inquiry-form-stack">
+    <div className="inquiry-staff-heading">
+      <strong>Assigned engineers · {engineers.length}</strong>
+      {!adding && engineers.length < (multi ? 3 : 1) && <button className="button" type="button" disabled={!options(engineers.length).length} onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
+    </div>
     {!engineers.length && <p>Unfilled</p>}
     <div className="inquiry-engineers">
       {engineers.map((person, index) => {
@@ -196,7 +203,15 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
         <button className="button" type="button" onClick={() => setAdding(false)}>Cancel</button>
       </article>}
     </div>
-    {!adding && engineers.length < (multi ? 3 : 1) && <button className="button" type="button" disabled={!options(engineers.length).length} onClick={() => setAdding(true)}>Add engineer</button>}
+    </div>
+    {!!required.length && <aside className="inquiry-summary-card inquiry-phase-coverage">
+      <h4>Phase coverage</h4>
+      <ul>{required.map(area => {
+        const covered = !missing.includes(area)
+        return <li key={area} className={covered ? "covered" : "gap"}><Icon name={covered ? "check" : "alert"} size={16} />{area} <span className="sr-only">{covered ? "covered" : "unfilled"}</span></li>
+      })}</ul>
+    </aside>}
+    </div>
   </section>
 }
 
@@ -205,7 +220,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [search, setSearch] = useState("")
   const recordHeading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState("")
-  const [dialog, setDialog] = useState<"new" | "route" | "intake">()
+  const [dialog, setDialog] = useState<"new" | "route" | "review" | "outcome" | "intake">()
   const [step, setStep] = useState(1)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
@@ -221,8 +236,11 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [end, setEnd] = useState("")
   const [budget, setBudget] = useState("")
   const [reason, setReason] = useState("")
-  const [withdrawing, setWithdrawing] = useState(false)
+  const [outcome, setOutcome] = useState<"approve" | "withdraw">()
+  const [decisionDate, setDecisionDate] = useState("")
+  const [decisionNote, setDecisionNote] = useState("")
   const [contract, setContract] = useState<File>()
+  const [contractPreview, setContractPreview] = useState("")
   const [plans, setPlans] = useState<File>()
   const [uploads, setUploads] = useState<{ contract?: string; plans?: string }>({})
   const [busy, setBusy] = useState(false)
@@ -235,6 +253,18 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setTeam([])
   }
   const refresh = async () => setRows(await api<Inquiry[]>(root))
+  useEffect(() => {
+    const mime = /.(pdf)$/i.test(contract?.name || "") ? "application/pdf"
+      : /.png$/i.test(contract?.name || "") ? "image/png"
+        : /.jpe?g$/i.test(contract?.name || "") ? "image/jpeg" : ""
+    if (!contract || !mime) {
+      setContractPreview("")
+      return
+    }
+    const url = URL.createObjectURL(contract.slice(0, contract.size, mime))
+    setContractPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [contract])
   useEffect(() => {
     if (dialog === "intake") stepperRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
   }, [dialog, step])
@@ -258,7 +288,9 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setTeam([])
     setPhases([])
     setReason("")
-    setWithdrawing(false)
+    setOutcome(undefined)
+    setDecisionDate("")
+    setDecisionNote("")
     setStart(typeof item?.details.anticipated_start === "string" ? item.details.anticipated_start : "")
     setEnd("")
     setBudget("")
@@ -282,12 +314,21 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setDialog("route")
   }
   async function decision(action: string) {
-    await post(`${root}/${selected}/decision`, { action, reason, opm_id: recommendation?.id })
-    setWithdrawing(false)
+    await post(`${root}/${selected}/decision`, {
+      action, reason, opm_id: recommendation?.id,
+      ...(action === "approve" || action === "withdraw" ? { decision_date: decisionDate, decision_note: decisionNote } : {}),
+    })
     setRecommendation(undefined)
     await refresh()
     setDialog(undefined)
     void onReload()
+  }
+  function openOutcome() {
+    setOutcome(undefined)
+    setDecisionDate(inquiryDay.format(new Date()))
+    setDecisionNote("")
+    setReason("")
+    setDialog("outcome")
   }
   async function intakePreview(event: FormEvent) {
     event.preventDefault()
@@ -416,34 +457,112 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </p>}
     </section>
     {row && <fieldset disabled={busy} className="inquiry-record">
-      <h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2><p>{statusLabel(row)}</p>
-      {row.opm_name && <p>Office Project Manager: {row.opm_name}</p>}
+      {admin ? <div className="inquiry-record-heading">
+        <div>
+          <span className={`inquiry-pill ${row.status === "offered" ? "pending" : ""}`}>{statusLabel(row)}</span>
+          <h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2>
+          <p>{row.details.client_name}</p>
+        </div>
+        {row.status === "offered" && <button type="button" className="button" disabled>OPM selected</button>}
+      </div> : <><h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2><p>{statusLabel(row)}</p></>}
+      {admin && row.status === "offered" ? <div className="inquiry-sent-notice" role="status">
+        <span className="inquiry-list-icon"><Icon name="clock" /></span>
+        <div>
+          <strong>Consultation request sent</strong>
+          <p>{row.opm_name ? `${row.opm_name} has been invited to review this project.` : "The assigned Office Project Manager has been invited to review this project."}</p>
+          <small>You can continue once the Office PM responds.</small>
+        </div>
+      </div> : row.opm_name && <p>Office Project Manager: {row.opm_name}</p>}
       {row.reason && <p>Withdrawal reason: {row.reason}</p>}
+      {row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
+      {row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
       <InquiryDetails details={row.details} includeClient />
       <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
       {role === "admin" && ["draft", "returned"].includes(row.status) && <div>
         <button className="button primary" onClick={() => void run(() => recommend(row.id))}>Find OPM</button>
       </div>}
         {role === "admin" && row.status === "withdrawn" && <button className="button" onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button>}
-        {role === "opm" && row.status === "offered" && <div className="inquiry-actions">
-          <button className="button" onClick={() => void run(() => decision("cancel"))}>Cancel and return to Admin</button>
-          <button className="button primary" onClick={() => void run(() => decision("confirm"))}>Confirm consultation</button>
-        </div>}
-        {role === "opm" && row.status === "consulting" && <>
-          <p>Contact the client to discuss the project. Keep the inquiry open while the client considers revised options.</p>
-          <div className="inquiry-actions">
-            <button className="button" onClick={() => setWithdrawing(true)}>Drop project</button>
-            <button className="button primary" onClick={() => void run(async () => { await decision("approve"); setDialog("intake") })}>Proceed to project intake</button>
-          </div>
-          {withdrawing && <form onSubmit={event => { event.preventDefault(); void run(() => decision("withdraw")) }}>
-            <label>Client withdrawal reason<textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>
-            <button className="button" type="button" onClick={() => setWithdrawing(false)}>Back</button>
-            <button className="button primary">Record withdrawal</button>
-          </form>}
-        </>}
+      {role === "opm" && row.status === "offered" && <div className="inquiry-actions">
+        <button className="button primary" onClick={() => { setShowProject(false); setDialog("review") }}>Review consultation request</button>
+      </div>}
+      {role === "opm" && row.status === "consulting" && <div className="inquiry-sent-notice inquiry-accepted-notice">
+        <span className="inquiry-list-icon"><Icon name="check" /></span>
+        <div><strong>Consultation accepted</strong><p>Discuss the proposal with the client outside 10BuildLine, then record their decision here.</p></div>
+        <button className="button primary" onClick={openOutcome}>Record client decision <Icon name="chevron" size={16} /></button>
+      </div>}
 
       {role === "opm" && row.status === "approved" && <div><button className="button primary" onClick={() => setDialog("intake")}>Open project intake</button></div>}
     </fieldset>}
+
+    {dialog === "review" && role === "opm" && row?.status === "offered" && <Modal title="Review consultation request" wide onClose={closeDialog} footer={<>
+      <button className="button inquiry-decline" disabled={busy} onClick={() => void run(() => decision("cancel"))}>Decline request</button>
+      <button className="button primary" disabled={busy} onClick={() => void run(() => decision("confirm"))}>Accept consultation</button>
+    </>}>
+      <div className="inquiry-dialog-content inquiry-opm-review">
+        <div className="inquiry-sent-notice">
+          <span className="inquiry-list-icon"><Icon name="users" /></span>
+          <div><strong>You’ve been invited to consult on this project</strong><p>Review the inquiry and consultation details before accepting.</p></div>
+          {row.updated_at && Number.isFinite(Date.parse(row.updated_at)) && <time dateTime={row.updated_at}>Sent {inquiryDate.format(new Date(row.updated_at))}</time>}
+        </div>
+        <div className="inquiry-review-columns">
+          <FormSection title="Consultation scope" icon="doc" description="Provided by the Admin">
+            <dl className="inquiry-fields"><div><dt>Preferred consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div></dl>
+            <p className="inquiry-muted">Review the project and discuss the proposal with the client after accepting.</p>
+          </FormSection>
+          <FormSection title={String(row.details.name)} icon="building" description="Project inquiry">
+            <dl className="inquiry-fields">
+              <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
+              <div><dt>Location</dt><dd>{row.details.address}</dd></div>
+              <div><dt>Type</dt><dd>{row.details.project_type}</dd></div>
+              <div><dt>Total floor area (m²)</dt><dd>{row.details.floor_area_sqm}</dd></div>
+            </dl>
+            <div className="inquiry-disclosure">
+              <button type="button" aria-expanded={showProject} aria-controls="opm-review-details" onClick={() => setShowProject(previous => !previous)}>
+                {showProject ? "Hide project details" : "View project details"}<Icon name="down" size={17} />
+              </button>
+              <div id="opm-review-details" hidden={!showProject}><InquiryDetails details={row.details} includeClient /></div>
+            </div>
+          </FormSection>
+        </div>
+        <p className="inquiry-sent-notice inquiry-accepted-notice">Accepting the consultation lets you record the client’s decision. Intake opens once the client accepts the proposal.</p>
+        {feedback}
+      </div>
+    </Modal>}
+
+    {dialog === "outcome" && role === "opm" && row?.status === "consulting" && <Modal title="Record client decision" onClose={closeDialog} footer={<>
+      <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
+      <button form="inquiry-outcome-form" type="submit" className="button primary" disabled={busy || !outcome || !decisionDate || (outcome === "withdraw" && !reason.trim())}>Save decision</button>
+    </>}>
+      <form id="inquiry-outcome-form" className="inquiry-dialog-content inquiry-outcome" onSubmit={event => {
+        event.preventDefault()
+        if (!busy && outcome) void run(() => decision(outcome))
+      }}>
+        <div className="inquiry-sent-notice"><span className="inquiry-list-icon"><Icon name="doc" /></span>
+          <div><strong>Confirm the outcome with the client first</strong><p>Use this form to record the decision after your conversation outside 10BuildLine.</p></div>
+        </div>
+        <FormSection title={String(row.details.name)} icon="building" description={String(row.details.client_name)}>
+          {row.details.primary_contact && <p>Primary contact: {row.details.primary_contact}</p>}
+          <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
+        </FormSection>
+        <fieldset disabled={busy} className="inquiry-form-stack">
+          <fieldset className="inquiry-routing-options inquiry-outcome-options">
+            <legend>Did the client accept the proposal?</legend>
+            <label><input type="radio" name="client-outcome" required checked={outcome === "approve"} onChange={() => setOutcome("approve")} />
+              <span><strong>Yes, client accepted</strong><small>Unlock project intake and continue setup.</small></span>
+            </label>
+            <label><input type="radio" name="client-outcome" required checked={outcome === "withdraw"} onChange={() => setOutcome("withdraw")} />
+              <span><strong>No, client declined</strong><small>Return the outcome to Admin without starting intake.</small></span>
+            </label>
+          </fieldset>
+          {outcome && <>
+            <label>Decision confirmed on<input type="date" required max={inquiryDay.format(new Date())} value={decisionDate} onChange={event => setDecisionDate(event.target.value)} /></label>
+            {outcome === "withdraw" && <label>Reason the client declined<textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} rows={2} /></label>}
+            <label>Internal note (optional)<textarea maxLength={1000} value={decisionNote} onChange={event => setDecisionNote(event.target.value)} rows={3} /></label>
+          </>}
+        </fieldset>
+        {feedback}
+      </form>
+    </Modal>}
 
     {dialog === "new" && <Modal title="New project inquiry" wide onClose={closeDialog} footer={<>
       <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
@@ -485,40 +604,53 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </form>
     </Modal>}
 
-    {dialog === "route" && row && <Modal title="Route inquiry" onClose={closeDialog} footer={<>
+    {dialog === "route" && row && <Modal title="Route inquiry" wide onClose={closeDialog} footer={<>
       <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
       {recommendation && <button className="button primary" disabled={busy} onClick={() => void run(() => decision("send"))}>Send consultation request</button>}
     </>}>
       <div className="inquiry-dialog-content inquiry-routing">
-        <dl className="inquiry-route-summary">
-          <div><dt>Project</dt><dd>{row.details.name}</dd><span className="inquiry-pill">{statusLabel(row)}</span></div>
-          <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
-          <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
-          <div><dt>Consultation</dt><dd>{consultationLabel(row.details)}</dd></div>
-        </dl>
-        <div className="inquiry-disclosure">
-          <button type="button" aria-expanded={showProject} aria-controls="route-project-details" onClick={() => setShowProject(previous => !previous)}>
-            {showProject ? "Hide project details" : "View project details"} <span aria-hidden="true">{showProject ? "⌃" : "⌄"}</span>
-          </button>
-          <div id="route-project-details" hidden={!showProject}><InquiryDetails details={row.details} /></div>
-        </div>
-        <section><h3>System-matched OPM</h3>
+        <section className="inquiry-route-summary" aria-label="Inquiry summary">
+          <p className="inquiry-route-label">Inquiry summary</p>
+          <h3>{row.details.name}</h3>
+          <p>{row.details.client_name}</p>
+          <dl>
+            <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
+            <div><dt>Location</dt><dd>{row.details.address}</dd></div>
+            <div><dt>Total floor area</dt><dd>{row.details.floor_area_sqm ? `${Number(row.details.floor_area_sqm).toLocaleString("en-PH")} m²` : "—"}</dd></div>
+            <div><dt>Anticipated start</dt><dd>{row.details.anticipated_start || "—"}</dd></div>
+            <div><dt>Consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div>
+            <div><dt>Status</dt><dd>{statusLabel(row)}</dd></div>
+          </dl>
+          <div className="inquiry-disclosure">
+            <button type="button" aria-expanded={showProject} aria-controls="route-project-details" onClick={() => setShowProject(previous => !previous)}>
+              {showProject ? "Hide project details" : "View project details"} <Icon name="down" size={18} />
+            </button>
+            <div id="route-project-details" hidden={!showProject}><InquiryDetails details={row.details} /></div>
+          </div>
+        </section>
+        <section className="inquiry-route-result">
+          <p className="inquiry-route-label">System match</p>
+          <h3>Recommended Office Project Manager</h3>
           {recommendation ? <div className="inquiry-card inquiry-match">
-            <div><h4>{recommendation.full_name}</h4><p>Office Project Manager</p>
+            <div className="inquiry-match-heading">
+              <div><h4>{recommendation.full_name}</h4><p>Office Project Manager</p></div>
               <span className={`inquiry-pill ${recommendation.availability === "available" ? "ready" : ""}`}>{recommendation.availability || "Availability unknown"}</span>
             </div>
-            <ul><li>{row.details.project_type} specialization</li>
-              <li>{recommendation.experience_years ?? 0} years of relevant experience</li>
-              <li>{recommendation.active_projects ?? 0} active projects</li>
-            </ul>
-          </div> : <p>No eligible Office Project Manager is currently available.</p>}
+            <dl className="inquiry-match-metrics">
+              <div><Icon name="building" size={18} /><dt>Specialization</dt><dd>{row.details.project_type}</dd></div>
+              <div><Icon name="clock" size={18} /><dt>Relevant experience</dt><dd>{recommendation.experience_years == null ? "—" : `${recommendation.experience_years} years`}</dd></div>
+              {recommendation.active_projects != null && <div><Icon name="doc" size={18} /><dt>Active projects</dt><dd>{recommendation.active_projects}</dd></div>}
+            </dl>
+            <p className="inquiry-match-note"><Icon name="check" size={16} /> Matched by project type, relevant experience, and availability.</p>
+          </div> : <p className="inquiry-card">No eligible Office Project Manager is currently available.</p>}
         </section>
         {feedback}
       </div>
     </Modal>}
 
     {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(details.name || row.details.name || "")} wide onClose={closeDialog} footer={<>
-      <button type="button" className="button" disabled={busy} onClick={step === 1 ? closeDialog : () => setStep(step - 1)}>{step === 1 ? "Cancel" : "Back"}</button>
+      <span className="inquiry-intake-progress">Step {step} of 3</span>
+      <button type="button" className="button" disabled={busy} onClick={step === 1 ? closeDialog : () => setStep(step - 1)}>{step === 1 ? "Close" : "Back"}</button>
       {step === 1 && <button type="submit" form="inquiry-intake-form" className="button primary" disabled={busy}>Review project size and phases</button>}
       {step === 2 && <button className="button primary" disabled={busy || !canAllocate} onClick={() => {
         if (planning?.candidates) setStep(3)
@@ -528,8 +660,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
         <ol ref={stepperRef} className="inquiry-stepper" aria-label="Project intake steps">
-          {["Intake details", "Size & phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined}>
-            <span aria-hidden="true">{index + 1}</span>{label}
+          {["Intake details", "Size & phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
+            <span aria-hidden="true">{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span>{label}
           </li>)}
         </ol>
         <form id="inquiry-intake-form" hidden={step !== 1} onSubmit={event => {
@@ -538,20 +670,27 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         }}>
           <fieldset disabled={busy || step !== 1} className="inquiry-form-stack">
             <InquiryFields details={details} onChange={change} />
-            <FormSection title="Schedule & budget"><div className="inquiry-fields">
+            <FormSection title="Schedule and budget" icon="calendar"><div className="inquiry-fields">
               <label>Target start date<input type="date" required value={start} onChange={event => { setStart(event.target.value); setPlanning(undefined); setTeam([]) }} /></label>
               <label>Overall end date<input type="date" min={start} value={end} onChange={event => { setEnd(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
               <label>Estimated budget (₱)<input type="number" min="0.01" step="0.01" required value={budget} onChange={event => { setBudget(event.target.value); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})) }} /></label>
             </div></FormSection>
-            <FormSection title="Documents"><div className="inquiry-fields">
-              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" required={!contract} onChange={event => { setContract(event.target.files?.[0]); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})); setUploads(previous => ({...previous,contract:undefined})) }} />{contract && <small>{contract.name}</small>}</label>
+            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement and any registered plans."><div className="inquiry-fields">
+              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" required={!contract} onChange={event => { setContract(event.target.files?.[0]); setTeam([]); setPlanning(previous => previous && ({...previous,candidates:undefined})); setUploads(previous => ({...previous,contract:undefined})) }} /></label>
               <label>Registered plans<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={event => { setPlans(event.target.files?.[0]); setUploads(previous => ({...previous,plans:undefined})) }} />{plans && <small>{plans.name}</small>}</label>
-            </div></FormSection>
+            </div>
+            {contract && contractPreview && <div className="inquiry-sent-notice inquiry-contract-preview">
+              <span className="inquiry-list-icon"><Icon name="doc" /></span>
+              <div><strong>{contract.name}</strong><small>Contract attached</small></div>
+              <a className="button" href={contractPreview} target="_blank" rel="noopener noreferrer">View contract</a>
+            </div>}
+            </FormSection>
           </fieldset>
         </form>
         {step === 2 && planning && <fieldset className="inquiry-review" disabled={busy}>
           <aside className="inquiry-summary-card">
             <h3>Inquiry summary</h3>
+            {details.overview && <p>{details.overview}</p>}
             <span className="inquiry-pill">{statusLabel(row)}</span>
             <dl>
               <div><dt>Client</dt><dd>{details.client_name}</dd></div>
@@ -559,6 +698,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
               <div><dt>Project address</dt><dd>{details.address}</dd></div>
               <div><dt>Total floor area (m²)</dt><dd>{details.floor_area_sqm}</dd></div>
               <div><dt>Number of floors</dt><dd>{details.floor_count}</dd></div>
+              <div><dt>Target start</dt><dd>{start || "—"}</dd></div>
             </dl>
             <details><summary>View full inquiry</summary>
               <InquiryDetails details={row.details} includeClient />
@@ -591,6 +731,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
+          <div><h3>Build the project team</h3><p className="inquiry-muted">Review staffing by phase and assign qualified engineers to cover responsibilities.</p></div>
           <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => <button key={stage} type="button" className={`button ${staffingPhase === stage ? "primary" : ""}`} aria-pressed={staffingPhase === stage} onClick={() => {
               setStaffingPhase(stage)
