@@ -17,7 +17,7 @@ const fields = [
   ["floor_area_sqm", "Total floor area (m²)", "number"], ["floor_count", "Number of floors", "number"],
 ] as const
 type Details = Record<string, string | number>
-type Inquiry = { id: string; details: Details; status: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string }
+type Inquiry = { id: string; details: Details; status: string; updated_at?: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string }
 type Candidate = { id: string; name: string; qualifiedTags: string[] }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
@@ -31,40 +31,70 @@ const statuses: Record<string,string> = {
 }
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
+const inquiryDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "Asia/Manila" })
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 
-function FormSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="inquiry-form-section"><h3>{title}</h3><div>{children}</div></section>
+function FormSection({ title, icon, description, children }: { title: string; icon?: string; description?: string; children: ReactNode }) {
+  return <section className="inquiry-form-section">
+    {icon ? <header className="inquiry-section-heading">
+      <span className="inquiry-list-icon"><Icon name={icon} /></span>
+      <div><h3>{title}</h3>{description && <p>{description}</p>}</div>
+    </header> : <h3>{title}</h3>}
+    <div>{children}</div>
+  </section>
 }
 
 function InquiryFields({ details, onChange, standaloneTypeSection = false }: { details: Details; onChange: (key: string, value: string | number) => void; standaloneTypeSection?: boolean }) {
-  const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => <label key={key}>{label}
-        <input type={type} required value={details[key] ?? ""} min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
-          step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
-          onChange={event => onChange(key,event.target.value)} />
-      </label>)
+  const field = (key: string, label: string, type = "text", required = true, maxLength?: number) => <label key={key}>{label}
+    <input type={type} required={required} maxLength={maxLength} value={details[key] ?? ""} min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
+      step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
+      onChange={event => onChange(key, event.target.value)} />
+  </label>
+  const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => field(key, label, type))
   const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className={`inquiry-types ${standaloneTypeSection ? "inquiry-intake-style-types" : ""}`}>
       {projectTypes.map(([type, icon, description]) => {
         const selected = details.project_type === type
         return <label key={type} className={`${standaloneTypeSection ? "button project-type-card" : ""} ${selected ? "selected" : ""}`}>
           <input type="radio" name="project-type" required checked={selected} onChange={() => onChange("project_type",type)} />
           {standaloneTypeSection ? <>
-            <span className="project-type-icon"><Icon name={type === "Commercial" ? "storefront" : icon} size={24} /></span>
-            <span className="project-type-copy"><strong>{type}</strong><span>{description}</span></span>
+            <span className="project-type-icon"><Icon name={icon} size={24} /></span>
+            <strong>{type}</strong>
             {selected && <span className="project-type-check"><Icon name="check" size={15} /></span>}
           </> : <><Icon name={icon} /><strong>{type}</strong><span>{description}</span></>}
         </label>
       })}
     </div></fieldset>
+  if (standaloneTypeSection) return <>
+    <FormSection title="Client information" icon="users" description="Who should we contact about this project?">
+      <div className="inquiry-create-grid">
+        {field("client_name", "Client or organization", "text", true, 150)}
+        {field("primary_contact", "Primary contact (optional)", "text", false, 150)}
+        {field("email", "Email address", "email", true, 150)}
+        {field("phone", "Phone number", "tel", true, 150)}
+      </div>
+    </FormSection>
+    <FormSection title="Project details" icon="doc" description="Share the key information known today.">
+      <div className="inquiry-create-grid">
+        {field("name", "Project name", "text", true, 150)}
+        {field("address", "Project location", "text", true, 500)}
+        {field("floor_area_sqm", "Estimated total floor area (m²)", "number")}
+        {field("anticipated_start", "Anticipated start (optional)", "date", false)}
+        {renderFields([fields[5], fields[6], fields[8]])}
+        <label className="inquiry-overview">Project overview (optional)
+          <textarea rows={3} maxLength={2000} value={details.overview ?? ""} onChange={event => onChange("overview", event.target.value)} />
+        </label>
+      </div>
+    </FormSection>
+    <FormSection title="Project type" icon="building" description="Select the option that best fits the project.">{types}</FormSection>
+  </>
   return <>
     <FormSection title="Client information"><div className="inquiry-fields">{renderFields(fields.slice(0, 3))}</div></FormSection>
     <FormSection title="Project details">
       <div className="inquiry-fields inquiry-location">{renderFields(fields.slice(3, 5))}</div>
       <div className="inquiry-fields inquiry-measurements">{renderFields(fields.slice(5))}</div>
-      {!standaloneTypeSection && types}
+      {types}
     </FormSection>
-    {standaloneTypeSection && <FormSection title="Project type">{types}</FormSection>}
   </>
 }
 
@@ -72,6 +102,9 @@ function InquiryDetails({ details, includeClient = false }: { details: Details; 
   return <dl className="inquiry-fields">
     {[...(includeClient ? fields : fields.slice(3)), ["project_type", "Project type"]].map(([key, label]) =>
       <div key={key}><dt>{label}</dt><dd>{details[key] || "—"}</dd></div>)}
+    {includeClient && details.primary_contact && <div><dt>Primary contact</dt><dd>{details.primary_contact}</dd></div>}
+    {details.anticipated_start && <div><dt>Anticipated start</dt><dd>{details.anticipated_start}</dd></div>}
+    {details.overview && <div className="inquiry-overview"><dt>Project overview</dt><dd>{details.overview}</dd></div>}
   </dl>
 }
 
@@ -168,7 +201,9 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
 }
 
 export default function ProjectInquiries({ role, onReload }: { role: "admin" | "opm"; onReload: () => unknown }) {
-  const [rows, setRows] = useState<Inquiry[]>([])
+  const [rows, setRows] = useState<Inquiry[]>()
+  const [search, setSearch] = useState("")
+  const recordHeading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState("")
   const [dialog, setDialog] = useState<"new" | "route" | "intake">()
   const [step, setStep] = useState(1)
@@ -177,6 +212,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [showProject, setShowProject] = useState(false)
   const stepperRef = useRef<HTMLOListElement>(null)
   const [details, setDetails] = useState<Details>({ consultation: 30 })
+  const [matchOnCreate, setMatchOnCreate] = useState(true)
   const [recommendation, setRecommendation] = useState<Recommendation | null>()
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
@@ -191,7 +227,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [uploads, setUploads] = useState<{ contract?: string; plans?: string }>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
-  const row = rows.find(item => item.id === selected)
+  const row = rows?.find(item => item.id === selected)
   const root = "/projects/inquiries"
   const change = (key: string, value: string | number) => {
     setDetails(previous => ({ ...previous, [key]: value }))
@@ -223,7 +259,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setPhases([])
     setReason("")
     setWithdrawing(false)
-    setStart("")
+    setStart(typeof item?.details.anticipated_start === "string" ? item.details.anticipated_start : "")
     setEnd("")
     setBudget("")
     setContract(undefined)
@@ -314,19 +350,73 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     {busy && <p role="status">Saving or loading inquiry…</p>}
     {error && <p role="alert">{error}</p>}
   </>
-  return <section className="project-inquiries">
-    <header className="inquiries-page-heading"><h1>Project inquiries</h1>
+  const admin = role === "admin"
+  const query = search.trim().toLowerCase()
+  const visibleRows = admin && query ? rows?.filter(item =>
+    [item.details.name, item.details.client_name, statusLabel(item)]
+      .some(value => String(value ?? "").toLowerCase().includes(query))
+  ) : rows
+  return <section className={`project-inquiries${admin ? " admin-inquiries" : ""}`}>
+    <header className="inquiries-page-heading">
+      <div><h1>Project inquiries</h1>
+        {admin && <p>Review saved inquiries or start a new project request.</p>}
+      </div>
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
-      {role === "admin" && <button className="button primary" disabled={busy} onClick={() => { open(); setDialog("new") }}>New project inquiry</button>}
+      {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setMatchOnCreate(true); setDialog("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
     </header>
-    <div className="inquiry-list">
-      {rows.map(item => <button type="button" key={item.id} disabled={busy} aria-pressed={item.id === selected} onClick={() => open(item)}>
-        <strong>{item.details.name}</strong><span>{statusLabel(item)}</span>
-      </button>)}
-      {!rows.length && role === "opm" && <p>No consultation requests.</p>}
-    </div>
+    <section className="inquiry-list-panel" aria-labelledby="existing-inquiries-heading">
+      <div className="inquiry-list-heading">
+        <div>
+          <h2 id="existing-inquiries-heading">Existing inquiries
+            {admin && rows && <span className="inquiry-list-count" aria-label={`${rows.length} saved inquiries`}>{rows.length}</span>}
+          </h2>
+          {admin && <p>Open a saved record to review details and continue the workflow.</p>}
+        </div>
+        {admin ? <div className="inquiry-list-search">
+          <Icon name="search" size={17} />
+          <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
+        </div> : rows && <span>{rows.length} {rows.length === 1 ? "inquiry" : "inquiries"}</span>}
+      </div>
+      {admin && !!visibleRows?.length && <div className="inquiry-list-columns" aria-hidden="true">
+        <span>Project</span><span>Status</span><span>Last updated</span>
+      </div>}
+      {visibleRows?.length ? <ul className="inquiry-list">
+        {visibleRows.map(item => {
+          const name = item.details.name || "Untitled project"
+          const status = statusLabel(item) || "Status unavailable"
+          const updated = item.updated_at && Number.isFinite(Date.parse(item.updated_at)) ? item.updated_at : undefined
+          const updatedLabel = updated ? inquiryDate.format(new Date(updated)) : ""
+          return <li key={item.id}>
+            <button type="button" className="inquiry-list-row" disabled={busy} aria-pressed={item.id === selected}
+              aria-label={`View inquiry for ${name}, ${[admin && item.details.client_name, status, admin && updatedLabel && `last updated ${updatedLabel}`].filter(Boolean).join(", ")}`}
+              onClick={() => {
+                open(item)
+                requestAnimationFrame(() => recordHeading.current?.focus())
+              }}>
+              {admin ? <span className="inquiry-list-project">
+                <span className="inquiry-list-icon"><Icon name="building" /></span>
+                <span className="inquiry-list-name"><strong>{name}</strong>
+                  {item.details.client_name && <small>{item.details.client_name}</small>}
+                </span>
+              </span> : <>
+                <span className="inquiry-list-icon"><Icon name="doc" /></span>
+                <strong className="inquiry-list-name">{name}</strong>
+              </>}
+              <span className="inquiry-list-status" data-status={item.status}>{status}</span>
+              {admin && <span className="inquiry-list-updated">{updated
+                ? <time dateTime={updated}>{updatedLabel}</time>
+                : "—"}</span>}
+              <span className="inquiry-list-action">View inquiry <Icon name="chevron" size={16} /></span>
+            </button>
+          </li>
+        })}
+      </ul> : <p className="inquiry-list-empty">
+        {rows?.length ? "No inquiries match your search." : rows ? role === "opm" ? "No consultation requests yet." : "No project inquiries have been created yet." :
+          error ? "Inquiries could not be loaded." : "Loading inquiries…"}
+      </p>}
+    </section>
     {row && <fieldset disabled={busy} className="inquiry-record">
-      <h2>{row.details.name}</h2><p>{statusLabel(row)}</p>
+      <h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2><p>{statusLabel(row)}</p>
       {row.opm_name && <p>Office Project Manager: {row.opm_name}</p>}
       {row.reason && <p>Withdrawal reason: {row.reason}</p>}
       <InquiryDetails details={row.details} includeClient />
@@ -363,18 +453,33 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         event.preventDefault()
         void run(async () => {
           const result = await post<Inquiry>(root, details)
-          setRows(previous => [result, ...previous.filter(item => item.id !== result.id)])
+          setRows(previous => [result, ...(previous || []).filter(item => item.id !== result.id)])
+          setSearch("")
           open(result)
-          await recommend(result.id)
+          if (matchOnCreate) await recommend(result.id)
         })
       }}>
+        <p className="inquiry-create-intro">Tell us what you’re building. You can review and route the inquiry after it’s created.</p>
         <fieldset disabled={busy} className="inquiry-form-stack">
           <InquiryFields details={details} onChange={change} standaloneTypeSection />
-          <FormSection title="Consultation"><label className="inquiry-consultation-field">Preferred consultation timing
-            <select value={details.consultation} onChange={event => change("consultation", Number(event.target.value))}>
-              {timing.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-            </select>
-          </label></FormSection>
+          <FormSection title="Consultation" icon="users" description="Choose what should happen after creation.">
+            <fieldset className="inquiry-routing-options">
+              <legend className="sr-only">Routing after creation</legend>
+              <label>
+                <input type="radio" name="match-on-create" checked={matchOnCreate} onChange={() => setMatchOnCreate(true)} />
+                <span><strong>Yes, help me find the right OPM</strong><small>We’ll match the project with an available Office Project Manager.</small></span>
+              </label>
+              <label>
+                <input type="radio" name="match-on-create" checked={!matchOnCreate} onChange={() => setMatchOnCreate(false)} />
+                <strong>No, save this inquiry for later</strong>
+              </label>
+            </fieldset>
+            <label className="inquiry-consultation-field">Preferred consultation timing
+              <select value={details.consultation} onChange={event => change("consultation", Number(event.target.value))}>
+                {timing.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+              </select>
+            </label>
+          </FormSection>
         </fieldset>
         {feedback}
       </form>
@@ -502,5 +607,15 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </div>
     </Modal>}
     {!dialog && feedback}
+    {admin && <details className="inquiry-workflow-help">
+      <summary>
+        <span className="inquiry-list-icon"><Icon name="doc" /></span>
+        <span><strong>What happens after an inquiry?</strong>
+          <small>Review the project, match it with an available Office Project Manager, then begin project intake.</small>
+        </span>
+        <span className="inquiry-workflow-action">See an example <Icon name="chevron" size={16} /></span>
+      </summary>
+      <p>For example, open a saved residential inquiry and choose <strong>Find OPM</strong>. Review the system match and send a consultation request. Once the client agrees to proceed, the Office PM can start project intake.</p>
+    </details>}
   </section>
 }

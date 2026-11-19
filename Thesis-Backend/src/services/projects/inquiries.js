@@ -26,6 +26,18 @@ export function inquiryDetails(input) {
   }
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
+  for (const [key, limit] of [["primary_contact", 150], ["overview", 2000]]) {
+    const value = input[key];
+    if (value == null || value === "") continue;
+    if (typeof value !== "string" || value.trim().length > limit)
+      throw new HttpError(422, `Enter a valid ${key.replaceAll("_", " ")}.`);
+    if (value.trim()) details[key] = value.trim();
+  }
+  if (input.anticipated_start != null && input.anticipated_start !== "") {
+    if (!validSchedule(input.anticipated_start, input.anticipated_start))
+      throw new HttpError(422, "Enter a valid anticipated start date.");
+    details.anticipated_start = input.anticipated_start;
+  }
   return details;
 }
 
