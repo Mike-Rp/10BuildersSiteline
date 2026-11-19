@@ -15,6 +15,8 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
 import { recordArchiveEvent } from "../archive/audit.utility.js";
+import { selectInquiryLead } from "../../domain/inquiry-lead.js";
+import { experienceForProjectSql } from "../accounts/experience.utility.js";
 
 // Lifecycle states an intake may be corrected and resubmitted from. Active and archived projects are closed to intake edits.
 const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
@@ -136,10 +138,24 @@ export const createIntake = async (req, res) => {
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
       await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true});
+      let inquiryLead;
       if (inquiry) {
         const ids = [...new Set(phase_team.flatMap(row => [row.user_id,...(row.engineers || []).map(person => person.user_id)]))];
         if ((await scheduleConflicts(client,ids,{start:target_start_date,end:req.body.target_end_date})).size)
           throw new HttpError(409,"A selected Site PM has a conflicting project schedule. Refresh the allocation.");
+        const experience = await client.query(
+          `SELECT u.id, ${experienceForProjectSql("$1")} AS years FROM users u WHERE u.id=ANY($2::uuid[])`,
+          [project_type, ids],
+        );
+        inquiryLead = selectInquiryLead(phases, phase_team, new Map(experience.rows.map(row => [row.id, Number(row.years)])));
+        if (!inquiryLead) throw new HttpError(422, "Assign a Site PM before submitting staffing.");
+        const leadPhase = phase_team.find(row => row.stage === inquiryLead.stage);
+        if (leadPhase.user_id !== inquiryLead.id) {
+          const engineer = leadPhase.engineers.find(person => person.user_id === inquiryLead.id);
+          leadPhase.engineers = [engineer, ...leadPhase.engineers.filter(person => person !== engineer)];
+          leadPhase.user_id = engineer.user_id;
+          leadPhase.assigned_disciplines = engineer.assigned_disciplines;
+        }
       }
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
@@ -187,7 +203,7 @@ export const createIntake = async (req, res) => {
            response_deadline_at, created_by, updated_by)
           SELECT $1, ps.id, $3, $4, 'pending', $6, $5, $5
           FROM project_stages ps WHERE ps.code = $2 RETURNING project_stage_id`,
-          [project.id,phase.stage,phase.user_id,inquiry || phaseScope ? index===0 : phase.is_lead ?? false,actor.id,deadline ?? null]);
+          [project.id,phase.stage,phase.user_id,inquiryLead ? phase.stage === inquiryLead.stage : phaseScope ? index===0 : phase.is_lead ?? false,actor.id,deadline ?? null]);
         if (!r.rowCount) throw Object.assign(new Error(`Unknown stage: ${phase.stage}`), {status:422});
       }
       await saveEngineerScopes(client,project.id,phase_team,actor.id);

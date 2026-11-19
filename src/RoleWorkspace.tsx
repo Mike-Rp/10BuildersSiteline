@@ -129,6 +129,7 @@ import {
   leadConfirmed,
   officePmStage,
   leadId,
+  leadPhaseAssignment,
   ownedProjects,
   phaseOwner,
   canWorkPhase,
@@ -721,7 +722,7 @@ export default function RoleWorkspace({
             <div>
               <strong>{t.phase}</strong>
               <small>
-                {t.phase === "Mobilization"
+                {t === leadPhaseAssignment(p)
                   ? `Project-specific Lead Site PM · ${projectPhaseDisciplines(p, t.phase).join(", ")}`
                   : projectPhaseDisciplines(p, t.phase).join(", ") ||
                     "Phase responsibility"}

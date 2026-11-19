@@ -210,6 +210,7 @@ export function mapProject(parts: ProjectParts): Project {
     phase: t.stage,
     accountId: t.spm_user_id || "",
     status: teamStatus(t.status),
+    isLead: t.is_lead === true,
     requiredDisciplines: t.required_disciplines,
     assignedDisciplines: t.assigned_disciplines,
     sequence: t.sort_order,

@@ -184,6 +184,12 @@
 .inquiry-intake .inquiry-phase-grid { grid-template-columns: 1fr; }
 .inquiry-intake .inquiry-phase-option { min-height: 48px; align-items: center; padding: 10px; }
 .inquiry-staff-layout { display: grid; gap: 14px; }
+.inquiry-lineup-table { overflow-x: auto; border: 1px solid var(--color-line); border-radius: 8px; }
+.inquiry-lineup-table table { width: 100%; text-align: left; }
+.inquiry-lineup-table tr[data-lead=true] td { background: #eaf3fa; }
+.inquiry-lineup-table td { padding: 9px 12px; border-top: 1px solid var(--color-line); }
+.inquiry-lineup-table th { padding: 9px 12px; }
+.inquiry-lineup-lead { padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); }
 .inquiry-staff-layout.with-coverage { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); align-items: start; }
 .inquiry-staff-layout .inquiry-engineers { grid-template-columns: 1fr; }
 .inquiry-staff-layout .inquiry-engineers fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }

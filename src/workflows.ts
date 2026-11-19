@@ -158,8 +158,11 @@ export function workflowFor(p: Project): ProjectWorkflow {
     }
   )
 }
+export function leadPhaseAssignment(p: Project) {
+  return p.team.find((t) => t.isLead) ?? p.team.find((t) => t.phase === "Mobilization")
+}
 export function leadId(p: Project) {
-  return p.team.find((t) => t.phase === "Mobilization")?.accountId || ""
+  return leadPhaseAssignment(p)?.accountId || ""
 }
 export function phaseOwner(p: Project, phase = p.phase) {
   return p.team.find((t) => t.phase === phase)?.accountId || ""
@@ -186,7 +189,7 @@ export function registeredCount(p: Project) {
 export function leadConfirmed(p: Project) {
   return (
     !!leadId(p) &&
-    p.team.find((t) => t.phase === "Mobilization")?.status === "confirmed"
+    leadPhaseAssignment(p)?.status === "confirmed"
   )
 }
 // Coverage is measured against the project's workflow, never the saved team rows alone.
@@ -723,7 +726,7 @@ function startDeadline(p: Project, actorId: string, days: number, now: number) {
   }
 }
 function pendingNextPerson(p: Project) {
-  const lead = p.team.find((t) => t.phase === "Mobilization")
+  const lead = leadPhaseAssignment(p)
   if (lead && lead.status !== "confirmed") return lead.accountId
   return (
     p.team.find((t) => t.status === "pending" && t.accountId)?.accountId || ""
@@ -1193,7 +1196,7 @@ export function applyWorkflow(
           t.status === "pending",
       )
       assert(row, "Only your pending phase assignment can be declined.")
-      const isLead = row.phase === "Mobilization"
+      const isLead = row === leadPhaseAssignment(p)
       assert(
         !isLead || command.note?.trim(),
         "A reason is required when declining the Lead Site PM assignment.",
@@ -2084,7 +2087,7 @@ export function processWorkflowTimers(state: State, now = Date.now()): State {
         t.status = "declined"
         t.accountId = ""
       })
-      if (rows.some((t) => t.phase === "Mobilization")) resetIntake(p)
+      if (rows.some((t) => t === leadPhaseAssignment(p))) resetIntake(p)
       work.deadline = undefined
       p.note = `${person?.name || "Site PM"} did not respond. Reassignment required.`
       event(

@@ -295,6 +295,7 @@ export type Project = {
     phase: string
     accountId: string
     status: "pending" | "confirmed" | "declined"
+    isLead?: boolean
     requiredDisciplines?: string[]
     assignedDisciplines?: string[]
     engineers?: {accountId:string;assignedDisciplines:string[];status:"pending"|"confirmed"|"declined";completionStatus?:string;responsibilityId?:string;responseDeadline?:string}[]

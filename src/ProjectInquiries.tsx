@@ -3,6 +3,7 @@ import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
+import { selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import "./project-inquiries.css"
 
 const projectTypes = [
@@ -18,7 +19,7 @@ const fields = [
 ] as const
 type Details = Record<string, string | number>
 type Inquiry = { id: string; details: Details; status: string; updated_at?: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string }
-type Candidate = { id: string; name: string; qualifiedTags: string[] }
+type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
 type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]> }
@@ -116,6 +117,37 @@ function requiredAreas(entry?: Phase) {
     ...(entry?.missing_specializations || []),
     ...(entry?.engineers || []).flatMap(person => person.assigned_disciplines),
   ])].sort()
+}
+
+function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: Phase[]; candidates: Record<string, Candidate[]> }) {
+  const people = new Map(Object.values(candidates).flat().map(person => [person.id, person]))
+  const experience = new Map([...people].map(([id, person]) => [id, Number(person.experienceYears ?? 0)]))
+  const lead = selectInquiryLead(phases, team, experience)
+  if (!lead) return null
+  const years = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2, style: "unit", unit: "year", unitDisplay: "long" })
+  return <section className="inquiry-card inquiry-lineup">
+    <h3>Staffing lineup</h3>
+    <div className="inquiry-lineup-table">
+      <table>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Designation</th></tr></thead>
+        <tbody>{phases.flatMap(stage => {
+          const entry = team.find(item => item.stage === stage)
+          const assigned = entry?.engineers?.map(person => person.user_id) ?? (entry?.user_id ? [entry.user_id] : [])
+          return assigned.map(id => {
+            const isLead = lead.id === id && lead.stage === stage
+            const designation = isLead ? "Lead SPM" : entry?.user_id === id && lead.stage !== stage ? "Phase coordinator" : "Phase SPM"
+            return <tr key={`${stage}:${id}`} data-lead={isLead}>
+              <td>{stage}</td><td>{people.get(id)?.name || "Site PM"}</td>
+              <td>{years.format(experience.get(id) ?? 0)}</td>
+              <td>{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
+            </tr>
+          })
+        })}</tbody>
+      </table>
+    </div>
+    <p className="inquiry-lineup-lead"><strong>{people.get(lead.id)?.name || "Site PM"} · {lead.stage}</strong> is the proposed Lead. Relevant project-type experience ranks first, with phase order as the first tiebreaker.</p>
+    <p className="inquiry-muted">The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
+  </section>
 }
 
 function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, onChange }: {
@@ -741,6 +773,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
           <div><h3>Build the project team</h3><p className="inquiry-muted">Review staffing by phase and assign qualified engineers to cover responsibilities.</p></div>
+          <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
           <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => <button key={stage} type="button" className={`button ${staffingPhase === stage ? "primary" : ""}`} aria-pressed={staffingPhase === stage} onClick={() => {
               setStaffingPhase(stage)

@@ -121,7 +121,8 @@ export const updatePhaseTeam = async (req, res) => {
     }
     const data = await withTransaction(async (client) => {
       // Prevent overwriting an SPM's already confirmed assignments.
-      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status, to_jsonb(projects)->'phase_scope' AS phase_scope FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
+      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status, to_jsonb(projects)->'phase_scope' AS phase_scope,
+        (to_jsonb(projects)->>'inquiry_intake') IS NOT NULL AS inquiry_origin FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
       if (!locked.rowCount) throw Object.assign(new Error('Project not found.'), {status:404});
       if(locked.rows[0].lifecycle_status==="archived") throw Object.assign(new Error("Archived projects are read-only."),{status:409});
       const confirmed = await client.query(`SELECT 1 FROM project_phase_team WHERE project_id = $1 AND status = 'confirmed' LIMIT 1`, [project_id]);
@@ -133,6 +134,10 @@ export const updatePhaseTeam = async (req, res) => {
       await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
       await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
+      const savedLeadStage = locked.rows[0].inquiry_origin ? (await client.query(
+        "SELECT s.code FROM project_phase_team t JOIN project_stages s ON s.id=t.project_stage_id WHERE t.project_id=$1 AND t.is_lead ORDER BY t.project_stage_id LIMIT 1",
+        [project_id],
+      )).rows[0]?.code : undefined;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
@@ -142,7 +147,7 @@ export const updatePhaseTeam = async (req, res) => {
           (project_id, project_stage_id, spm_user_id, is_lead, status, response_deadline_at, created_by, updated_by)
           SELECT $1, ps.id, $3, $4, 'pending', $6::timestamptz, $5, $5
           FROM project_stages ps WHERE ps.code=$2 RETURNING project_stage_id`,
-          [project_id,stage.stage,stage.user_id,locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
+          [project_id,stage.stage,stage.user_id,savedLeadStage ? stage.stage === savedLeadStage : locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
         if (!inserted.rowCount) throw Object.assign(new Error('Unknown project stage.'), {status:422});
       }
       await saveEngineerScopes(client,project_id,phase_team,actor.id);
@@ -330,13 +335,13 @@ export const getSpm = async (project_type, phases, candidateMap, schedule) => {
         const qualifiedTags=(await execute('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=$1 and d.id=any($2::int[])',[person.id,row.disciplines.map(Number)])).rows.map(r=>r.code);
         candidates.push({id:person.id,qualifiedTags});
       }
-      if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name}));
+      if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years}));
       const result=allocatePhaseCoverage(required,candidates);
       suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 
-    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines || []}));
+    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines || [],experienceYears:person.experience_years}));
     if (details.length > 0) {
       suggestedSpms.push({
         id: row.project_stage_id,
