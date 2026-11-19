@@ -172,7 +172,11 @@
 .admin-inquiries .inquiry-list-row:enabled:hover .inquiry-list-action { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-surface); }
 .admin-inquiries .inquiry-list-row[aria-pressed=true]:enabled:not(:hover) .inquiry-list-action { background: var(--color-surface); color: var(--color-primary); }
 .admin-inquiries .inquiry-list-empty { margin: 0; padding: 18px clamp(14px, 2.5vw, 28px); }
-.inquiry-log-controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px clamp(14px, 2.5vw, 28px); border-bottom: 1px solid var(--color-line); }
+.inquiry-log-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 14px clamp(14px, 2.5vw, 28px) 0; }
+.inquiry-log-filters label { flex: 0 1 220px; min-width: 0; }
+.inquiry-log-filters label:last-child { flex-basis: 160px; }
+.inquiry-log-count { margin: 10px clamp(14px, 2.5vw, 28px) 0; }
+.inquiry-log-pagination:has(nav) { padding: 0 clamp(14px, 2.5vw, 28px) 16px; }
 .inquiry-log-cards { display: grid; gap: 12px; list-style: none; margin: 0; padding: 16px clamp(14px, 2.5vw, 28px); }
 .inquiry-log-card { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--color-line); border-radius: 12px; min-width: 0; }
 .inquiry-log-card-header, .inquiry-log-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }

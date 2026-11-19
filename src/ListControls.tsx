@@ -38,6 +38,7 @@ const DEFAULT = defaultListQuery()
 // Three-column card collections use complete 3 × 3 pages. Table lists keep
 // their existing row counts; two-column project explorers already use 6/12/24.
 const cardPageSize = (key: string) =>
+  key === "admin:inquiry-log" ? 5 :
   ["admin:engineers", "admin:engineer-docs", "admin:companies"].includes(key) ||
   /^(opm|spm):directory$/.test(key) ? 9 :
   /^(opm|spm):assignments-/.test(key) ? 6 : undefined

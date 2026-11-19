@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
+import { ListPager, runList, updateListQuery, useListMemory } from "./ListControls"
+import { withPage } from "./listing"
 import { IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
@@ -71,6 +73,12 @@ const inquiryWaiting: Record<string, string> = {
   offered: "Waiting for Office PM response",
   consulting: "Waiting for the client’s decision",
   approved: "Waiting for project intake",
+}
+
+const adminInquiryListKey = "admin:inquiry-log"
+const adminInquiryListConfig = { searchText: (item: Inquiry) => String(item.details.name ?? "") }
+function resetInquiryPage() {
+  updateListQuery(adminInquiryListKey, query => withPage(query, 1))
 }
 
 const inquiryMilestones = ["Inquiry submitted", "Office PM review", "Client proposal", "Project assessment", "Project intake"]
@@ -330,6 +338,9 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
   const [adminInquiryFilter, setAdminInquiryFilter] = useState<"all" | "action" | "waiting">("all")
+  const [adminInquiryStatusFilter, setAdminInquiryStatusFilter] = useState("")
+  const [adminInquiryTypeFilter, setAdminInquiryTypeFilter] = useState("")
+  useListMemory()
   const [step, setStep] = useState(2)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
@@ -513,10 +524,25 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const adminCurrent = (rows ?? []).filter(item => !["converted", "dropped"].includes(item.status))
   const adminActionCount = adminCurrent.filter(item => adminInquiryActions[adminInquiryStatus(item)]).length
   const adminWaitingCount = adminCurrent.filter(item => inquiryWaiting[item.status]).length
-  const adminVisibleRows = (adminInquiryTab === "history" ? adminHistory : adminCurrent.filter(item =>
+  const adminTabRows = adminInquiryTab === "history" ? adminHistory : adminCurrent
+  const adminStatuses = [...new Set([...adminTabRows.map(adminInquiryStatus), adminInquiryStatusFilter].filter(Boolean))].sort()
+  const adminVisibleRows = adminTabRows.filter(item =>
+    adminInquiryTab === "history" ||
     adminInquiryFilter === "all" ||
     (adminInquiryFilter === "action" ? adminInquiryActions[adminInquiryStatus(item)] : inquiryWaiting[item.status])
-  )).filter(matchesSearch)
+  ).filter(item => matchesSearch(item) &&
+    (!adminInquiryStatusFilter || adminInquiryStatus(item) === adminInquiryStatusFilter) &&
+    (!adminInquiryTypeFilter || item.details.project_type === adminInquiryTypeFilter))
+  const adminList = runList(adminInquiryListKey, adminVisibleRows, adminInquiryListConfig)
+  function changeAdminInquiryTab(tab: typeof adminInquiryTab) {
+    setAdminInquiryTab(tab)
+    setAdminInquiryStatusFilter("")
+    resetInquiryPage()
+  }
+  function changeAdminInquiryFilter(filter: typeof adminInquiryFilter) {
+    setAdminInquiryFilter(filter)
+    resetInquiryPage()
+  }
   const queueRows = visibleRows?.filter(item =>
     (queueView === "all" || officeAction(item.status)?.bucket === queueView) &&
     (!queueStatus || statusLabel(item) === queueStatus) &&
@@ -710,23 +736,43 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       <div className="inquiry-list-heading">
         <div>
           <h2 id="existing-inquiries-heading">Project Inquiry Log</h2>
+          {rows && <p>{adminCurrent.length} current inquiries · {adminHistory.length} closed inquiries</p>}
         </div>
+      </div>
+      <div className="intake-tabs" role="group" aria-label="Inquiry records">
+        <button type="button" aria-pressed={adminInquiryTab === "current"} onClick={() => changeAdminInquiryTab("current")}>Current inquiries ({adminCurrent.length})</button>
+        <button type="button" aria-pressed={adminInquiryTab === "history"} onClick={() => changeAdminInquiryTab("history")}>Inquiry history ({adminHistory.length})</button>
+      </div>
+      {adminInquiryTab === "current" && <IntakeTabs value={adminInquiryFilter}
+        counts={{ all: adminCurrent.length, action: adminActionCount, waiting: adminWaitingCount }}
+        onChange={changeAdminInquiryFilter} allLabel="All inquiries"
+        help="Needs your action shows inquiries you can route, retry, or close. Waiting for others shows inquiries awaiting an Office PM, client decision, or project intake." />}
+      <div className="inquiry-log-filters">
         <div className="inquiry-list-search">
           <Icon name="search" size={17} />
-          <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
+          <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => {
+            setSearch(event.target.value)
+            resetInquiryPage()
+          }} />
         </div>
+        <label>Status<select value={adminInquiryStatusFilter} onChange={event => {
+          setAdminInquiryStatusFilter(event.target.value)
+          resetInquiryPage()
+        }}>
+          <option value="">All statuses</option>
+          {adminStatuses.map(status => <option key={status}>{status}</option>)}
+        </select></label>
+        <label>Project type<select value={adminInquiryTypeFilter} onChange={event => {
+          setAdminInquiryTypeFilter(event.target.value)
+          resetInquiryPage()
+        }}>
+          <option value="">All types</option>
+          {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
+        </select></label>
       </div>
-      <div className="inquiry-log-controls" role="group" aria-label="Inquiry records">
-        <button type="button" className="button" aria-pressed={adminInquiryTab === "current"} onClick={() => setAdminInquiryTab("current")}>Current inquiries ({adminCurrent.length})</button>
-        <button type="button" className="button" aria-pressed={adminInquiryTab === "history"} onClick={() => setAdminInquiryTab("history")}>Inquiry history ({adminHistory.length})</button>
-      </div>
-      {adminInquiryTab === "current" && <div className="inquiry-log-controls" role="group" aria-label="Filter current inquiries">
-        <button type="button" className="button" aria-pressed={adminInquiryFilter === "all"} onClick={() => setAdminInquiryFilter("all")}>All inquiries ({adminCurrent.length})</button>
-        <button type="button" className="button" aria-pressed={adminInquiryFilter === "action"} onClick={() => setAdminInquiryFilter("action")}>Needs your action ({adminActionCount})</button>
-        <button type="button" className="button" aria-pressed={adminInquiryFilter === "waiting"} onClick={() => setAdminInquiryFilter("waiting")}>Waiting for others ({adminWaitingCount})</button>
-      </div>}
+      {rows && <p className="list-count inquiry-log-count" role="status">{adminList.count} {adminList.count === 1 ? "inquiry" : "inquiries"}</p>}
       {adminVisibleRows.length ? <ul className="inquiry-log-cards">
-        {adminVisibleRows.map(item => {
+        {adminList.view.items.map(item => {
           const name = item.details.name || "Untitled project"
           const status = adminInquiryStatus(item)
           const updated = item.updated_at && Number.isFinite(Date.parse(item.updated_at)) ? item.updated_at : undefined
@@ -760,10 +806,11 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           </li>
         })}
       </ul> : <p className="inquiry-list-empty">
-        {rows ? query ? "No inquiries match your search." : adminInquiryTab === "history"
+        {rows ? query || adminInquiryStatusFilter || adminInquiryTypeFilter ? "No inquiries match your filters." : adminInquiryTab === "history"
           ? "No inquiries in history yet." : "No inquiries in this view." :
           error ? "Inquiries could not be loaded." : "Loading inquiries…"}
       </p>}
+      <div className="inquiry-log-pagination"><ListPager list={adminList} unit="inquiries" /></div>
     </section>}
     </>}
     {dialog === "details" && role === "opm" && row && <Modal title={String(row.details.name || "Inquiry details")} wide onClose={closeDialog}>
