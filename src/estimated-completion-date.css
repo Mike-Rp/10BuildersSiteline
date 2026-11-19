@@ -14,7 +14,7 @@
 .completion-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
 #root .completion-calendar-days .button { min-width: 0; min-height: 44px; padding: 8px 0; font-size: 14px; }
 .completion-weekday { text-align: center; padding-bottom: 8px; font-size: 14px; color: var(--color-muted); }
-#root .completion-calendar-days .completion-selected { background: var(--color-primary); color: var(--color-surface); }
+#root .completion-calendar-days .button.completion-selected { background: var(--color-primary); color: var(--color-surface); }
 .completion-calendar-note { color: var(--color-muted); font-size: 14px; margin-top: 12px; }
 #root .completion-calendar .modal-actions { margin-top: 12px; padding-top: 12px; }
 #root .completion-calendar-days .button:disabled { color: var(--color-muted); opacity: .5; }

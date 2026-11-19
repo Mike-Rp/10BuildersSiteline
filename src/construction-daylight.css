@@ -688,7 +688,10 @@ body { min-width: 0; background: var(--color-canvas); color: var(--color-ink); f
 #root .tabs button.active { border-color: var(--color-steel); color: var(--color-steel); }
 #root .button:not(.primary):not(.danger):not(.danger-ghost):not(.text-button):not(.icon-button):not(:where(
   .project-inquiries .office-workflow-nav > [aria-current=step],
-  .project-inquiries .inquiry-phase-nav > [aria-pressed=true]
+  .project-inquiries .inquiry-phase-nav > [aria-pressed=true],
+  .inquiry-log-controls > button,
+  .completion-calendar-days .completion-selected,
+  .pagination-page.active
 )) { color: var(--color-primary); border-color: var(--control-border); }
 #root .button:not(:disabled):hover { border-color: var(--color-steel); }
 #root .button.document-nav-card { color: var(--color-ink); border-color: var(--color-line); background: var(--color-surface); box-shadow: var(--shadow); }

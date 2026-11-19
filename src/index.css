@@ -1531,7 +1531,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .pagination-summary { color: var(--color-muted); }
 .pagination-size { display: flex; align-items: center; gap: 8px; color: var(--color-muted); }
 .pagination-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.pagination-page.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); text-decoration: underline; }
+#root .button.pagination-page.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); text-decoration: underline; }
 .pagination-gap { padding: 0 4px; color: var(--color-muted); }
 .pagination.touch .button, .pagination.touch select { min-height: 48px; }
 .pagination-mini { display: none; font-size: 14px; color: var(--color-muted); }
