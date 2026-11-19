@@ -12,9 +12,9 @@ import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./Off
 import "./project-inquiries.css"
 
 const projectTypes = [
-  ["Residential", "home", "Houses, condos, and apartments."],
-  ["Commercial", "building", "Offices, retail, and hotels."],
-  ["Mixed-Use", "mixed-building", "Residential and commercial spaces."],
+  ["Residential", "home", "Houses, condominiums, apartments, and residential buildings."],
+  ["Commercial", "storefront", "Offices, retail spaces, hotels, and business establishments."],
+  ["Mixed-Use", "mixed-building", "Developments combining residential and commercial spaces."],
 ] as const
 const fields = [
   ["client_name", "Client name", "text"], ["email", "Email", "email"], ["phone", "Phone", "tel"],
@@ -555,23 +555,28 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     return counts
   }, { all: 0, action: 0, waiting: 0 })
   const statusOptions = [...new Set([...(rows ?? []).map(statusLabel), queueStatus].filter(Boolean))]
-  if (admin && adminPage === "new") {
+  function renderAdminInquiryForm() {
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) =>
       <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
         <input type={type} value={details[key] ?? ""} required={required} maxLength={maxLength}
+          inputMode={key === "phone" ? "numeric" : undefined}
+          pattern={key === "phone" ? "09[0-9]{0,9}" : key === "email" ? "[^@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined}
+          title={key === "phone" ? "Enter up to 11 digits starting with 09." : key === "email" ? "Use an @gmail.com address." : undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           max={key === "floor_count" ? 32767 : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
           placeholder={required ? undefined : "Optional"} onChange={event => change(key, event.target.value)} />
       </label>
-    return <section className="project-inquiries admin-inquiries admin-inquiry-page">
-      <header className="inquiries-page-heading">
-        <div><h1 ref={recordHeading} tabIndex={-1}>Submit a project inquiry</h1>
-          <p>Record client and project information. The system matches an Office PM when immediate consultation is requested.</p>
-        </div>
-        <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
-      </header>
-      <form className="admin-inquiry-submission" onSubmit={event => {
+    function close() {
+      if (busy) return
+      setError("")
+      setAdminPage("list")
+    }
+    return <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
+      <button type="button" className="button" disabled={busy} onClick={close}>Cancel</button>
+      <button type="submit" form="admin-inquiry-form" className="button primary" disabled={busy}>Submit Project Inquiry</button>
+    </>}>
+      <form id="admin-inquiry-form" className="admin-inquiry-submission" onSubmit={event => {
         event.preventDefault()
         if (busy) return
         void run(async () => {
@@ -587,24 +592,32 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           <FormSection title="Client information" icon="users" description="Required contact details for the project inquiry.">
             <div className="admin-inquiry-form-grid">
               {input("client_name", "Client name", "text", true, 150)}
-              {input("phone", "Contact number", "tel", true, 150)}
+              {input("phone", "Contact number", "tel", true, 11)}
               {input("email", "Email address", "email", true, 150)}
             </div>
           </FormSection>
           <FormSection title="Project information" icon="building" description="Measurements use square meters (m²).">
-            <div className="admin-inquiry-form-grid">
+            <div className="admin-inquiry-project-identity">
               {input("name", "Project name", "text", true, 150)}
-              <label><span>Project type<span className="inquiry-required"> *</span></span>
-                <select required value={details.project_type ?? ""} onChange={event => change("project_type", event.target.value)}>
-                  <option value="">Select a project type</option>
-                  {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
-                </select>
-              </label>
+              {input("address", "Project address / location", "text", true, 500)}
+            </div>
+            <fieldset className="admin-inquiry-project-types">
+              <legend>Project type <span className="inquiry-required">*</span></legend>
+              <div className="project-type-options">
+                {projectTypes.map(([type, icon, description]) => <label key={type}
+                  className={`button project-type-card${details.project_type === type ? " selected" : ""}`}>
+                  <input className="sr-only" type="radio" name="inquiry-project-type" value={type} required
+                    checked={details.project_type === type} onChange={() => change("project_type", type)} />
+                  <span className="project-type-icon"><Icon name={icon} size={24} /></span>
+                  <span className="project-type-copy"><strong>{type}</strong><span>{description}</span></span>
+                </label>)}
+              </div>
+            </fieldset>
+            <div className="admin-inquiry-form-grid admin-inquiry-measurements">
               {input("land_area", "Land area (m²)", "number", false)}
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
-              {input("address", "Project address / location", "text", true, 500)}
             </div>
           </FormSection>
           <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">
@@ -625,12 +638,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           </FormSection>
         </fieldset>
         {feedback}
-        <div className="admin-inquiry-submit-bar">
-          <p><Icon name="lock" size={17} /> Project assessment and staffing remain Office PM responsibilities.</p>
-          <button type="submit" className="button primary" disabled={busy}>Submit Project Inquiry</button>
-        </div>
       </form>
-    </section>
+    </Modal>
   }
   if (admin && row && (adminPage === "submitted" || adminPage === "tracking")) {
     const submitted = adminPage === "submitted"
@@ -908,6 +917,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         {feedback}
       </div>
     </Modal>}
-    {!dialog && !officePage && feedback}
+    {admin && adminPage === "new" && renderAdminInquiryForm()}
+    {!dialog && !officePage && adminPage !== "new" && feedback}
   </section>
 }

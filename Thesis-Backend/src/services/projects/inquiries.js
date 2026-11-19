@@ -10,6 +10,13 @@ import { assessInquiry, technicalOptions, arrangementOptions } from "../../domai
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
 
+function validateInquiryContact(details, previous) {
+  if (details.phone !== previous?.phone && !/^09[0-9]{0,9}$/.test(details.phone))
+    throw new HttpError(422, "Enter a contact number starting with 09 and containing up to 11 digits.");
+  if (details.email !== previous?.email && !/^[^\s@]+@gmail\.com$/i.test(details.email))
+    throw new HttpError(422, "Enter a valid @gmail.com email address.");
+}
+
 export function inquiryDetails(input) {
   const details = {};
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
@@ -180,6 +187,7 @@ export function mountInquiries(router) {
 
   router.post("/inquiries", endpoint(["admin"], (req, actor) => withTransaction(async db => {
     const details = inquiryDetails(req.body);
+    validateInquiryContact(details);
     const row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
       [JSON.stringify(details), actor.id])).rows[0];
     return inquiryResponse(details.immediate_consultation === "yes" ? await matchInquiry(db, row, actor.id) : row, true);
@@ -272,6 +280,7 @@ export function mountInquiries(router) {
         const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
         }) : before;
+        if (input.correction) validateInquiryContact(after, before);
         const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
           .filter(key => before[key] !== after[key]).map(key => [key, { before: before[key] ?? null, after: after[key] ?? null }]));
         for (const key of ["start", "end"]) {
