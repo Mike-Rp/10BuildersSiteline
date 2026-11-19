@@ -24,6 +24,14 @@ export async function leadAssignment(db, projectId) {
       WHERE project_id = $1 ORDER BY is_lead DESC, project_stage_id ASC LIMIT 1`, [projectId])).rows[0] ?? null;
 }
 
+export async function assertLeadResponded(db, project, user) {
+  const lead = await leadAssignment(db, project.id);
+  if (project.inquiry_intake && !lead?.is_lead)
+    throw new HttpError(409, "A saved Lead Site PM assignment is required.", "LEAD_ASSIGNMENT_REQUIRED");
+  if (lead && lead.spm_user_id !== user.id && lead.status !== "confirmed")
+    throw new HttpError(409, "The Lead Site PM must accept first.", "LEAD_ACCEPTANCE_REQUIRED");
+}
+
 /**
  * Server-side gate for accepting a phase assignment or an engineer responsibility.
  * Mirrors the workspace sequence: the assigned Office PM has accepted (the project is in
@@ -33,18 +41,9 @@ export async function leadAssignment(db, projectId) {
 export async function assertAcceptancePrerequisites(db, project, user) {
   if (!ACCEPTANCE_LIFECYCLES.includes(project.lifecycle_status))
     throw new HttpError(409, "Wait for the assigned Office PM to accept this project before responding.", "OPM_ACCEPTANCE_REQUIRED");
-  let required = REGISTERED_DOCUMENT_CODES;
-  let uploaded = await registeredDocumentCount(db, project.id);
-  if (uploaded < required.length) {
-    const inquiry = (await db.query("SELECT (to_jsonb(p)->>'inquiry_intake') IS NOT NULL AS enabled FROM projects p WHERE id=$1",[project.id])).rows[0];
-    if (inquiry?.enabled) {
-      required = ["owner_contract", "registered_plans"];
-      uploaded = await registeredDocumentCount(db, project.id, required);
-    }
-  }
+  const required = project.inquiry_intake ? ["owner_contract", "registered_plans"] : REGISTERED_DOCUMENT_CODES;
+  const uploaded = await registeredDocumentCount(db, project.id, required);
   if (uploaded < required.length)
     throw new HttpError(409, `Waiting for Office PM documents: ${uploaded} of ${required.length} uploaded.`, "REGISTERED_DOCUMENTS_REQUIRED");
-  const lead = await leadAssignment(db, project.id);
-  if (lead && lead.spm_user_id !== user.id && lead.status !== "confirmed")
-    throw new HttpError(409, "The Lead Site PM must accept first.", "LEAD_ACCEPTANCE_REQUIRED");
+  await assertLeadResponded(db, project, user);
 }

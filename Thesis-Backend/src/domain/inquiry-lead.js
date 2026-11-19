@@ -1,5 +1,5 @@
 export function matchingInquiryTags(assignedTags, eligibleTags) {
-  if (!assignedTags?.length || !assignedTags.every(tag => eligibleTags.includes(tag))) return []
+  if (!Array.isArray(assignedTags) || !assignedTags.length || !assignedTags.every(tag => eligibleTags.includes(tag))) return []
   return [...new Set(assignedTags)]
 }
 

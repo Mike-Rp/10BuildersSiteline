@@ -37,4 +37,5 @@ test("the Site PM workspace uses the saved lead phase for identity and confirmat
   structure.status = "confirmed"
   assert.equal(leadConfirmed({ team: [structure] }), true)
   assert.equal(leadId({ team: [mobilization] }), "first")
+  assert.equal(leadId({ inquiryOrigin: true, team: [mobilization] }), "")
 })

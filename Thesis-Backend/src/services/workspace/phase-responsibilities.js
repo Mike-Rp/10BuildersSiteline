@@ -6,7 +6,7 @@ import {
 } from "../../common/utilities/access.utility.js"
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js"
 import { responsibilitiesInstalled } from "../projects/phase-responsibilities.utility.js"
-import { assertAcceptancePrerequisites } from "../projects/assignment-prerequisites.utility.js"
+import { assertAcceptancePrerequisites, assertLeadResponded } from "../projects/assignment-prerequisites.utility.js"
 import {
   prepareEngineerAssignments,
   engineerCommitments,
@@ -171,7 +171,6 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             "The response deadline has passed. Ask Admin for reassignment.",
           )
         if (action === "accept") {
-          // Same gate as phase-team acceptance: OPM accepted, six documents, Lead Site PM first.
           await assertAcceptancePrerequisites(db, p, user)
           await assertEligibleManager(db, user.id, "spm")
           await prepareEngineerAssignments(
@@ -186,8 +185,10 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
             ],
             { projectId: p.id },
           )
-        } else if (typeof note !== "string" || !note.trim())
-          throw new HttpError(422, "Give a reason for declining.")
+        } else {
+          if (p.inquiry_intake) await assertLeadResponded(db, p, user)
+          if (typeof note !== "string" || !note.trim()) throw new HttpError(422, "Give a reason for declining.")
+        }
         const status = action === "accept" ? "confirmed" : "declined"
         await db.query(
           "update project_phase_responsibilities set status=$2,responded_at=now(),review_note=$3 where id=$1",

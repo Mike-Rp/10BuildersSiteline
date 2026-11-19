@@ -26,8 +26,9 @@ type Inquiry = OfficeRecord & { id: string; routing_history?: RoutingEvent[]; cr
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
-type CandidateBlocker = "qualifications" | "schedule" | "commitments"
-type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker> }
+type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability"
+type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
+  staffing?: {assessment_id:string; phases:string[]; contract_file_id:string} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
 const classifications = ["Normal", "Priority", "Urgent"]
 const statuses: Record<string,string> = {
@@ -215,6 +216,8 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   const addOptions = options(engineers.length)
   const atLimit = engineers.length >= (multi ? 3 : 1)
   const noEligibleMessage = {
+    phase_disciplines: "This phase has no configured discipline requirements. Ask Admin to review its project-type setup.",
+    availability: "The qualified Site PMs already have assignments. Recheck after an assignment ends.",
     qualifications: "No available Site PM meets the account, verified license, and discipline requirements for this phase. Ask Admin to review the required discipline and credentials.",
     schedule: "The matching Site PMs have conflicting assignments during the current project dates. Review the schedule or recheck after availability changes.",
     commitments: "The matching Site PMs have unfinished commitments or no available qualifying scope for this phase.",
@@ -401,7 +404,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   async function saveWorkflow(action: string, input: Record<string, unknown>) {
     const updated = await post<Inquiry>(`${root}/${selected}/workflow`, { action, version: row?.workflow?.review?.version ?? 0, ...input })
     updateInquiry(updated)
-    if (action === "review") {
+    if (updated.workflow?.assessment?.id !== row?.workflow?.assessment?.id || action === "review") {
       setPlanning(undefined)
       setPhases([])
       setTeam([])
@@ -411,14 +414,15 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     open(item)
     if (item.status === "offered") navigateOffice("pending")
     else if (item.status === "consulting") navigateOffice("accepted")
-    else if (item.status === "approved") navigateOffice(item.workflow?.budget ? "assessment" : "review")
+    else if (item.status === "approved") navigateOffice(item.workflow?.assessment ? "assessment" : "review")
     else setDialog("details")
   }
   async function startStaffing() {
     if (!planning) {
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
-      setPhases(result.phases)
+      setPhases(result.staffing?.phases ?? result.phases)
+      setContractFileId(result.staffing?.contract_file_id)
     }
     setStep(2)
     setDialog("intake")
@@ -451,7 +455,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     navigateOffice()
     void onReload()
   }
-  const canAllocate = !!contract && !!row?.workflow?.assessment && phases.length > 0
+  const canAllocate = !!(contract || contractFileId) && !!row?.workflow?.assessment && phases.length > 0
   const canSend = canAllocate && phases.every(stage => {
     const entry = team.find(item => item.stage === stage)
     if (!entry?.user_id) return false
@@ -778,7 +782,10 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
               <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={event => {
                 setContract(event.target.files?.[0])
                 setContractFileId(undefined)
+                setPlanning({ ...planning, candidates: undefined })
+                setTeam([])
               }} /></label>
+              {!contract && contractFileId && <p>Signed client contract agreement attached.</p>}
               {contract && <div className="inquiry-sent-notice inquiry-contract-preview">
                 <span className="inquiry-list-icon"><Icon name="doc" /></span>
                 <div><strong>{contract.name}</strong><small>Contract attached</small></div>

@@ -3,6 +3,7 @@ import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
 import {allocatePhaseCoverage} from '../../domain/engineer-phase-coverage.js';
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { experienceForProjectSql } from "../accounts/experience.utility.js";
+import { prepareInquiryLead, scheduleConflicts } from "./inquiry-staffing.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -79,7 +80,7 @@ export const rerunRecommendations = async (req, res) => {
     }
 
     const suggested_opm = await getOpm(project_type);
-    const suggested_spms = await getSpm(project_type, true);
+    const suggested_spms = await getSpm(project_type);
 
     const suggested_allocation = {
       opm: suggested_opm,
@@ -121,7 +122,8 @@ export const updatePhaseTeam = async (req, res) => {
     }
     const data = await withTransaction(async (client) => {
       // Prevent overwriting an SPM's already confirmed assignments.
-      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status, to_jsonb(projects)->'phase_scope' AS phase_scope,
+      const locked = await client.query(`SELECT id, project_type_id, lifecycle_status, target_start_date::text AS start, target_end_date::text AS end,
+        (SELECT code FROM project_types WHERE id=projects.project_type_id) AS project_type, to_jsonb(projects)->'phase_scope' AS phase_scope,
         (to_jsonb(projects)->>'inquiry_intake') IS NOT NULL AS inquiry_origin FROM projects WHERE id = $1 FOR UPDATE`, [project_id]);
       if (!locked.rowCount) throw Object.assign(new Error('Project not found.'), {status:404});
       if(locked.rows[0].lifecycle_status==="archived") throw Object.assign(new Error("Archived projects are read-only."),{status:409});
@@ -133,11 +135,10 @@ export const updatePhaseTeam = async (req, res) => {
       }
       await validatePhaseTeam(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
-      await validateScopedQualifications(client,locked.rows[0].project_type_id,phase_team,{projectId:project_id});
-      const savedLeadStage = locked.rows[0].inquiry_origin ? (await client.query(
-        "SELECT s.code FROM project_phase_team t JOIN project_stages s ON s.id=t.project_stage_id WHERE t.project_id=$1 AND t.is_lead ORDER BY t.project_stage_id LIMIT 1",
-        [project_id],
-      )).rows[0]?.code : undefined;
+      const project = locked.rows[0];
+      await validateScopedQualifications(client,project.project_type_id,phase_team,{projectId:project_id,requireCoverage:project.inquiry_origin});
+      const lead = project.inquiry_origin ? await prepareInquiryLead(client, phase_team, project.phase_scope.phases,
+        project.project_type_id, project.project_type, {start:project.start,end:project.end}, project_id) : null;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
@@ -147,7 +148,7 @@ export const updatePhaseTeam = async (req, res) => {
           (project_id, project_stage_id, spm_user_id, is_lead, status, response_deadline_at, created_by, updated_by)
           SELECT $1, ps.id, $3, $4, 'pending', $6::timestamptz, $5, $5
           FROM project_stages ps WHERE ps.code=$2 RETURNING project_stage_id`,
-          [project_id,stage.stage,stage.user_id,savedLeadStage ? stage.stage === savedLeadStage : locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
+          [project_id,stage.stage,stage.user_id,lead ? stage.stage === lead.stage : locked.rows[0].phase_scope ? index===0 : stage.is_lead ?? false,actor.id,deadline]);
         if (!inserted.rowCount) throw Object.assign(new Error('Unknown project stage.'), {status:422});
       }
       await saveEngineerScopes(client,project_id,phase_team,actor.id);
@@ -220,16 +221,6 @@ export const getOpm = async (project_type, excludedId = null, db = {query: execu
   const randomIndex = 0; // Refreshing suggestions must not bypass relevant experience priority.
 
   return mapSingle(result.rows[randomIndex], 'id');
-}
-
-export async function scheduleConflicts(db, ids, {start,end}) {
-  const rows = (await db.query(`SELECT DISTINCT e.user_id FROM project_engineers e
-    JOIN projects p ON p.id=e.project_id
-    WHERE e.user_id=ANY($1::uuid[]) AND e.unassigned_at IS NULL
-      AND NOT coalesce(p.is_deleted,false) AND p.lifecycle_status IN ('spm_review','active')
-      AND (p.target_start_date IS NULL OR p.target_start_date <= $3::date)
-      AND (p.target_end_date IS NULL OR p.target_end_date >= $2::date)`,[ids,start,end])).rows;
-  return new Set(rows.map(row => row.user_id));
 }
 
 export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers) => {
@@ -305,7 +296,7 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
           ARRAY(SELECT d.code FROM disciplines d WHERE d.id=ANY(ranked_users.disciplines)
             AND d.id=ANY($1::int[]) ORDER BY d.code) AS "MAIN.matching_scopes"
         FROM ranked_users
-        WHERE matching_count > 0 and availability = 'available'
+        WHERE matching_count > 0
         ORDER BY
         matching_count DESC,
         experience_years DESC,
@@ -313,8 +304,9 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
       `, [row.disciplines.map(Number), project_type, scoped]
     );
 
-    let details = mapMultiple(spm_result.rows, 'id');
-    let blocker = details.length ? undefined : "qualifications";
+    const qualified = mapMultiple(spm_result.rows, 'id');
+    let details = qualified.filter(person => person.availability === "available");
+    let blocker = details.length ? undefined : qualified.length ? "availability" : "qualifications";
     if (schedule && details.length) {
       const blocked = await scheduleConflicts(db, details.map(person => person.id), schedule);
       details = details.filter(person => !blocked.has(person.id));

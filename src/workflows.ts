@@ -159,7 +159,7 @@ export function workflowFor(p: Project): ProjectWorkflow {
   )
 }
 export function leadPhaseAssignment(p: Project) {
-  return p.team.find((t) => t.isLead) ?? p.team.find((t) => t.phase === "Mobilization")
+  return p.team.find((t) => t.isLead) ?? (p.inquiryOrigin ? undefined : p.team.find((t) => t.phase === "Mobilization"))
 }
 export function leadId(p: Project) {
   return leadPhaseAssignment(p)?.accountId || ""

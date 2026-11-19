@@ -8,6 +8,7 @@ import { PGlite } from "@electric-sql/pglite"
 import { citext } from "@electric-sql/pglite/contrib/citext"
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
 import { installCredentialFixture } from "./helpers/credential-fixture.mjs"
+import { COMPANY_TRADES } from "../Thesis-Backend/src/domain/company-trades.js"
 
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8")
 const freePort = () => new Promise(resolve => {
@@ -37,7 +38,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await db.exec("update user_licenses set license_expiry=current_date+400 where superseded_at is null")
   await db.exec("delete from license_renewal_requests where file_ref like 'seed/licenses/renewal-%'")
   await installCredentialFixture(db)
-  if (multiEngineer) for (const file of ["019-engineer-phase-commitments","020-engineer-phase-responsibilities"])
+  if (multiEngineer) for (const file of ["013-trade-subcontractor-allocation","018-phase-foreman-allocation","019-engineer-phase-commitments","020-engineer-phase-responsibilities"])
     await db.exec(read(`../Thesis-Backend/migrations/${file}.sql`))
   await db.exec("UPDATE project_engineers SET unassigned_at=now() WHERE unassigned_at IS NULL; UPDATE projects SET lifecycle_status='archived'")
   const [dbPort,apiPort] = await Promise.all([freePort(),freePort()])
@@ -59,9 +60,9 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     if (attempt===100 || server.exitCode !== null) assert.fail("Backend failed to start. "+output)
     await new Promise(resolve=>setTimeout(resolve,200))
   }
-  async function call(path, {token, json, form, status=200}={}) {
+  async function call(path, {token, json, form, status=200, method}={}) {
     const response = await fetch(base+path,{
-      method:json || form ? "POST" : "GET",
+      method:method ?? (json || form ? "POST" : "GET"),
       headers:{...(token ? {Authorization:"Bearer "+token}:{}),...(json ? {"Content-Type":"application/json"}:{})},
       body:form || (json && JSON.stringify(json)),
     })
@@ -93,7 +94,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(delayed.opm_id,null)
   assert.equal(delayed.details.land_area,undefined)
 
-  const cancelled = await call(root,{token:admin,json:{...details,classification:"Priority",immediate_consultation:"yes"}})
+  const cancelled = await call(root,{token:admin,json:{...details,project_type:"Mixed-Use",classification:"Priority",immediate_consultation:"yes"}})
   assert.equal(cancelled.status,"offered")
   assert.ok(cancelled.opm_name)
   assert.equal(cancelled.routing_history[0].kind,"offered")
@@ -103,12 +104,13 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const offered = (await call(root,{token:firstToken})).find(item=>item.id===cancelled.id)
   assert.equal(offered.details.classification,"Priority")
   assert.equal(offered.routing_history,undefined)
-  assert.equal(offered.match.project_type,"Residential")
+  assert.equal(offered.match.project_type,"Mixed-Use")
   assert.equal((await decision(cancelled,firstToken,"cancel")).status,"returned")
   const retried = (await call(root,{token:admin})).find(item=>item.id===cancelled.id)
   assert.deepEqual(retried.routing_history.slice(0,2).map(event=>event.kind),["offered","declined"])
-  if (retried.status === "offered") assert.notEqual(retried.opm_id,cancelled.opm_id)
-  else assert.equal(retried.routing_history.at(-1).kind,"no_match")
+  assert.equal(retried.status,"offered")
+  assert.notEqual(retried.opm_id,cancelled.opm_id)
+  assert.equal(retried.routing_history.at(-1).opm_id,retried.opm_id)
   assert.equal((await call(root,{token:firstToken})).some(item=>item.id===cancelled.id),false)
   const withdrawn = await create()
   const second = await offer(withdrawn)
@@ -149,7 +151,12 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.deepEqual(review.review_history.at(-1).changes.floor_area_sqm,{before:180,after:200})
   await save("assessment",1,assessmentInput,409)
   await call(planning,{token,status:409,json:{...intake,estimated_budget:4500000,assessment_id:firstAssessment.id}})
+  const beforeBudgetChange = (await save("assessment",2,assessmentInput)).workflow.assessment
+  const updatedBudget = 4600000
+  assert.equal((await save("budget",2,{amount:updatedBudget})).workflow.assessment,undefined)
+  await call(planning,{token,status:409,json:{...intake,estimated_budget:updatedBudget,assessment_id:beforeBudgetChange.id}})
   const assessed = (await save("assessment",2,assessmentInput)).workflow
+  assert.notEqual(assessed.assessment.id,beforeBudgetChange.id)
   assert.equal(assessed.assessment.durationDays,90)
   assert.equal(assessed.assessment.size,"Small")
   assert.equal(assessed.assessment.score,7)
@@ -158,11 +165,11 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const adminRecord = (await call(root,{token:admin})).find(item=>item.id===row.id)
   assert.equal(adminRecord.workflow,undefined)
   assert.equal(adminRecord.details.opm_workflow,undefined)
-  const planInput = {...intake,estimated_budget:4500000,assessment_id:assessed.assessment.id}
+  const planInput = {...intake,estimated_budget:updatedBudget,assessment_id:assessed.assessment.id}
   await call(planning,{token,status:409,json:{...planInput,target_end_date:"2027-04-13"}})
   const preview = await call(planning,{token,json:planInput})
   assert.deepEqual(preview.estimate,{size:"Small",end:"2027-04-12"})
-  const phases = preview.phases.slice(0,1)
+  const phases = preview.phases.slice(0,2)
 
   async function upload(name) {
     const id = crypto.randomUUID()
@@ -171,8 +178,10 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     form.set("file",new Blob(["%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"],{type:"application/pdf"}),name)
     return (await call("/files",{token,form})).id
   }
-  const documents = {estimated_budget:4500000,contract_file_id:await upload("signed.pdf"),plans_file_id:await upload("plans.pdf")}
+  const documents = {contract_file_id:await upload("signed.pdf")}
   const recommended = await call(planning,{token,json:{...planInput,...documents,phases}})
+  const resumed = await call(planning,{token,json:planInput})
+  assert.deepEqual(resumed.staffing,{assessment_id:assessed.assessment.id,phases,contract_file_id:documents.contract_file_id})
   assert.deepEqual(recommended.team.map(item=>item.stage),phases)
   assert.ok(recommended.team[0].user_id)
   const eligibleIds = recommended.candidates[phases[0]].map(person => person.id)
@@ -186,24 +195,95 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const rechecked = await call(planning,{token,json:{...planInput,...documents,phases}})
   assert.deepEqual(rechecked.candidates[phases[0]].map(person => person.id), eligibleIds)
   assert.equal(rechecked.candidateBlockers[phases[0]], undefined)
+  // Use two independently qualified coordinators so that Lead permissions are exercised by both accounts.
+  const secondPhase = recommended.team[1]
+  const tags = secondPhase.engineers?.[0].assigned_disciplines ?? secondPhase.assigned_disciplines
+  const firstPhaseIds = recommended.team[0].engineers?.map(e=>e.user_id) ?? [recommended.team[0].user_id]
+  const alternate = recommended.candidates[phases[1]].find(person =>
+    !firstPhaseIds.includes(person.id) && !secondPhase.engineers?.slice(1).some(e=>e.user_id===person.id)
+    && tags.every(tag=>person.qualifiedTags.includes(tag)))
+  assert.ok(alternate,"A second qualified Site PM is required for the authorization scenario")
+  secondPhase.user_id = alternate.id
+  if (secondPhase.engineers) secondPhase.engineers[0].user_id = alternate.id
+  await db.query(`INSERT INTO workspace_account_metadata(user_id,metadata) VALUES($1,'{"experienceByType":{"Residential":{"months":240}}}')
+    ON CONFLICT(user_id) DO UPDATE SET metadata=workspace_account_metadata.metadata||excluded.metadata`,[alternate.id])
   const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
+  await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:undefined}})
+  await call("/projects/intake",{token,status:409,json:{...payload,estimated_budget:updatedBudget-1}})
+  await call("/projects/intake",{token,status:422,json:{...payload,contract_file_id:undefined}})
+  await call("/projects/intake",{token,status:409,json:{...payload,phases:[phases[0]],phase_team:[recommended.team[0]]}})
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{...recommended.team[0],stage:preview.phases[1]}]}})
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{stage:phases[0],user_id:manager.id}]}})
+  // An invalid second document fails after the project and signed contract were written inside the transaction.
+  await call("/projects/intake",{token,status:422,json:{...payload,plans_file_id:crypto.randomUUID()}})
+  assert.equal((await db.query("SELECT count(*)::int n FROM projects WHERE name=$1",[details.name])).rows[0].n,0)
+  assert.equal((await db.query("SELECT project_id FROM stored_files WHERE id=$1",[documents.contract_file_id])).rows[0].project_id,null)
   const response = await call("/projects/intake",{token,json:payload})
   const repeated = await call("/projects/intake",{token,json:payload})
+  await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:firstAssessment.id}})
   assert.equal(response.project.id,repeated.project.id)
   assert.equal(response.project.lifecycle_status,"spm_review")
   assert.equal((await call(root,{token})).find(inquiry=>inquiry.id===row.id).project_status,"spm_review")
   const [stored] = (await db.query("SELECT inquiry_intake,phase_scope,lifecycle_status FROM projects WHERE id=$1",[response.project.id])).rows
   assert.equal(stored.inquiry_intake.floor_area_sqm,200)
+  assert.deepEqual(stored.inquiry_intake.assessment,assessed.assessment)
+  assert.equal(stored.inquiry_intake.target_end_date,intake.target_end_date)
+  assert.equal(stored.inquiry_intake.estimated_budget,updatedBudget)
   assert.deepEqual(stored.phase_scope.phases,phases)
-  const [lead] = (await db.query(`SELECT t.project_stage_id,u.email FROM project_phase_team t JOIN users u ON u.id=t.spm_user_id WHERE t.project_id=$1 AND t.is_lead`,[response.project.id])).rows
-  const spm = await login(lead.email,"staff")
-  if (multiEngineer) {
-    const [responsibility] = (await db.query("SELECT id FROM project_phase_responsibilities WHERE project_id=$1 AND is_coordinator",[response.project.id])).rows
-    await call(`/projects/${response.project.id}/engineer-responsibilities/${responsibility.id}`,{token:spm,json:{action:"accept"}})
-  } else {
-    await call(`/confirmations/projects/${response.project.id}/phase-team/${lead.project_stage_id}/accept`,{token:spm,json:{}})
+  const projectId = response.project.id
+  await call("/projects/recommendations/update-phase-team",{token,method:"PUT",json:{project_id:projectId,phase_team:recommended.team}})
+  const assignments = (await db.query(`SELECT t.project_stage_id,t.is_lead,u.id,u.email FROM project_phase_team t
+    JOIN users u ON u.id=t.spm_user_id WHERE t.project_id=$1 ORDER BY t.is_lead DESC`,[projectId])).rows
+  assert.deepEqual(assignments.map(a=>a.is_lead),[true,false])
+  const [lead,other] = assignments
+  assert.equal(lead.id,alternate.id)
+  const leadToken = await login(lead.email,"staff")
+  const otherToken = await login(other.email,"staff")
+  const offerRecipients = new Set(recommended.team.flatMap(p=>p.engineers?.map(e=>e.user_id) ?? [p.user_id]))
+  const notices = (await db.query("SELECT recipient_user_id FROM notifications WHERE title='Site PM assignment offer' AND related_project_id=$1",[projectId])).rows
+  assert.deepEqual(notices.map(n=>n.recipient_user_id).sort(),[...offerRecipients].sort())
+  async function respond(assignment,staffToken,action,status=200) {
+    const stageId = assignment.project_stage_id
+    const note = "Test assignment response"
+    if (multiEngineer) {
+      const [r] = (await db.query("SELECT id FROM project_phase_responsibilities WHERE project_id=$1 AND project_stage_id=$2 AND is_coordinator",[projectId,stageId])).rows
+      return call(`/projects/${projectId}/engineer-responsibilities/${r.id}`,{token:staffToken,status,json:{action,note}})
+    }
+    return call(`/confirmations/projects/${projectId}/phase-team/${stageId}/${action}`,{token:staffToken,status,json:{note}})
   }
+  const command = `/projects/${projectId}/workspace-command`
+  const [{id:companyId}] = (await db.query("SELECT id FROM subcontractors WHERE directory_status='approved' AND NOT coalesce(is_deleted,false) LIMIT 1")).rows
+  let allocationPath = command
+  let allocation = {type:"contact_company",companyId}
+  if (multiEngineer) {
+    const metadata = {foremen:[{name:"Test foreman",phone:"09123456789"}],capabilityReview:{
+      disciplines:COMPANY_TRADES,reviewedAt:new Date().toISOString(),unavailable:false}}
+    await db.query(`INSERT INTO workspace_company_metadata(subcontractor_id,metadata) VALUES($1,$2)
+      ON CONFLICT(subcontractor_id) DO UPDATE SET metadata=workspace_company_metadata.metadata||excluded.metadata`,[companyId,metadata])
+    allocationPath = `/projects/${projectId}/phase-allocation`
+    const ctx = await call(allocationPath,{token:leadToken})
+    const foremanId = ctx.companies.find(c=>c.id===companyId).foremen[0].id
+    allocation = {action:"submit",note:"Confirmed project coverage.",revision:ctx.revision,
+      assignments:ctx.phases.map(p=>({phase:p.name,companyId,foremanId}))}
+  }
+  const allocate = (staffToken,status=200) => call(allocationPath,{token:staffToken,status,json:allocation})
+  await respond(lead,leadToken,"accept",409)
+  const uploadRegistered = async (docIndex,name) => call(command,{token,json:{type:"upload_registered",docIndex,doc:{id:await upload(name)}}})
+  await uploadRegistered(3,"registered-plans.pdf")
+  await respond(other,otherToken,"accept",409)
+  await respond(other,otherToken,"decline",409)
+  await respond(lead,leadToken,"accept")
+  await allocate(leadToken,409)
+  for (const index of [0,1,4,5]) await uploadRegistered(index,`registered-${index}.pdf`)
+  await allocate(leadToken,409)
+  await respond(other,otherToken,"accept")
+  if (multiEngineer) {
+    const pending = (await db.query(`SELECT r.id,u.email FROM project_phase_responsibilities r JOIN users u ON u.id=r.user_id
+      WHERE r.project_id=$1 AND r.status='pending'`,[projectId])).rows
+    for (const r of pending) await call(`/projects/${projectId}/engineer-responsibilities/${r.id}`,{token:await login(r.email,"staff"),json:{action:"accept"}})
+  }
+  await allocate(otherToken,403)
+  await call(command,{token:otherToken,status:403,json:{type:"upload_agreement"}})
+  await allocate(leadToken)
   assert.equal((await db.query("SELECT lifecycle_status FROM projects WHERE id=$1",[response.project.id])).rows[0].lifecycle_status,"spm_review")
 })

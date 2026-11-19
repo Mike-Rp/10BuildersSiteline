@@ -128,7 +128,7 @@ function inquiryResponse(row, includeHistory = false) {
 export function staffingAssessment(row, input) {
   const workflow = row.details.opm_workflow;
   const assessment = workflow?.assessment;
-  if (!assessment || input.assessment_id !== assessment.id)
+  if (!assessment || !assessment.id || input?.assessment_id !== assessment.id)
     throw new HttpError(409, "Complete the current project assessment before opening staffing.");
   const original = inquiryDetails(row.details);
   const submitted = inquiryDetails(input);
@@ -298,6 +298,7 @@ export function mountInquiries(router) {
         if (amount !== workflow.budget) {
           workflow.budget_history = [...(workflow.budget_history ?? []), { ...audit, amount }];
           workflow.budget = amount;
+          delete workflow.assessment;
         }
         break;
       }
@@ -314,6 +315,7 @@ export function mountInquiries(router) {
       }
       default: throw new HttpError(422, "Select a valid project workflow action.");
     }
+    if (workflow.assessment?.id !== row.details.opm_workflow?.assessment?.id) delete workflow.staffing;
     details.opm_workflow = workflow;
     const updated = (await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1 RETURNING *",
       [row.id, JSON.stringify(details)])).rows[0];
@@ -325,20 +327,29 @@ export function mountInquiries(router) {
     const row = (await execute("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 AND status='approved'",
       [req.params.id, actor.id])).rows[0];
     if (!row) throw new HttpError(404, "Approved inquiry not found.");
-    const details = inquiryDetails(req.body);
-    const phases = await inquiryPhases({query: execute}, details.project_type);
     const assessment = staffingAssessment(row, req.body);
+    const type = row.details.project_type;
+    const phases = await inquiryPhases({query: execute}, type);
     const estimate = { size: assessment.size, end: assessment.suggestedEnd };
-    if (!req.body.phases) return { phases, estimate };
-    if (!validSchedule(req.body.target_start_date, req.body.target_end_date))
-      throw new HttpError(422, "Enter the overall project start and end dates before allocating.");
-    const budget = Number(req.body.estimated_budget);
-    if (!Number.isFinite(budget) || budget <= 0) throw new HttpError(422, "Enter the estimated project budget.");
+    if (!req.body.phases) return { phases, estimate, staffing: row.details.opm_workflow.staffing };
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
     const selected = confirmedPhases(phases, req.body.phases);
     const candidates = {};
     const candidateBlockers = {};
-    const team = await getSpm(details.project_type, selected, candidates, {start:req.body.target_start_date,end:req.body.target_end_date}, candidateBlockers);
-    return { phases, estimate, team, candidates, candidateBlockers };
+    const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers);
+    for (const phase of selected) {
+      if (!Object.hasOwn(candidates, phase)) {
+        candidates[phase] = [];
+        candidateBlockers[phase] = "phase_disciplines";
+      }
+    }
+    const staffing = {assessment_id:assessment.id, phases:selected, contract_file_id:req.body.contract_file_id};
+    // A correction or conversion can finish while the recommendations are being calculated.
+    const saved = await execute(`UPDATE project_inquiries
+      SET details=jsonb_set(details,'{opm_workflow,staffing}',$3::jsonb), updated_at=now()
+      WHERE id=$1 AND opm_id=$2 AND status='approved' AND details #>> '{opm_workflow,assessment,id}'=$4`,
+      [row.id, actor.id, JSON.stringify(staffing), assessment.id]);
+    if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
+    return { phases, estimate, team, candidates, candidateBlockers, staffing };
   }));
 }

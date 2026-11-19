@@ -68,7 +68,7 @@ async function lockCompanies(db, ids) {
     [[...new Set(ids)].sort()],
   )
 }
-async function intakeReady(db, p) {
+export async function intakeReady(db, p) {
   if (p.lifecycle_status !== "spm_review")
     fail("Allocation can be changed only during Site PM intake review.")
   const required = await db.query(

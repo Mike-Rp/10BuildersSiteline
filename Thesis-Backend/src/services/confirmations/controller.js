@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { loadPhaseCoverage } from "../projects/phase-coverage.utility.js";
-import { assertAcceptancePrerequisites } from "../projects/assignment-prerequisites.utility.js";
+import { assertAcceptancePrerequisites, assertLeadResponded } from "../projects/assignment-prerequisites.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   hasProjectAccess, isUuid, isBigintId, isSmallintId, paging,
@@ -296,7 +296,8 @@ const respondToPhase = (newStatus) => async (req, res) => {
 
     const data = await withTransaction(async (client) => {
       const project = await client.query(
-        `SELECT id, project_type_id, lifecycle_status FROM projects WHERE id = $1 AND COALESCE(is_deleted, false) = false FOR UPDATE`, [id]);
+        `SELECT id, project_type_id, lifecycle_status, to_jsonb(projects)->'inquiry_intake' AS inquiry_intake
+         FROM projects WHERE id = $1 AND COALESCE(is_deleted, false) = false FOR UPDATE`, [id]);
       if (!project.rowCount) throw new HttpError(404, "Project not found.");
       if (!["spm_review", "active"].includes(project.rows[0].lifecycle_status)) {
         throw new HttpError(422, "The Office PM must accept the project before phase assignments can be confirmed.");
@@ -317,6 +318,7 @@ const respondToPhase = (newStatus) => async (req, res) => {
       }
       // Acceptance follows the workspace sequence even for direct API requests.
       if (newStatus === "confirmed") await assertAcceptancePrerequisites(client, project.rows[0], user);
+      else if (project.rows[0].inquiry_intake) await assertLeadResponded(client, project.rows[0], user);
 
       let scopedTeam=[];
       if(newStatus==='confirmed') {

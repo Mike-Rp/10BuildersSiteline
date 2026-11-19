@@ -1,6 +1,6 @@
-import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, validSchedule, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
+import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
 import { intakeSize } from "../../domain/inquiry-assessment.js";
-import { scheduleConflicts } from "./recommend.controller.js";
+import { prepareInquiryLead } from "./inquiry-staffing.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
 import { HttpError } from "../../common/utilities/access.utility.js";
@@ -16,8 +16,6 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
 import { recordArchiveEvent } from "../archive/audit.utility.js";
-import { selectInquiryLead } from "../../domain/inquiry-lead.js";
-import { experienceForProjectSql } from "../accounts/experience.utility.js";
 
 // Lifecycle states an intake may be corrected and resubmitted from. Active and archived projects are closed to intake edits.
 const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
@@ -27,7 +25,7 @@ export const createIntake = async (req, res) => {
     const inquiryId = req.body?.inquiry_id;
     const actor = await requireUser(req, res, inquiryId ? ['opm'] : ['admin']);
     if (!actor) return;
-    if (inquiryId && (!isUuid(inquiryId) || req.body.draft_project_id)) throw new HttpError(422, "Invalid inquiry intake.");
+    if (inquiryId && (!isUuid(inquiryId) || req.body.draft_project_id || req.body.intake_id)) throw new HttpError(422, "Invalid inquiry intake.");
     if (req.body?.client_subcon_company !== undefined) {
       try { normalizeClientCompany(req.body.client_subcon_company); }
       catch (error) { return responseError(res, error.message, 400); }
@@ -57,19 +55,22 @@ export const createIntake = async (req, res) => {
       if (inquiryId) {
         inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
         if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
+        const assessment = staffingAssessment(inquiry, req.body);
         if (inquiry.project_id) {
           const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
           return {project: prior, duplicate: true};
         }
         if (inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
-        const assessment = staffingAssessment(inquiry, req.body);
-        const details = inquiryDetails({...req.body, consultation: inquiry.details.consultation});
-        const { target_end_date: end, estimated_budget: budget, contract_file_id: contract } = req.body;
-        if (!validSchedule(target_start_date,end) || !Number.isFinite(Number(budget)) || Number(budget) <= 0 || !isUuid(contract))
-          throw new HttpError(422, "Enter valid project dates and budget, and upload the signed agreement.");
-        phases = confirmedPhases(await inquiryPhases(client,project_type),req.body.phases);
+        const details = inquiryDetails(inquiry.details);
+        const {review, budget} = inquiry.details.opm_workflow;
+        if (!isUuid(req.body.contract_file_id)) throw new HttpError(422, "Upload the signed client contract agreement.");
+        phases = confirmedPhases(await inquiryPhases(client,details.project_type),req.body.phases);
+        const confirmed = inquiry.details.opm_workflow.staffing;
+        if (confirmed && (confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
+            confirmed.phases.length !== phases.length || confirmed.phases.some((phase,index) => phase !== phases[index])))
+          throw new HttpError(409, "The confirmed phases or signed agreement changed. Reopen staffing before sending offers.");
         tier = assessment.size;
-        intake = {...details, estimated_budget:Number(budget), size:assessment.size, assessment};
+        intake = {...details, target_start_date:review.start, target_end_date:review.end, estimated_budget:budget, size:assessment.size, assessment};
         deadline = businessDeadline((await client.query("SELECT now() AS now")).rows[0].now);
       }
       // A repeat of a new submission returns the project it already created instead of inserting another.
@@ -140,41 +141,8 @@ export const createIntake = async (req, res) => {
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
       await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true});
-      let inquiryLead;
-      if (inquiry) {
-        const ids = [...new Set(phase_team.flatMap(row => [row.user_id,...(row.engineers || []).map(person => person.user_id)]))];
-        if ((await scheduleConflicts(client,ids,{start:target_start_date,end:req.body.target_end_date})).size)
-          throw new HttpError(409,"A selected Site PM has a conflicting project schedule. Refresh the allocation.");
-        const experience = await client.query(
-          `SELECT u.id, ${experienceForProjectSql("$1")} AS years FROM users u WHERE u.id=ANY($2::uuid[])`,
-          [project_type, ids],
-        );
-        const qualifications = await client.query(
-          `SELECT s.code AS stage, q.user_id, array_agg(DISTINCT d.code ORDER BY d.code) AS tags
-           FROM engineer_qualified_scopes q
-           JOIN project_stage_discipline_links l ON l.discipline_id=q.discipline_id AND l.project_type_id=$1
-           JOIN disciplines d ON d.id=q.discipline_id
-           JOIN project_stages s ON s.id=l.project_stage_id
-           WHERE q.user_id=ANY($2::uuid[]) AND s.code=ANY($3::text[])
-           GROUP BY s.code, q.user_id`,
-          [projectType.rows[0].id, ids, phases],
-        );
-        const scopeByAssignment = new Map(qualifications.rows.map(row => [`${row.stage}:${row.user_id}`, row.tags]));
-        const eligibleTagsFor = (stage, id) => scopeByAssignment.get(`${stage}:${id}`) ?? [];
-        for (const phase of phase_team) {
-          if (!phase.engineers && phase.assigned_disciplines == null)
-            phase.assigned_disciplines = eligibleTagsFor(phase.stage, phase.user_id).slice(0, 1);
-        }
-        inquiryLead = selectInquiryLead(phases, phase_team, new Map(experience.rows.map(row => [row.id, Number(row.years)])), eligibleTagsFor);
-        if (!inquiryLead) throw new HttpError(422, "Assign a Site PM with a verified qualification that covers their phase before submitting staffing.");
-        const leadPhase = phase_team.find(row => row.stage === inquiryLead.stage);
-        if (leadPhase.user_id !== inquiryLead.id) {
-          const engineer = leadPhase.engineers.find(person => person.user_id === inquiryLead.id);
-          leadPhase.engineers = [engineer, ...leadPhase.engineers.filter(person => person !== engineer)];
-          leadPhase.user_id = engineer.user_id;
-          leadPhase.assigned_disciplines = engineer.assigned_disciplines;
-        }
-      }
+      const inquiryLead = inquiry ? await prepareInquiryLead(client, phase_team, phases, projectType.rows[0].id,
+        intake.project_type, inquiry.details.opm_workflow.review) : null;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
