@@ -6,6 +6,7 @@ import { mirrorLegacyNotifications } from "../notifications/notification.utility
 import { getOpm, getSpm } from "./recommend.controller.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
+const classifications = ["Normal", "Priority", "Urgent"];
 
 export function inquiryDetails(input) {
   const details = {};
@@ -19,6 +20,7 @@ export function inquiryDetails(input) {
   if (!inquiryTypes.includes(input.project_type)) throw new HttpError(422, "Select a project type.");
   details.project_type = input.project_type;
   for (const key of ["lot_area", "land_area", "floor_area_sqm", "floor_count"]) {
+    if (key === "land_area" && (input[key] == null || input[key] === "")) continue;
     const value = Number(input[key]);
     if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > 32767)))
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
@@ -26,6 +28,14 @@ export function inquiryDetails(input) {
   }
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
+  if (input.classification != null) {
+    if (!classifications.includes(input.classification)) throw new HttpError(422, "Select an inquiry classification.");
+    details.classification = input.classification;
+  }
+  if (input.immediate_consultation != null) {
+    if (!["yes", "no"].includes(input.immediate_consultation)) throw new HttpError(422, "Select an OPM consultation preference.");
+    details.immediate_consultation = input.immediate_consultation;
+  }
   for (const [key, limit] of [["primary_contact", 150], ["overview", 2000]]) {
     const value = input[key];
     if (value == null || value === "") continue;
@@ -49,7 +59,7 @@ export function validSchedule(start, end) {
 export function estimateInquiry(details, start) {
   const config = JSON.parse(process.env.INQUIRY_PLANNING_RULES || "{}");
   const rule = config[details.project_type];
-  const keys = ["lot_area", "land_area", "floor_area_sqm", "floor_count"];
+  const keys = ["lot_area", "land_area", "floor_area_sqm", "floor_count"].filter(key => details[key] != null);
   const matches = (size) => keys.every(key => Number.isFinite(rule?.[size]?.[key]) && details[key] <= rule[size][key]);
   const size = matches("Small") ? "Small" : matches("Medium") ? "Medium"
     : keys.every(key => Number.isFinite(rule?.Medium?.[key])) ? "Large" : null;
@@ -101,6 +111,36 @@ const transition = {
   drop: ["admin", ["withdrawn"], "dropped"],
 };
 
+function recordRoutingEvent(details, event) {
+  details.routing_history = [...(details.routing_history ?? []), { ...event, at: new Date().toISOString() }];
+}
+
+function inquiryResponse(row, includeHistory = false) {
+  const { routing_history, ...details } = row.details;
+  return { ...row, details, ...(includeHistory && routing_history ? { routing_history } : {}) };
+}
+
+function excludedOpmIds(row) {
+  return [row.opm_id, ...(row.details.routing_history ?? [])
+    .filter(event => event.kind === "declined").map(event => event.opm_id)].filter(Boolean);
+}
+
+async function matchInquiry(db, row, actorId, requestedId) {
+  const details = { ...row.details };
+  const candidate = await getOpm(details.project_type, excludedOpmIds(row), db);
+  if (requestedId !== undefined && (!candidate || candidate.id !== requestedId))
+    throw new HttpError(409, "Refresh the OPM recommendation before sending.");
+  recordRoutingEvent(details, candidate
+    ? { kind: "offered", opm: candidate.full_name, opm_id: candidate.id }
+    : { kind: "no_match" });
+  const updated = (await db.query(
+    "UPDATE project_inquiries SET status=$2,opm_id=$3,details=$4,updated_at=now() WHERE id=$1 RETURNING *",
+    [row.id, candidate ? "offered" : row.status, candidate?.id ?? row.opm_id, JSON.stringify(details)],
+  )).rows[0];
+  if (candidate) await notifyInquiry(db, actorId, candidate.id, "Consultation request", details.name);
+  return candidate ? { ...updated, opm_name: candidate.full_name } : updated;
+}
+
 function endpoint(roles, action) {
   return async (req, res) => {
     try {
@@ -112,21 +152,29 @@ function endpoint(roles, action) {
 
 export function mountInquiries(router) {
   router.get("/inquiries", endpoint(["admin", "opm"], async (_, actor) =>
-    (await execute(`SELECT i.*,u.full_name AS opm_name,p.lifecycle_status AS project_status FROM project_inquiries i
+    (await execute(`SELECT i.*,u.full_name AS opm_name,p.lifecycle_status AS project_status,p.target_start_date,p.target_end_date FROM project_inquiries i
       LEFT JOIN users u ON u.id=i.opm_id LEFT JOIN projects p ON p.id=i.project_id WHERE $1='admin' OR (i.opm_id=$2 AND i.status NOT IN ('draft','returned'))
-      ORDER BY i.updated_at DESC`, [actor.role, actor.id])).rows));
+      ORDER BY i.updated_at DESC`, [actor.role, actor.id])).rows.map(row => inquiryResponse(row, actor.role === "admin"))));
 
-  router.post("/inquiries", endpoint(["admin"], async (req, actor) => {
+  router.post("/inquiries", endpoint(["admin"], (req, actor) => withTransaction(async db => {
     const details = inquiryDetails(req.body);
-    return (await execute("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
+    const row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
       [JSON.stringify(details), actor.id])).rows[0];
-  }));
+    return inquiryResponse(details.immediate_consultation === "yes" ? await matchInquiry(db, row, actor.id) : row, true);
+  })));
+
+  router.post("/inquiries/:id/match", endpoint(["admin"], (req, actor) => withTransaction(async db => {
+    if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
+    const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+    if (!row || !["draft", "returned"].includes(row.status)) throw new HttpError(409, "This inquiry is not open for matching.");
+    return inquiryResponse(await matchInquiry(db, row, actor.id), true);
+  })));
 
   router.get("/inquiries/:id/recommendation", endpoint(["admin"], async req => {
     if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
     const row = (await execute("SELECT details,opm_id,status FROM project_inquiries WHERE id=$1", [req.params.id])).rows[0];
     if (!row || !["draft","returned"].includes(row.status)) throw new HttpError(409, "This inquiry is not open for routing.");
-    return getOpm(row.details.project_type, row.opm_id);
+    return getOpm(row.details.project_type, excludedOpmIds(row));
   }));
 
   router.post("/inquiries/:id/decision", endpoint(["admin","opm"], (req, actor) => withTransaction(async db => {
@@ -136,13 +184,15 @@ export function mountInquiries(router) {
     const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
     if (!row || (role === "opm" && row.opm_id !== actor.id)) throw new HttpError(404, "Inquiry not found.");
     if (!from.includes(row.status)) throw new HttpError(409, "The inquiry has already moved to another step.");
-    let opmId = row.opm_id;
     let reason = row.reason;
     const details = { ...row.details };
     if (status === "offered") {
-      const candidate = await getOpm(row.details.project_type, row.opm_id, db);
-      if (!candidate || candidate.id !== req.body.opm_id) throw new HttpError(409, "Refresh the OPM recommendation before sending.");
-      opmId = candidate.id;
+      if (!isUuid(req.body.opm_id)) throw new HttpError(422, "Select a valid OPM recommendation.");
+      return inquiryResponse(await matchInquiry(db, row, actor.id, req.body.opm_id), true);
+    }
+    if (status === "returned" || status === "consulting") {
+      const name = (await db.query("SELECT full_name FROM users WHERE id=$1", [actor.id])).rows[0]?.full_name;
+      recordRoutingEvent(details, { kind: status === "returned" ? "declined" : "accepted", opm: name, opm_id: actor.id });
     }
     if (status === "withdrawn") {
       reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
@@ -161,12 +211,11 @@ export function mountInquiries(router) {
         if (decision_note.trim()) details.client_decision_note = decision_note.trim();
       }
     }
-    const result = await db.query("UPDATE project_inquiries SET status=$2,opm_id=$3,reason=$4,details=$5,updated_at=now() WHERE id=$1 RETURNING *",
-      [row.id, status, opmId, reason, JSON.stringify(details)]);
-    if (status === "offered") await notifyInquiry(db, actor.id, opmId, "Consultation request", row.details.name);
+    const result = await db.query("UPDATE project_inquiries SET status=$2,reason=$3,details=$4,updated_at=now() WHERE id=$1 RETURNING *",
+      [row.id, status, reason, JSON.stringify(details)]);
     if (status === "returned") await notifyInquiry(db, actor.id, row.admin_id, "Inquiry returned", row.details.name);
     if (status === "withdrawn") await notifyInquiry(db, actor.id, row.admin_id, "Client withdrew", `${row.details.name}: ${reason}`);
-    return result.rows[0];
+    return inquiryResponse(result.rows[0], actor.role === "admin");
   })));
 
   router.post("/inquiries/:id/planning", endpoint(["opm"], async (req, actor) => {
@@ -185,7 +234,8 @@ export function mountInquiries(router) {
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
     const selected = confirmedPhases(phases, req.body.phases);
     const candidates = {};
-    const team = await getSpm(details.project_type, selected, candidates, {start:req.body.target_start_date,end:req.body.target_end_date});
-    return { phases, estimate, team, candidates };
+    const candidateBlockers = {};
+    const team = await getSpm(details.project_type, selected, candidates, {start:req.body.target_start_date,end:req.body.target_end_date}, candidateBlockers);
+    return { phases, estimate, team, candidates, candidateBlockers };
   }));
 }

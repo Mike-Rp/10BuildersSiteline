@@ -5,7 +5,7 @@ import { Icon, Modal } from "./ui"
 import { IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
-import { selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
+import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import "./project-inquiries.css"
 
 const projectTypes = [
@@ -20,13 +20,15 @@ const fields = [
   ["floor_area_sqm", "Total floor area (m²)", "number"], ["floor_count", "Number of floors", "number"],
 ] as const
 type Details = Record<string, string | number>
-type Inquiry = { id: string; details: Details; status: string; updated_at?: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string }
+type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
+type Inquiry = { id: string; details: Details; routing_history?: RoutingEvent[]; status: string; created_at?: string; updated_at?: string; opm_id?: string; opm_name?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
-type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]> }
-type Recommendation = { id: string; full_name: string; experience_years: number; availability: string; active_projects?: number }
+type CandidateBlocker = "qualifications" | "schedule" | "commitments"
+type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker> }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
+const classifications = ["Normal", "Priority", "Urgent"]
 const statuses: Record<string,string> = {
   draft: "Ready for routing", offered: "Awaiting OPM response", returned: "Returned to Admin",
   consulting: "Awaiting client decision", approved: "Ready for project intake", withdrawn: "Client withdrew",
@@ -45,6 +47,16 @@ const inquiryDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", time
 const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" })
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
+const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
+
+function inquiryReference(row: Inquiry) {
+  return `10BL-${row.created_at?.slice(0, 4) || row.updated_at?.slice(0, 4) || inquiryDay.format(new Date()).slice(0, 4)}-${row.id.replaceAll("-", "").slice(0, 12).toUpperCase()}`
+}
+
+function adminInquiryStatus(row: Inquiry) {
+  if (row.status === "draft") return row.routing_history?.at(-1)?.kind === "no_match" ? "No eligible OPM" : "Saved for later"
+  return statusLabel(row) || "Status unavailable"
+}
 
 function FormSection({ title, icon, description, children }: { title: string; icon?: string; description?: string; children: ReactNode }) {
   return <section className="inquiry-form-section">
@@ -56,49 +68,22 @@ function FormSection({ title, icon, description, children }: { title: string; ic
   </section>
 }
 
-function InquiryFields({ details, onChange, standaloneTypeSection = false }: { details: Details; onChange: (key: string, value: string | number) => void; standaloneTypeSection?: boolean }) {
+function InquiryFields({ details, onChange }: { details: Details; onChange: (key: string, value: string | number) => void }) {
   const field = (key: string, label: string, type = "text", required = true, maxLength?: number) => <label key={key}>{label}
     <input type={type} required={required} maxLength={maxLength} value={details[key] ?? ""} min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
       step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
       onChange={event => onChange(key, event.target.value)} />
   </label>
-  const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => field(key, label, type))
-  const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className={`inquiry-types ${standaloneTypeSection ? "inquiry-intake-style-types" : ""}`}>
+  const renderFields = (group: typeof fields[number][]) => group.map(([key, label, type]) => field(key, label, type, key !== "land_area"))
+  const types = <fieldset className="inquiry-type-field"><legend>Project type</legend><div className="inquiry-types">
       {projectTypes.map(([type, icon, description]) => {
         const selected = details.project_type === type
-        return <label key={type} className={`${standaloneTypeSection ? "button project-type-card" : ""} ${selected ? "selected" : ""}`}>
+        return <label key={type} className={selected ? "selected" : ""}>
           <input type="radio" name="project-type" required checked={selected} onChange={() => onChange("project_type",type)} />
-          {standaloneTypeSection ? <>
-            <span className="project-type-icon"><Icon name={icon} size={24} /></span>
-            <strong>{type}</strong>
-            {selected && <span className="project-type-check"><Icon name="check" size={15} /></span>}
-          </> : <><Icon name={icon} /><strong>{type}</strong><span>{description}</span></>}
+          <Icon name={icon} /><strong>{type}</strong><span>{description}</span>
         </label>
       })}
     </div></fieldset>
-  if (standaloneTypeSection) return <>
-    <FormSection title="Client information" icon="users" description="Who should we contact about this project?">
-      <div className="inquiry-create-grid">
-        {field("client_name", "Client or organization", "text", true, 150)}
-        {field("primary_contact", "Primary contact (optional)", "text", false, 150)}
-        {field("email", "Email address", "email", true, 150)}
-        {field("phone", "Phone number", "tel", true, 150)}
-      </div>
-    </FormSection>
-    <FormSection title="Project details" icon="doc" description="Share the key information known today.">
-      <div className="inquiry-create-grid">
-        {field("name", "Project name", "text", true, 150)}
-        {field("address", "Project location", "text", true, 500)}
-        {field("floor_area_sqm", "Estimated total floor area (m²)", "number")}
-        {field("anticipated_start", "Anticipated start (optional)", "date", false)}
-        {renderFields([fields[5], fields[6], fields[8]])}
-        <label className="inquiry-overview">Project overview (optional)
-          <textarea rows={3} maxLength={2000} value={details.overview ?? ""} onChange={event => onChange("overview", event.target.value)} />
-        </label>
-      </div>
-    </FormSection>
-    <FormSection title="Project type" icon="building" description="Select the option that best fits the project.">{types}</FormSection>
-  </>
   return <>
     <FormSection title="Client information"><div className="inquiry-fields">{renderFields(fields.slice(0, 3))}</div></FormSection>
     <FormSection title="Project details">
@@ -119,6 +104,51 @@ function InquiryDetails({ details, includeClient = false }: { details: Details; 
   </dl>
 }
 
+function AdminInquirySummary({ row }: { row: Inquiry }) {
+  const { details } = row
+  const area = (value: string | number) => value ? `${Number(value).toLocaleString("en-PH")} m²` : "Not provided"
+  const date = (value?: string | number) => typeof value === "string" && Number.isFinite(Date.parse(value))
+    ? inquiryDate.format(new Date(value)) : "To be determined by Office PM"
+  const values = [
+    ["Client", details.client_name], ["Contact", details.phone], ["Email", details.email],
+    ["Project type", details.project_type], ["Land area", area(details.land_area)], ["Lot area", area(details.lot_area)],
+    ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count], ["Location", details.address],
+    ["Estimated start", date(row.target_start_date || details.anticipated_start)],
+    ["Potential completion", date(row.target_end_date)],
+    ["Inquiry classification", details.classification || "—"],
+  ]
+  return <dl className="admin-inquiry-summary-grid">
+    {values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+  </dl>
+}
+
+function AdminInquiryHistory({ row }: { row: Inquiry }) {
+  const history = row.routing_history ?? []
+  const labels: Record<RoutingEvent["kind"], (name?: string) => string> = {
+    offered: name => `Consultation request sent to ${name || "the matched OPM"}`,
+    declined: name => `${name || "The assigned OPM"} declined the request`,
+    accepted: name => `${name || "The assigned OPM"} accepted the request`,
+    no_match: () => "No eligible OPM found",
+  }
+  return <section className="inquiry-card admin-inquiry-history">
+    <h2>Automated assignment history</h2>
+    <ol>
+      <li><span className="admin-history-icon"><Icon name="check" size={17} /></span><div><strong>Inquiry submitted</strong>
+        {row.created_at && <time dateTime={row.created_at}>{inquiryDate.format(new Date(row.created_at))}</time>}
+      </div></li>
+      {history.map((event, index) => <li key={index}>
+        <span className={`admin-history-icon ${event.kind === "accepted" ? "" : "pending"}`}><Icon name={event.kind === "accepted" ? "check" : "clock"} size={17} /></span>
+        <div><strong>{labels[event.kind](event.opm)}</strong>
+          {event.at && <time dateTime={event.at}>{inquiryDate.format(new Date(event.at))}</time>}
+        </div>
+      </li>)}
+      {!history.length && row.opm_name && <li><span className="admin-history-icon pending"><Icon name="clock" size={17} /></span>
+        <div><strong>{row.opm_name}</strong><p>{adminInquiryStatus(row)}</p></div>
+      </li>}
+    </ol>
+  </section>
+}
+
 const consultationLabel = (details: Details) => timing.find(([value]) => value === Number(details.consultation))?.[1] || "—"
 
 function requiredAreas(entry?: Phase) {
@@ -131,42 +161,53 @@ function requiredAreas(entry?: Phase) {
 function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: Phase[]; candidates: Record<string, Candidate[]> }) {
   const people = new Map(Object.values(candidates).flat().map(person => [person.id, person]))
   const experience = new Map([...people].map(([id, person]) => [id, Number(person.experienceYears ?? 0)]))
-  const lead = selectInquiryLead(phases, team, experience)
-  if (!lead) return null
+  const eligibleTagsFor = (stage: string, id: string) => candidates[stage]?.find(person => person.id === id)?.qualifiedTags ?? []
+  const lead = selectInquiryLead(phases, team, experience, eligibleTagsFor)
   const years = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2, style: "unit", unit: "year", unitDisplay: "long" })
   return <section className="inquiry-card inquiry-lineup">
     <h3>Staffing lineup</h3>
+    <div className="inquiry-lineup-lead">
+      {lead ? <>
+        <strong>Proposed Lead SPM · {people.get(lead.id)?.name || "Site PM"}</strong>
+        <p>{lead.stage} · {years.format(lead.years)} of relevant experience</p>
+        <p><span className="inquiry-pill ready">Phase requirement matched</span> {lead.tags.join(", ")}</p>
+      </> : <p>Assign an eligible Site PM with a matching phase qualification to propose a Lead.</p>}
+    </div>
     <div className="inquiry-lineup-table">
       <table>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Designation</th></tr></thead>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Phase qualification</th><th scope="col">Designation</th></tr></thead>
         <tbody>{phases.flatMap(stage => {
           const entry = team.find(item => item.stage === stage)
-          const assigned = entry?.engineers?.map(person => person.user_id) ?? (entry?.user_id ? [entry.user_id] : [])
-          return assigned.map(id => {
-            const isLead = lead.id === id && lead.stage === stage
-            const designation = isLead ? "Lead SPM" : entry?.user_id === id && lead.stage !== stage ? "Phase coordinator" : "Phase SPM"
+          const assigned = entry?.engineers ?? (entry?.user_id ? [{ user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines }] : [])
+          if (!assigned.length) return <tr key={stage}><td>{stage}</td><td colSpan={4}>Unfilled</td></tr>
+          return assigned.map(({ user_id: id, assigned_disciplines }) => {
+            const isLead = lead?.id === id && lead.stage === stage
+            const designation = entry?.user_id === id && lead?.stage !== stage ? "Phase coordinator" : "Phase SPM"
+            const tags = matchingInquiryTags(assigned_disciplines, eligibleTagsFor(stage, id))
             return <tr key={`${stage}:${id}`} data-lead={isLead}>
               <td>{stage}</td><td>{people.get(id)?.name || "Site PM"}</td>
               <td>{years.format(experience.get(id) ?? 0)}</td>
+              <td>{tags.length ? <><span className="inquiry-pill ready">Matched</span> {tags.join(", ")}</> : <span className="inquiry-pill pending">Matching tag needed</span>}</td>
               <td>{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
             </tr>
           })
         })}</tbody>
       </table>
     </div>
-    <p className="inquiry-lineup-lead"><strong>{people.get(lead.id)?.name || "Site PM"} · {lead.stage}</strong> is the proposed Lead. Relevant project-type experience ranks first, with phase order as the first tiebreaker.</p>
-    <p className="inquiry-muted">The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
+    <p className="inquiry-muted">Qualified assignments are ranked by relevant project-type experience. Ties use phase order, then account ID. The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
   </section>
 }
 
-function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, onChange }: {
+function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck }: {
   stage: string
   entry?: Phase
   suggested?: Phase
   choices: Candidate[]
+  blocker?: CandidateBlocker
   adding: boolean
   setAdding: (value: boolean) => void
   onChange: (entry: Phase) => void
+  onRecheck: () => void
 }) {
   const multi = !!suggested?.engineers
   const engineers = entry?.engineers ?? (entry?.user_id ? [
@@ -196,6 +237,13 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
     update(next)
     setAdding(false)
   }
+  const addOptions = options(engineers.length)
+  const atLimit = engineers.length >= (multi ? 3 : 1)
+  const noEligibleMessage = {
+    qualifications: "No available Site PM meets the account, verified license, and discipline requirements for this phase. Ask Admin to review the required discipline and credentials.",
+    schedule: "The matching Site PMs have conflicting assignments during the current project dates. Review the schedule or recheck after availability changes.",
+    commitments: "The matching Site PMs have unfinished commitments or no available qualifying scope for this phase.",
+  }
   return <section className="inquiry-card inquiry-staffing">
     <div className="inquiry-staff-heading"><h3>{stage}</h3>
       {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} areas covered · minimum {quota} (50%)</span>}
@@ -205,9 +253,18 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
     <div className="inquiry-form-stack">
     <div className="inquiry-staff-heading">
       <strong>Assigned engineers · {engineers.length}</strong>
-      {!adding && engineers.length < (multi ? 3 : 1) && <button className="button" type="button" disabled={!options(engineers.length).length} onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
+      {!adding && !atLimit && <button className="button inquiry-add-engineer" type="button" disabled={!addOptions.length}
+        aria-describedby={addOptions.length ? undefined : "inquiry-add-engineer-help"}
+        onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
     </div>
     {!engineers.length && <p>Unfilled</p>}
+    {!atLimit && !addOptions.length && <div id="inquiry-add-engineer-help" className="inquiry-candidate-help">
+      <p>{choices.length
+        ? "No additional Site PM is eligible for an uncovered responsibility in this phase."
+        : blocker ? noEligibleMessage[blocker] : "No eligible Site PM is available for this phase."}</p>
+      {missing.length > 0 && <p>Uncovered: <strong>{missing.join(", ")}</strong></p>}
+      {!choices.length && <button className="button" type="button" onClick={onRecheck}>Recheck eligibility</button>}
+    </div>}
     <div className="inquiry-engineers">
       {engineers.map((person, index) => {
         const assigned = choices.find(candidate => candidate.id === person.user_id)
@@ -217,7 +274,7 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
             {!replacements.some(option => option.id === person.user_id) && <option value={person.user_id}>{assigned?.name || "Site PM"}</option>}
             {replacements.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select></label>
-          <p className="inquiry-muted">Site PM{assigned?.qualifiedTags.length ? ` · ${assigned.qualifiedTags.join(", ")}` : ""}</p>
+          <p className="inquiry-muted">{assigned ? `Site PM${assigned.qualifiedTags.length ? ` · ${assigned.qualifiedTags.join(", ")}` : ""}` : "This assignment is no longer eligible. Replace or remove it before sending offers."}</p>
           {multi && <fieldset>
             <legend>Responsibilities in {stage}</legend>
             {required.map(area => {
@@ -237,9 +294,9 @@ function StaffingCards({ stage, entry, suggested, choices, adding, setAdding, on
         </article>
       })}
       {adding && <article className="inquiry-card"><label>Add SPM to phase
-        <select value="" onChange={event => assign(engineers.length, event.target.value)}>
+        <select autoFocus value="" onChange={event => assign(engineers.length, event.target.value)}>
           <option value="">Select an eligible SPM</option>
-          {options(engineers.length).map(option => <option key={option.id} value={option.id}>{option.name} · {option.tags.join(", ")}</option>)}
+          {addOptions.map(option => <option key={option.id} value={option.id}>{option.name} · {option.tags.join(", ")}</option>)}
         </select></label>
         <button className="button" type="button" onClick={() => setAdding(false)}>Cancel</button>
       </article>}
@@ -264,15 +321,14 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const [queueType, setQueueType] = useState("")
   const recordHeading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState("")
-  const [dialog, setDialog] = useState<"new" | "route" | "review" | "outcome" | "intake" | "details">()
+  const [dialog, setDialog] = useState<"review" | "outcome" | "intake" | "details">()
+  const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [step, setStep] = useState(1)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
   const [showProject, setShowProject] = useState(false)
   const stepperRef = useRef<HTMLOListElement>(null)
   const [details, setDetails] = useState<Details>({ consultation: 30 })
-  const [matchOnCreate, setMatchOnCreate] = useState(true)
-  const [recommendation, setRecommendation] = useState<Recommendation | null>()
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
@@ -296,6 +352,9 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setTeam([])
   }
   const refresh = async () => setRows(await api<Inquiry[]>(root))
+  useEffect(() => {
+    if (adminPage !== "list") recordHeading.current?.focus()
+  }, [adminPage])
   useEffect(() => {
     const mime = /.(pdf)$/i.test(contract?.name || "") ? "application/pdf"
       : /.png$/i.test(contract?.name || "") ? "image/png"
@@ -326,7 +385,6 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   function open(item?: Inquiry) {
     setSelected(item?.id || "")
     setDetails(item ? { ...item.details } : { consultation: 30 })
-    setRecommendation(undefined)
     setPlanning(undefined)
     setTeam([])
     setPhases([])
@@ -349,18 +407,11 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setDialog(undefined)
     setError("")
   }
-  async function recommend(id: string) {
-    const result = await api<Recommendation | { data: null } | null>(`${root}/${id}/recommendation`)
-    setRecommendation(result && "id" in result ? result : null)
-    setShowProject(false)
-    setDialog("route")
-  }
   async function decision(action: string) {
     const updated = await post<Inquiry>(`${root}/${selected}/decision`, {
-      action, reason, opm_id: recommendation?.id,
+      action, reason,
       ...(action === "approve" || action === "withdraw" ? { decision_date: decisionDate, decision_note: decisionNote } : {}),
     })
-    setRecommendation(undefined)
     if (action === "approve") {
       setRows(previous => previous?.map(item => item.id === updated.id ? { ...item, ...updated } : item))
       setDetails({ ...updated.details })
@@ -398,11 +449,11 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       setStep(2)
     })
   }
-  async function allocate() {
+  async function allocate(recheck = false) {
     const fileId = await uploadIntakeContract()
     const result = await post<Planning>(`${root}/${selected}/planning`, { ...details, target_start_date: start, target_end_date: end, phases, estimated_budget: budget, contract_file_id: fileId })
     setPlanning(result)
-    setTeam(result.team || [])
+    if (!recheck) setTeam(result.team || [])
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
     setAddingEngineer(false)
     setStep(3)
@@ -430,6 +481,11 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const canSend = canAllocate && phases.every(stage => {
     const entry = team.find(item => item.stage === stage)
     if (!entry?.user_id) return false
+    const choices = planning?.candidates?.[stage] ?? []
+    const assigned = entry.engineers ?? [entry]
+    if (assigned.some(person => !matchingInquiryTags(
+      person.assigned_disciplines, choices.find(candidate => candidate.id === person.user_id)?.qualifiedTags ?? [],
+    ).length)) return false
     if (!entry.engineers) return true
     const required = requiredAreas(planning?.team?.find(item => item.stage === stage))
     const covered = new Set(entry.engineers.flatMap(person => person.assigned_disciplines))
@@ -443,7 +499,8 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   const admin = role === "admin"
   const query = search.trim().toLowerCase()
   const matchesSearch = (item: Inquiry) => !query ||
-    [item.details.name, item.details.client_name, statusLabel(item)]
+    [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : statusLabel(item),
+      admin ? inquiryReference(item) : ""]
       .some(value => String(value ?? "").toLowerCase().includes(query))
   const visibleRows = rows?.filter(matchesSearch)
   const queueRows = visibleRows?.filter(item =>
@@ -458,13 +515,133 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     return counts
   }, { all: 0, action: 0, waiting: 0 })
   const statusOptions = [...new Set([...(rows ?? []).map(statusLabel), queueStatus].filter(Boolean))]
+  if (admin && adminPage === "new") {
+    const input = (key: string, label: string, type = "text", required = true, maxLength?: number) =>
+      <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
+        <input type={type} value={details[key] ?? ""} required={required} maxLength={maxLength}
+          min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
+          max={key === "floor_count" ? 32767 : undefined}
+          step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
+          placeholder={required ? undefined : "Optional"} onChange={event => change(key, event.target.value)} />
+      </label>
+    return <section className="project-inquiries admin-inquiries admin-inquiry-page">
+      <header className="inquiries-page-heading">
+        <div><h1 ref={recordHeading} tabIndex={-1}>Submit a project inquiry</h1>
+          <p>Record client and project information. The system matches an Office PM when immediate consultation is requested.</p>
+        </div>
+        <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
+      </header>
+      <form className="admin-inquiry-submission" onSubmit={event => {
+        event.preventDefault()
+        if (busy) return
+        void run(async () => {
+          const result = await post<Inquiry>(root, details)
+          setRows(previous => [result, ...(previous ?? []).filter(item => item.id !== result.id)])
+          setSelected(result.id)
+          setSearch("")
+          setAdminPage("submitted")
+          void onReload()
+        })
+      }}>
+        <fieldset disabled={busy} className="inquiry-form-stack">
+          <FormSection title="Client information" icon="users" description="Required contact details for the project inquiry.">
+            <div className="admin-inquiry-form-grid">
+              {input("client_name", "Client name", "text", true, 150)}
+              {input("phone", "Contact number", "tel", true, 150)}
+              {input("email", "Email address", "email", true, 150)}
+            </div>
+          </FormSection>
+          <FormSection title="Project information" icon="building" description="Measurements use square meters (m²).">
+            <div className="admin-inquiry-form-grid">
+              {input("name", "Project name", "text", true, 150)}
+              <label><span>Project type<span className="inquiry-required"> *</span></span>
+                <select required value={details.project_type ?? ""} onChange={event => change("project_type", event.target.value)}>
+                  <option value="">Select a project type</option>
+                  {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
+                </select>
+              </label>
+              {input("land_area", "Land area (m²)", "number", false)}
+              {input("lot_area", "Lot area (m²)", "number")}
+              {input("floor_area_sqm", "Total floor area (m²)", "number")}
+              {input("floor_count", "Number of floors", "number")}
+              {input("address", "Project address / location", "text", true, 500)}
+            </div>
+          </FormSection>
+          <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">
+            <div className="admin-inquiry-consultation">
+              <fieldset className="admin-inquiry-preference">
+                <legend>Does the client wish to speak with an OPM right away? <span className="inquiry-required">*</span></legend>
+                {(["yes", "no"] as const).map(value => <label key={value}>
+                  <input type="radio" name="immediate-consultation" required checked={details.immediate_consultation === value} onChange={() => change("immediate_consultation", value)} />
+                  {value === "yes" ? "Yes" : "No"}
+                </label>)}
+              </fieldset>
+              <label><span>Inquiry classification<span className="inquiry-required"> *</span></span>
+                <select required value={details.classification} onChange={event => change("classification", event.target.value)}>
+                  {classifications.map(value => <option key={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
+          </FormSection>
+        </fieldset>
+        {feedback}
+        <div className="admin-inquiry-submit-bar">
+          <p><Icon name="lock" size={17} /> Project assessment and staffing remain Office PM responsibilities.</p>
+          <button type="submit" className="button primary" disabled={busy}>Submit Project Inquiry</button>
+        </div>
+      </form>
+    </section>
+  }
+  if (admin && row && (adminPage === "submitted" || adminPage === "tracking")) {
+    const submitted = adminPage === "submitted"
+    const status = adminInquiryStatus(row)
+    return <section className="project-inquiries admin-inquiries admin-inquiry-page">
+      <header className="inquiries-page-heading">
+        <div><h1 ref={recordHeading} tabIndex={-1}>{submitted ? "Inquiry submitted" : "Inquiry tracking"}</h1>
+          <p>{submitted
+            ? row.status === "offered" ? "The system generated a reference and sent the consultation request."
+              : status === "No eligible OPM" ? "The inquiry was saved. No eligible Office PM was available for matching."
+                : "The inquiry was saved for later consultation."
+            : "Monitor matching and acceptance for this inquiry."}</p>
+        </div>
+        {submitted ? <button className="button" onClick={() => setAdminPage("tracking")}>View inquiry status</button> : <>
+          <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
+          <button className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
+        </>}
+      </header>
+      {submitted && <div className="admin-inquiry-success" role="status">
+        <span className="admin-history-icon"><Icon name="check" /></span>
+        <div><strong>Saved successfully</strong><h2>{row.details.name}</h2><p>Reference {inquiryReference(row)}</p></div>
+        <span className={`inquiry-pill ${status === "No eligible OPM" ? "pending" : "ready"}`}>{status}</span>
+      </div>}
+      <div className={submitted ? "" : "admin-inquiry-tracking-grid"}>
+        <section className="inquiry-card admin-inquiry-tracking-summary">
+          {!submitted && <header><div><p>{inquiryReference(row)}</p><h2>{row.details.name}</h2></div><span className="inquiry-pill">{status}</span></header>}
+          <AdminInquirySummary row={row} />
+          {!submitted && row.reason && <p>Withdrawal reason: {row.reason}</p>}
+          {!submitted && row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
+          {!submitted && row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
+        </section>
+        {!submitted && <AdminInquiryHistory row={row} />}
+      </div>
+      {!submitted && ["draft", "returned"].includes(row.status) && <div>
+        <button className="button primary" disabled={busy} onClick={() => void run(async () => {
+          const updated = await post<Inquiry>(`${root}/${row.id}/match`, {})
+          setRows(previous => [ { ...row, ...updated }, ...(previous ?? []).filter(item => item.id !== row.id) ])
+          void onReload()
+        })}>{status === "Saved for later" ? "Start automatic matching" : "Retry automatic matching"}</button>
+      </div>}
+      {!submitted && row.status === "withdrawn" && <div><button className="button" disabled={busy} onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button></div>}
+      {feedback}
+    </section>
+  }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
     <header className="inquiries-page-heading">
       <div><h1>Project inquiries</h1>
         {admin && <p>Review saved inquiries or start a new project request.</p>}
       </div>
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
-      {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setMatchOnCreate(true); setDialog("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
+      {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
     </header>
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
       <div className="confirmation-intake-filters">
@@ -523,20 +700,20 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       {visibleRows?.length ? <ul className="inquiry-list">
         {visibleRows.map(item => {
           const name = item.details.name || "Untitled project"
-          const status = statusLabel(item) || "Status unavailable"
+          const status = adminInquiryStatus(item)
           const updated = item.updated_at && Number.isFinite(Date.parse(item.updated_at)) ? item.updated_at : undefined
           const updatedLabel = updated ? inquiryDate.format(new Date(updated)) : ""
           return <li key={item.id}>
-            <button type="button" className="inquiry-list-row" disabled={busy} aria-pressed={item.id === selected}
+            <button type="button" className="inquiry-list-row" disabled={busy}
               aria-label={`View inquiry for ${name}, ${[item.details.client_name, status, updatedLabel && `last updated ${updatedLabel}`].filter(Boolean).join(", ")}`}
               onClick={() => {
                 open(item)
-                requestAnimationFrame(() => recordHeading.current?.focus())
+                setAdminPage("tracking")
               }}>
               <span className="inquiry-list-project">
                 <span className="inquiry-list-icon"><Icon name="building" /></span>
                 <span className="inquiry-list-name"><strong>{name}</strong>
-                  {item.details.client_name && <small>{item.details.client_name}</small>}
+                  <small>{[item.details.client_name, inquiryReference(item)].filter(Boolean).join(" · ")}</small>
                 </span>
               </span>
               <span className="inquiry-list-status" data-status={item.status}>{status}</span>
@@ -552,34 +729,6 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           error ? "Inquiries could not be loaded." : "Loading inquiries…"}
       </p>}
     </section>}
-    {admin && row && <fieldset disabled={busy} className="inquiry-record">
-      <div className="inquiry-record-heading">
-        <div>
-          <span className={`inquiry-pill ${row.status === "offered" ? "pending" : ""}`}>{statusLabel(row)}</span>
-          <h2 ref={recordHeading} tabIndex={-1}>{row.details.name}</h2>
-          <p>{row.details.client_name}</p>
-        </div>
-        {row.status === "offered" && <button type="button" className="button" disabled>OPM selected</button>}
-      </div>
-      {row.status === "offered" ? <div className="inquiry-sent-notice" role="status">
-        <span className="inquiry-list-icon"><Icon name="clock" /></span>
-        <div>
-          <strong>Consultation request sent</strong>
-          <p>{row.opm_name ? `${row.opm_name} has been invited to review this project.` : "The assigned Office Project Manager has been invited to review this project."}</p>
-          <small>You can continue once the Office PM responds.</small>
-        </div>
-      </div> : row.opm_name && <p>Office Project Manager: {row.opm_name}</p>}
-      {row.reason && <p>Withdrawal reason: {row.reason}</p>}
-      {row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
-      {row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
-      <InquiryDetails details={row.details} includeClient />
-      <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
-      {["draft", "returned"].includes(row.status) && <div>
-        <button className="button primary" onClick={() => void run(() => recommend(row.id))}>Find OPM</button>
-      </div>}
-      {row.status === "withdrawn" && <button className="button" onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button>}
-    </fieldset>}
-
     {dialog === "details" && role === "opm" && row && <Modal title={String(row.details.name || "Inquiry details")} wide onClose={closeDialog}>
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
@@ -603,7 +752,10 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         </div>
         <div className="inquiry-review-columns">
           <FormSection title="Consultation scope" icon="doc" description="Provided by the Admin">
-            <dl className="inquiry-fields"><div><dt>Preferred consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div></dl>
+            <dl className="inquiry-fields">
+              <div><dt>Preferred consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div>
+              {row.details.classification && <div><dt>Inquiry classification</dt><dd>{row.details.classification}</dd></div>}
+            </dl>
             <p className="inquiry-muted">Review the project and discuss the proposal with the client after accepting.</p>
           </FormSection>
           <FormSection title={String(row.details.name)} icon="building" description="Project inquiry">
@@ -664,90 +816,6 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </form>
     </Modal>}
 
-    {dialog === "new" && <Modal title="New project inquiry" wide onClose={closeDialog} footer={<>
-      <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
-      <button type="submit" form="new-inquiry-form" className="button primary" disabled={busy}>Create inquiry</button>
-    </>}>
-      <form id="new-inquiry-form" className="inquiry-dialog-content inquiry-create" onSubmit={event => {
-        event.preventDefault()
-        void run(async () => {
-          const result = await post<Inquiry>(root, details)
-          setRows(previous => [result, ...(previous || []).filter(item => item.id !== result.id)])
-          setSearch("")
-          open(result)
-          if (matchOnCreate) await recommend(result.id)
-        })
-      }}>
-        <p className="inquiry-create-intro">Tell us what you’re building. You can review and route the inquiry after it’s created.</p>
-        <fieldset disabled={busy} className="inquiry-form-stack">
-          <InquiryFields details={details} onChange={change} standaloneTypeSection />
-          <FormSection title="Consultation" icon="users" description="Choose what should happen after creation.">
-            <fieldset className="inquiry-routing-options">
-              <legend className="sr-only">Routing after creation</legend>
-              <label>
-                <input type="radio" name="match-on-create" checked={matchOnCreate} onChange={() => setMatchOnCreate(true)} />
-                <span><strong>Yes, help me find the right OPM</strong><small>We’ll match the project with an available Office Project Manager.</small></span>
-              </label>
-              <label>
-                <input type="radio" name="match-on-create" checked={!matchOnCreate} onChange={() => setMatchOnCreate(false)} />
-                <strong>No, save this inquiry for later</strong>
-              </label>
-            </fieldset>
-            <label className="inquiry-consultation-field">Preferred consultation timing
-              <select value={details.consultation} onChange={event => change("consultation", Number(event.target.value))}>
-                {timing.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-              </select>
-            </label>
-          </FormSection>
-        </fieldset>
-        {feedback}
-      </form>
-    </Modal>}
-
-    {dialog === "route" && row && <Modal title="Route inquiry" wide onClose={closeDialog} footer={<>
-      <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
-      {recommendation && <button className="button primary" disabled={busy} onClick={() => void run(() => decision("send"))}>Send consultation request</button>}
-    </>}>
-      <div className="inquiry-dialog-content inquiry-routing">
-        <section className="inquiry-route-summary" aria-label="Inquiry summary">
-          <p className="inquiry-route-label">Inquiry summary</p>
-          <h3>{row.details.name}</h3>
-          <p>{row.details.client_name}</p>
-          <dl>
-            <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
-            <div><dt>Location</dt><dd>{row.details.address}</dd></div>
-            <div><dt>Total floor area</dt><dd>{row.details.floor_area_sqm ? `${Number(row.details.floor_area_sqm).toLocaleString("en-PH")} m²` : "—"}</dd></div>
-            <div><dt>Anticipated start</dt><dd>{row.details.anticipated_start || "—"}</dd></div>
-            <div><dt>Consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div>
-            <div><dt>Status</dt><dd>{statusLabel(row)}</dd></div>
-          </dl>
-          <div className="inquiry-disclosure">
-            <button type="button" aria-expanded={showProject} aria-controls="route-project-details" onClick={() => setShowProject(previous => !previous)}>
-              {showProject ? "Hide project details" : "View project details"} <Icon name="down" size={18} />
-            </button>
-            <div id="route-project-details" hidden={!showProject}><InquiryDetails details={row.details} /></div>
-          </div>
-        </section>
-        <section className="inquiry-route-result">
-          <p className="inquiry-route-label">System match</p>
-          <h3>Recommended Office Project Manager</h3>
-          {recommendation ? <div className="inquiry-card inquiry-match">
-            <div className="inquiry-match-heading">
-              <div><h4>{recommendation.full_name}</h4><p>Office Project Manager</p></div>
-              <span className={`inquiry-pill ${recommendation.availability === "available" ? "ready" : ""}`}>{recommendation.availability || "Availability unknown"}</span>
-            </div>
-            <dl className="inquiry-match-metrics">
-              <div><Icon name="building" size={18} /><dt>Specialization</dt><dd>{row.details.project_type}</dd></div>
-              <div><Icon name="clock" size={18} /><dt>Relevant experience</dt><dd>{recommendation.experience_years == null ? "—" : `${recommendation.experience_years} years`}</dd></div>
-              {recommendation.active_projects != null && <div><Icon name="doc" size={18} /><dt>Active projects</dt><dd>{recommendation.active_projects}</dd></div>}
-            </dl>
-            <p className="inquiry-match-note"><Icon name="check" size={16} /> Matched by project type, relevant experience, and availability.</p>
-          </div> : <p className="inquiry-card">No eligible Office Project Manager is currently available.</p>}
-        </section>
-        {feedback}
-      </div>
-    </Modal>}
-
     {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(details.name || row.details.name || "")} wide onClose={closeDialog} footer={<>
       <span className="inquiry-intake-progress">Step {step} of 3</span>
       <button type="button" className="button" disabled={busy} onClick={step === 1 ? closeDialog : () => setStep(step - 1)}>{step === 1 ? "Close" : "Back"}</button>
@@ -756,7 +824,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
         if (planning?.candidates) setStep(3)
         else void run(allocate)
       }}>Continue to staffing</button>}
-      {step === 3 && <button className="button primary" disabled={busy || !canSend} onClick={() => void run(submit)}>Send assignment offers</button>}
+      {step === 3 && <button className="button primary inquiry-send-offers" disabled={busy || !canSend} onClick={() => void run(submit)}>Send assignment offers</button>}
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
         <ol ref={stepperRef} className="inquiry-stepper" aria-label="Project intake steps">
@@ -840,6 +908,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           <StaffingCards stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
             suggested={planning.team?.find(entry => entry.stage === staffingPhase)}
             choices={planning.candidates[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
+            blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
           {!canSend && <p className="inquiry-muted">Fill every selected phase and meet its minimum coverage before sending assignment offers.</p>}
         </fieldset>}
@@ -847,15 +916,5 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       </div>
     </Modal>}
     {!dialog && feedback}
-    {admin && <details className="inquiry-workflow-help">
-      <summary>
-        <span className="inquiry-list-icon"><Icon name="doc" /></span>
-        <span><strong>What happens after an inquiry?</strong>
-          <small>Review the project, match it with an available Office Project Manager, then begin project intake.</small>
-        </span>
-        <span className="inquiry-workflow-action">See an example <Icon name="chevron" size={16} /></span>
-      </summary>
-      <p>For example, open a saved residential inquiry and choose <strong>Find OPM</strong>. Review the system match and send a consultation request. Once the client agrees to proceed, the Office PM can start project intake.</p>
-    </details>}
   </section>
 }

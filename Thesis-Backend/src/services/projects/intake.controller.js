@@ -147,8 +147,24 @@ export const createIntake = async (req, res) => {
           `SELECT u.id, ${experienceForProjectSql("$1")} AS years FROM users u WHERE u.id=ANY($2::uuid[])`,
           [project_type, ids],
         );
-        inquiryLead = selectInquiryLead(phases, phase_team, new Map(experience.rows.map(row => [row.id, Number(row.years)])));
-        if (!inquiryLead) throw new HttpError(422, "Assign a Site PM before submitting staffing.");
+        const qualifications = await client.query(
+          `SELECT s.code AS stage, q.user_id, array_agg(DISTINCT d.code ORDER BY d.code) AS tags
+           FROM engineer_qualified_scopes q
+           JOIN project_stage_discipline_links l ON l.discipline_id=q.discipline_id AND l.project_type_id=$1
+           JOIN disciplines d ON d.id=q.discipline_id
+           JOIN project_stages s ON s.id=l.project_stage_id
+           WHERE q.user_id=ANY($2::uuid[]) AND s.code=ANY($3::text[])
+           GROUP BY s.code, q.user_id`,
+          [projectType.rows[0].id, ids, phases],
+        );
+        const scopeByAssignment = new Map(qualifications.rows.map(row => [`${row.stage}:${row.user_id}`, row.tags]));
+        const eligibleTagsFor = (stage, id) => scopeByAssignment.get(`${stage}:${id}`) ?? [];
+        for (const phase of phase_team) {
+          if (!phase.engineers && phase.assigned_disciplines == null)
+            phase.assigned_disciplines = eligibleTagsFor(phase.stage, phase.user_id).slice(0, 1);
+        }
+        inquiryLead = selectInquiryLead(phases, phase_team, new Map(experience.rows.map(row => [row.id, Number(row.years)])), eligibleTagsFor);
+        if (!inquiryLead) throw new HttpError(422, "Assign a Site PM with a verified qualification that covers their phase before submitting staffing.");
         const leadPhase = phase_team.find(row => row.stage === inquiryLead.stage);
         if (leadPhase.user_id !== inquiryLead.id) {
           const engineer = leadPhase.engineers.find(person => person.user_id === inquiryLead.id);

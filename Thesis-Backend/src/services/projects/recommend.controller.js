@@ -205,13 +205,13 @@ export const getOpm = async (project_type, excludedId = null, db = {query: execu
         availability AS "MAIN.availability",
         experience_years AS "MAIN.experience_years"
       FROM ranked_users
-      WHERE matching_count > 0 and availability = 'available' AND id IS DISTINCT FROM $2::uuid
+      WHERE matching_count > 0 and availability = 'available' AND NOT (id = ANY($2::uuid[]))
       ORDER BY
         matching_count DESC,
         experience_years DESC,
         total_user_tags ASC, full_name ASC, id ASC
     `;
-  const result = await db.query(query, [project_type, excludedId]);
+  const result = await db.query(query, [project_type, Array.isArray(excludedId) ? excludedId : excludedId ? [excludedId] : []]);
 
   if (result.rowCount === 0) {
     return null;
@@ -232,7 +232,7 @@ export async function scheduleConflicts(db, ids, {start,end}) {
   return new Set(rows.map(row => row.user_id));
 }
 
-export const getSpm = async (project_type, phases, candidateMap, schedule) => {
+export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers) => {
   const db={query:execute}; const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
   const typeId=(await execute('select id from project_types where code=$1',[project_type])).rows[0]?.id;
@@ -301,7 +301,9 @@ export const getSpm = async (project_type, phases, candidateMap, schedule) => {
           full_name AS "MAIN.full_name",
           cast((cast(matching_count as float) / total_requested_tags) * 100 as int) as "MAIN.percentage",
           availability AS "MAIN.availability",
-          experience_years AS "MAIN.experience_years"
+          experience_years AS "MAIN.experience_years",
+          ARRAY(SELECT d.code FROM disciplines d WHERE d.id=ANY(ranked_users.disciplines)
+            AND d.id=ANY($1::int[]) ORDER BY d.code) AS "MAIN.matching_scopes"
         FROM ranked_users
         WHERE matching_count > 0 and availability = 'available'
         ORDER BY
@@ -312,11 +314,13 @@ export const getSpm = async (project_type, phases, candidateMap, schedule) => {
     );
 
     let details = mapMultiple(spm_result.rows, 'id');
+    let blocker = details.length ? undefined : "qualifications";
     if (schedule && details.length) {
       const blocked = await scheduleConflicts(db, details.map(person => person.id), schedule);
       details = details.filter(person => !blocked.has(person.id));
+      if (!details.length) blocker = "schedule";
     }
-    if(scoped) {
+    if(scoped && details.length) {
       const available=[];
       for(const candidate of details) {
         const team=[{stage:row.code,user_id:candidate.id}];
@@ -324,24 +328,22 @@ export const getSpm = async (project_type, phases, candidateMap, schedule) => {
         catch(error) { if(error.status!==409) throw error; }
       }
       details=available;
+      if (!details.length) blocker = "commitments";
     }
+    if (candidateBlockers && blocker) candidateBlockers[row.code] = blocker;
 
     const randomIndex = 0;
 
     if(multi) {
       const required=(await execute('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
-      const candidates=[];
-      for(const person of details) {
-        const qualifiedTags=(await execute('select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=$1 and d.id=any($2::int[])',[person.id,row.disciplines.map(Number)])).rows.map(r=>r.code);
-        candidates.push({id:person.id,qualifiedTags});
-      }
+      const candidates = details.map(person => ({id:person.id,qualifiedTags:person.matching_scopes}));
       if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years}));
       const result=allocatePhaseCoverage(required,candidates);
       suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 
-    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines || [],experienceYears:person.experience_years}));
+    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines ?? person.matching_scopes,experienceYears:person.experience_years}));
     if (details.length > 0) {
       suggestedSpms.push({
         id: row.project_stage_id,
@@ -350,7 +352,7 @@ export const getSpm = async (project_type, phases, candidateMap, schedule) => {
         user_id: details[randomIndex].id,
         name: details[randomIndex].full_name,
         percentage: details[randomIndex].percentage,
-        assigned_disciplines: details[randomIndex].assigned_disciplines
+        assigned_disciplines: details[randomIndex].assigned_disciplines ?? details[randomIndex].matching_scopes.slice(0, 1)
       });
     }
   }
