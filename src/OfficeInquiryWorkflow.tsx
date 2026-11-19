@@ -203,7 +203,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           decide(proposalAction ?? "approve", { decision_date: decisionDate, decision_note: note, reason })
         }}>
           <fieldset className="office-workflow-form" disabled={busy}>
-            <label>Discussion date<input required type="date" max={today()} value={decisionDate} onChange={event => setDecisionDate(event.target.value)} /></label>
+            <div>
+              <label htmlFor="inquiry-discussion-date">Discussion date</label>
+              <DatePicker id="inquiry-discussion-date" calendarTitle="Discussion date"
+                required disabled={busy} max={today()} value={decisionDate} onValueChange={setDecisionDate} />
+            </div>
             <label>{proposalAction === "revise" ? "Requested revisions" : "Internal note (optional)"}
               <textarea required={proposalAction === "revise"} maxLength={1000} value={note} onChange={event => setNote(event.target.value)} />
             </label>
