@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Icon } from "./ui"
+import DatePicker from "./DatePicker"
 import { arrangementOptions, assessInquiry, technicalOptions } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
@@ -267,8 +268,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           </>}
           {(editing || !review) && <Card title="Estimated project dates" icon="calendar">
             <div className="office-workflow-fields">
-              <label>Estimated start date<input type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
-              <label>Estimated completion date<input type="date" required min={start} value={end} onChange={event => setEnd(event.target.value)} /></label>
+              <div>
+                <label htmlFor="inquiry-start-date">Estimated start date</label>
+                <DatePicker id="inquiry-start-date" calendarTitle="Estimated start date"
+                  required disabled={busy} value={start} onValueChange={setStart} />
+              </div>
+              <div>
+                <label htmlFor="inquiry-completion-date">Estimated completion date</label>
+                <DatePicker id="inquiry-completion-date" calendarTitle="Estimated completion date"
+                  calendarSubtitle="Choose the estimated start date or a later date."
+                  required disabled={busy} value={end} min={start || undefined} start={start} onValueChange={setEnd} />
+              </div>
             </div>
           </Card>}
           {editing && <Card title="Modification reason" icon="doc">
