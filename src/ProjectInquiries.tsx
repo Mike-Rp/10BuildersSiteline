@@ -639,11 +639,21 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
                   {value === "yes" ? "Yes" : "No"}
                 </label>)}
               </fieldset>
-              <label><span>Inquiry classification<span className="inquiry-required"> *</span></span>
-                <select required value={details.classification} onChange={event => change("classification", event.target.value)}>
-                  {classifications.map(value => <option key={value}>{value}</option>)}
-                </select>
-              </label>
+              <fieldset className="admin-inquiry-classification">
+                <legend>Inquiry classification <span className="inquiry-required">*</span></legend>
+                <div className="admin-inquiry-classification-options">
+                  {classifications.map(value => (
+                    <label key={value}>
+                      <input className="sr-only" type="radio" name="inquiry-classification" value={value} required
+                        checked={details.classification === value} onChange={() => change("classification", value)} />
+                      <span>{value}</span>
+                      {details.classification === value && <span className="inquiry-classification-check" aria-hidden="true">
+                        <Icon name="check" size={13} />
+                      </span>}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </div>
           </FormSection>
         </fieldset>
