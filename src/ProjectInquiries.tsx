@@ -314,13 +314,20 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     setDialog("route")
   }
   async function decision(action: string) {
-    await post(`${root}/${selected}/decision`, {
+    const updated = await post<Inquiry>(`${root}/${selected}/decision`, {
       action, reason, opm_id: recommendation?.id,
       ...(action === "approve" || action === "withdraw" ? { decision_date: decisionDate, decision_note: decisionNote } : {}),
     })
     setRecommendation(undefined)
-    await refresh()
-    setDialog(undefined)
+    if (action === "approve") {
+      setRows(previous => previous?.map(item => item.id === updated.id ? { ...item, ...updated } : item))
+      setDetails({ ...updated.details })
+      setStep(1)
+      setDialog("intake")
+    } else {
+      await refresh()
+      setDialog(undefined)
+    }
     void onReload()
   }
   function openOutcome() {
@@ -531,7 +538,9 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
 
     {dialog === "outcome" && role === "opm" && row?.status === "consulting" && <Modal title="Record client decision" onClose={closeDialog} footer={<>
       <button className="button" disabled={busy} onClick={closeDialog}>Cancel</button>
-      <button form="inquiry-outcome-form" type="submit" className="button primary" disabled={busy || !outcome || !decisionDate || (outcome === "withdraw" && !reason.trim())}>Save decision</button>
+      <button form="inquiry-outcome-form" type="submit" className="button primary" disabled={busy || !outcome || !decisionDate || (outcome === "withdraw" && !reason.trim())}>
+        {outcome === "approve" ? "Save and open intake" : "Save decision"}
+      </button>
     </>}>
       <form id="inquiry-outcome-form" className="inquiry-dialog-content inquiry-outcome" onSubmit={event => {
         event.preventDefault()
@@ -548,7 +557,7 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
           <fieldset className="inquiry-routing-options inquiry-outcome-options">
             <legend>Did the client accept the proposal?</legend>
             <label><input type="radio" name="client-outcome" required checked={outcome === "approve"} onChange={() => setOutcome("approve")} />
-              <span><strong>Yes, client accepted</strong><small>Unlock project intake and continue setup.</small></span>
+              <span><strong>Yes, client accepted</strong><small>Open project intake after saving the decision.</small></span>
             </label>
             <label><input type="radio" name="client-outcome" required checked={outcome === "withdraw"} onChange={() => setOutcome("withdraw")} />
               <span><strong>No, client declined</strong><small>Return the outcome to Admin without starting intake.</small></span>
