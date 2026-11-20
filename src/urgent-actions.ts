@@ -53,7 +53,7 @@ export function staffUrgentItems(state: State, actor: Account, page = "Dashboard
     const work = workflowFor(project)
     const guidance = intakeGuidance(state, project, actor)
     if (guidance?.kind === "action" && guidance.action === "confirm")
-      items.push({ key: `confirm:${project.id}`, projectId: project.id, title: project.name, module: "Confirmation queue", target: "confirm", urgency: "attention", detail: guidance.next, status: "Office PM acceptance required" })
+      items.push({ key: `confirm:${project.id}`, projectId: project.id, title: project.name, module: "Project intake", target: "confirm", urgency: "attention", detail: guidance.next, status: "Office PM acceptance required" })
     if (!isOpm && guidance?.kind === "action" && guidance.action === "coordinate")
       items.push({ key: `coordinate:${project.id}`, projectId: project.id, title: project.name, module: "Active sites", target: "coordinate", urgency: "attention", detail: guidance.next, status: guidance.stage })
     if (isOpm && project.status === "active") {
@@ -84,7 +84,7 @@ export function staffUrgentItems(state: State, actor: Account, page = "Dashboard
         items.push({ key: `handoff:${project.id}`, projectId: project.id, title: project.name, module: "Active sites", target: "project", urgency: "blocked", detail: project.handoffReadiness.reason, status: "Phase handoff blocked" })
     }
     if (isOpm) {
-      if (guidance?.kind === "action" && guidance.action === "reassign") items.push({ key: `reassign:${project.id}`, projectId: project.id, title: project.name, module: "Confirmation queue", target: "responses", urgency: "blocked", detail: guidance.next, status: "Phase reassignment required", actionText: "Review assignment status" })
+      if (guidance?.kind === "action" && guidance.action === "reassign") items.push({ key: `reassign:${project.id}`, projectId: project.id, title: project.name, module: "Project intake", target: "responses", urgency: "blocked", detail: guidance.next, status: "Phase reassignment required", actionText: "Review assignment status" })
       if (guidance?.kind === "action" && guidance.action === "documents") items.push({ key: `documents:${project.id}`, projectId: project.id, title: project.name, module: "Documents", target: "documents", urgency: "attention", detail: guidance.next, status: "Required intake documents missing", actionText: "Upload required documents" })
     }
     const deadline = work.deadline
@@ -99,7 +99,7 @@ export function staffUrgentItems(state: State, actor: Account, page = "Dashboard
     const due = Number.isFinite(candidate) ? candidate : undefined
     const urgency = deadlineUrgency(due, now)
     if (isOpm && urgency === "attention") continue
-    items.push({ key: `response:${project.id}`, projectId: project.id, title: project.name, module: isOpm ? "Confirmation queue" : "Active sites", target: isOpm ? "responses" : "assignment", due, urgency,
+    items.push({ key: `response:${project.id}`, projectId: project.id, title: project.name, module: isOpm ? "Project intake" : "Active sites", target: isOpm ? "responses" : "assignment", due, urgency,
       detail: isOpm ? "An assigned Site PM response needs follow-up." : "Your assigned phase responsibility is awaiting your response.",
       status: Number.isFinite(hard) && hard <= now ? "Hard response deadline passed" : due !== undefined && due <= now ? "Past soft response target" : urgency === "soon" ? "Response due within 24 hours" : "Assignment response required" })
   }

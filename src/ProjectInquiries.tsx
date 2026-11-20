@@ -327,11 +327,16 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   </section>
 }
 
-export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments }: {
+export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments, embedded = false, onInquiryCountChange }: {
   role: "admin" | "opm"; onReload: () => unknown; projects?: Project[]
   onOpenDocuments?: (project: Project) => void; onOpenAssignments?: (project: Project) => void
+  embedded?: boolean; onInquiryCountChange?: (count: number | undefined) => void
 }) {
   const [rows, setRows] = useState<Inquiry[]>()
+  const inquiryCount = rows?.length
+  useEffect(() => {
+    onInquiryCountChange?.(inquiryCount)
+  }, [inquiryCount, onInquiryCountChange])
   const [search, setSearch] = useState("")
   const [queueView, setQueueView] = useState<IntakeView>("all")
   const [queueStatus, setQueueStatus] = useState("")
@@ -733,7 +738,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           save={(action, input) => void run(() => saveWorkflow(action, input))} />
       : <>
     <header className="inquiries-page-heading">
-      <div><h1>Project inquiries</h1>
+      <div>{embedded ? <h2>Project inquiries</h2> : <h1>Project inquiries</h1>}
         {admin && <p>Review saved inquiries or start a new project request.</p>}
       </div>
       <button className="button" disabled={busy} onClick={() => void run(async () => {

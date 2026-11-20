@@ -42,12 +42,12 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     const priority = name => [...document.querySelectorAll(".urgent-banner-item")].find(button=>button.textContent.includes(name))
     for (compact of [false,true]) {
       await render(office,"/opm/confirmation-queue")
-      assert.equal(document.querySelector('[aria-label="Confirmation queue"] .nav-count').textContent,"2")
+      assert.equal(document.querySelector('[aria-label="Project intake"] .nav-count').textContent,"2")
       assert.ok(priority("Acceptance needed"))
-      assert.equal(priority("Waiting for Site PM"),undefined,"Waiting records do not demand an Office PM action")
+      assert.ok(!priority("Waiting for Site PM"),"Waiting records do not demand an Office PM action")
       await act(()=>priority("Acceptance needed").click())
       assert.match(document.querySelector("main").textContent,/Accept Office PM assignment/)
-      assert.equal(document.querySelector('[aria-pressed="true"]').textContent.includes("Needs your action"),true)
+      assert.match(document.querySelector('#project-intake-panel-mine [aria-pressed="true"]').textContent,/Needs your action/)
       await render(office,"/opm/dashboard")
       assert.equal(document.querySelector('[aria-label="Active sites"] .nav-count').textContent,"1")
       await act(()=>priority("Photos to review").click())
@@ -55,10 +55,40 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
       assert.match(document.querySelector("main").textContent,/Site photos awaiting review \(1\)/)
       await render(site,"/spm/dashboard")
       assert.equal(document.querySelector('[aria-label="Active sites"] .nav-count').textContent,"3")
-      assert.equal(priority("Acceptance needed"),undefined)
+      assert.doesNotMatch(document.querySelector("main").textContent,/Office PM acceptance required/)
       await act(()=>priority("Waiting for Site PM").click())
-      assert.ok(document.querySelector('[role="dialog"] [aria-label="Accept this project assignment"]'),"Response banner opens actual acceptance controls")
+      assert.match(document.querySelector('[role="dialog"]').textContent,/Accept (Lead Site PM assignment|my phase assignments)/)
     }
+
+    state.projects = [project("Concurrent intake", {
+      inquiryOrigin: true,
+      docs: [],
+      team: [{phase:"Mobilization",accountId:site.id,status:"pending",isLead:true}],
+    })]
+    await render(office,"/opm/project-inquiries")
+    assert.equal(document.querySelector("main h1").textContent,"Project intake")
+    assert.equal(document.querySelector('[aria-label="Project intake views"] [aria-selected="true"]').id,"project-intake-tab-inquiries")
+    assert.ok(!document.querySelector('nav [aria-label="Project inquiries"]'),"The inquiry workflow has no separate sidebar entry")
+    assert.ok(!document.querySelector('nav [aria-label="Confirmation queue"]'),"The confirmation queue has no separate sidebar entry")
+    await act(()=>document.querySelector("#project-intake-tab-mine").click())
+    const intakeSearch = document.querySelector('input[placeholder="Search confirmations"]')
+    await act(() => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(intakeSearch, "")
+      intakeSearch.dispatchEvent(new w.Event("input", { bubbles: true }))
+    })
+    const card = document.querySelector(".opm-confirmation-card")
+    assert.match(card.textContent,/0 of 6 uploaded/)
+    assert.match(card.textContent,/0 of 1 assignments accepted/)
+    assert.match(card.textContent,/while documents are being uploaded/)
+    const cardButton = label => [...card.querySelectorAll("button")].find(button=>button.textContent.includes(label))
+    await act(()=>cardButton("View assignment status").click())
+    const status = document.querySelector('[aria-label="Site PM assignment status"]')
+    assert.match(status.textContent,/Concurrent intake/)
+    assert.match(status.textContent,/Mobilization/)
+    await act(()=>[...status.querySelectorAll("button")].find(button=>button.textContent==="Close").click())
+    await act(()=>cardButton("Upload required documents").click())
+    assert.equal(w.location.pathname,"/opm/documents")
+    assert.match(document.querySelector("main").textContent,/Required documents/)
   } finally {
     await act(()=>root.unmount()); await server.close(); dom.window.close()
     for (const [key,descriptor] of previous) descriptor ? Object.defineProperty(globalThis,key,descriptor) : delete globalThis[key]

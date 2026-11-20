@@ -32,7 +32,7 @@ for (let i = 0; i < 120; i++) { try { if ((await fetch(`http://127.0.0.1:${apiPo
 
 const runs = [
   ["patricia.domingo@10builders.com", "Dashboard", "Active sites", "Project intake", "Documents", "Directory", "Team", "Archive", "Activity log", "Settings"],
-  ["lea.fernandez@10builders.com", "Dashboard", "Confirmation queue", "Documents", "Active sites", "Archive", "Activity log", "Preferences"],
+  ["lea.fernandez@10builders.com", "Dashboard", "Project intake", "Documents", "Active sites", "Archive", "Activity log", "Preferences"],
   ["karlo.espiritu@10builders.com", "Dashboard", "Active sites", "Resources", "Archive", "Activity log", "Preferences"],
   ["mikaela.bautista@10builders.com", "Dashboard", "Active sites", "Resources", "Archive", "Activity log", "Preferences"],
   ["f.uy@aldenheights-hoa.com", "Active sites", "Project Overview", "Project Documents", "Progress History", "Site Photographs", "Preferences"],

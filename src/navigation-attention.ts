@@ -25,7 +25,7 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
   if (actor.role === "opm") {
     const stages = projects.map(project => officePmStage(project))
     return {
-      "Confirmation queue": {
+      "Project intake": {
         count: projects.filter(project => isIntake(project) ||
           (project.status === "active" && project.team.some(row => row.engineers?.length
             ? row.engineers.some(engineer => engineer.status !== "confirmed") : row.status !== "confirmed"))).length,

@@ -68,7 +68,7 @@ test("assignment alerts respect ownership, response gates, stored soft/hard dead
   assert.equal(items.length, 1)
   assert.equal(items[0].urgency, "soon")
   assert.equal(items[0].target, "assignment")
-  assert.equal(staffUrgentItems(state, office, "Confirmation queue", now)[0].target, "responses")
+  assert.equal(staffUrgentItems(state, office, "Project intake", now)[0].target, "responses")
   assert.deepEqual(staffUrgentItems(state, { ...site, id: "foreign-site" }, "Dashboard", now), [])
   pending.workflow.deadline.hard = date(1)
   assert.match(staffUrgentItems(state, site, "Dashboard", now)[0].status, /Hard response deadline passed/)
@@ -107,7 +107,7 @@ test("new intake acceptance, photo review and undated Site PM tasks appear only 
   office.expiry=site.expiry="2099-01-01"
   state.projects=[project("accept",{status:"pending",opmAccepted:false}),project("photos")]
   state.projects[1].workflow.photos=[{id:"pending",photoReviewStatus:"pending"},{id:"released",photoReviewStatus:"approved"}]
-  assert.ok(staffUrgentItems(state,office,"Confirmation queue",now).some(item=>item.target==="confirm"))
+  assert.ok(staffUrgentItems(state,office,"Project intake",now).some(item=>item.target==="confirm"))
   const photoTask=staffUrgentItems(state,office,"Active sites",now).find(item=>item.target==="photos")
   assert.match(photoTask.detail,/1 site photo needs/)
   assert.ok(!staffUrgentItems(state,site,"Dashboard",now).some(item=>["photos","confirm"].includes(item.target)))

@@ -69,13 +69,13 @@ test("Office PM badges track intake once and map review items to the current Act
     project("restricted",{opmId:"other",workflow:{pendingUpdate:{},checklist:{}}}),
   ]
   const counts = navigationAttention(state,actor("opm"))
-  assert.equal(counts["Confirmation queue"].count,4)
+  assert.equal(counts["Project intake"].count,4)
   assert.equal(counts.Documents.count,1)
   assert.equal(counts["Active sites"].count,3)
   assert.equal(counts["Rework & approvals"],undefined)
   state.projects[0].opmAccepted = true
   const refreshed = navigationAttention(state,actor("opm"))
-  assert.equal(refreshed["Confirmation queue"].count,4)
+  assert.equal(refreshed["Project intake"].count,4)
   assert.equal(refreshed.Documents.count,2)
 })
 
@@ -84,14 +84,14 @@ test("waiting intake stays visible, overlapping response tabs count once, and ph
   state.projects=[project("waiting",{status:"pending",team:[{phase:"Mobilization",accountId:"spm",status:"pending"}]}),
     project("photos",{workflow:{checklist:{},photos:[{id:"one",photoReviewStatus:"pending"},{id:"two",photoReviewStatus:"approved"}]}})]
   const counts=()=>navigationAttention(state,actor("opm"))
-  assert.equal(counts()["Confirmation queue"].count,1,"One project in both tabs counts once")
-  assert.match(counts()["Confirmation queue"].description,/waiting/)
+  assert.equal(counts()["Project intake"].count,1,"One project in both tabs counts once")
+  assert.match(counts()["Project intake"].description,/waiting/)
   assert.equal(counts()["Active sites"].count,1)
   state.projects[1].workflow.photos[0].photoReviewStatus="approved"
   assert.equal(counts()["Active sites"].count,0)
   state.projects[0].status="active"
   state.projects[0].team[0].status="confirmed"
-  assert.equal(counts()["Confirmation queue"].count,0)
+  assert.equal(counts()["Project intake"].count,0)
 })
 
 test("Site PM Assignments counts every project in the panel; client gets no staff queues", () => {

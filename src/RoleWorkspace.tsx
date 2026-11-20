@@ -203,9 +203,8 @@ function Status({ value }: { value: string }) {
   )
 }
 const OPM_NAV = [
-  ["Project inquiries", "plus"],
   ["Dashboard", "grid"],
-  ["Confirmation queue", "check"],
+  ["Project intake", "check"],
   ["Documents", "folder"],
   ["Active sites", "building"],
   ["Archive", "archive"],
@@ -275,7 +274,8 @@ export default function RoleWorkspace({
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
   const { page: routePage, navigate: setPage } = useWorkspacePage(actor.role, !extensionDemo)
-  const page = extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
+  const legacyIntakeRoute = isOpm && ["Project inquiries", "Confirmation queue"].includes(routePage)
+  const page = legacyIntakeRoute ? "Project intake" : extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -315,7 +315,13 @@ export default function RoleWorkspace({
   const [query, setQuery] = useState("")
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
-  const [confirmTab, setConfirmTab] = useState("mine")
+  const [confirmTab, setConfirmTab] = useState<"inquiries" | "mine" | "responses">(
+    () => routePage === "Project inquiries" ? "inquiries" : "mine",
+  )
+  const [inquiryCount, setInquiryCount] = useState<number>()
+  useEffect(() => {
+    if (legacyIntakeRoute) setConfirmTab(routePage === "Project inquiries" ? "inquiries" : "mine")
+  }, [legacyIntakeRoute, routePage])
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const navigation = useSidebarNavigation(!paused)
@@ -583,6 +589,8 @@ export default function RoleWorkspace({
   }
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); return }
+    const openInquiryTab = isOpm && next === "Project inquiries"
+    if (openInquiryTab || (isOpm && next === "Confirmation queue")) next = "Project intake"
     if (next === "Documents" && page !== "Documents") setOfficeDocumentsPath({})
     let nextActiveSitesView: typeof activeSitesView | undefined
     if (!isOpm && next === "Document repository") {
@@ -604,16 +612,15 @@ export default function RoleWorkspace({
     setActiveSitesScheduleFilter("")
     if (nextActiveSitesView) setActiveSitesView(nextActiveSitesView)
     setPage(normalizeWorkspacePage(next))
-    setConfirmTab("mine")
+    setConfirmTab(openInquiryTab ? "inquiries" : "mine")
     setQuery("")
     setError("")
     navigation.closeMobile()
     setBell(false)
   }
   const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:roleNav.map(([label])=>label),enabled:!paused && !extensionDemo,blocked:navigation.compact && navigation.expanded,navigate})
-  // Old SPM responses links open the Site PM responses tab of Confirmation queue.
   function openSiteResponses() {
-    navigate("Confirmation queue")
+    navigate("Project intake")
     setConfirmTab("responses")
   }
   function openDocuments(p: Project) {
@@ -650,7 +657,7 @@ export default function RoleWorkspace({
       setActiveSitesView("uploads")
       requestAnimationFrame(() => document.getElementById("active-sites-photo-review")?.scrollIntoView({ block: "start" }))
     } else if (priority.target === "confirm") {
-      navigate("Confirmation queue")
+      navigate("Project intake")
       setIntakeView("action")
       updateListQuery(`${actor.role}:confirmations`, q => ({ ...q, search: project.name, filters: {}, page: 1 }))
     } else if (priority.target === "assignment" || priority.target === "coordinate") {
@@ -697,7 +704,7 @@ export default function RoleWorkspace({
         {page === "Dashboard" && <div className="staff-priority-summary"><span>Priority Items ({staffUrgentItems(state, actor, page, urgencyNow).length})</span></div>}
         {urgentBanner()}
         <LicenseBanner license={state.license?.self} />
-        {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
+        {["Dashboard", "Assignments", "Project intake"].includes(page) && (
           <ReassignRequests
             requests={state.license?.requests || []}
             onError={setError}
@@ -810,6 +817,11 @@ export default function RoleWorkspace({
   function confirmationCard(p: Project) {
     const work = workflowFor(p)
     const guidance = intakeGuidance(state, p, actor)
+    const parallelIntake = p.inquiryOrigin && p.opmAccepted
+    const assignments = parallelIntake ? inquiryAssignments(p) : []
+    const accepted = assignments.filter(person => person.status === "confirmed").length
+    const declined = assignments.some(person => person.status === "declined")
+    const documentsComplete = registeredComplete(p)
     return (
       <Panel
         key={p.id}
@@ -842,7 +854,25 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
-          {timeline(p)}
+          {parallelIntake ? (
+            <div className="opm-intake-progress" aria-label="Intake progress">
+              <div>
+                <h3><Icon name="folder" size={17} />Required documents</h3>
+                <p>{registeredCount(p)} of 6 uploaded</p>
+                <Badge tone={documentsComplete ? "green" : "amber"}>{documentsComplete ? "Complete" : "Uploads pending"}</Badge>
+              </div>
+              <div>
+                <h3><Icon name="users" size={17} />Site PM acceptance</h3>
+                <p>{assignments.length ? `${accepted} of ${assignments.length} assignments accepted` : "No assignments recorded"}</p>
+                <Badge tone={declined ? "red" : teamConfirmed(p) ? "green" : "amber"}>
+                  {declined ? "Reassignment needed" : teamConfirmed(p) ? "Accepted" : assignments.length ? "Awaiting responses" : "Staffing pending"}
+                </Badge>
+              </div>
+              {!documentsComplete && assignments.some(person => person.status === "pending") && (
+                <small>Site PMs can accept their assignments while documents are being uploaded. The Lead Site PM responds first.</small>
+              )}
+            </div>
+          ) : timeline(p)}
           <div className="opm-confirmation-next-action">
             {guidance && <div className="opm-confirmation-next-copy" aria-label={`${p.name} intake next step`}>
               <span className={`intake-stage ${guidance.kind}`}>{stageLabel(guidance, p)}</span>
@@ -898,15 +928,15 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  icon={registeredComplete(p) ? "folder" : "upload"}
+                  icon={documentsComplete ? "folder" : "upload"}
                   onClick={() => openDocuments(p)}
                 >
-                  {registeredComplete(p)
+                  {documentsComplete
                     ? "View project documents"
-                    : "Open required documents"}
+                    : parallelIntake ? "Upload required documents" : "Open required documents"}
                 </Button>
-                <Button onClick={openSiteResponses}>
-                  {guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
+                <Button onClick={parallelIntake && assignments.length ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses}>
+                  {parallelIntake && assignments.length ? "View assignment status" : guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
                 </Button>
               </div>
             </>
@@ -914,7 +944,7 @@ export default function RoleWorkspace({
           </div>
           <div className="role-project-facts">
             <span><Icon name="users" size={17} />Lead: {actorName(leadId(p))}</span>
-            <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>
+            {!parallelIntake && <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>}
           </div>
           {work.deadline && (
             <div className="deadline-inline">
@@ -974,7 +1004,7 @@ export default function RoleWorkspace({
           description={isOpm ? `${active.length} managed active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your confirmation; ${reviewCount} reviews need attention.` : `${active.length} current active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your response; ${reviewCount} rework flags await Office PM review.`}
           metrics={[
             { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("sites") } },
-            { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
+            { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Project intake" : "Assignments") },
             { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("updates") } },
             { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
           ]}
@@ -1020,7 +1050,7 @@ export default function RoleWorkspace({
                 Accept your Office PM assignment before uploading any required
                 project document.
               </p>
-              <Button onClick={() => navigate("Confirmation queue")}>
+              <Button onClick={() => navigate("Project intake")}>
                 Review assignment
               </Button>
             </div>
@@ -2681,7 +2711,7 @@ export default function RoleWorkspace({
             className="deadline-list-item"
             onClick={() => {
               setPickedId(p.id)
-              navigate("Confirmation queue")
+              navigate("Project intake")
             }}
           >
             <span className="activity-icon request">
@@ -2980,17 +3010,21 @@ export default function RoleWorkspace({
     )
   }
 
-  function inquiryAssignmentStatus(project: Project) {
-    const assignments = project.team.flatMap(phase => {
+  function inquiryAssignments(project: Project) {
+    const lead = leadPhaseAssignment(project)
+    return project.team.flatMap(phase => {
       const people = phase.engineers?.length ? phase.engineers : phase.accountId
         ? [{ accountId: phase.accountId, assignedDisciplines: phase.assignedDisciplines ?? [], status: phase.status }]
         : []
       return people.map(person => ({
         ...person,
         phase: phase.phase,
-        lead: phase === leadPhaseAssignment(project) && person.accountId === phase.accountId,
+        lead: phase === lead && person.accountId === phase.accountId,
       }))
     })
+  }
+  function inquiryAssignmentStatus(project: Project) {
+    const assignments = inquiryAssignments(project)
     const responses = [...workflowFor(project).responses].reverse()
     const accepted = assignments.filter(person => person.status === "confirmed").length
     const close = () => setInquiryAssignmentProjectId(undefined)
@@ -3861,20 +3895,16 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
-    if (isOpm && page === "Project inquiries") return <ProjectInquiries key={actor.id} role="opm" onReload={onReload}
-      projects={projects} onOpenDocuments={openDocuments}
-      onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
     switch (page) {
       case "Dashboard":
         return dashboard()
-      case "Confirmation queue":
+      case "Project intake":
         return (
           <>
-            {header(
-              "Confirmation queue",
-            )}
-            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Confirmation queue views">
+            {header("Project intake")}
+            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Project intake views">
               {([
+                ["inquiries", "Project inquiries", inquiryCount, "plus"],
                 ["mine", "Intake overview", intakes.length, "check"],
                 ["responses", "Site PM responses", responsesNeedingAction.length, "users"],
               ] as const).map(([value, label, count, icon]) => (
@@ -3882,17 +3912,26 @@ export default function RoleWorkspace({
                   key={value}
                   type="button"
                   role="tab"
+                  id={`project-intake-tab-${value}`}
+                  aria-controls={`project-intake-panel-${value}`}
                   aria-selected={confirmTab === value}
                   className={confirmTab === value ? "active" : ""}
                   onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
-                  <Icon name={icon} size={17} /> {label} <span>{count}</span>
+                  <Icon name={icon} size={17} /> {label} {count !== undefined && <span>{count}</span>}
                 </button>
               ))}
             </div>
-            {confirmTab === "responses" ? (
-              responseTracking()
-            ) : (
+            <div role="tabpanel" id="project-intake-panel-inquiries" aria-labelledby="project-intake-tab-inquiries" hidden={confirmTab !== "inquiries"}>
+              <ProjectInquiries key={actor.id} role="opm" embedded onReload={onReload}
+                projects={projects} onOpenDocuments={openDocuments} onInquiryCountChange={setInquiryCount}
+                onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
+            </div>
+            <div role="tabpanel" id="project-intake-panel-responses" aria-labelledby="project-intake-tab-responses" hidden={confirmTab !== "responses"}>
+              {confirmTab === "responses" && responseTracking()}
+            </div>
+            <div role="tabpanel" id="project-intake-panel-mine" aria-labelledby="project-intake-tab-mine" hidden={confirmTab !== "mine"}>
+              {confirmTab === "mine" && (
               <><div className="confirmation-intake-filters"><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /></div><ListSection
                 list={intakesList}
                 placeholder="Search confirmations"
@@ -3903,7 +3942,8 @@ export default function RoleWorkspace({
                 }
                 render={(items) => <>{items.map(confirmationCard)}</>}
               /></>
-            )}
+              )}
+            </div>
           </>
         )
       case "Documents":
