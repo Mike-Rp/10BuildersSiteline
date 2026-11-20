@@ -94,6 +94,7 @@ export function mapAccount(
     scope: detail?.specializations ?? scope,
     qualifiedRequirements: detail?.qualifiedRequirements,
     projectTypes: types,
+    jobTitle: detail?.job_title ?? a.job_title ?? undefined,
     experienceByType: detail?.experience_by_type ?? a.experience_by_type,
     status: accountStatus(a.status),
     added: day(a.date_added),

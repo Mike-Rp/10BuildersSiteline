@@ -1,5 +1,5 @@
 import { workEmailFor } from "../Thesis-Backend/src/domain/work-email.js";
-import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
+import { CREDENTIAL_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import type { LicenseData } from "./licenseTypes.ts"
 import { experienceYears, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import { DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB } from "../Thesis-Backend/src/domain/upload-limits.js"
@@ -215,6 +215,7 @@ export type Account = {
   certifications?: string[]
   scope: string[]
   projectTypes: string[]
+  jobTitle?: string
   experienceByType?: EngineerExperience
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
@@ -896,8 +897,8 @@ export function accountError(
   if (
     a.role === "spm" &&
     (!a.scope.length ||
-      a.scope.length > (a.initialCredentials || a.hasCredentialSpecializations ? ENGINEER_SPECIALIZATIONS.length : 3) ||
-      a.scope.some((t) => !ENGINEER_SPECIALIZATIONS.includes(t)))
+      a.scope.length > (a.initialCredentials || a.hasCredentialSpecializations ? CREDENTIAL_SPECIALIZATIONS.length : 3) ||
+      a.scope.some((t) => !CREDENTIAL_SPECIALIZATIONS.includes(t)))
   )
     return a.initialCredentials||a.hasCredentialSpecializations ? "Choose supported specializations within each professional credential." : "Choose one to three valid discipline tags."
   if (

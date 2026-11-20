@@ -1,6 +1,6 @@
 import DatePicker from "./DatePicker"
 import { useRef, useState } from "react"
-import { PROFESSIONS, ENGINEER_SPECIALIZATIONS, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
+import { PROFESSIONS, credentialChoices, licenseNumberError, isoDateValid } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { uploadFile } from "./api/actions"
 import { DOCUMENT_UPLOAD_LIMIT_MB, type Account, type RegistrationCredential, uid, today } from "./model"
 import { Button, Field, Icon, Modal } from "./ui"
@@ -41,7 +41,7 @@ export function registrationCredentialErrors(value: Partial<Account>) {
     if (!isoDateValid(row.license_expiry) || row.license_expiry <= today()) errors.license_expiry = "Enter a future expiry date."
     if (!row.file_id) errors.file_id = "Attach a supporting document."
     const tags=row.specializations||[]
-    if(tags.length>3||new Set(tags).size!==tags.length||tags.some(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag))) errors.specializations = "Choose up to three supported specializations."
+    if(tags.length>3||new Set(tags).size!==tags.length||tags.some(tag=>!credentialChoices(row.profession).includes(tag))) errors.specializations = "Choose up to three supported specializations."
     return errors
   })
   const seenProfessions = new Set<string>()
@@ -116,7 +116,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
         <p className="role-muted">{row.profession||'Select a profession'} · {tags.length}/3 specializations · Pending verification until reviewed</p>
         <div id={`credential-${key}`} hidden={!open}>
         <div className="form-grid">
-          <Field label="Licensed profession *" error={errors[index]?.profession}><select required value={row.profession} onChange={e => update(index, { profession: e.target.value })}>
+          <Field label="Licensed profession *" error={errors[index]?.profession}><select required value={row.profession} onChange={e => update(index, { profession: e.target.value, specializations: [] })}>
             <option value="">Select profession</option>{PROFESSIONS.map(p => <option key={p}>{p}</option>)}
           </select></Field>
           <Field label="License number exactly as printed *" error={errors[index]?.license_number}><input required inputMode="numeric" pattern="[0-9]{7}" minLength={7} maxLength={7} placeholder="e.g. 0012345" value={row.license_number} onChange={e => update(index, { license_number: e.target.value })} /></Field>
@@ -124,7 +124,7 @@ export default function RegistrationCredentials({ value, onChange, onBusy, onErr
           <Field label="Supporting credential document *" error={errors[index]?.file_id}><CredentialDocumentUpload name={row.fileName} busy={uploadingIndex === index} disabled={uploadingIndex !== null} onFile={file => void upload(index, file)} /></Field>
         </div>
         {errors[index]?.specializations && <p className="field-error" role="alert">{errors[index]?.specializations}</p>}
-        <fieldset className="credential-specializations"><legend>Areas of specialization · Credential {index+1} · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button type="button" key={tag} className={`chip ${tags.includes(tag)?'selected':''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag)&&tags.length>=3} onClick={()=>update(index,{specializations:tags.includes(tag)?tags.filter(t=>t!==tag):[...tags,tag]})}>{tag}</button>)}</div></fieldset>
+        <fieldset className="credential-specializations"><legend>Areas of specialization · Credential {index+1} · Choose up to 3</legend><div className="tag-list account-choice-chips">{credentialChoices(row.profession).map(tag=><button type="button" key={tag} className={`chip ${tags.includes(tag)?'selected':''}`} aria-pressed={tags.includes(tag)} disabled={!tags.includes(tag)&&tags.length>=3} onClick={()=>update(index,{specializations:tags.includes(tag)?tags.filter(t=>t!==tag):[...tags,tag]})}>{tag}</button>)}</div></fieldset>
         </div>
       </section>})}
       <Button disabled={uploadingIndex !== null || rows.length >= PROFESSIONS.length} onClick={() => patch({ initialCredentials: [...rows, { clientKey:uid(),profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "",specializations:[] }] })}>Add another professional credential</Button>

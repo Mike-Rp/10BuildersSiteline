@@ -1,9 +1,13 @@
-import {ENGINEER_SPECIALIZATIONS} from '../../domain/engineer-credentials.js';
+import {ENGINEER_SPECIALIZATIONS, SPECIALTIES_BY_PROFESSION} from '../../domain/engineer-credentials.js';
 import {HttpError} from '../../common/utilities/access.utility.js';
 
-export function validateSpecializations(values) {
- if (!Array.isArray(values) || values.length>3 || new Set(values).size!==values.length || values.some(tag=>!ENGINEER_SPECIALIZATIONS.includes(tag))) {
+export function validateSpecializations(values, profession) {
+ if (!Array.isArray(values) || values.length>3 || new Set(values).size!==values.length) {
   throw new HttpError(400,'Choose up to three supported specializations per professional credential.');
+ }
+ const supported = Object.hasOwn(SPECIALTIES_BY_PROFESSION, profession) ? SPECIALTIES_BY_PROFESSION[profession] : [];
+ if (values.some(tag => !ENGINEER_SPECIALIZATIONS.includes(tag) && !supported.includes(tag))) {
+  throw new HttpError(400, "Select specializations belonging to this credential's profession.");
  }
  return values;
 }

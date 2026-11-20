@@ -48,7 +48,7 @@ export async function createRenewalRequest(db, user, body, file, options = {}) {
   let tags=body.specializations;
   if (tags!==undefined) {
     if (typeof tags==='string') {try {tags=JSON.parse(tags);} catch {throw new HttpError(400,'Specializations must be an array.');}}
-    validateSpecializations(tags);
+    validateSpecializations(tags, profession);
     await requireCredentialTags(db);
   }
   if (!PROFESSIONS.includes(profession)) throw new HttpError(400, "Select the licensed profession. Do not infer it from tags.");
@@ -193,7 +193,7 @@ async function reviewRenewalInTransaction(db, user, requestId, decision, body = 
       let tags=request.specializations;
       // Renewals inherit only the prior credential's explicit association.
       if (tags==null) tags=(await db.query('select specializations from user_licenses where user_id=$1 and profession=$2 and id<>$3 order by created_at desc limit 1',[request.user_id,profession,licenseId])).rows[0]?.specializations??null;
-      if (tags!==null) validateSpecializations(tags);
+      if (tags!==null) validateSpecializations(tags, profession);
       await db.query('update user_licenses set specializations=$2 where id=$1',[licenseId,tags]);
     }
   }

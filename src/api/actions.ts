@@ -230,6 +230,7 @@ function accountPayload(account: Account) {
         { project_types: account.projectTypes } : account.role === "client" ? { projects: account.scope } : undefined;
     return { full_name: account.name, email: account.email, phone: account.phone, role: account.role, scope,
       ...(employeeIdFromWorkEmail(account.email) ? { employee_id: employeeIdFromWorkEmail(account.email) } : {}),
+      ...(account.jobTitle !== undefined && ["opm", "spm"].includes(account.role) ? { job_title: account.jobTitle || null } : {}),
       ...(account.experienceByType !== undefined && ["opm", "spm"].includes(account.role) ? { experience_by_type: account.experienceByType } : {}) };
 }
 export async function saveApiAccount(account: Account, existing: boolean, password?: string) {

@@ -2,7 +2,7 @@ import { validateUpload } from "../workspace/upload-policy.utility.js";
 import { saveSpecializations,credentialSummary } from "../licenses/credentials.controller.js";
 import { workEmailFromAssignedId, assertWorkEmailAvailable } from "./work-email.utility.js";
 import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
-import { ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
+import { ENGINEER_JOB_TITLES, ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
 import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import {validateSpecializations,requireCredentialTags} from '../licenses/credential-specializations.utility.js';
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
@@ -175,6 +175,18 @@ export async function createAccountRecord(client, actor, body) {
   return saved;
 }
 
+async function saveJobTitle(client, userId, role, title) {
+  if (title === undefined) return;
+  if (!["opm", "spm"].includes(role) || (title !== null && !ENGINEER_JOB_TITLES.includes(title))) {
+    throw new HttpError(422, "Select a supported engineer job title.");
+  }
+  await client.query(
+    `INSERT INTO workspace_account_metadata(user_id, metadata) VALUES($1, jsonb_build_object('jobTitle', $2::text))
+     ON CONFLICT(user_id) DO UPDATE SET metadata = workspace_account_metadata.metadata || excluded.metadata`,
+    [userId, title],
+  );
+}
+
 async function insertAccountRecord(client, actor, body) {
   const fullName = body.full_name ?? body.fullName ?? body.contact_person;
   const userId = uuidv4();
@@ -195,7 +207,7 @@ async function insertAccountRecord(client, actor, body) {
   const associated=Array.isArray(body.initial_credentials)&&body.initial_credentials.some(c=>c?.specializations!==undefined);
   if (associated) {
     await requireCredentialTags(client);
-    for(const credential of body.initial_credentials)validateSpecializations(credential?.specializations);
+    for(const credential of body.initial_credentials)validateSpecializations(credential?.specializations, credential?.profession);
   }
   const scope = normalizeScope(role,associated&&role==='spm'?undefined:body.scope);
   const experience = validateEngineerExperience(body.experience_by_type, role);
@@ -219,6 +231,7 @@ async function insertAccountRecord(client, actor, body) {
     inserted.rows[0].email = workEmail;
   }
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
+  await saveJobTitle(client, userId, role, body.job_title);
   await saveEngineerExperience(client, inserted.rows[0].id, experience);
   if (body.initial_credentials !== undefined) {
     if (actor.role !== "admin") throw new HttpError(403, "Administrator access required.");
@@ -298,6 +311,7 @@ export const getAccount = async (req, res) => {
     const base = await execute(
       `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.status,
               u.date_added::text AS date_added, u.last_login_at, u.temp_password_issued,
+              (SELECT m.metadata->>'jobTitle' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS job_title,
               (SELECT m.metadata->'experienceByType' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS experience_by_type
          FROM users u JOIN roles r ON r.id = u.role_id
         WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false`, [id]);
@@ -367,7 +381,7 @@ export const updateAccount = async (req, res) => {
       if (fullName !== undefined) set("full_name", String(fullName).trim());
       if (b.email !== undefined) set("email", b.email);
       if (b.phone !== undefined) set("phone", b.phone);
-      if (sets.length === 0 && !scope && experience === undefined) throw new HttpError(400, "No editable fields provided.");
+      if (sets.length === 0 && !scope && experience === undefined && b.job_title === undefined) throw new HttpError(400, "No editable fields provided.");
 
       if (sets.length > 0) {
         params.push(actor.id);
@@ -375,6 +389,7 @@ export const updateAccount = async (req, res) => {
           `UPDATE users SET ${sets.join(", ")}, updated_by = $${params.length}, updated_at = now() WHERE id = $1`, params);
       }
       if (scope) await writeScope(client, id, scope, actor.id);
+      await saveJobTitle(client, id, found.rows[0].role, b.job_title);
       await saveEngineerExperience(client, id, experience);
 
       const out = await client.query(`SELECT id, full_name, email, phone FROM users WHERE id = $1`, [id]);

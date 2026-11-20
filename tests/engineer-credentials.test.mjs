@@ -621,6 +621,22 @@ test(
           assert.equal((await db.query('select count(*)::int as n from engineer_specializations where user_id=$1',[result.data.id])).rows[0].n,0,'new associations are not flattened into the legacy account list')
         }
       }
+      const wrongProfession = await create(1, 'verified', [['HVAC Engineering']])
+      assert.equal(wrongProfession.result.status, 400)
+      const detailed = await create(2, 'verified', [['Foundation Engineering'], ['HVAC Engineering']])
+      assert.equal(detailed.result.status, 201)
+      const accountId = detailed.result.data.id
+      const profilePath = '/accounts/' + accountId
+      const profile = (await call('admin','GET','/licenses/credentials/'+accountId)).data
+      assert.ok(profile.credentials.some(c=>c.specializations.includes('HVAC Engineering')))
+      assert.deepEqual(profile.qualifiedRequirements, [])
+      assert.equal((await call('admin','PATCH',profilePath,{job_title:'Planning Engineer'})).status,200)
+      const titled = (await call('admin','GET',profilePath)).data
+      assert.equal(titled.job_title,'Planning Engineer')
+      assert.equal(titled.role,'spm')
+      assert.equal((await call('admin','PATCH',profilePath,{job_title:'Unlisted title'})).status,422)
+      assert.equal((await call('admin','PATCH',profilePath,{job_title:null})).status,200)
+      assert.equal((await call('admin','GET',profilePath)).data.job_title,null)
       const invalid=await create(1,'pending',[['Civil','Structural','Geotechnical','Mechanical']]);assert.equal(invalid.result.status,400)
       const duplicate=await create(1,'pending',[['Civil','Civil']]);assert.equal(duplicate.result.status,400)
       const mixed=await create(3,'pending',[['Civil'],['Mechanical','Acoustic'],['Electrical','Acoustic','Facade']]);assert.equal(mixed.result.status,201)

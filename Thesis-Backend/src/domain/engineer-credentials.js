@@ -47,6 +47,97 @@ export const REQUIREMENT_SPECIALIZATIONS = {
   Facade: [],
   Acoustic: [],
 }
+export const SPECIALTIES_BY_PROFESSION = {
+  "Civil Engineer": [
+    "Structural Engineering",
+    "Geotechnical Engineering",
+    "Foundation Engineering",
+    "Construction Engineering",
+    "Transportation Engineering",
+    "Highway Engineering",
+    "Hydraulic Engineering",
+    "Water Resources Engineering",
+    "Materials Engineering",
+    "Earthquake/Seismic Engineering"
+  ],
+  "Mechanical Engineer": [
+    "HVAC Engineering",
+    "Air-Conditioning Engineering",
+    "Refrigeration Engineering",
+    "Ventilation Engineering",
+    "Fire Protection Engineering (Mechanical Systems)",
+    "Mechanical Building Services Engineering",
+    "Energy Systems Engineering",
+    "Elevator and Escalator Engineering"
+  ],
+  "Electrical Engineer": [
+    "Power Systems Engineering",
+    "Electrical Design Engineering",
+    "Power Distribution Engineering",
+    "Lighting Engineering",
+    "Renewable Energy Engineering",
+    "Electrical Protection Engineering",
+    "Electrical Installation Engineering"
+  ],
+  "Electronics Engineer": [
+    "Telecommunications Engineering",
+    "Extra-Low Voltage (ELV) Systems Engineering",
+    "Fire Detection and Alarm Systems Engineering",
+    "Building Automation Engineering",
+    "Instrumentation and Controls Engineering",
+    "Data and Network Systems Engineering",
+    "Security and Surveillance Systems Engineering"
+  ],
+  "Sanitary Engineer": [
+    "Water Supply Engineering",
+    "Sanitary Drainage Engineering",
+    "Sewerage Engineering",
+    "Wastewater Treatment Engineering",
+    "Environmental Sanitation Engineering",
+    "Plumbing Systems Engineering"
+  ],
+  "Geodetic Engineer": [
+    "Land Surveying",
+    "Construction Surveying",
+    "Geomatics Engineering",
+    "Mapping and Cartography",
+    "Geographic Information Systems (GIS)",
+    "Geospatial Data Engineering"
+  ]
+}
+export const ENGINEER_JOB_TITLES = [
+  "Office Project Manager (OPM)",
+  "Site Project Manager (SPM)",
+  "Project Engineer",
+  "Site Engineer",
+  "Field Engineer",
+  "Resident Engineer",
+  "Construction Engineer",
+  "Planning Engineer",
+  "Scheduling Engineer",
+  "Cost Engineer",
+  "Quantity Engineer",
+  "Estimation Engineer",
+  "QA/QC Engineer",
+  "Safety Engineer",
+  "MEP Engineer",
+  "MEP Coordination Engineer",
+  "Commissioning Engineer",
+  "Testing and Commissioning Engineer",
+  "BIM Engineer",
+  "Project Controls Engineer"
+]
+export const CREDENTIAL_SPECIALIZATIONS = [
+  ...ENGINEER_SPECIALIZATIONS,
+  ...Object.values(SPECIALTIES_BY_PROFESSION).flat(),
+]
+
+export function credentialChoices(profession, saved = []) {
+  const current = Object.hasOwn(SPECIALTIES_BY_PROFESSION, profession) ? SPECIALTIES_BY_PROFESSION[profession] : []
+  const eligible = ENGINEER_SPECIALIZATIONS.filter(tag => SPECIALIZATION_PROFESSIONS[tag]?.includes(profession))
+  return [...new Set([...current, ...eligible, ...saved])]
+}
+
 export const LICENSE_NUMBER_MAX = 7
 export function licenseNumberError(value) {
   return typeof value === "string" && /^[0-9]{7}$/.test(value)

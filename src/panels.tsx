@@ -1,5 +1,5 @@
 import DatePicker from "./DatePicker"
-import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
+import { ENGINEER_JOB_TITLES, ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,phaseCoverageMeetsQuota} from './PhaseEngineerAllocation'
 import RegistrationCredentials, { RegistrationVerification, registrationCredentialErrors, validateRegistrationCredentials, type RegistrationCredentialErrors } from "./RegistrationCredentials"
 import ProjectExperienceFields from "./ProjectExperienceFields"
@@ -727,6 +727,7 @@ export function AccountForm({
                   scope: [],
                   projectTypes: [],
                   experienceByType: undefined,
+                  jobTitle: undefined,
                 })
               }
             >
@@ -809,6 +810,12 @@ export function AccountForm({
           {fieldErrors.projectTypes && <p className="field-error" role="alert">{fieldErrors.projectTypes}</p>}
         </section>
       )}
+      {!clientOnly && ["opm", "spm"].includes(draft.role) && <Field label="Job title">
+        <select value={draft.jobTitle ?? ""} onChange={event => patch({ jobTitle: event.target.value })}>
+          <option value="">Select a job title (optional)</option>
+          {ENGINEER_JOB_TITLES.map(title => <option key={title}>{title}</option>)}
+        </select>
+      </Field>}
       {!clientOnly && ["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} validationError={experienceError} onChange={experienceByType => { patch({ experienceByType }) }} />}
       {draft.role === "client" && !clientOnly && (
         <section className="form-section">

@@ -1803,7 +1803,7 @@ function AppInner() {
                     >
                       <div className="engineer-top">
                         <span className="avatar large">{initials(a.name)}</span>
-                        <div className="engineer-identity"><h3>{a.name}</h3><p>{ROLE_NAMES[a.role]}</p></div>
+                        <div className="engineer-identity"><h3>{a.name}</h3><p>{ROLE_NAMES[a.role]}</p>{a.jobTitle && <p>{a.jobTitle}</p>}</div>
                         <Status status={a.status} />
                       </div>
                       {a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) && (
@@ -2703,6 +2703,7 @@ function AppInner() {
           <div>
             <span className="eyebrow">{ROLE_NAMES[a.role]}</span>
             <h3>{a.name}</h3>
+            {a.jobTitle && <p>{a.jobTitle}</p>}
             <p>{a.email}</p>
           </div>
           <Status status={a.status} />

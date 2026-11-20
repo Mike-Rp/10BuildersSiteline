@@ -10,7 +10,7 @@ import {
 } from "./api/licenses"
 import {
   PROFESSIONS,
-  ENGINEER_SPECIALIZATIONS,
+  credentialChoices,
   licenseNumberError,
 } from "../Thesis-Backend/src/domain/engineer-credentials.js"
 import { Button, Field } from "./ui"
@@ -61,11 +61,11 @@ type Summary = {
   eligibleForNewAssignment: boolean
   eligibilityNote: string
 }
-function CredentialSpecializations({tags,editable,onSave}:{tags?:string[]|null;editable:boolean;onSave:(tags:string[])=>Promise<unknown>}) {
+function CredentialSpecializations({profession,tags,editable,onSave}:{profession:string|null;tags?:string[]|null;editable:boolean;onSave:(tags:string[])=>Promise<unknown>}) {
  const [selected,setSelected]=useState<string[]>(tags||[])
  const signature=JSON.stringify(tags)
  useEffect(()=>setSelected(tags||[]),[signature])
- return <section className="credential-specializations"><h5>Areas of specialization</h5>{tags==null&&<p>Legacy associations have not been recorded. Existing account-level tags remain unchanged.</p>}{!editable?<p>{tags?.join(', ')||'No credential-specific specializations recorded.'}</p>:<><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${selected.includes(tag)?'selected':''}`} aria-pressed={selected.includes(tag)} disabled={!selected.includes(tag)&&selected.length>=3} onClick={()=>setSelected(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p>{selected.length}/3 selected for this credential</p><Button onClick={()=>void onSave(selected)}>Save this credential's specializations</Button></>}</section>
+ return <section className="credential-specializations"><h5>Areas of specialization</h5>{tags==null&&<p>Legacy associations have not been recorded. Existing account-level tags remain unchanged.</p>}{!editable?<p>{tags?.join(', ')||'No credential-specific specializations recorded.'}</p>:<><div className="tag-list account-choice-chips">{credentialChoices(profession, tags || []).map(tag=><button key={tag} type="button" className={`chip ${selected.includes(tag)?'selected':''}`} aria-pressed={selected.includes(tag)} disabled={!selected.includes(tag)&&selected.length>=3} onClick={()=>setSelected(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p>{selected.length}/3 selected for this credential</p><Button onClick={()=>void onSave(selected)}>Save this credential's specializations</Button></>}</section>
 }
 export default function EngineerCredentials({
   userId,
@@ -173,7 +173,7 @@ export default function EngineerCredentials({
                     {c.expiryStatus}
                   </p>
                   {c.document_url&&<Button onClick={()=>void downloadBlob(c.document_url!.replace(/^\/api\/v1/,'' )).then(blob=>{if(!blob)throw new Error('Document unavailable.');const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000)}).catch(e=>setError(e.message))}>View supporting credential document</Button>}
-                  <CredentialSpecializations tags={c.specializations} editable={admin&&!readOnly&&!busy&&!c.superseded_at} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{credential_id:c.id,specializations:tags}}))}/>
+                  <CredentialSpecializations profession={c.profession} tags={c.specializations} editable={admin&&!readOnly&&!busy&&!c.superseded_at} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{credential_id:c.id,specializations:tags}}))}/>
                   <p>
                     {c.superseded_at
                       ? "Superseded"
@@ -256,7 +256,7 @@ export default function EngineerCredentials({
               <select
                 required
                 value={profession}
-                onChange={(e) => setProfession(e.target.value)}
+                onChange={(e) => { setProfession(e.target.value); setNewTags([]) }}
               >
                 <option value="">Select profession</option>
                 {PROFESSIONS.map((p) => (
@@ -297,7 +297,7 @@ export default function EngineerCredentials({
               <small id={`${credentialFileId}-help`}>PDF, JPG or PNG</small>
               </div>
             </div>
-            {admin&&<fieldset className="credential-specializations"><legend>Areas of specialization for this credential · Choose up to 3</legend><div className="tag-list account-choice-chips">{ENGINEER_SPECIALIZATIONS.map(tag=><button key={tag} type="button" className={`chip ${newTags.includes(tag)?'selected':''}`} aria-pressed={newTags.includes(tag)} disabled={!newTags.includes(tag)&&newTags.length>=3} onClick={()=>setNewTags(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p className="credential-entry-selection-count">{newTags.length} of 3 selected</p></fieldset>}
+            {admin&&<fieldset className="credential-specializations"><legend>Areas of specialization for this credential · Choose up to 3</legend><div className="tag-list account-choice-chips">{credentialChoices(profession).map(tag=><button key={tag} type="button" className={`chip ${newTags.includes(tag)?'selected':''}`} aria-pressed={newTags.includes(tag)} disabled={!newTags.includes(tag)&&newTags.length>=3} onClick={()=>setNewTags(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p className="credential-entry-selection-count">{newTags.length} of 3 selected</p></fieldset>}
             <div className="credential-entry-actions">
             <Button disabled={busy} type="submit" variant="primary">
               {busy ? "Saving…" : admin ? "Save credential" : "Submit license renewal"}
@@ -318,7 +318,7 @@ export default function EngineerCredentials({
                       ? q.review_note === "Replaced by a credential saved directly by an Administrator." ? "Replaced by Admin update" : "Correction required"
                       : "Verified"}
                 </strong>
-                <CredentialSpecializations tags={q.specializations} editable={admin&&!readOnly&&!busy&&q.status==='under_review'} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{submission_id:q.id,specializations:tags}}))}/>
+                <CredentialSpecializations profession={q.profession} tags={q.specializations} editable={admin&&!readOnly&&!busy&&q.status==='under_review'} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{submission_id:q.id,specializations:tags}}))}/>
                 <p>
                   {q.license_number} · Expiry: {dateLabel(q.license_expiry)} ·
                   Submitted {dateLabel(q.submitted_at)}
