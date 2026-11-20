@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Icon } from "./ui"
 import { addDays } from "./model"
 import DatePicker from "./DatePicker"
-import { arrangementOptions, assessInquiry, technicalOptions } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, technicalOptions, MIN_INQUIRY_DURATION_DAYS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -35,6 +35,7 @@ const projectFields = [
 const currency = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" })
 const date = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "Asia/Manila" })
 const today = () => new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" }).format(new Date())
+const latestInquiryStart = addDays("9999-12-31", -MIN_INQUIRY_DURATION_DAYS)
 const formatDay = (value: string) => date.format(new Date(value))
 const amount = (value: string | number | undefined) => value ?? "Not provided"
 const durationLabel = (days: number) => {
@@ -78,9 +79,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
   const [end, setEnd] = useState(review?.end ?? "")
   const earliestStart = today()
-  const earliestCompletion = start >= earliestStart && start < "9999-12-31"
-    ? addDays(start, 1)
-    : earliestStart
+  const earliestCompletion = start >= earliestStart && start <= latestInquiryStart
+    ? addDays(start, MIN_INQUIRY_DURATION_DAYS)
+    : undefined
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
   const [technical, setTechnical] = useState(assessment?.technical ?? review?.technical ?? technicalOptions[0])
@@ -125,7 +126,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   ]
   const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
   const scheduleDetails = editing ? draft : row.details
-  const scheduleEstimate = page === "review" && (editing || !review) && start >= earliestStart &&
+  const scheduleEstimate = page === "review" && (editing || !review) && earliestCompletion &&
     ["Residential", "Commercial", "Mixed-Use"].includes(String(scheduleDetails.project_type)) &&
     ["lot_area", "floor_area_sqm", "floor_count"].every(key => {
       const value = Number(scheduleDetails[key])
@@ -298,16 +299,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 <label htmlFor="inquiry-start-date">Estimated start date</label>
                 <DatePicker id="inquiry-start-date" calendarTitle="Estimated start date"
                   calendarSubtitle="Choose today or a later date."
-                  required disabled={busy} min={earliestStart} max="9999-12-30" value={start} onValueChange={value => {
+                  required disabled={busy} min={earliestStart} max={latestInquiryStart} value={start} onValueChange={value => {
                     setStart(value)
-                    if (value && end && end <= value) setEnd("")
+                    if (value && value <= latestInquiryStart && end && end < addDays(value, MIN_INQUIRY_DURATION_DAYS)) setEnd("")
                   }} />
               </div>
               <div>
                 <label htmlFor="inquiry-completion-date">Estimated completion date</label>
                 <DatePicker id="inquiry-completion-date" calendarTitle="Estimated completion date"
-                  calendarSubtitle="Choose a date after the estimated start date."
-                  required disabled={busy} value={end} min={earliestCompletion} onValueChange={setEnd} />
+                  calendarSubtitle={earliestCompletion && `Select ${formatDay(earliestCompletion)} or later. Minimum duration is ${MIN_INQUIRY_DURATION_DAYS} calendar days.`}
+                  required disabled={busy || !earliestCompletion} value={end} min={earliestCompletion} highlightMin onValueChange={setEnd} />
+                <p>{earliestCompletion ? `Earliest completion: ${formatDay(earliestCompletion)} (${MIN_INQUIRY_DURATION_DAYS} calendar days after start).` : "Select a valid estimated start date first."}</p>
               </div>
             </div>
             <div className="office-workflow-fields">
@@ -322,7 +324,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <div className="office-workflow-result duration">
                 <strong>Suggested completion {formatDay(scheduleEstimate.suggestedEnd)}</strong>
                 <p>{scheduleEstimate.size} · {scheduleEstimate.complexity} complexity · {scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days ({durationLabel(scheduleEstimate.planningDays)})</p>
-                <button type="button" className="button" onClick={() => setEnd(scheduleEstimate.suggestedEnd!)}>Use suggested date</button>
+                {earliestCompletion && scheduleEstimate.suggestedEnd >= earliestCompletion
+                  ? <button type="button" className="button" onClick={() => setEnd(scheduleEstimate.suggestedEnd!)}>Use suggested date</button>
+                  : <p>Choose a completion date that meets the minimum duration.</p>}
               </div>}
           </Card>}
           {editing && <Card title="Modification reason" icon="doc">

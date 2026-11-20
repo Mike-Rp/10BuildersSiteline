@@ -5,7 +5,7 @@ import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { getOpm, getSpm } from "./recommend.controller.js";
 import { randomUUID } from "node:crypto";
-import { assessInquiry, inquirySize, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, inquirySize, technicalOptions, arrangementOptions, MIN_INQUIRY_DURATION_DAYS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -261,7 +261,8 @@ export function mountInquiries(router) {
         if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
         if (input.start < today) throw new HttpError(422, "Choose an estimated start date of today or later.");
-        if (input.end === input.start) throw new HttpError(422, "Choose an estimated completion date after the start date.");
+        if ((Date.parse(input.end) - Date.parse(input.start)) / 86400000 < MIN_INQUIRY_DURATION_DAYS)
+          throw new HttpError(422, `Choose an estimated completion date at least ${MIN_INQUIRY_DURATION_DAYS} calendar days after the start date.`);
         const technical = input.technical ?? workflow.review?.technical;
         const arrangement = input.arrangement ?? workflow.review?.arrangement;
         if ((technical !== undefined || arrangement !== undefined) &&

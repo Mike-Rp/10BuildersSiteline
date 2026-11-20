@@ -17,13 +17,14 @@ test("shared calendar preserves bounds, cancellation, clearing, and disabled fie
   const { default: DatePicker } = await server.ssrLoadModule("/src/DatePicker.tsx")
   const { Modal, Field } = await server.ssrLoadModule("/src/ui.tsx")
   let value = "2026-11-15", outerClosed = 0, submits = 0
-  function Form({ disabled = false, required = false, bounded = true }) {
+  function Form({ disabled = false, required = false, bounded = true, earliest } = {}) {
     const [date, setDate] = React.useState(value)
     return React.createElement(Modal, { title: "Parent form", onClose: () => outerClosed++ },
       React.createElement("form", { onSubmit: e => { e.preventDefault(); submits++ } },
         React.createElement(Field, { label: "Expiry date" }, React.createElement(DatePicker, {
           calendarTitle: "Expiry date", value: date, disabled, required,
           ...(bounded ? { min: "2026-11-10", max: "2026-11-20" } : {}),
+          ...(earliest ? { min: earliest, highlightMin: true } : {}),
           onValueChange: next => { value = next; setDate(next) },
         }))))
   }
@@ -59,4 +60,14 @@ test("shared calendar preserves bounds, cancellation, clearing, and disabled fie
   await click('input[type="date"]')
   assert.ok(document.querySelectorAll('.completion-calendar-selectors label:last-child option').length >= 200)
   assert.ok([...document.querySelectorAll('.completion-calendar-days button')].every(el => !el.disabled))
+  await React.act(() => document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  await render({ bounded: false, earliest: "2027-01-04" })
+  await click('button[aria-label="Choose expiry date"]')
+  assert.match(document.querySelector(".completion-calendar-heading").textContent, /January 2027/)
+  assert.equal(day(3).disabled, true)
+  assert.equal(day(4).disabled, false)
+  assert.ok(day(4).classList.contains("completion-earliest"))
+  assert.equal(input.value, "")
+  await React.act(() => day(4).click())
+  assert.equal(input.value, "2027-01-04")
 })

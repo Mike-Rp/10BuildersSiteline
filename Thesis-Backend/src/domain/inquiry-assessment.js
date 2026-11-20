@@ -1,5 +1,6 @@
 export const technicalOptions = ["Standard construction", "Several specialized systems", "Extensive specialized systems"];
 export const arrangementOptions = ["Sequential phases", "Partially overlapping phases", "Highly concurrent phases"];
+export const MIN_INQUIRY_DURATION_DAYS = 45;
 
 export function intakeSize(floorArea, floors) {
   if (floorArea >= 50000 || floors >= 31) return "Large";
