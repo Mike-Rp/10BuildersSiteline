@@ -287,6 +287,7 @@ export default function RoleWorkspace({
   const [confirmationView, setConfirmationView] = useState<{ projectId: string; view: "team" | "subcontractors" }>()
   const [sitePmContact, setSitePmContact] = useState<{ projectId: string; accountId: string }>()
   const [suggestedReassignment, setSuggestedReassignment] = useState<{ projectId: string; accountId: string; phase: string }>()
+  const [inquiryAssignmentProjectId, setInquiryAssignmentProjectId] = useState<string>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [repositoryOpen, setRepositoryOpen] = useState(false)
@@ -365,6 +366,7 @@ export default function RoleWorkspace({
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
   const [completedProjectId, setCompletedProjectId] = useState("")
+  const [officeDocumentsPath, setOfficeDocumentsPath] = useState<RepositoryPath>({})
   const previousStatuses = useRef(
     Object.fromEntries(projects.map((p) => [p.id, p.status])),
   )
@@ -558,6 +560,7 @@ export default function RoleWorkspace({
   }
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); return }
+    if (next === "Documents" && page !== "Documents") setOfficeDocumentsPath({})
     let nextActiveSitesView: typeof activeSitesView | undefined
     if (!isOpm && next === "Document repository") {
       setResourcesTab("documents")
@@ -593,6 +596,7 @@ export default function RoleWorkspace({
   function openDocuments(p: Project) {
     setPickedId(p.id)
     navigate("Documents")
+    setOfficeDocumentsPath({ projectId: p.id })
   }
   function openChecklistApprovals(project?: Project) {
     const filters: Record<string, string> = project ? { project: project.id } : {}
@@ -1159,6 +1163,8 @@ export default function RoleWorkspace({
           ),
         })}
         {...(isOpm && {
+          path: officeDocumentsPath,
+          onPathChange: setOfficeDocumentsPath,
           rootLabel: "Documents",
           rootClickable: true,
           fileDetails: true,
@@ -2927,6 +2933,49 @@ export default function RoleWorkspace({
       </Panel>
     )
   }
+
+  function inquiryAssignmentStatus(project: Project) {
+    const assignments = project.team.flatMap(phase => {
+      const people = phase.engineers?.length ? phase.engineers : phase.accountId
+        ? [{ accountId: phase.accountId, assignedDisciplines: phase.assignedDisciplines ?? [], status: phase.status }]
+        : []
+      return people.map(person => ({
+        ...person,
+        phase: phase.phase,
+        lead: phase === leadPhaseAssignment(project) && person.accountId === phase.accountId,
+      }))
+    })
+    const responses = [...workflowFor(project).responses].reverse()
+    const accepted = assignments.filter(person => person.status === "confirmed").length
+    const close = () => setInquiryAssignmentProjectId(undefined)
+    return <Modal title="Site PM assignment status"
+      subtitle={`${project.name} · ${accepted} of ${assignments.length} assignments accepted`}
+      wide onClose={close} footer={<Button onClick={close}>Close</Button>}>
+      {assignments.length ? <div className="inquiry-lineup-table">
+        <table aria-label="Assigned Site PMs">
+          <thead><tr><th scope="col">Assigned phase</th><th scope="col">Site PM</th><th scope="col">Assigned tags</th>
+            <th scope="col">Designation</th><th scope="col">Response</th><th scope="col">Next action</th></tr></thead>
+          <tbody>{assignments.map(person => {
+            const declined = person.status === "declined"
+            const reason = declined ? responses.find(response => response.accountId === person.accountId &&
+              response.phase === person.phase && response.status === "declined")?.note : undefined
+            return <tr key={`${person.phase}:${person.accountId}`} data-declined={declined}>
+              <th scope="row">{person.phase}</th>
+              <td>{actorName(person.accountId)}</td>
+              <td>{person.assignedDisciplines.join(", ") || "No tags recorded"}</td>
+              <td>{person.lead ? "Lead Site PM" : "Phase Site PM"}</td>
+              <td><Badge tone={declined ? "red" : person.status === "confirmed" ? "green" : "amber"}>
+                {declined ? "Declined" : person.status === "confirmed" ? "Accepted" : "Pending"}
+              </Badge>{reason && <p>{reason}</p>}</td>
+              <td>{declined && project.status !== "completed" && <Button onClick={() => setSuggestedReassignment({
+                projectId: project.id, accountId: person.accountId, phase: person.phase,
+              })}>Review reassignment</Button>}</td>
+            </tr>
+          })}</tbody>
+        </table>
+      </div> : <p>No Site PM assignments are recorded for this project.</p>}
+    </Modal>
+  }
   function responseTracking() {
     const completed = responseProjects.filter((p) =>
       p.team.every((t) => t.engineers?.length ? t.engineers.every(engineer => engineer.status === "confirmed") : t.status === "confirmed"),
@@ -3642,7 +3691,9 @@ export default function RoleWorkspace({
     )
   }
   function renderPage() {
-    if (isOpm && page === "Project inquiries") return <ProjectInquiries key={actor.id} role="opm" onReload={onReload} />
+    if (isOpm && page === "Project inquiries") return <ProjectInquiries key={actor.id} role="opm" onReload={onReload}
+      projects={projects} onOpenDocuments={openDocuments}
+      onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
     switch (page) {
       case "Dashboard":
         return dashboard()
@@ -3925,6 +3976,10 @@ export default function RoleWorkspace({
           </div>
         </main>
       </div>
+      {isOpm && inquiryAssignmentProjectId && (() => {
+        const project = projects.find(p => p.id === inquiryAssignmentProjectId)
+        return project ? inquiryAssignmentStatus(project) : null
+      })()}
       {isOpm && suggestedReassignment && (() => {
         const project = projects.find(p => p.id === suggestedReassignment.projectId)
         if (!project) return null

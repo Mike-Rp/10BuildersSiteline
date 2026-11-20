@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { api } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
+import type { Project } from "./model"
+import { phaseEngineerSummary, registeredComplete, registeredCount, teamConfirmed } from "./workflows"
 import { ListPager, runList, updateListQuery, useListMemory } from "./ListControls"
 import { withPage } from "./listing"
 import { IntakeTabs } from "./IntakeGuidance"
@@ -24,7 +26,7 @@ const fields = [
 ] as const
 type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
-type Inquiry = OfficeRecord & { id: string; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
+type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
@@ -325,7 +327,10 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   </section>
 }
 
-export default function ProjectInquiries({ role, onReload }: { role: "admin" | "opm"; onReload: () => unknown }) {
+export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments }: {
+  role: "admin" | "opm"; onReload: () => unknown; projects?: Project[]
+  onOpenDocuments?: (project: Project) => void; onOpenAssignments?: (project: Project) => void
+}) {
   const [rows, setRows] = useState<Inquiry[]>()
   const [search, setSearch] = useState("")
   const [queueView, setQueueView] = useState<IntakeView>("all")
@@ -515,8 +520,22 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
   </>
   const admin = role === "admin"
   const query = search.trim().toLowerCase()
+  const projectsById = new Map(projects.map(project => [project.id, project]))
+  const setupByInquiry = new Map((rows ?? []).flatMap(item => {
+    if (admin || item.project_status !== "spm_review") return []
+    const project = item.project_id ? projectsById.get(item.project_id) : undefined
+    const confirmed = project && teamConfirmed(project)
+    const needsReassignment = project?.team.some(phase => !phase.accountId || phaseEngineerSummary(phase).status === "declined")
+    const needsDocuments = !!project && !registeredComplete(project)
+    const status = confirmed ? "Site PM assignments accepted" : needsReassignment
+      ? "Site PM assignment needs review" : "Awaiting Site PM acceptance"
+    const bucket: IntakeView | undefined = needsDocuments || needsReassignment ? "action" : confirmed ? undefined : "waiting"
+    return [[item.id, { project, status, bucket, needsDocuments }] as const]
+  }))
+  const officeStatus = (item: Inquiry) => setupByInquiry.get(item.id)?.status ?? statusLabel(item)
+  const officeBucket = (item: Inquiry) => setupByInquiry.get(item.id)?.bucket ?? officeAction(item.status)?.bucket
   const matchesSearch = (item: Inquiry) => !query ||
-    [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : statusLabel(item),
+    [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : officeStatus(item),
       admin ? inquiryReference(item) : ""]
       .some(value => String(value ?? "").toLowerCase().includes(query))
   const visibleRows = rows?.filter(matchesSearch)
@@ -544,17 +563,17 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
     resetInquiryPage()
   }
   const queueRows = visibleRows?.filter(item =>
-    (queueView === "all" || officeAction(item.status)?.bucket === queueView) &&
-    (!queueStatus || statusLabel(item) === queueStatus) &&
+    (queueView === "all" || officeBucket(item) === queueView) &&
+    (!queueStatus || officeStatus(item) === queueStatus) &&
     (!queueType || item.details.project_type === queueType)
   )
   const queueCounts = (rows ?? []).reduce((counts, item) => {
     counts.all++
-    const bucket = officeAction(item.status)?.bucket
+    const bucket = officeBucket(item)
     if (bucket) counts[bucket]++
     return counts
   }, { all: 0, action: 0, waiting: 0 })
-  const statusOptions = [...new Set([...(rows ?? []).map(statusLabel), queueStatus].filter(Boolean))]
+  const statusOptions = [...new Set([...(rows ?? []).map(officeStatus), queueStatus].filter(Boolean))]
   function renderAdminInquiryForm() {
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
@@ -717,13 +736,16 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       <div><h1>Project inquiries</h1>
         {admin && <p>Review saved inquiries or start a new project request.</p>}
       </div>
-      <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
+      <button className="button" disabled={busy} onClick={() => void run(async () => {
+        await refresh()
+        if (!admin) await onReload()
+      })}>Refresh</button>
       {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
     </header>
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
       <div className="confirmation-intake-filters">
-        <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries" waitingLabel="Waiting for client"
-          help="Needs your action includes requests to review and projects ready for intake. Waiting for client includes accepted consultations with no client decision recorded yet." />
+        <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
+          help="Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action." />
       </div>
       <div className="opm-inquiry-filters">
         <div className="inquiry-list-search">
@@ -742,17 +764,29 @@ export default function ProjectInquiries({ role, onReload }: { role: "admin" | "
       {queueRows && <p className="inquiry-muted" role="status">{queueRows.length} {queueRows.length === 1 ? "inquiry" : "inquiries"}</p>}
       {queueRows?.length ? <div className="opm-inquiry-results">
         <table aria-label="Assigned project inquiries">
-          <thead><tr><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Next action</th></tr></thead>
+          <thead><tr><th scope="col">Project</th><th scope="col">Status</th><th scope="col">Required documents</th><th scope="col">Next action</th></tr></thead>
           <tbody>{queueRows.map(item => {
             const label = item.status === "approved" && !item.workflow?.budget
               ? "Review project information" : officeAction(item.status)?.label ?? "View inquiry"
+            const setup = setupByInquiry.get(item.id)
+            const project = setup?.project
+            const uploaded = project ? registeredCount(project) : null
             return <tr key={item.id}>
-            <th scope="row">{item.details.name || "Untitled project"}<small>{item.details.project_type || "Project type unavailable"}</small></th>
-            <td><span className="inquiry-list-status" data-status={item.status}>{statusLabel(item) || "Status unavailable"}</span></td>
-            <td><button type="button" className="button" disabled={busy} onClick={() => openOfficeInquiry(item)}
+            <th scope="row">{item.details.name || "Untitled project"}<small>{item.details.project_type || "Project type unavailable"}{setup && " · Project setup"}</small></th>
+            <td><span className="inquiry-list-status" data-status={item.status}>{officeStatus(item) || "Status unavailable"}</span></td>
+            <td>{uploaded !== null ? <div className="opm-inquiry-document-progress">
+              <span>{uploaded} of 6 uploaded</span>
+              <progress aria-label="Required documents uploaded" value={uploaded} max={6} />
+            </div> : setup ? "Status unavailable" : "—"}</td>
+            <td>{setup ? <div className="opm-inquiry-row-actions">
+              {setup.needsDocuments && project && <button type="button" className="button primary" disabled={busy}
+                onClick={() => onOpenDocuments?.(project)}>Upload required documents</button>}
+              <button type="button" className="button" disabled={busy || !project}
+                onClick={() => project && onOpenAssignments?.(project)}>View assignment status</button>
+            </div> : <button type="button" className="button" disabled={busy} onClick={() => openOfficeInquiry(item)}
               aria-label={`${label} for ${item.details.name || "Untitled project"}`}>
               {label} <Icon name="chevron" size={16} />
-            </button></td>
+            </button>}</td>
           </tr>})}</tbody>
         </table>
       </div> : <div className="opm-inquiry-empty">

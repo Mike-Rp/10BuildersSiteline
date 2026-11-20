@@ -23,7 +23,7 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
     const data = mode === 'missing'
       ? { available: false, message: 'Apply database migration 023 to enable suggested reassignment.' }
       : { available: true, canReassign: !waiting, version: 'offer-v1', name: 'Juan Dela Cruz', phase: 'Design', userId: 'old',
-          tags: ['Civil', 'Structural'], status: 'pending', deadline: waiting ? '2099-01-01T00:00:00Z' : '2020-01-01T00:00:00Z',
+          tags: ['Civil', 'Structural'], status: mode === 'declined' ? 'declined' : 'pending', deadline: waiting ? '2099-01-01T00:00:00Z' : '2020-01-01T00:00:00Z',
           message: waiting ? 'Reassignment becomes available when the Site PM declines or the response deadline passes.'
             : mode === 'empty' ? 'No eligible replacement covers this responsibility scope.' : 'Eligibility is checked again when you confirm.',
           candidates }
@@ -35,22 +35,30 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
   const tick=()=>new Promise(resolve=>setTimeout(resolve,0))
   try {
     const {default:Popup}=await server.ssrLoadModule('/src/SuggestedReassignment.tsx')
-    const render=async key=>act(async()=>{root.render(React.createElement(Popup,{key,project:{id:'p1',name:'STI Santa Rosa'},phase:'Design',userId:'old',onClose:()=>{closed++},onSaved:async()=>{saved++}}));await tick()})
+    const project = { id: 'p1', name: 'STI Santa Rosa', workflow: { responses: [
+      { status: 'declined', phase: 'Design', accountId: 'old', note: 'Unavailable during the Design schedule.' },
+    ] } }
+    const render=async key=>act(async()=>{root.render(React.createElement(Popup,{key,project,phase:'Design',userId:'old',onClose:()=>{closed++},onSaved:async()=>{saved++}}));await tick()})
     const button=text=>[...document.querySelectorAll('button')].find(element=>element.textContent===text)
+    const sendOffer = () => button('Send replacement offer')
+    mode='declined';await render('declined')
+    assert.match(document.querySelector('.reassignment-current').textContent,/Unavailable during the Design schedule/)
+    assert.match(document.querySelector('.reassignment-scope').textContent,/Design.*Civil · Structural/)
+    assert.equal(document.querySelector('input[type="radio"]:checked'),null)
     mode='waiting';await render('waiting')
     assert.match(document.querySelector('[role="dialog"]').textContent,/Awaiting acceptance/)
     assert.match(document.querySelector('[role="dialog"]').textContent,/declines or the response deadline passes/)
-    assert.equal(button('Confirm Reassignment'),undefined)
+    assert.equal(sendOffer(),undefined)
     mode='normal'
     await act(async()=>{button('Refresh Suggestions').click();await tick()})
     assert.match(document.querySelector('[role="dialog"]').textContent,/Response overdue/)
     assert.equal(document.querySelectorAll('input[type="radio"]').length,2)
-    assert.equal(button('Confirm Reassignment').disabled,true)
+    assert.equal(sendOffer().disabled,true)
     await act(()=>document.querySelectorAll('input[type="radio"]')[1].click())
     const note=document.querySelector('textarea')
     await act(()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(note,'No response after recorded contact attempts.');note.dispatchEvent(new dom.window.Event('input',{bubbles:true}))})
-    assert.equal(button('Confirm Reassignment').disabled,false)
-    await act(()=>{button('Confirm Reassignment').click();button('Confirm Reassignment').click()})
+    assert.equal(sendOffer().disabled,false)
+    await act(()=>{sendOffer().click();sendOffer().click()})
     assert.equal(requests.filter(request=>request.method==='POST').length,1)
     assert.deepEqual(requests.at(-1).body,{phase:'Design',userId:'old',newUserId:'new-b',version:'offer-v1',note:'No response after recorded contact attempts.'})
     await act(async()=>{finish();await tick()})
@@ -59,15 +67,15 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
     assert.equal(document.querySelector('input[value="new-b"]').checked,true)
     assert.equal(saved,0);assert.equal(closed,0)
     fail=false
-    await act(()=>button('Confirm Reassignment').click())
+    await act(()=>sendOffer().click())
     await act(async()=>{finish();await tick()})
     assert.equal(saved,1);assert.equal(closed,1)
     mode='empty';await render('empty')
-    assert.equal(button('Confirm Reassignment'),undefined)
+    assert.equal(sendOffer(),undefined)
     assert.match(document.querySelector('[role="dialog"]').textContent,/No eligible replacement/)
     mode='missing';await render('missing')
     assert.match(document.querySelector('[role="dialog"]').textContent,/migration 023/)
-    assert.equal(button('Confirm Reassignment'),undefined)
+    assert.equal(sendOffer(),undefined)
   } finally {
     await act(()=>root.unmount());await server.close();dom.window.close()
     for(const [key,descriptor]of previous)descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key]

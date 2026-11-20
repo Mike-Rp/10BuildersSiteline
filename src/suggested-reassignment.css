@@ -2,10 +2,15 @@
 #root .suggested-reassignment > h3 { margin: 16px 0 6px; font-size: 17px; }
 #root .suggested-reassignment > p { font-size: 14px; color: var(--color-muted); }
 #root .reassignment-current { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; background: #f7fafc; }
+#root .reassignment-current[data-declined=true] { border-color: #f3c7a6; background: #fff4ea; }
 #root .reassignment-current h3 { margin: 10px 0 6px; font-size: 16px; }
 #root .reassignment-current p { margin: 5px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+#root .reassignment-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+#root .reassignment-scope > div { padding: 10px 12px; border-radius: 8px; background: #edf5fc; }
+#root .reassignment-scope dt { font-size: 13px; color: var(--color-muted); }
+#root .reassignment-scope dd { margin: 2px 0 0; font-weight: 650; overflow-wrap: anywhere; }
 #root .reassignment-candidates { border: 0; padding: 0; margin: 12px 0; min-width: 0; display: grid; gap: 10px; }
-#root .reassignment-candidates legend { font-size: 13px; color: var(--color-muted); margin-bottom: 8px; }
+#root .reassignment-candidates legend { font-size: 16px; font-weight: 650; margin-bottom: 8px; }
 #root .reassignment-candidates > label { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #c9d9e7; border-radius: 9px; padding: 12px; cursor: pointer; min-width: 0; }
 #root .reassignment-candidates > label.selected { background: #edf5fc; border-color: #315f85; }
 #root .reassignment-candidates input { flex-shrink: 0; width: 18px; height: 18px; min-height: 0; margin: 3px 0 0; accent-color: #193b59; }
