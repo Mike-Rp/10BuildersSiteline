@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import React, { act } from "react"
 
-test("priority banner sorts critical records, preserves exact actions, expands all items and clears resolved work", async () => {
+test("priority banner opens individual tasks and shows the full queue only for multiple items", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" })
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -35,14 +35,16 @@ test("priority banner sorts critical records, preserves exact actions, expands a
     assert.doesNotMatch(document.querySelector('.urgent-item-status.soon time').textContent, /AM|PM|:/)
     await act(() => document.querySelector('[aria-label="Open priority item: Approaching license expiry"]').click())
     await act(() => document.querySelector('.urgent-banner-heading button').click())
-    assert.deepEqual(opened, ["soon", "qa"])
-    await act(() => document.querySelector('.urgent-banner-more button').click())
-    assert.equal(document.querySelectorAll('.urgent-banner-item').length, 5)
-    assert.equal(document.querySelector('.urgent-banner-more button').getAttribute("aria-expanded"), "true")
-    await act(() => document.querySelector('.urgent-banner-more button').click())
-    assert.equal(document.querySelectorAll('.urgent-banner-item').length, 3)
+    assert.deepEqual(opened, ["soon"])
+    const queue = document.querySelector('[role="dialog"][aria-label="All priority items"]')
+    assert.equal(queue.querySelectorAll('.urgent-banner-item').length, 5)
+    await act(() => queue.querySelector('[aria-label="Open priority item: Other action"]').click())
+    assert.deepEqual(opened, ["soon", "other"])
+    assert.equal(document.querySelector('[role="dialog"]'), null)
+    assert.equal(banner().querySelectorAll('.urgent-banner-item').length, 3)
     await render([items[1]])
     assert.ok(banner().classList.contains("urgent-warning"))
+    assert.equal(banner().querySelector('.urgent-banner-heading button'), null)
     await render([])
     assert.equal(banner(), null)
   } finally {

@@ -15,6 +15,7 @@ export type UrgentItem = {
   overdue?: number
   dueSoon?: number
   actionLabel?: string
+  actionText?: string
 }
 export type StaffUrgentItem = UrgentItem & {
   projectId: string
@@ -68,6 +69,7 @@ export function staffUrgentItems(state: State, actor: Account, page = "Dashboard
           status: due === undefined ? "Submission date unavailable" : urgency === "overdue" ? "Overdue for review" : urgency === "soon" ? "Due within 24 hours" : "Review due",
           overdue: deadlines.filter(date => date <= now).length, dueSoon: deadlines.filter(date => date > now && date <= now + DAY).length,
           actionLabel: `Review checklist for ${project.name}`,
+          actionText: "Review checklist evidence",
         })
       }
       if (work.pendingUpdate) {
@@ -82,8 +84,8 @@ export function staffUrgentItems(state: State, actor: Account, page = "Dashboard
         items.push({ key: `handoff:${project.id}`, projectId: project.id, title: project.name, module: "Active sites", target: "project", urgency: "blocked", detail: project.handoffReadiness.reason, status: "Phase handoff blocked" })
     }
     if (isOpm) {
-      if (guidance?.kind === "action" && guidance.action === "reassign") items.push({ key: `reassign:${project.id}`, projectId: project.id, title: project.name, module: "Confirmation queue", target: "responses", urgency: "blocked", detail: guidance.next, status: "Phase reassignment required" })
-      if (guidance?.kind === "action" && guidance.action === "documents") items.push({ key: `documents:${project.id}`, projectId: project.id, title: project.name, module: "Documents", target: "documents", urgency: "attention", detail: guidance.next, status: "Required intake documents missing" })
+      if (guidance?.kind === "action" && guidance.action === "reassign") items.push({ key: `reassign:${project.id}`, projectId: project.id, title: project.name, module: "Confirmation queue", target: "responses", urgency: "blocked", detail: guidance.next, status: "Phase reassignment required", actionText: "Review assignment status" })
+      if (guidance?.kind === "action" && guidance.action === "documents") items.push({ key: `documents:${project.id}`, projectId: project.id, title: project.name, module: "Documents", target: "documents", urgency: "attention", detail: guidance.next, status: "Required intake documents missing", actionText: "Upload required documents" })
     }
     const deadline = work.deadline
     const ownPending = project.team.some(row => (row.accountId === actor.id && row.status === "pending") || row.engineers?.some(engineer => engineer.accountId === actor.id && engineer.status === "pending"))

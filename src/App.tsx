@@ -1596,7 +1596,7 @@ function AppInner() {
       <PageTitlePanel title={title}>
         {action}
       </PageTitlePanel>
-      <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />
+      <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} />
       </>
     )
   }

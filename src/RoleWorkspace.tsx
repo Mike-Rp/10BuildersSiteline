@@ -664,12 +664,10 @@ export default function RoleWorkspace({
   function urgentBanner() {
     const items = staffUrgentItems(state, actor, page, urgencyNow)
     const checklistOnly = items.length > 0 && items.every(item => item.target === "qa")
-    const documentsOnly = items.length > 0 && items.every(item => item.target === "documents")
     return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : "Priority items need your attention"}
       description={checklistOnly ? `${items.length} ${items.length === 1 ? "project has" : "projects have"} submitted checklist evidence awaiting your approval.` : undefined}
       label="Priority action items"
-      actionLabel={checklistOnly ? "Review approvals" : documentsOnly ? "Upload required documents" : "Open priority item"} onOpen={openUrgentItem}
-      onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm && items.some(item => item.target === "qa" || item.target === "progress") ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
+      onOpen={openUrgentItem} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm && items.some(item => item.target === "qa" || item.target === "progress") ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
   }
   async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
