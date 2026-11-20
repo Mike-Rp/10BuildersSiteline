@@ -35,15 +35,17 @@ export async function assertLeadResponded(db, project, user) {
 /**
  * Server-side gate for accepting a phase assignment or an engineer responsibility.
  * Mirrors the workspace sequence: the assigned Office PM has accepted (the project is in
- * SPM review or active), the required review documents are uploaded, and the Lead Site PM
- * accepts before any other Site PM. Callers check that the actor owns a pending row.
+ * SPM review or active), and the Lead Site PM accepts before any other Site PM.
+ * Legacy intakes also require the registered documents before acceptance.
+ * Callers check that the actor owns a pending row.
  */
 export async function assertAcceptancePrerequisites(db, project, user) {
   if (!ACCEPTANCE_LIFECYCLES.includes(project.lifecycle_status))
     throw new HttpError(409, "Wait for the assigned Office PM to accept this project before responding.", "OPM_ACCEPTANCE_REQUIRED");
-  const required = project.inquiry_intake ? ["owner_contract", "registered_plans"] : REGISTERED_DOCUMENT_CODES;
-  const uploaded = await registeredDocumentCount(db, project.id, required);
-  if (uploaded < required.length)
-    throw new HttpError(409, `Waiting for Office PM documents: ${uploaded} of ${required.length} uploaded.`, "REGISTERED_DOCUMENTS_REQUIRED");
+  if (!project.inquiry_intake) {
+    const uploaded = await registeredDocumentCount(db, project.id);
+    if (uploaded < REGISTERED_DOCUMENT_CODES.length)
+      throw new HttpError(409, `Waiting for Office PM documents: ${uploaded} of ${REGISTERED_DOCUMENT_CODES.length} uploaded.`, "REGISTERED_DOCUMENTS_REQUIRED");
+  }
   await assertLeadResponded(db, project, user);
 }

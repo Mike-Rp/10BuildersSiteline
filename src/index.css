@@ -1105,6 +1105,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .registered-document { display: flex; align-items: center; gap: 16px; padding: 23px 0; border-bottom: 1px solid var(--color-line); flex-wrap: wrap; }
 .registered-document > div:not(.button-group) { flex: 1; min-width: 240px; }
 .registered-document h3 { font-size: 16px; font-weight: 550; }
+.registered-document:focus { outline: 2px solid var(--color-primary); outline-offset: 4px; }
 .registered-document p { color: var(--color-muted); font-size: 14px; margin-top: 5px; overflow-wrap: anywhere; }
 .registered-document > .button { max-width: 340px; white-space: normal; text-align: center; }
 .document-number { color: var(--color-muted); font-size: 18px; font-weight: 500; display: flex; align-items: center; justify-content: center; width: 36px; height: 41px; flex-shrink: 0; }

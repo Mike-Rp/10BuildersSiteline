@@ -275,21 +275,18 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
       assignments:ctx.phases.map(p=>({phase:p.name,companyId,foremanId}))}
   }
   const allocate = (staffToken,status=200) => call(allocationPath,{token:staffToken,status,json:allocation})
-  await respond(lead,leadToken,"accept",409)
   const uploadRegistered = async (docIndex,name) => call(command,{token,json:{type:"upload_registered",docIndex,doc:{id:await upload(name)}}})
-  await uploadRegistered(3,"registered-plans.pdf")
   await respond(other,otherToken,"accept",409)
   await respond(other,otherToken,"decline",409)
   await respond(lead,leadToken,"accept")
-  await allocate(leadToken,409)
-  for (const index of [0,1,4,5]) await uploadRegistered(index,`registered-${index}.pdf`)
-  await allocate(leadToken,409)
   await respond(other,otherToken,"accept")
   if (multiEngineer) {
     const pending = (await db.query(`SELECT r.id,u.email FROM project_phase_responsibilities r JOIN users u ON u.id=r.user_id
       WHERE r.project_id=$1 AND r.status='pending'`,[projectId])).rows
     for (const r of pending) await call(`/projects/${projectId}/engineer-responsibilities/${r.id}`,{token:await login(r.email,"staff"),json:{action:"accept"}})
   }
+  await allocate(leadToken,409)
+  for (const index of [0,1,3,4,5]) await uploadRegistered(index,`registered-${index}.pdf`)
   await allocate(otherToken,403)
   await call(command,{token:otherToken,status:403,json:{type:"upload_agreement"}})
   await allocate(leadToken)

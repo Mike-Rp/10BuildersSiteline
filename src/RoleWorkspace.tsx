@@ -369,6 +369,19 @@ export default function RoleWorkspace({
     useState("all")
   const [completedProjectId, setCompletedProjectId] = useState("")
   const [officeDocumentsPath, setOfficeDocumentsPath] = useState<RepositoryPath>({})
+  const [requiredDocumentJump, setRequiredDocumentJump] = useState<{ projectId: string; index: number }>()
+  useEffect(() => {
+    if (page !== "Documents" || !requiredDocumentJump || officeDocumentsPath.projectId !== requiredDocumentJump.projectId) return
+    const { projectId, index } = requiredDocumentJump
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(`required-document-${projectId}-${index}`)
+        ?? document.getElementById(`required-documents-${projectId}`)
+      target?.scrollIntoView?.({ block: "center" })
+      target?.focus({ preventScroll: true })
+      setRequiredDocumentJump(undefined)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [page, officeDocumentsPath, requiredDocumentJump])
   const previousStatuses = useRef(
     Object.fromEntries(projects.map((p) => [p.id, p.status])),
   )
@@ -607,6 +620,9 @@ export default function RoleWorkspace({
     setPickedId(p.id)
     navigate("Documents")
     setOfficeDocumentsPath({ projectId: p.id })
+    const missing = assignmentDocumentsMissing(p)[0] ?? DOC_LABELS.slice(0, 6).find(label =>
+      !p.docs.some(doc => doc.label === label && doc.uploaded))
+    setRequiredDocumentJump({ projectId: p.id, index: missing ? DOC_LABELS.indexOf(missing) : -1 })
   }
   function openChecklistApprovals(project?: Project) {
     const filters: Record<string, string> = project ? { project: project.id } : {}
@@ -648,11 +664,12 @@ export default function RoleWorkspace({
   function urgentBanner() {
     const items = staffUrgentItems(state, actor, page, urgencyNow)
     const checklistOnly = items.length > 0 && items.every(item => item.target === "qa")
+    const documentsOnly = items.length > 0 && items.every(item => item.target === "documents")
     return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : "Priority items need your attention"}
       description={checklistOnly ? `${items.length} ${items.length === 1 ? "project has" : "projects have"} submitted checklist evidence awaiting your approval.` : undefined}
       label="Priority action items"
-      actionLabel={checklistOnly ? "Review approvals" : "Open priority item"} onOpen={openUrgentItem}
-      onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
+      actionLabel={checklistOnly ? "Review approvals" : documentsOnly ? "Upload required documents" : "Open priority item"} onOpen={openUrgentItem}
+      onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm && items.some(item => item.target === "qa" || item.target === "progress") ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
   }
   async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
@@ -697,29 +714,21 @@ export default function RoleWorkspace({
     )
   }
   function timeline(p: Project) {
-    const step = !p.opmAccepted
-      ? 0
-      : assignmentDocumentsMissing(p).length
-        ? 1
-        : !leadConfirmed(p)
-          ? 2
-          : !teamConfirmed(p)
-            ? 3
-            : 4
+    const labels = p.inquiryOrigin
+      ? ["Office PM accepts", "Lead Site PM", "Remaining Site PMs", "Required documents", "Subcontractor allocation"]
+      : ["Office PM accepts", "Six documents", "Lead Site PM", "Remaining Site PMs", "Subcontractor allocation"]
+    const completed = p.inquiryOrigin
+      ? [p.opmAccepted, leadConfirmed(p), teamConfirmed(p), registeredComplete(p), false]
+      : [p.opmAccepted, !assignmentDocumentsMissing(p).length, leadConfirmed(p), teamConfirmed(p), false]
+    const step = completed.indexOf(false)
     return (
       <ol className="role-intake-timeline">
-        {[
-          "Office PM accepts",
-          p.inquiryOrigin ? "Review documents" : "Six documents",
-          "Lead Site PM",
-          "Remaining Site PMs",
-          "Subcontractor allocation",
-        ].map((label, i) => (
+        {labels.map((label, i) => (
           <li
             key={label}
-            className={i < step ? "done" : i === step ? "current" : ""}
+            className={completed[i] ? "done" : i === step ? "current" : ""}
           >
-            <span>{i < step ? <Icon name="check" size={15} /> : i + 1}</span>
+            <span>{completed[i] ? <Icon name="check" size={15} /> : i + 1}</span>
             <strong>{label}</strong>
           </li>
         ))}
@@ -1000,7 +1009,7 @@ export default function RoleWorkspace({
           </Badge>
         }
       >
-        <div className="role-card-content">
+        <div className="role-card-content" id={page === "Documents" ? `required-documents-${p.id}` : undefined} tabIndex={-1}>
           <IntakeGuidance state={state} project={p} actor={actor} />
           <div className="document-completion">
             <progress max={6} value={registeredCount(p)} />
@@ -1038,6 +1047,9 @@ export default function RoleWorkspace({
                 const doc = p.docs.find((d) => d.label === label)
                 return (
                   <section
+                    id={page === "Documents" ? `required-document-${p.id}-${i}` : undefined}
+                    tabIndex={-1}
+                    aria-label={label}
                     className={`registered-document ${
                       doc?.uploaded ? "complete" : ""
                     }`}
@@ -1102,9 +1114,9 @@ export default function RoleWorkspace({
             <div className="notice">
               <Icon name="check" />
               <p>
-                All six documents are confirmed. {actorName(leadId(p))} must
-                accept first, then the remaining Site PMs. Uploading documents
-                does not activate the project.
+                All six documents are confirmed. {teamConfirmed(p) ? "All Site PM assignments are accepted." :
+                  leadConfirmed(p) ? "Waiting for the remaining Site PM responses." :
+                    "Waiting for the Lead Site PM to accept before the remaining Site PMs can respond."}
               </p>
             </div>
           )}
@@ -3476,6 +3488,7 @@ export default function RoleWorkspace({
           </div>
           {blocker ? <div className="site-offer-blocker"><Icon name="shield" /><p>{blocker}</p></div>
             : <p>Accepting confirms {pending.length === 1 ? "your pending phase assignment" : `all ${pending.length} pending phase assignments`} for this project.</p>}
+          {project.inquiryOrigin && missingDocuments.length > 0 && <p>Office PM uploads pending: {missingDocuments.join(", ")}.</p>}
         </> : <>
           <div className="site-offer-tabs" role="group" aria-label="Project details sections">
             {(["Overview", "Construction phases", "Assigned team", "Documents"] as const).map(tab =>
@@ -3525,7 +3538,7 @@ export default function RoleWorkspace({
           {offerView === "Documents" && <section className="site-offer-card">
             <h3>Project documents</h3>
             {missingDocuments.length > 0 && <div className="site-offer-blocker"><Icon name="shield" />
-              <p>Waiting for Office PM documents: {missingDocuments.join(", ")}.</p></div>}
+              <p>{project.inquiryOrigin ? "Office PM uploads pending" : "Waiting for Office PM documents"}: {missingDocuments.join(", ")}.</p></div>}
             {documents.length ? <ul>{documents.map(doc => <li key={doc.id}>
               <Button variant="text-button" icon="doc" onClick={() => void showDoc(project, doc)}>{doc.label} · {doc.name}</Button>
             </li>)}</ul> : <p>No files are available to your account yet.</p>}

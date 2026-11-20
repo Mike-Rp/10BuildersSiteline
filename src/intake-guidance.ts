@@ -46,10 +46,12 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!p.opmId) return step("Office PM unassigned", "Unassigned", "Review the intake record; an Office PM assignment is missing.", false, "view", "View details")
   if (!p.opmAccepted) return step("Office PM acceptance", person(p.opmId, "Office PM"),
     "Office PM must review and accept the assignment or request changes.", actor.role === "opm", "confirm", "Review assignment")
-  if (assignmentDocumentsMissing(p).length) return step("Required documents", person(p.opmId, "Office PM"),
-    p.inquiryOrigin ? "Upload the signed contract and registered plans before Site PM acceptance." : "Office PM must complete the six required documents before Site PM acceptance.",
+  if (assignmentDocumentsMissing(p).length && (actor.role !== "spm" || !p.inquiryOrigin)) return step("Required documents", person(p.opmId, "Office PM"),
+    p.inquiryOrigin ? "Upload the remaining intake documents. Site PMs can respond while uploads are in progress." : "Office PM must complete the six required documents before Site PM acceptance.",
     actor.role === "opm", "documents", "Open required documents")
-  const ownPending = p.team.filter(row => row.accountId === actor.id && row.status === "pending")
+  const ownPending = p.team.filter(row => row.engineers?.length
+    ? row.engineers.some(engineer => engineer.accountId === actor.id && engineer.status === "pending")
+    : row.accountId === actor.id && row.status === "pending")
   if (actor.role === "spm" && ownPending.length && !assignmentBlock(p, actor.id))
     return step(actor.id === lead ? "Lead Site PM acceptance" : "Site PM confirmations", person(actor.id, "Site PM"),
       `Review your assigned phases: ${ownPending.map(row => row.phase).join(", ")}. Accept or decline through your existing assignment controls.`, true, "assignment", "Review assignment")
