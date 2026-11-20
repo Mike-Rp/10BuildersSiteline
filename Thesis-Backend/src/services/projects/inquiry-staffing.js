@@ -48,7 +48,7 @@ export async function prepareInquiryLead(db, team, phases, typeId, type, schedul
   }
   const years = new Map(experience.rows.map(row => [row.id, Number(row.years)]));
   const lead = selectInquiryLead(phases, team, years, eligible);
-  if (!lead) throw new HttpError(422, "Assign a Site PM with a verified qualification that covers their phase before submitting staffing.");
+  if (!lead) throw new HttpError(422, "Assign a qualified Site PM to the first included phase before submitting staffing.");
   const phase = team.find(row => row.stage === lead.stage);
   if (phase.user_id !== lead.id) {
     const engineer = phase.engineers.find(person => person.user_id === lead.id);

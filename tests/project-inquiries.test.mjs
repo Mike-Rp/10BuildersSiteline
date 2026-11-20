@@ -243,7 +243,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     JOIN users u ON u.id=t.spm_user_id WHERE t.project_id=$1 ORDER BY t.is_lead DESC`,[projectId])).rows
   assert.deepEqual(assignments.map(a=>a.is_lead),[true,false])
   const [lead,other] = assignments
-  assert.equal(lead.id,alternate.id)
+  assert.ok(firstPhaseIds.includes(lead.id))
+  assert.equal(other.id,alternate.id)
   const leadToken = await login(lead.email,"staff")
   const otherToken = await login(other.email,"staff")
   const offerRecipients = new Set(recommended.team.flatMap(p=>p.engineers?.map(e=>e.user_id) ?? [p.user_id]))

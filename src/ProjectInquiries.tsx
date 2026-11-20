@@ -183,7 +183,7 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
         <strong>Proposed Lead SPM · {people.get(lead.id)?.name || "Site PM"}</strong>
         <p>{lead.stage} · {years.format(lead.years)} of relevant experience</p>
         <p><span className="inquiry-pill ready">Phase requirement matched</span> {lead.tags.join(", ")}</p>
-      </> : <p>Assign an eligible Site PM with a matching phase qualification to propose a Lead.</p>}
+      </> : <p>Assign an eligible Site PM to the first included phase to propose a lead.</p>}
     </div>
     <div className="inquiry-lineup-table">
       <table>
