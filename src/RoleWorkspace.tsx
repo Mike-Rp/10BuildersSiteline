@@ -3427,6 +3427,8 @@ export default function RoleWorkspace({
           .filter(doc => !DOC_LABELS.slice(0, 6).some(label => label === doc.label))
       : []
     const close = () => setDialog(undefined)
+    const inquiry = project.inquiryOverview
+    const areaLabel = (area?: number) => area == null ? "Not provided" : `${area.toLocaleString("en-PH")} m²`
     const projectFacts = <dl className="site-offer-facts">
       <div><dt>Target start</dt><dd>{project.start ? dateLabel(project.start) : "Not set"}</dd></div>
       <div><dt>Target completion</dt><dd>{project.end ? dateLabel(project.end) : "Not set"}</dd></div>
@@ -3480,11 +3482,31 @@ export default function RoleWorkspace({
               <Button key={tab} variant={offerView === tab ? "primary" : ""} aria-pressed={offerView === tab}
                 onClick={() => setOfferView(tab)}>{tab}</Button>)}
           </div>
-          {offerView === "Overview" && <section className="site-offer-card">
-            <h3>Project at a glance</h3>{projectFacts}
-            {project.location && <p><strong>Location:</strong> {project.location}</p>}
-            {blocker && <p>{blocker}</p>}
-          </section>}
+          {offerView === "Overview" && <>
+            <div className="site-offer-grid">
+              <section className="site-offer-card">
+                <h3>Project information</h3>
+                <dl className="site-offer-facts">
+                  <div><dt>Project type</dt><dd>{project.type || "Not provided"}</dd></div>
+                  <div><dt>Land area</dt><dd>{areaLabel(inquiry?.land_area)}</dd></div>
+                  <div><dt>Lot area</dt><dd>{areaLabel(inquiry?.lot_area)}</dd></div>
+                  <div><dt>Total floor area</dt><dd>{project.area ? `${project.area} m²` : "Not provided"}</dd></div>
+                  <div><dt>Number of floors</dt><dd>{project.floors || "Not provided"}</dd></div>
+                  <div><dt>Project location</dt><dd>{project.location || "Not provided"}</dd></div>
+                  <div><dt>Inquiry classification</dt><dd>{inquiry?.classification || "Not provided"}</dd></div>
+                </dl>
+              </section>
+              <section className="site-offer-card">
+                <h3>Schedule and construction plan</h3>
+                {projectFacts}
+                <dl className="site-offer-facts">
+                  <div><dt>Technical requirements</dt><dd>{inquiry?.technical || "Not provided"}</dd></div>
+                  <div><dt>Project phase arrangement</dt><dd>{inquiry?.arrangement || "Not provided"}</dd></div>
+                </dl>
+              </section>
+            </div>
+            {blocker && <div className="site-offer-blocker"><Icon name="shield" /><p>{blocker}</p></div>}
+          </>}
           {offerView === "Construction phases" && <section aria-label="Construction phase sequence">
             <p><strong>Target start:</strong> {project.start ? dateLabel(project.start) : "Not set"}
               {" · "}<strong>Target completion:</strong> {project.end ? dateLabel(project.end) : "Not set"}</p>

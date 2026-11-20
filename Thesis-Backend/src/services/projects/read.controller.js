@@ -141,7 +141,14 @@ export const getProjectById = async (req, res) => {
     const from=await projectListFrom({query:execute});
  
     const project = await execute(
-      `SELECT ${LIST_SELECT} ${from}
+      `SELECT ${LIST_SELECT}${user.role === "spm" ? `,
+        jsonb_strip_nulls(jsonb_build_object(
+          'land_area', to_jsonb(p)#>'{inquiry_intake,land_area}',
+          'lot_area', to_jsonb(p)#>'{inquiry_intake,lot_area}',
+          'classification', to_jsonb(p)#>'{inquiry_intake,classification}',
+          'technical', to_jsonb(p)#>'{inquiry_intake,assessment,technical}',
+          'arrangement', to_jsonb(p)#>'{inquiry_intake,assessment,arrangement}'
+        )) AS inquiry_overview` : ""} ${from}
         WHERE p.id = $1 AND COALESCE(p.is_deleted, false) = false`,
       [id]
     );

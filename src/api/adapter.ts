@@ -348,6 +348,7 @@ export function mapProject(parts: ProjectParts): Project {
     subcontractorAllocationVersion: Number(list.subcontractor_allocation_version || 0),
     type: list.project_type,
     inquiryOrigin: list.inquiry_origin === true,
+    inquiryOverview: detail.inquiry_overview,
     ...(list.phase_scope ? {phaseScope: list.phase_scope} : {}),
     area: formatArea(list.floor_area_sqm),
     floors:

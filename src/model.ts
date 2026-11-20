@@ -269,6 +269,13 @@ export type ClientSubconReview = {
 }
 export type Project = {
   inquiryOrigin?: boolean
+  inquiryOverview?: {
+    land_area?: number
+    lot_area?: number
+    classification?: string
+    technical?: string
+    arrangement?: string
+  }
   phaseScope?: import("../Thesis-Backend/src/domain/mixed-use-scope.js").MixedUseScope
   subcontractorAllocationVersion?: number
   subcontractorAllocation?: import("./subcontractor-allocation").SavedAllocation
