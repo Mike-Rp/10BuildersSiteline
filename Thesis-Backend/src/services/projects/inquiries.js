@@ -5,7 +5,7 @@ import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { getOpm, getSpm } from "./recommend.controller.js";
 import { randomUUID } from "node:crypto";
-import { assessInquiry, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, inquirySize, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -63,23 +63,6 @@ export function inquiryDetails(input) {
 export function validSchedule(start, end) {
   const isDay = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
   return isDay(start) && isDay(end) && start <= end;
-}
-
-export function estimateInquiry(details, start) {
-  const config = JSON.parse(process.env.INQUIRY_PLANNING_RULES || "{}");
-  const rule = config[details.project_type];
-  const keys = ["lot_area", "land_area", "floor_area_sqm", "floor_count"].filter(key => details[key] != null);
-  const matches = (size) => keys.every(key => Number.isFinite(rule?.[size]?.[key]) && details[key] <= rule[size][key]);
-  const size = matches("Small") ? "Small" : matches("Medium") ? "Medium"
-    : keys.every(key => Number.isFinite(rule?.Medium?.[key])) ? "Large" : null;
-  const duration = size && rule?.durationDays?.[size];
-  const date = new Date(`${start}T00:00:00Z`);
-  let end = null;
-  if (Number.isInteger(duration) && duration > 0 && duration <= 36500 && Number.isFinite(date.valueOf())) {
-    date.setUTCDate(date.getUTCDate() + duration);
-    end = date.toISOString().slice(0, 10);
-  }
-  return { size, end };
 }
 
 export async function assertInquiryUpload(db, actorId, fileId, lock = false) {
@@ -276,6 +259,9 @@ export function mountInquiries(router) {
     switch (input.action) {
       case "review": {
         if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
+        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
+        if (input.start < today) throw new HttpError(422, "Choose an estimated start date of today or later.");
+        if (input.end === input.start) throw new HttpError(422, "Choose an estimated completion date after the start date.");
         const before = inquiryDetails(details);
         const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
@@ -293,7 +279,7 @@ export function mountInquiries(router) {
         for (const key of Object.keys(before)) delete details[key];
         Object.assign(details, after);
         const version = (workflow.review?.version ?? 0) + 1;
-        workflow.review = { start: input.start, end: input.end, version, estimate: estimateInquiry(after, input.start) };
+        workflow.review = { start: input.start, end: input.end, version, estimate: { size: inquirySize(after), end: null } };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
         break;
@@ -315,9 +301,9 @@ export function mountInquiries(router) {
         if (!workflow.review || !workflow.budget) throw new HttpError(409, "Confirm project information and save the approved budget first.");
         if (!technicalOptions.includes(input.technical) || !arrangementOptions.includes(input.arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
-        const { estimate, start, end } = workflow.review;
+        const { start, end } = workflow.review;
         if (workflow.assessment?.technical !== input.technical || workflow.assessment?.arrangement !== input.arrangement) {
-          workflow.assessment = { ...assessInquiry(details, estimate, start, end, input.technical, input.arrangement),
+          workflow.assessment = { ...assessInquiry(details, start, end, input.technical, input.arrangement),
             id: randomUUID(), completed_at: audit.at };
         }
         break;

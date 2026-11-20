@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Icon } from "./ui"
+import { addDays } from "./model"
 import DatePicker from "./DatePicker"
 import { arrangementOptions, assessInquiry, technicalOptions } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
@@ -36,6 +37,13 @@ const date = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "
 const today = () => new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" }).format(new Date())
 const formatDay = (value: string) => date.format(new Date(value))
 const amount = (value: string | number | undefined) => value ?? "Not provided"
+const durationLabel = (days: number) => {
+  const months = Math.ceil(days / 30)
+  const years = Math.floor(months / 12)
+  const remainder = months % 12
+  return [years && `${years} ${years === 1 ? "year" : "years"}`,
+    remainder && `${remainder} ${remainder === 1 ? "month" : "months"}`].filter(Boolean).join(" and ")
+}
 
 function Card({ title, icon, children }: { title: string; icon?: string; children: ReactNode }) {
   return <section className="inquiry-card office-workflow-card">
@@ -69,6 +77,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [draft, setDraft] = useState(row.details)
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
   const [end, setEnd] = useState(review?.end ?? "")
+  const earliestStart = today()
+  const earliestCompletion = start >= earliestStart && start < "9999-12-31"
+    ? addDays(start, 1)
+    : earliestStart
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
   const [technical, setTechnical] = useState(assessment?.technical ?? technicalOptions[0])
@@ -111,7 +123,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Estimated completion", review ? formatDay(review.end) : "Not provided"],
     ["Classification", row.details.classification || "Normal"],
   ]
-  const preview = review && (assessment ?? assessInquiry(row.details, review.estimate, review.start, review.end, technical, arrangement))
+  const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
   const editField = (key: string, label: string) => {
     const numeric = /^(land_area|lot_area|floor_area_sqm|floor_count)$/.test(key)
     return <label key={key}>{label}{key === "project_type"
@@ -275,13 +287,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <div>
                 <label htmlFor="inquiry-start-date">Estimated start date</label>
                 <DatePicker id="inquiry-start-date" calendarTitle="Estimated start date"
-                  required disabled={busy} value={start} onValueChange={setStart} />
+                  calendarSubtitle="Choose today or a later date."
+                  required disabled={busy} min={earliestStart} max="9999-12-30" value={start} onValueChange={value => {
+                    setStart(value)
+                    if (value && end && end <= value) setEnd("")
+                  }} />
               </div>
               <div>
                 <label htmlFor="inquiry-completion-date">Estimated completion date</label>
                 <DatePicker id="inquiry-completion-date" calendarTitle="Estimated completion date"
-                  calendarSubtitle="Choose the estimated start date or a later date."
-                  required disabled={busy} value={end} min={start || undefined} start={start} onValueChange={setEnd} />
+                  calendarSubtitle="Choose a date after the estimated start date."
+                  required disabled={busy} value={end} min={earliestCompletion} onValueChange={setEnd} />
               </div>
             </div>
           </Card>}
@@ -315,7 +331,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       <Card title="Project size classification" icon="building">
         <Facts values={[["Lot area (m²)", row.details.lot_area], ["Floor area (m²)", row.details.floor_area_sqm], ["Floors", row.details.floor_count]]} />
         <div className="office-workflow-result"><span>Automatic result</span><strong>{preview.size}</strong>
-          <p>{review.estimate.size ? "Based on configured project-type thresholds." : "Based on the workspace’s floor area and floor count thresholds."}</p></div>
+          <p>{preview.planningDays != null ? "Uses the higher size category from lot area and total floor area." : "Size recorded when this assessment was completed."}</p></div>
       </Card>
       <Card title="Complexity classification" icon="doc">
         <fieldset className="office-workflow-form" disabled={busy || !!assessment}>
@@ -323,14 +339,15 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>{arrangementOptions.map(option => <option key={option}>{option}</option>)}</select></label>
         </fieldset>
         <div className="office-workflow-result"><span>Complexity score · {preview.score}/15</span><strong>{preview.complexity}</strong>
-          <p>Planning score based on project type, size, floors, technical systems, and phase overlap.</p></div>
+          <p>Planning score based on project type, size, floors, technical systems, and phase overlap.</p>
+          {preview.durationMultiplier != null && <p>Duration multiplier ×{preview.durationMultiplier.toFixed(2)}</p>}</div>
       </Card>
       <Card title="Estimated project duration" icon="calendar">
         <div className="office-workflow-result duration">
-          <strong>{preview.durationDays.toLocaleString("en-PH")} {preview.durationDays === 1 ? "day" : "days"}</strong>
-          {preview.durationDays >= 30 && <span>About {Math.round(preview.durationDays / 30.4375)} months</span>}
-          <p>{formatDay(review.start)} – {formatDay(review.end)}</p>
-          {preview.suggestedEnd && <p>Configured planning estimate ends {formatDay(preview.suggestedEnd)}.</p>}
+          {preview.planningDays != null && <><strong>{durationLabel(preview.planningDays)}</strong>
+            <span>{preview.planningDays.toLocaleString("en-PH")} estimated calendar days</span></>}
+          {preview.suggestedEnd && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
+          <p>Reviewed schedule: {formatDay(review.start)} – {formatDay(review.end)} ({preview.durationDays.toLocaleString("en-PH")} calendar days)</p>
         </div>
         {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>Choose construction phases to continue to Site PM staffing.</p></Notice>}
         <div className="office-workflow-actions">

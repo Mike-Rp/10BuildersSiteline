@@ -51,7 +51,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     env:{...process.env,NODE_ENV:"development",DB_SERVER:"127.0.0.1",DB_PORT:String(dbPort),
       DB_NAME:"postgres",DB_USER:"postgres",DB_PASSWORD:"x",DB_POOL_MAX:"1",PGSSLMODE:"disable",
       JWT_SECRET:"project-inquiries-test-secret-0123456789",PORT:String(apiPort),HOST:"127.0.0.1",ARCHIVE_MAINTENANCE_ENABLED:"false",
-      INQUIRY_PLANNING_RULES:JSON.stringify({Residential:{Small:{lot_area:300,land_area:600,floor_area_sqm:200,floor_count:2},durationDays:{Small:90}}})},
+      },
   })
   server.stdout.on("data",data => { output += data })
   server.stderr.on("data",data => { output += data })
@@ -158,8 +158,10 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const assessed = (await save("assessment",2,assessmentInput)).workflow
   assert.notEqual(assessed.assessment.id,beforeBudgetChange.id)
   assert.equal(assessed.assessment.durationDays,90)
-  assert.equal(assessed.assessment.size,"Small")
-  assert.equal(assessed.assessment.score,7)
+  assert.equal(assessed.assessment.size,"Medium")
+  assert.equal(assessed.assessment.score,8)
+  assert.equal(assessed.assessment.planningDays,215)
+  assert.equal(assessed.assessment.suggestedEnd,"2027-08-15")
   assert.equal(assessed.budget_history[0].amount,4500000)
   assert.equal((await save("assessment",2,assessmentInput)).workflow.assessment.id,assessed.assessment.id)
   const adminRecord = (await call(root,{token:admin})).find(item=>item.id===row.id)
@@ -168,7 +170,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const planInput = {...intake,estimated_budget:updatedBudget,assessment_id:assessed.assessment.id}
   await call(planning,{token,status:409,json:{...planInput,target_end_date:"2027-04-13"}})
   const preview = await call(planning,{token,json:planInput})
-  assert.deepEqual(preview.estimate,{size:"Small",end:"2027-04-12"})
+  assert.deepEqual(preview.estimate,{size:"Medium",end:"2027-08-15"})
   const phases = preview.phases.slice(0,2)
 
   async function upload(name) {

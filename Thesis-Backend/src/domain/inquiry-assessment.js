@@ -7,17 +7,37 @@ export function intakeSize(floorArea, floors) {
   return "Small";
 }
 
-export function assessInquiry(details, estimate, start, end, technical, arrangement) {
-  const size = estimate.size ?? intakeSize(Number(details.floor_area_sqm), Number(details.floor_count));
+const planningRules = {
+  Residential: { small: [200, 150], medium: [500, 350], rate: 0.75 },
+  Commercial: { small: [300, 250], medium: [1000, 750], rate: 0.95 },
+  "Mixed-Use": { small: [300, 300], medium: [1000, 1000], rate: 1.10 },
+};
+
+export function inquirySize(details) {
+  const { small, medium } = planningRules[details.project_type];
+  const [lot, floor] = [Number(details.lot_area), Number(details.floor_area_sqm)];
+  if (lot <= small[0] && floor <= small[1]) return "Small";
+  if (lot <= medium[0] && floor <= medium[1]) return "Medium";
+  return "Large";
+}
+
+export function assessInquiry(details, start, end, technical, arrangement) {
+  const size = inquirySize(details);
   const typePoints = { Residential: 1, Commercial: 2, "Mixed-Use": 3 }[details.project_type];
   const sizePoints = { Small: 1, Medium: 2, Large: 3 }[size];
   const floorPoints = details.floor_count >= 10 ? 3 : details.floor_count >= 4 ? 2 : 1;
   const score = typePoints + sizePoints + floorPoints +
     (technicalOptions.indexOf(technical) + 1) + (arrangementOptions.indexOf(arrangement) + 1);
+  const complexity = score <= 7 ? "Low" : score <= 11 ? "Moderate" : "High";
+  const durationMultiplier = { Low: 0.85, Moderate: 1, High: 1.30 }[complexity];
+  const rate = planningRules[details.project_type].rate;
+  const planningDays = Math.ceil((45 + Number(details.floor_area_sqm) * rate +
+    20 * (Number(details.floor_count) - 1)) * durationMultiplier);
+  const finish = new Date(Date.parse(start) + planningDays * 86400000);
   return {
     size, score, technical, arrangement,
-    complexity: score <= 7 ? "Low" : score <= 11 ? "Moderate" : "High",
+    complexity, planningDays, durationMultiplier,
     durationDays: (Date.parse(end) - Date.parse(start)) / 86400000,
-    suggestedEnd: estimate.end,
+    suggestedEnd: finish.getUTCFullYear() <= 9999 ? finish.toISOString().slice(0, 10) : null,
   };
 }
