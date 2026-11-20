@@ -8,15 +8,6 @@
 #root .staff-priority-summary > span { display: inline-flex; align-items: center; min-height: 42px; padding: 10px 16px; border-radius: 999px; background: #193b59; color: #fff; font-size: 14px; font-weight: 600; }
 #root .staff-overview .executive-summary { padding: 16px; margin-bottom: 16px; }
 #root .staff-overview .executive-metric { padding: 14px; }
-#root .staff-assignment-offers { margin-bottom: 16px; overflow: hidden; border: 1px solid #7ca6cd; border-inline-start: 5px solid #245d90; }
-#root .staff-assignment-offers .panel-header { background: #e3effb; }
-#root .staff-assignment-offers .panel-header h2 { color: #173f64; }
-#root .staff-assignment-offers ul { list-style: none; margin: 0; padding: 0; }
-#root .staff-assignment-offers li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #f0f6ff; }
-#root .staff-assignment-offers li[data-blocked=true] { background: #fff6e4; }
-#root .staff-assignment-offers li + li { border-top: 1px solid var(--color-line); }
-#root .staff-assignment-offer-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-#root .staff-assignment-offers p { margin: 4px 0 0; color: var(--color-muted); overflow-wrap: anywhere; }
 #root .site-offer-content { display: grid; gap: 14px; }
 #root .site-offer-meta, #root .site-offer-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #root .site-offer-meta { justify-content: space-between; }

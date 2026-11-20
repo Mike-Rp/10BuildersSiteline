@@ -407,7 +407,7 @@ export default function RoleWorkspace({
   )
   const pendingSiteOffers = isOpm ? [] : projects
     .filter(project => project.status === "pending")
-    .map(project => ({ project, phases: pendingSitePhases(project) }))
+    .map(project => ({ project, phases: pendingSitePhases(project), blocker: assignmentBlock(project, actor.id) }))
     .filter(offer => offer.phases.length > 0)
   const tasks = projects.filter((p) =>
     isOpm
@@ -931,30 +931,38 @@ export default function RoleWorkspace({
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
     const reviewCount = isOpm ? pendingUpdates.length + pendingRework.length + qaCount
       : projects.filter(p => workflowFor(p).pendingRework?.authorId === actor.id).length
+    const firstReadyOffer = pendingSiteOffers.find(offer => !offer.blocker)
+    const firstOffer = firstReadyOffer ?? pendingSiteOffers[0]
     return (
       <div className="staff-overview">
         {header(
           "Dashboard",
           <Button icon="doc" onClick={() => setMonthlySummaryOpen(true)}>Monthly report</Button>,
         )}
-        {pendingSiteOffers.length > 0 && <Panel title="Site PM assignment offers" className="staff-assignment-offers">
-          <ul>
-            {pendingSiteOffers.map(({ project, phases }) => {
-              const blocker = assignmentBlock(project, actor.id)
-              return <li key={project.id} data-blocked={Boolean(blocker)}>
-                <div>
-                  <div className="staff-assignment-offer-heading"><strong>{project.name}</strong>
-                    <Badge tone={blocker ? "amber" : "green"}>{blocker ? "Waiting on prerequisites" : "Awaiting your response"}</Badge>
-                  </div>
-                  <p>{actor.id === leadId(project) ? "Lead Site PM" : "Phase Site PM"} · {phases.map(phase => phase.phase).join(", ")}</p>
-                  {blocker && <p>{blocker}</p>}
-                </div>
-                <Button variant={blocker ? "" : "primary"} onClick={() => setDialog({ kind: "project", projectId: project.id })}
-                  aria-label={`View assignment offer for ${project.name}`}>View assignment offer</Button>
-              </li>
-            })}
-          </ul>
-        </Panel>}
+        {firstOffer && <section className="urgent-action-banner" aria-label="Site PM assignment offers">
+          <div className="urgent-banner-heading">
+            <span className="urgent-banner-icon" aria-hidden="true"><Icon name="alert" size={24} /></span>
+            <div className="urgent-banner-copy">
+              <span className="urgent-banner-eyebrow">{firstReadyOffer ? "Your response required" : "Pending assignments"}</span>
+              <h2>Site PM assignment offers</h2>
+              <p>{pendingSiteOffers.length === 1 ? "You have 1 pending offer." : `You have ${pendingSiteOffers.length} pending offers.`}</p>
+            </div>
+            <Button variant="primary" icon="arrow" onClick={() => setDialog({ kind: "project", projectId: firstOffer.project.id })}>
+              View assignment offer
+            </Button>
+          </div>
+          <div className="urgent-banner-items">
+            {pendingSiteOffers.map(({ project, phases, blocker }) => <button key={project.id} type="button" className="urgent-banner-item"
+              aria-label={`View assignment offer for ${project.name}`} onClick={() => setDialog({ kind: "project", projectId: project.id })}>
+              <span className="urgent-item-copy"><strong>{project.name}</strong>
+                <span>{actor.id === leadId(project) ? "Lead Site PM" : "Phase Site PM"} · {phases.map(phase => phase.phase).join(", ")}</span>
+                {blocker && <span>{blocker}</span>}
+              </span>
+              <span className="urgent-item-status"><strong>{blocker ? "Waiting on prerequisites" : "Awaiting your response"}</strong></span>
+              <Icon name="arrow" size={18} />
+            </button>)}
+          </div>
+        </section>}
         <ExecutiveSummary
           description={isOpm ? `${active.length} managed active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your confirmation; ${reviewCount} reviews need attention.` : `${active.length} current active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your response; ${reviewCount} rework flags await Office PM review.`}
           metrics={[
