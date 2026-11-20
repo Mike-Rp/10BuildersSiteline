@@ -3433,12 +3433,13 @@ export default function RoleWorkspace({
       <div><dt>Office PM</dt><dd>{project.officePmContact?.name || (project.opmId ? actorName(project.opmId) : "Unassigned")}</dd></div>
       <div><dt>Lead Site PM</dt><dd>{lead ? actorName(lead) : "Unassigned"}</dd></div>
     </dl>
-    return <Modal title={summary ? "Project assignment" : "Project details"} subtitle={project.name} wide onClose={close} footer={<>
-      <Button variant="text-button" className="site-offer-switch" onClick={() => setOfferView(summary ? "Overview" : "summary")}>
+    return <Modal title={summary ? "Project assignment" : "Project details"} subtitle={project.name} wide onClose={close} footer={<div className="site-offer-footer">
+      <Button icon={summary ? "doc" : undefined} onClick={() => setOfferView(summary ? "Overview" : "summary")}>
         {summary ? "View full project details" : "Back to assignment summary"}
       </Button>
-      <Button onClick={close}>Close</Button>
-      {summary && <>
+      <div className="site-offer-footer-actions">
+        <Button onClick={close}>Close</Button>
+        {summary && <>
         {!blocker && <Button disabled={saving} onClick={() => {
           setDeclineReason("")
           setDialog({ kind: "decline", projectId: project.id, phase: pending[0].phase })
@@ -3447,8 +3448,9 @@ export default function RoleWorkspace({
           onClick={async () => {
             if (await act({ type: "accept_assignment", projectId: project.id }, "Your pending Site PM assignments are confirmed.")) close()
           }}>{actor.id === lead ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}</Button>
-      </>}
-    </>}>
+        </>}
+      </div>
+    </div>}>
       <div className="site-offer-content">
         <div className="site-offer-meta">
           <p>{[project.type, project.area && `${project.area} m² floor area`,
