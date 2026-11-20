@@ -262,6 +262,11 @@ export function mountInquiries(router) {
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
         if (input.start < today) throw new HttpError(422, "Choose an estimated start date of today or later.");
         if (input.end === input.start) throw new HttpError(422, "Choose an estimated completion date after the start date.");
+        const technical = input.technical ?? workflow.review?.technical;
+        const arrangement = input.arrangement ?? workflow.review?.arrangement;
+        if ((technical !== undefined || arrangement !== undefined) &&
+            (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement)))
+          throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details);
         const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
@@ -269,9 +274,10 @@ export function mountInquiries(router) {
         if (input.correction) validateInquiryContact(after, before);
         const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
           .filter(key => before[key] !== after[key]).map(key => [key, { before: before[key] ?? null, after: after[key] ?? null }]));
-        for (const key of ["start", "end"]) {
+        const schedule = { start: input.start, end: input.end, ...(technical && arrangement ? { technical, arrangement } : {}) };
+        for (const key of Object.keys(schedule)) {
           const previous = workflow.review?.[key] ?? (key === "start" ? before.anticipated_start : undefined);
-          if (previous !== input[key]) changes[key] = { before: previous ?? null, after: input[key] };
+          if (previous !== schedule[key]) changes[key] = { before: previous ?? null, after: schedule[key] };
         }
         const reason = typeof input.reason === "string" ? input.reason.trim() : "";
         if ((input.correction || (workflow.review && Object.keys(changes).length)) && (!reason || reason.length > 1000))
@@ -279,7 +285,10 @@ export function mountInquiries(router) {
         for (const key of Object.keys(before)) delete details[key];
         Object.assign(details, after);
         const version = (workflow.review?.version ?? 0) + 1;
-        workflow.review = { start: input.start, end: input.end, version, estimate: { size: inquirySize(after), end: null } };
+        const suggestion = technical && arrangement
+          ? assessInquiry(after, schedule.start, schedule.end, technical, arrangement)
+          : null;
+        workflow.review = { ...schedule, version, estimate: { size: suggestion?.size ?? inquirySize(after), end: suggestion?.suggestedEnd ?? null } };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
         break;

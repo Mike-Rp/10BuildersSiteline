@@ -139,7 +139,11 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await save("budget",0,{amount:4500000},409)
   const schedule = {start:intake.target_start_date,end:intake.target_end_date}
   const assessmentInput = {technical:"Several specialized systems",arrangement:"Partially overlapping phases"}
-  await save("review",0,schedule)
+  const initialReview = (await save("review",0,{...schedule,...assessmentInput})).workflow.review
+  assert.equal(initialReview.technical,assessmentInput.technical)
+  assert.equal(initialReview.arrangement,assessmentInput.arrangement)
+  assert.equal(initialReview.end,schedule.end)
+  assert.ok(initialReview.estimate.end > schedule.end)
   await save("assessment",1,assessmentInput,409)
   await save("budget",1,{amount:4500000.001},422)
   await save("budget",1,{amount:4500000})

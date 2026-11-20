@@ -8,7 +8,7 @@ export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "rev
 type Details = Record<string, string | number>
 type ReviewEvent = { at: string; version: number; reason: string; changes: Record<string, { before: string | number | null; after: string | number | null }> }
 export type OfficeWorkflow = {
-  review?: { version: number; start: string; end: string; estimate: { size: string | null; end: string | null } }
+  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; estimate: { size: string | null; end: string | null } }
   review_history?: ReviewEvent[]
   budget?: number
   budget_history?: { at: string; amount: number }[]
@@ -83,8 +83,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     : earliestStart
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
-  const [technical, setTechnical] = useState(assessment?.technical ?? technicalOptions[0])
-  const [arrangement, setArrangement] = useState(assessment?.arrangement ?? arrangementOptions[0])
+  const [technical, setTechnical] = useState(assessment?.technical ?? review?.technical ?? technicalOptions[0])
+  const [arrangement, setArrangement] = useState(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
   const [decisionDate, setDecisionDate] = useState(today)
   const [note, setNote] = useState("")
   const [proposalAction, setProposalAction] = useState<"revise" | "withdraw">()
@@ -124,6 +124,15 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Classification", row.details.classification || "Normal"],
   ]
   const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
+  const scheduleDetails = editing ? draft : row.details
+  const scheduleEstimate = page === "review" && (editing || !review) && start >= earliestStart &&
+    ["Residential", "Commercial", "Mixed-Use"].includes(String(scheduleDetails.project_type)) &&
+    ["lot_area", "floor_area_sqm", "floor_count"].every(key => {
+      const value = Number(scheduleDetails[key])
+      return Number.isFinite(value) && value > 0 && (key !== "floor_count" || Number.isInteger(value))
+    })
+    ? assessInquiry(scheduleDetails, start, end, technical, arrangement)
+    : undefined
   const editField = (key: string, label: string) => {
     const numeric = /^(land_area|lot_area|floor_area_sqm|floor_count)$/.test(key)
     return <label key={key}>{label}{key === "project_type"
@@ -275,7 +284,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       {!editing && recordCards}
       <form className="office-workflow-form" onSubmit={event => {
         event.preventDefault()
-        save("review", { start, end, ...(editing ? { correction: draft, reason } : {}) })
+        save("review", { start, end, ...(editing || !review ? { technical, arrangement } : {}),
+          ...(editing ? { correction: draft, reason } : {}) })
       }}>
         <fieldset className="office-workflow-form" disabled={busy}>
           {editing && <>
@@ -300,6 +310,20 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                   required disabled={busy} value={end} min={earliestCompletion} onValueChange={setEnd} />
               </div>
             </div>
+            <div className="office-workflow-fields">
+              <label>Technical requirements<select value={technical} onChange={event => setTechnical(event.target.value)}>
+                {technicalOptions.map(option => <option key={option}>{option}</option>)}
+              </select></label>
+              <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>
+                {arrangementOptions.map(option => <option key={option}>{option}</option>)}
+              </select></label>
+            </div>
+            {scheduleEstimate?.suggestedEnd && scheduleEstimate.planningDays != null &&
+              <div className="office-workflow-result duration">
+                <strong>Suggested completion {formatDay(scheduleEstimate.suggestedEnd)}</strong>
+                <p>{scheduleEstimate.size} · {scheduleEstimate.complexity} complexity · {scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days ({durationLabel(scheduleEstimate.planningDays)})</p>
+                <button type="button" className="button" onClick={() => setEnd(scheduleEstimate.suggestedEnd!)}>Use suggested date</button>
+              </div>}
           </Card>}
           {editing && <Card title="Modification reason" icon="doc">
             <label>Reason for modifications<textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>
@@ -310,6 +334,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               setEditing(false)
               setStart(review?.start ?? String(row.details.anticipated_start ?? ""))
               setEnd(review?.end ?? "")
+              setTechnical(assessment?.technical ?? review?.technical ?? technicalOptions[0])
+              setArrangement(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
               setReason("")
             }}>Cancel</button>}
             {editing || !review ? <button type="submit" className="button primary">
