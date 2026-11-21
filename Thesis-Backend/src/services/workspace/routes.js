@@ -127,6 +127,7 @@ async function event(db, user, p, title, detail = "", extraRecipientIds = []) {
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null, extraRecipientIds]);
         await mirrorLegacyNotifications(db, [result.rows[0].id]);
     }
+    return result.rows[0]?.id;
 }
 const normalizeResetName = value => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 async function findResetAccounts(db, body) {

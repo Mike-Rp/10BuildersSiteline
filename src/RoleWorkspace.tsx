@@ -18,7 +18,7 @@ import ProjectClientDetails from "./ProjectClientDetails"
 import { projectClientNames } from "./project-clients"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
-import { CompanyProjectPhases } from "./AllocationDirectory"
+import AllocationDirectory, { AllocationChangeBanner, CompanyProjectPhases } from "./AllocationDirectory"
 import { api } from "./api/client"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
@@ -977,6 +977,7 @@ export default function RoleWorkspace({
           "Dashboard",
           <Button icon="doc" onClick={() => setMonthlySummaryOpen(true)}>Monthly report</Button>,
         )}
+        {isOpm && <AllocationChangeBanner events={events} onRead={onRead} onOpen={setSelectedNotification} />}
         {firstOffer && <section className="urgent-action-banner" aria-label="Site PM assignment offers">
           <div className="urgent-banner-heading">
             <span className="urgent-banner-icon" aria-hidden="true"><Icon name="alert" size={24} /></span>
@@ -3649,6 +3650,7 @@ export default function RoleWorkspace({
           <section className="detail-section">
             <h3>Subcontractor allocation</h3>
             <SubcontractorAllocationReadOnly state={state} project={p} />
+            {state.phaseAllocationAvailable && !p.clientSubcon && <AllocationDirectory projectId={p.id} />}
           </section>
         )}
         {!isOpm && (p.subcontractorAllocation || (actor.id === leadId(p) && allocationReady(p) && p.status !== "completed")) && <section className="detail-section">
@@ -4428,7 +4430,7 @@ export default function RoleWorkspace({
           confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
           onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
-      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave} showAllocationHistory={isOpm}
         action={notificationAction(selectedNotification, actor, projects, state.accounts, [...nav.map(([label]) => label), "Reports", ...(isOpm ? ["SPM responses"] : [])])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)

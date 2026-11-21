@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { api } from "./api/client"
-import { Badge, Button, Field } from "./ui"
+import { Badge, Button, Field, Modal } from "./ui"
 import { Upload } from "./panels"
 import { DOC_LABELS, type Project } from "./model"
 import type { WorkflowCommand } from "./workflows"
@@ -60,7 +60,6 @@ export default function PhaseAllocationPanel({
   onReload,
   onAction,
   onActivated,
-  admin = false,
   readOnly = false,
 }: {
   projectId: string
@@ -71,7 +70,6 @@ export default function PhaseAllocationPanel({
     message?: string,
   ) => boolean | Promise<boolean>
   onActivated?: () => void
-  admin?: boolean
   readOnly?: boolean
 }) {
   const [data, setData] = useState<Data>(),
@@ -86,6 +84,7 @@ export default function PhaseAllocationPanel({
   const [available, setAvailable] = useState(false),
     [message, setMessage] = useState("")
   const [method, setMethod] = useState("phone")
+  const [confirmation, setConfirmation] = useState<number>()
   const loadSequence=useRef(0)
   const saving=useRef(false)
   const refresh = async () => {
@@ -104,7 +103,7 @@ export default function PhaseAllocationPanel({
       live = false
     }
   }, [projectId])
-  const waitingForResponse=!!data?.requests.some(r=>['pending_admin','approved'].includes(r.status))
+  const waitingForResponse=!!data?.requests.some(r=>r.status==="approved")
   useEffect(()=>{
     if(!waitingForResponse)return
     let live=true
@@ -124,12 +123,17 @@ export default function PhaseAllocationPanel({
         method: "POST",
         json: { action, note, method, revision: data.revision, ...extra },
       })
-      await refresh()
       setEditing(false)
       setNote("")
       setAvailable(false)
-      setMessage("Allocation record saved.")
-      await onReload?.()
+      setConfirmation(undefined)
+      setMessage(action === "confirm" ? "Subcontractor allocation saved." : "Allocation record saved.")
+      try {
+        await refresh()
+        await onReload?.()
+      } catch {
+        setError("The change was saved. Refresh the project to load the latest allocation.")
+      }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -149,10 +153,16 @@ export default function PhaseAllocationPanel({
       </section>
     )
   const open = data.requests.find((r) =>
-    ["draft", "pending_admin", "approved"].includes(r.status),
+    ["draft", "approved"].includes(r.status),
   )
+  const openLabel = open?.status === "approved" ? "Company coordination" : "Draft"
   const remaining = data.phases.filter((p) => !data.completed.includes(p.name))
   const company = (id: string) => data.companies.find((c) => c.id === id)
+  const currentCompanies = (phase: string) => {
+    const row = data.assignments.find(row => row.phase === phase)
+    return row ? [row.companyId] : (data.legacyCompanies ?? []).filter(company => company.phases.includes(phase)).map(company => company.id)
+  }
+  const currentRoster = [...new Set(remaining.flatMap(phase => currentCompanies(phase.name)))]
   const eligible = data.companies
     .filter(
       (c) =>
@@ -171,7 +181,7 @@ export default function PhaseAllocationPanel({
         proposal?.find((r) => r.phase === p.name) ||
         data.assignments.find((r) => r.phase === p.name) || {
           phase: p.name,
-          companyId: "",
+          companyId: currentCompanies(p.name).length === 1 ? currentCompanies(p.name)[0] : "",
           foremanId: "",
         },
     )
@@ -202,6 +212,8 @@ export default function PhaseAllocationPanel({
   const allAssigned =
     rows.length === remaining.length &&
     rows.every((r) => r.companyId && r.foremanId) && roster.every(id=>rows.some(r=>r.companyId===id))
+  const confirmedProposal = open && open.status === "approved" && Number(open.id) === confirmation ? open : undefined
+  const companyName = (id: string) => company(id)?.name || data.legacyCompanies?.find(company => company.id === id)?.name || "Company record unavailable"
   return (
     <section className="phase-allocation detail-section">
       <div className="trade-heading">
@@ -214,7 +226,7 @@ export default function PhaseAllocationPanel({
         </div>
         <Badge tone={open ? "amber" : "green"}>
           {open
-            ? open.status.replace(/_/g, " ")
+            ? openLabel
             : data.assignments.length
               ? "Confirmed allocation"
               : "Needs assignment"}
@@ -313,17 +325,17 @@ export default function PhaseAllocationPanel({
       )}
       {data.canEdit && !readOnly && !open && !editing && remaining.length > 0 && (
         <div className="trade-actions"><Button disabled={busy} onClick={() => start()}>
-          {data.assignments.length
+          {data.assignments.length || currentRoster.length
             ? "Edit phase assignments"
             : "Prepare allocation"}
-        </Button>{data.assignments.length>0&&<><Button disabled={busy} onClick={()=>start()}>Add subcontractor company</Button><Button disabled={busy} onClick={()=>{start();setReplaceId(data.assignments.find(r=>!data.completed.includes(r.phase))?.companyId||"")}}>Replace company</Button></>}</div>
+        </Button>{currentRoster.length > 0 && <><Button disabled={busy} onClick={() => start()}>Add subcontractor company</Button>
+          <Button disabled={busy} onClick={() => { start(); if (currentRoster.length === 1) setReplaceId(currentRoster[0]) }}>Replace company</Button></>}</div>
       )}
       {editing && data.canEdit && !readOnly && (
         <section className="trade-company">
           <h4>Prepare phase assignments</h4>
           <p>
-            Additional companies, replacements and transfers between companies require Admin approval. Existing responsibility stays in effect
-            until confirmation.
+            Assign the eligible companies and their foremen, then record company availability and confirm the changes.
           </p>
           <div className="trade-actions">
             <Button
@@ -435,7 +447,7 @@ export default function PhaseAllocationPanel({
             <div className="notice">
               <p>
                 Select the replacement above. Current assignments are retained
-                until the approved replacement accepts.
+                until the replacement accepts and you confirm the allocation.
               </p>
               <Button
                 disabled={busy || !companyChoice || companyChoice === replaceId}
@@ -564,14 +576,13 @@ export default function PhaseAllocationPanel({
       {open && !editing && (
         <section className="trade-company">
           <h4>
-            Request #{open.id} · {open.status.replace(/_/g, " ")}
+            Allocation #{open.id} · {openLabel}
           </h4>
           <p>{open.reason}</p>
-          {open.review_note && <p>Admin decision: {open.review_note}</p>}
           {readOnly && <div className="trade-company-grid">
             {[...new Set(open.proposal.map(row => row.companyId))].map(id => <article className="trade-company" key={id}>
               <h4>{company(id)?.name || "Company record unavailable"}</h4>
-              <Badge tone={open.responses[id]?.status === "accepted" ? "green" : "amber"}>{open.responses[id]?.status?.replace(/_/g, " ") || (open.status === "pending_admin" ? "Awaiting Admin approval" : "Not contacted")}</Badge>
+              <Badge tone={open.responses[id]?.status === "accepted" ? "green" : "amber"}>{open.responses[id]?.status?.replace(/_/g, " ") || "Not contacted"}</Badge>
               {open.responses[id]?.note && <p>{open.responses[id].note}</p>}
               {open.proposal.filter(row => row.companyId === id).map(row => <p key={row.phase}><strong>{row.phase}</strong> · {company(id)?.foremen.find(foreman => foreman.id === row.foremanId)?.name || row.foremanName || "Foreman record unavailable"}</p>)}
             </article>)}
@@ -711,9 +722,7 @@ export default function PhaseAllocationPanel({
                         .filter(changed)
                         .some((id) => open.responses[id]?.status !== "accepted")
                     }
-                    onClick={() =>
-                      void post("confirm", { requestId: Number(open.id) })
-                    }
+                    onClick={() => setConfirmation(Number(open.id))}
                   >
                     Confirm phase allocation
                   </Button>
@@ -722,43 +731,35 @@ export default function PhaseAllocationPanel({
               {open.status === "draft" && (
                 <p>
                   A draft reserves no commitment. Edit it to submit the exact
-                  company and phase proposal for review.
+                  company and phase proposal for company coordination.
                 </p>
               )}
             </>
           )}
-          {admin && open.status === "pending_admin" && (
-            <>
-              <Field label="Admin decision note">
-                <textarea
-                  value={note}
-                  maxLength={2000}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </Field>
-              <div className="trade-actions">
-                <Button
-                  disabled={busy || !note.trim()}
-                  onClick={() =>
-                    void post("reject", { requestId: Number(open.id) })
-                  }
-                >
-                  Reject request
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={busy || !note.trim()}
-                  onClick={() =>
-                    void post("approve", { requestId: Number(open.id) })
-                  }
-                >
-                  Approve company allocation
-                </Button>
-              </div>
-            </>
-          )}
         </section>
       )}
+      {confirmedProposal && data.canEdit && !readOnly && <Modal
+        title="Confirm subcontractor changes"
+        subtitle={project?.name}
+        onClose={() => { if (!busy) setConfirmation(undefined) }}
+        footer={<><Button disabled={busy} onClick={() => setConfirmation(undefined)}>Go back</Button>
+          <Button variant="primary" disabled={busy} onClick={() => void post("confirm", { requestId: Number(confirmedProposal.id) })}>
+            Apply allocation
+          </Button></>}
+      >
+        <p><strong>Reason / proposed scope</strong> {confirmedProposal.reason}</p>
+        <div className="phase-assignment-list">
+          {confirmedProposal.proposal.filter(row => {
+            const current = data.assignments.find(item => item.phase === row.phase)
+            return !current || current.companyId !== row.companyId || current.foremanId !== row.foremanId
+          }).map(row => <div className="phase-assignment-row" key={row.phase}>
+            <strong>{row.phase}</strong>
+            <div><small>Current subcontractor</small><p>{currentCompanies(row.phase).map(companyName).join(", ") || "Unassigned"}</p></div>
+            <div><small>Proposed subcontractor</small><p>{companyName(row.companyId)}</p></div>
+          </div>)}
+        </div>
+        {error && <p role="alert" className="error">{error}</p>}
+      </Modal>}
       {project?.status === "pending" &&
         project.subcontractorAllocation?.phaseOwned &&
         !open &&
@@ -791,11 +792,11 @@ export default function PhaseAllocationPanel({
         )}
       {data.requests.length > 0 && (
         <details>
-          <summary>Allocation requests and response history</summary>
+          <summary>Company coordination history</summary>
           {data.requests.map((r) => (
             <article key={r.id}>
               <strong>
-                #{r.id} · {r.status.replace(/_/g, " ")}
+                #{r.id} · {r.status === "approved" ? "Company coordination" : r.status.replace(/_/g, " ")}
               </strong>
               <p>
                 {r.reason} · Requested by {r.requested_by_name}

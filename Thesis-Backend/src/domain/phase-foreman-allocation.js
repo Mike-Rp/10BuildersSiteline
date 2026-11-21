@@ -57,3 +57,21 @@ export function changedCompanies(previous, next) {
     )
   return [...ids].filter((id) => scope(previous, id) !== scope(next, id))
 }
+
+export function allocationCompanyChanges(previous, next, existingCompanyIds = []) {
+  const previousOwners = new Map(previous.map(row => [row.phase, row.companyId]))
+  const existing = new Set([...existingCompanyIds, ...previousOwners.values()])
+  const remaining = new Set(next.map(row => row.companyId))
+  const changes = new Map()
+  for (const { phase, companyId } of next) {
+    const before = previousOwners.get(phase)
+    if (before === companyId || (!before && existing.has(companyId))) continue
+    const replaced = before && (!remaining.has(before) || existing.has(companyId))
+    const action = replaced ? "Replaced" : "Added"
+    const previousCompanyId = replaced ? before : null
+    const key = `${action}:${previousCompanyId}:${companyId}`
+    if (!changes.has(key)) changes.set(key, { action, previousCompanyId, companyId, phases: [] })
+    changes.get(key).phases.push(phase)
+  }
+  return [...changes.values()]
+}

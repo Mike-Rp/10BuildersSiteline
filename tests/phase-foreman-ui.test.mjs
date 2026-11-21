@@ -200,49 +200,53 @@ test("system suggests company only; Lead SPM manually assigns every phase and re
       "Confirm agreed phase ownership.",
     )
     await click(button("Confirm phase allocation"))
+    const confirmation = document.querySelector('[role="dialog"]')
+    assert.match(confirmation.textContent, /Current subcontractor.*Unassigned.*Proposed subcontractor.*Company A/)
+    assert.equal(writes.length, 3, "opening confirmation does not save")
+    await click(button("Apply allocation"))
     assert.ok(document.querySelector(".phase-foremen"))
     assert.match(document.body.textContent, /Mika/)
     assert.match(document.body.textContent, /Yak/)
   }))
 
-test("Admin reviews immutable proposal without receiving SPM assignment controls", async () =>
-  withUi(async ({ render, button, click, change }) => {
-    const data = fixture()
-    data.canEdit = false
-    data.requests = [
-      {
-        id: 7,
-        status: "pending_admin",
-        reason: "Add Company B for the remaining scope.",
-        proposal: data.phases.map((p) => ({
-          phase: p.name,
-          companyId: "B",
-          foremanId: "carlos",
-        })),
-        responses: {},
-        requested_by_name: "Lead SPM",
-      },
-    ]
-    const writes = []
-    globalThis.fetch = async (url, init = {}) => {
-      if (init.method === "POST") {
-        writes.push(JSON.parse(init.body))
-        data.requests[0].status = "approved"
-      }
-      return Response.json({ data })
+test("allocation history is read-only and the latest unread banner opens its exact record", async () =>
+  withUi(async ({ server, root, button, click }) => {
+    const { default: Directory, AllocationChangeBanner, AllocationNotificationDetails } = await server.ssrLoadModule("/src/AllocationDirectory.tsx")
+    const record = {
+      id: "7", projectName: "Maple Residence", leadName: "Gabriel Salvador",
+      status: "Applied", reason: "Crew unavailable", date: "2026-11-21T04:00:00Z",
+      changes: [{ action: "Replaced", previousCompany: "Company A", company: "Company B", phases: ["Foundation"] }],
     }
-    await render({ admin: true })
-    assert.equal(button("Prepare allocation"), undefined)
-    assert.equal(button("Suggest company"), undefined)
-    assert.equal(document.querySelector(".phase-assignment-row"), null)
-    await change(
-      document.querySelector("textarea"),
-      "Approved additional support for this exact phase scope.",
-    )
-    await click(button("Approve company allocation"))
-    assert.equal(writes[0].action, "approve")
-    assert.equal(writes[0].requestId, 7)
-    assert.equal(writes[0].assignments, undefined)
+    const events = [
+      { id: "8", title: "New Subcontractor Assigned", date: "2026-11-20T04:00:00Z", read: false },
+      { id: "9", title: "Subcontractor Allocation Updated", detail: "Gabriel replaced Company A with Company B.", date: record.date, read: false },
+    ]
+    const reads = []
+    const paths = []
+    globalThis.fetch = async (url, init = {}) => {
+      assert.ok(!init.method || init.method === "GET")
+      paths.push(String(url))
+      return Response.json({ data: { records: [record], hasMore: false } })
+    }
+    function View() {
+      const [event, selectEvent] = React.useState()
+      return React.createElement(React.Fragment, null,
+        React.createElement(AllocationChangeBanner, { events, onRead: ids => reads.push(...ids), onOpen: selectEvent }),
+        event && React.createElement(AllocationNotificationDetails, { event }),
+        React.createElement(Directory))
+    }
+    await act(() => root.render(React.createElement(View)))
+    assert.equal(document.querySelectorAll(".allocation-change-banner").length, 1)
+    assert.ok(document.querySelector(".allocation-change-banner.replacement"))
+    await click(button("View details"))
+    assert.deepEqual(reads, ["9"])
+    assert.ok(paths.some(path => path.includes("notificationId=9")))
+    assert.match(document.querySelector(".allocation-history-record").textContent, /Company A → Company B.*Crew unavailable/)
+    assert.match(document.querySelector(".allocation-change-banner").textContent, /New Subcontractor Assigned/)
+    await click(button("View history"))
+    assert.equal(button("Approve company allocation"), undefined)
+    assert.equal(button("Reject request"), undefined)
+    assert.ok(document.querySelector(".allocation-history-filters"))
   }))
 
 test("failed saves retain manual assignments and completed phases are not editable", async () =>

@@ -24,7 +24,7 @@ const port = () =>
   })
 
 test(
-  "phase allocation API preserves history, enforces Admin approval, manual foremen and company capacity",
+  "phase allocation API preserves history, Lead Site PM ownership, manual foremen and company capacity",
   { timeout: 120000 },
   async (t) => {
     const db = new PGlite({ extensions: { citext } })
@@ -347,7 +347,7 @@ test(
         },
       }),
       (e) => e.status === 409,
-      "legacy command cannot bypass approval",
+      "legacy command cannot bypass phase allocation checks",
     )
     const changed = rows.map((r, i) =>
       i === 0
@@ -363,28 +363,14 @@ test(
       revision: 1,
       assignments: changed,
     })
-    assert.equal(addition.status, "pending_admin")
-    await assert.rejects(
-      post(p1, "approve", { requestId: Number(addition.id) }),
-      (e) => e.status === 403,
-    )
-    await assert.rejects(
-      post(p1, "contact", {
-        requestId: Number(addition.id),
-        companyId: companies[1],
-      }),
-      (e) => e.status === 409,
-    )
+    assert.equal(addition.status, "approved")
     assert.deepEqual(
       (await get(p1)).assignments.map((r) => r.companyId),
       rows.map((r) => r.companyId),
-      "pending request changes no current assignments",
+      "the proposal changes no current assignments before confirmation",
     )
     await admin()
-    assert.ok(
-      (await api("/allocation-requests")).some((r) => r.id === addition.id),
-    )
-    await post(p1, "approve", { requestId: Number(addition.id) })
+    await assert.rejects(post(p1, "approve", { requestId: Number(addition.id) }), e => e.status === 403)
     await lead()
     for (const id of companies.slice(0, 2))
       await contactAccept(p1, addition, id)
@@ -409,31 +395,18 @@ test(
       1,
       "cancel preserves current company commitment",
     )
-    const rejected = await post(p1, "submit", {
+    const legacyPending = await post(p1, "submit", {
       revision: 1,
       assignments: changed,
     })
-    await admin()
-    await post(p1, "reject", {
-      requestId: Number(rejected.id),
-      note: "Additional support is not required for this scope.",
-    })
-    await lead()
-    await assert.rejects(
-      post(p1, "contact", {
-        requestId: Number(rejected.id),
-        companyId: companies[1],
-      }),
-      (e) => e.status === 409,
-      "Admin rejection cannot be bypassed",
-    )
+    await db.query("update project_allocation_requests set status='pending_admin' where id=$1", [legacyPending.id])
+    assert.equal((await get(p1)).requests.find(r => r.id === legacyPending.id).status, "approved")
+    await post(p1, "contact", { requestId: Number(legacyPending.id), companyId: companies[1] })
+    await post(p1, "cancel", { requestId: Number(legacyPending.id) })
     const declined = await post(p1, "submit", {
       revision: 1,
       assignments: changed,
     })
-    await admin()
-    await post(p1, "approve", { requestId: Number(declined.id) })
-    await lead()
     await post(p1, "contact", {
       requestId: Number(declined.id),
       companyId: companies[1],
@@ -513,11 +486,9 @@ test(
     const replacement = await post(p1, "submit", {
       revision: 1,
       assignments: proposal(ctx, companies[2]),
+      note: "The original company is unavailable for the remaining phases.",
     })
-    assert.equal(replacement.status, "pending_admin")
-    await admin()
-    await post(p1, "approve", { requestId: Number(replacement.id) })
-    await lead()
+    assert.equal(replacement.status, "approved")
     await contactAccept(p1, replacement, companies[2])
     await post(p1, "confirm", { requestId: Number(replacement.id) })
     ctx = await get(p1)
@@ -540,23 +511,23 @@ test(
       "archived",
     )
     assert.ok(ctx.history.some((e) => e.action === "confirm"))
-    // Reintroducing a released historical company still requires Admin approval.
+    // A previously released company can be considered again by the Lead Site PM.
     const readd = await post(p1, "submit", {
       revision: 2,
       assignments: proposal(ctx, companies[0]),
     })
-    assert.equal(readd.status, "pending_admin")
+    assert.equal(readd.status, "approved")
     await post(p1, "cancel", { requestId: Number(readd.id) })
-    // Approval is scoped to phases: moving more work to an existing partner also needs review.
+    // Company acceptance remains scoped to the proposed phase assignments.
     ctx=await get(p1)
     const supporting=proposal(ctx,companies[2]).map((r,i)=>i===0?{...r,companyId:companies[1],foremanId:ctx.companies.find(c=>c.id===companies[1]).foremen[0].id}:r)
     const support=await post(p1,'submit',{revision:2,assignments:supporting})
-    await admin();await post(p1,'approve',{requestId:Number(support.id)});await lead()
+    assert.equal(support.status, "approved")
     for(const id of [companies[1],companies[2]])await contactAccept(p1,support,id)
     await post(p1,'confirm',{requestId:Number(support.id)})
     ctx=await get(p1)
     const revisedScope=await post(p1,'submit',{revision:3,assignments:proposal(ctx,companies[2])})
-    assert.equal(revisedScope.status,'pending_admin','previous approval cannot be reused for an expanded company scope')
+    assert.equal(revisedScope.status,'approved')
     await post(p1,'cancel',{requestId:Number(revisedScope.id)})
     await assert.rejects(
       api("/subcontractors/registrations", { method: "POST", json: {} }),
@@ -568,7 +539,24 @@ test(
       (e) => e.status === 403,
       "legacy directory creation is also Admin-only",
     )
-    await assert.rejects(api("/allocation-requests"), (e) => e.status === 403)
+    await assert.rejects(api("/allocation-history"), (e) => e.status === 403)
+    await admin()
+    const history = await api(`/allocation-history?projectId=${p1}`)
+    assert.deepEqual(history.records.map(record => record.changes[0].action), ["Added", "Replaced", "Added"])
+    const [replacementRecord] = (await api(`/allocation-history?projectId=${p1}&action=Replaced&search=Foreman`)).records
+    assert.match(replacementRecord.reason, /original company is unavailable/)
+    assert.ok(replacementRecord.changes[0].previousCompany)
+    const alerts = (await api("/notifications")).filter(event => event.related_project_id === p1 &&
+      ["Subcontractor Allocation Updated", "New Subcontractor Assigned"].includes(event.title))
+    assert.equal(alerts.length, 3)
+    const replacementAlert = alerts.find(event => event.title === "Subcontractor Allocation Updated")
+    assert.equal((await api(`/allocation-history?notificationId=${replacementAlert.id}`)).records[0].id, replacementRecord.id)
+    setToken("")
+    await login(opmEmail, "Password@123", true, "staff")
+    assert.equal((await api(`/allocation-history?notificationId=${replacementAlert.id}`)).records[0].id, replacementRecord.id)
+    assert.ok((await api("/notifications")).some(event => event.id === replacementAlert.id))
+    await assert.rejects(post(p1, "confirm", { requestId: Number(replacement.id) }), e => e.status === 403)
+    await lead()
     assert.equal(
       (await db.query("select count(*)::int as n from users")).rows[0].n,
       userCount,

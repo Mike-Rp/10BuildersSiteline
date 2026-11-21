@@ -94,7 +94,7 @@ import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyRemovalActions from "./CompanyRemovalActions"
 import CompanyForemen from "./CompanyForemen"
-import AllocationDirectory, { CompanyProjectPhases } from "./AllocationDirectory"
+import AllocationDirectory, { AllocationChangeBanner, CompanyProjectPhases } from "./AllocationDirectory"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
 import {
@@ -1581,6 +1581,7 @@ function AppInner() {
       onActivity={() => navigate("Activity log")}
       onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
+      allocationBanner={<AllocationChangeBanner events={state.events} onRead={notificationSettings.markRead} onOpen={setSelectedNotification} />}
     />}</PasswordResetRequests>
   }
   function openAdminPriority(item: UrgentItem) {
@@ -1847,7 +1848,7 @@ function AppInner() {
               <Button variant="icon-button" icon="close" aria-label="Dismiss company creation notification" onClick={() => setCompanyCreatedNotice(undefined)} />
             </div>
           </div>}
-          {state.phaseAllocationAvailable && <AllocationDirectory onChanged={reloadWorkspace} />}
+          {state.phaseAllocationAvailable && <AllocationDirectory />}
           <div className="active-sites-view-tabs" role="tablist" aria-label="Subcontractor directory views">
             {[
               ["registered", "Registered companies"],
@@ -3490,7 +3491,7 @@ function AppInner() {
           <Button onClick={stayActive}>Stay signed in</Button>
         </div>
       )}
-      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings} showAllocationHistory
         action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Reports", "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)

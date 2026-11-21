@@ -16,7 +16,7 @@ const categories: ["all" | DashboardCategory, string][] = [
   ["all", "All"], ["requests", "Requests"], ["licenses", "Licenses"], ["updates", "Project updates"], ["intake", "Intake"],
 ]
 
-export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, onCompletedProjects, resetRequests = [], onOpenReset = () => {}, resetRequestFocus = 0, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
+export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, allocationBanner, onCompletedProjects, resetRequests = [], onOpenReset = () => {}, resetRequestFocus = 0, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
   resetRequests?: PasswordResetRequest[]
   onOpenReset?: (id:string,requestedAt?:string) => void
   resetRequestFocus?: number
@@ -31,6 +31,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   onMonthlyReport: () => void
   onActivity: () => void
   activity: ReactNode
+  allocationBanner?: ReactNode
 }) {
   const [attentionView,setAttentionView]=useState("priority")
   const pendingResets=resetRequests.filter(r=>r.status!=='completed')
@@ -52,6 +53,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
       </div>
     </PageTitlePanel>
+    {allocationBanner}
     <div className="dashboard-attention-switch" role="tablist" aria-label="Dashboard attention views" onKeyDown={event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return
       event.preventDefault()

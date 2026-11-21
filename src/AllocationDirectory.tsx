@@ -1,112 +1,134 @@
 import { useEffect, useState } from "react"
 import { api } from "./api/client"
-import { Badge, Button, Field, Modal } from "./ui"
-import PhaseAllocationPanel from "./PhaseAllocationPanel"
-import { startPolling } from "./refresh-interval"
+import type { Event } from "./model"
+import { Badge, Button, Field, Icon } from "./ui"
+import "./allocation-history.css"
 
-export default function AllocationDirectory({
-  onChanged,
-}: {
-  onChanged?: () => unknown
-}) {
-  const [rows, setRows] = useState<{
-    id: number
-    project_id: string
-    project_name: string
-    status: string
-    reason: string
-    requested_by_name: string
-  }[]>([])
-  const [opened, setOpened] = useState(false),
-    [error, setError] = useState(""),
-    [project, setProject] = useState<string>(),
-    [filter, setFilter] = useState("pending_admin")
-  const refresh = async () => {
-    try {
-      setRows(await api("/allocation-requests"))
-      setError("")
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
+type AllocationChange = {
+  action: "Added" | "Replaced"
+  previousCompany?: string
+  company: string
+  phases: string[]
+}
+
+type AllocationRecord = {
+  id: string
+  projectName: string
+  leadName: string
+  date: string
+  reason: string
+  status: string
+  changes: AllocationChange[]
+}
+
+type HistoryPage = { records: AllocationRecord[]; hasMore: boolean }
+
+const titles = ["New Subcontractor Assigned", "Subcontractor Allocation Updated"]
+const dateTime = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })
+
+export const isAllocationNotification = (event: Event) => titles.includes(event.title)
+
+function useHistory(query: string, enabled = true) {
+  const [state, setState] = useState<{ query: string; page?: HistoryPage; error?: string }>()
   useEffect(() => {
-    void refresh()
-    const stop=startPolling(refresh)
-    const onFocus=()=>void refresh()
-    window.addEventListener('focus',onFocus)
-    return()=>{stop();window.removeEventListener('focus',onFocus)}
-  }, [])
-  return (
-    <section className="detail-section">
-      <div className="trade-heading">
-        <h3>Project allocation requests</h3>
-        <Button
-          onClick={() => {
-            setOpened((v) => !v)
-            void refresh()
-          }}
-        >
-          {opened ? "Hide requests" : "Review requests"} (
-          {rows.filter((r) => r.status === "pending_admin").length} pending)
-        </Button>
+    if (!enabled) return
+    const abort = new AbortController()
+    api<HistoryPage>(`/allocation-history?${query}`, { signal: abort.signal })
+      .then(page => { if (!abort.signal.aborted) setState({ query, page }) })
+      .catch(error => { if (!abort.signal.aborted) setState({ query, error: error.message }) })
+    return () => abort.abort()
+  }, [enabled, query])
+  return enabled && state?.query === query ? state : undefined
+}
+
+function AllocationRecordDetails({ record }: { record: AllocationRecord }) {
+  return <article className="allocation-history-record">
+    <header>
+      <h4>{record.projectName}</h4>
+      <Badge tone="green">{record.status}</Badge>
+    </header>
+    <p>{record.leadName} · Lead Site PM · <time dateTime={record.date}>{dateTime.format(new Date(record.date))}</time></p>
+    <ul>{record.changes.map(change => <li key={JSON.stringify([change.action, change.previousCompany, change.company, change.phases])}>
+      <Badge tone={change.action === "Replaced" ? "amber" : "blue"}>{change.action}</Badge>{" "}
+      {change.previousCompany && <>{change.previousCompany} → </>}<strong>{change.company}</strong>
+      <p>{change.phases.join(", ")}</p>
+    </li>)}</ul>
+    {record.reason && record.changes.some(change => change.action === "Replaced") && <p><strong>Replacement reason</strong> {record.reason}</p>}
+  </article>
+}
+
+export function AllocationNotificationDetails({ event }: { event: Event }) {
+  const history = useHistory(new URLSearchParams({ notificationId: event.id }).toString())
+  return history?.error ? <p role="alert">{history.error}</p>
+    : history?.page ? history.page.records.length
+      ? history.page.records.map(record => <AllocationRecordDetails key={record.id} record={record} />)
+      : <p>Allocation history is unavailable for this project.</p>
+    : <p role="status">Loading allocation change…</p>
+}
+
+export function AllocationChangeBanner({ events, onRead, onOpen }: {
+  events: Event[]
+  onRead: (ids: string[]) => void
+  onOpen: (event: Event) => void
+}) {
+  const [dismissed, setDismissed] = useState<string[]>([])
+  const latest = events.reduce<Event | undefined>((current, event) =>
+    !event.read && !dismissed.includes(event.id) && isAllocationNotification(event) &&
+    (!current || Date.parse(event.date) > Date.parse(current.date)) ? event : current, undefined)
+  if (!latest) return null
+  const dismiss = () => {
+    setDismissed(ids => [...ids, latest.id])
+    onRead([latest.id])
+  }
+  return <section aria-label="Latest subcontractor allocation update"
+    className={`allocation-change-banner${latest.title === titles[1] ? " replacement" : ""}`}>
+    <Icon name="building" />
+    <div>
+      <h2>{latest.title}</h2>
+      <p>{latest.detail}</p>
+      <time dateTime={latest.date}>{dateTime.format(new Date(latest.date))}</time>
+    </div>
+    <div className="allocation-change-actions">
+      <Button onClick={() => { dismiss(); onOpen(latest) }}>View details</Button>
+      <Button variant="icon-button" icon="close" aria-label="Dismiss allocation update" onClick={dismiss} />
+    </div>
+  </section>
+}
+
+export default function AllocationDirectory({ projectId }: { projectId?: string }) {
+  const [opened, setOpened] = useState(false)
+  const [filters, setFilters] = useState({ search: "", action: "", from: "", to: "", page: "1" })
+  const update = (key: keyof typeof filters, value: string) => setFilters(previous => ({ ...previous, page: "1", [key]: value }))
+  const query = new URLSearchParams(Object.entries({ ...filters, projectId: projectId ?? "" }).filter(([, value]) => value)).toString()
+  const validRange = !filters.from || !filters.to || filters.from <= filters.to
+  const history = useHistory(query, opened && validRange)
+  return <section className="detail-section allocation-history">
+    <div className="trade-heading">
+      <h3>Subcontractor allocation history</h3>
+      <Button aria-expanded={opened} onClick={() => setOpened(value => !value)}>{opened ? "Hide history" : "View history"}</Button>
+    </div>
+    {opened && <>
+      <div className="allocation-history-filters">
+        {!projectId && <Field label="Search by project"><input type="search" value={filters.search} onChange={event => update("search", event.target.value)} /></Field>}
+        <Field label="Action type"><select value={filters.action} onChange={event => update("action", event.target.value)}>
+          <option value="">All actions</option><option>Added</option><option>Replaced</option>
+        </select></Field>
+        <Field label="From date"><input type="date" value={filters.from} onChange={event => update("from", event.target.value)} /></Field>
+        <Field label="To date"><input type="date" value={filters.to} onChange={event => update("to", event.target.value)} /></Field>
       </div>
-      <p>
-        Admin approval is required to add or replace a company on an existing
-        project allocation. Directory approval alone does not approve a project
-        request.
-      </p>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {opened && (
-        <>
-          <Field label="Request status">
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="pending_admin">Pending Admin approval</option>
-              <option value="all">All requests and decisions</option>
-            </select>
-          </Field>
-          {rows
-            .filter((r) => filter === "all" || r.status === filter)
-            .map((r) => (
-              <article className="history-row" key={r.id}>
-                <div>
-                  <strong>{r.project_name}</strong>
-                  <p>
-                    {r.reason} · {r.requested_by_name}
-                  </p>
-                  <Badge>{r.status.replace(/_/g, " ")}</Badge>
-                </div>
-                <Button onClick={() => setProject(r.project_id)}>
-                  Review request #{r.id}
-                </Button>
-              </article>
-            ))}
-          {!rows.some((r) => filter === "all" || r.status === filter) && (
-            <p>No matching allocation requests.</p>
-          )}
-        </>
-      )}
-      {project && (
-        <Modal
-          title="Project subcontractor allocation"
-          wide
-          onClose={() => setProject(undefined)}
-        >
-          <PhaseAllocationPanel
-            projectId={project}
-            admin
-            onReload={async () => {
-              await refresh()
-              await onChanged?.()
-            }}
-          />
-        </Modal>
-      )}
-    </section>
-  )
+      {!validRange ? <p role="alert">Choose an end date on or after the start date.</p>
+        : history?.error ? <p role="alert">{history.error}</p>
+        : history?.page ? history.page.records.length
+          ? history.page.records.map(record => <AllocationRecordDetails key={record.id} record={record} />)
+          : <p>No matching allocation changes.</p>
+        : <p role="status">Loading allocation history…</p>}
+      {validRange && (Number(filters.page) > 1 || history?.page?.hasMore) && <div className="allocation-change-actions">
+        <Button disabled={filters.page === "1"} onClick={() => update("page", String(Number(filters.page) - 1))}>Previous</Button>
+        <span>Page {filters.page}</span>
+        <Button disabled={!history?.page?.hasMore} onClick={() => update("page", String(Number(filters.page) + 1))}>Next</Button>
+      </div>}
+    </>}
+  </section>
 }
 export function CompanyProjectPhases({ companyId }: { companyId: string }) {
   const [rows, setRows] =
