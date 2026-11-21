@@ -428,6 +428,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [selected, setSelected] = useState("")
   const [dialog, setDialog] = useState<"intake" | "details">()
   const [officePage, setOfficePage] = useState<OfficePage>()
+  const [showOfficeApproval, setShowOfficeApproval] = useState(false)
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
   const [adminInquiryFilter, setAdminInquiryFilter] = useState<"all" | "action" | "waiting">("all")
@@ -549,8 +550,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   function updateInquiry(updated: Inquiry) {
     setRows(previous => previous?.map(item => item.id === updated.id ? { ...item, ...updated } : item))
   }
-  function navigateOffice(page?: OfficePage) {
+  function navigateOffice(page?: OfficePage, justApproved = false) {
     setError("")
+    setShowOfficeApproval(justApproved)
     setOfficePage(page)
   }
   async function decision(action: string, input?: Record<string, string>) {
@@ -561,7 +563,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     } else {
       updateInquiry(updated)
       if (action === "confirm") navigateOffice("received")
-      if (action === "approve") navigateOffice("review")
+      if (action === "approve") navigateOffice("review", true)
       if (action === "withdraw") {
         navigateOffice()
         setDialog("details")
@@ -577,6 +579,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       setPhases([])
       setTeam([])
     }
+    if (action === "review" && updated.workflow?.review && updated.workflow.budget) navigateOffice("assessment")
   }
   function openOfficeInquiry(item: Inquiry) {
     open(item)
@@ -908,7 +911,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     {officePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${officePage}`} row={row} page={officePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
-          pendingCount={pendingInquiries.length}
+          pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           decide={(action, input) => void run(() => decision(action, input))}
           save={(action, input) => void run(() => saveWorkflow(action, input))} />
