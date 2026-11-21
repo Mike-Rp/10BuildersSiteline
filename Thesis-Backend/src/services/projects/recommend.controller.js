@@ -223,12 +223,22 @@ export const getOpm = async (project_type, excludedId = null, db = {query: execu
   return mapSingle(result.rows[randomIndex], 'id');
 }
 
-export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers) => {
-  const db={query:execute}; const scoped=await commitmentsInstalled(db);
+export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers, {
+  requiredScopes, blockedCandidates, db = { query: execute },
+} = {}) => {
+  const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
-  const typeId=(await execute('select id from project_types where code=$1',[project_type])).rows[0]?.id;
-  const existingCommitments=scoped?await engineerCommitments(db,(await execute("select u.id from users u join roles r on r.id=u.role_id where r.code='spm'")).rows.map(r=>r.id)):undefined;
-  const matrix_result = await execute(
+  const typeId=(await db.query('select id from project_types where code=$1',[project_type])).rows[0]?.id;
+  const existingCommitments=scoped?await engineerCommitments(db,(await db.query("select u.id from users u join roles r on r.id=u.role_id where r.code='spm'")).rows.map(r=>r.id)):undefined;
+  const matrix_result = requiredScopes ? await db.query(
+    `SELECT s.id AS project_stage_id, s.code,
+       ARRAY(SELECT d.id FROM disciplines d WHERE d.code IN (
+         SELECT jsonb_array_elements_text($2::jsonb->s.code)
+       ) ORDER BY d.id) AS disciplines
+     FROM project_type_stages workflow JOIN project_stages s ON s.id=workflow.project_stage_id
+     WHERE workflow.project_type_id=$1 AND $2::jsonb ? s.code ORDER BY workflow.sort_order`,
+    [typeId, JSON.stringify(requiredScopes)],
+  ) : await db.query(
     `
     SELECT
       pstdl.project_stage_id,
@@ -250,7 +260,7 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
 
   for (const row of matrix_result.rows) {
     if (phases && !phases.includes(row.code)) continue;
-    const spm_result = await execute(
+    const spm_result = await db.query(
       `
         WITH search_params AS (
           SELECT $1::int[] AS target_tags
@@ -307,31 +317,38 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
     const qualified = mapMultiple(spm_result.rows, 'id');
     let details = qualified.filter(person => person.availability === "available");
     let blocker = details.length ? undefined : qualified.length ? "availability" : "qualifications";
+    const blocked = [];
+    for (const person of qualified.filter(person => person.availability !== "available"))
+      blocked.push({person, reason: "availability"});
     if (schedule && details.length) {
-      const blocked = await scheduleConflicts(db, details.map(person => person.id), schedule);
-      details = details.filter(person => !blocked.has(person.id));
+      const conflicts = await scheduleConflicts(db, details.map(person => person.id), schedule);
+      for (const person of details.filter(person => conflicts.has(person.id))) blocked.push({person, reason: "schedule"});
+      details = details.filter(person => !conflicts.has(person.id));
       if (!details.length) blocker = "schedule";
     }
     if(scoped && details.length) {
       const available=[];
       for(const candidate of details) {
         const team=[{stage:row.code,user_id:candidate.id}];
-        try { await prepareEngineerAssignments(db,typeId,team,{lock:false,existingCommitments}); available.push({...candidate,assigned_disciplines:team[0].assigned_disciplines}); }
-        catch(error) { if(error.status!==409) throw error; }
+        try { await prepareEngineerAssignments(db,typeId,team,{lock:false,existingCommitments,requiredScopes}); available.push({...candidate,assigned_disciplines:team[0].assigned_disciplines}); }
+        catch(error) { if(error.status!==409) throw error; blocked.push({person:candidate,reason:"commitments"}); }
       }
       details=available;
       if (!details.length) blocker = "commitments";
     }
     if (candidateBlockers && blocker) candidateBlockers[row.code] = blocker;
+    if (blockedCandidates) blockedCandidates[row.code] = blocked.map(({person,reason}) => ({
+      id:person.id, name:person.full_name, qualifiedTags:person.matching_scopes, reason,
+    }));
 
     const randomIndex = 0;
 
     if(multi) {
-      const required=(await execute('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
+      const required=requiredScopes?.[row.code] ?? (await db.query('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
       const candidates = details.map(person => ({id:person.id,qualifiedTags:person.matching_scopes}));
       if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years}));
       const result=allocatePhaseCoverage(required,candidates);
-      suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
+      suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),required_specializations:required,coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 

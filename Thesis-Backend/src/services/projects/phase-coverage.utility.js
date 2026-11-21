@@ -3,6 +3,7 @@ import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
 import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js";
+import { projectEngineerScopesSql } from "./phase-engineer-scopes.utility.js";
 
 // Pure check: every required phase has exactly one row with a valid engineer that is confirmed.
 // `required` comes only from the authoritative workflow; `rows` are the saved assignment rows.
@@ -57,7 +58,8 @@ export async function loadPhaseCoverage(db, projectId) {
    const responsibilities=(await db.query(`select assignment.*,s.code,(u.status='active' and not coalesce(u.is_deleted,false) and ${LICENSE_ELIGIBILITY_SQL} and not exists(select 1 from unnest(assignment.assigned_disciplines) tag where not exists(select 1 from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=u.id and d.code=tag))) as engineer_valid from project_phase_responsibilities assignment join project_stages s on s.id=assignment.project_stage_id join users u on u.id=assignment.user_id where assignment.project_id=$1 for update of assignment`,[projectId])).rows;
    if(responsibilities.length)for(const phase of required) {
     const assigned=responsibilities.filter(r=>String(r.project_stage_id)===String(phase.project_stage_id));
-    const requiredTags=(await db.query('select d.code from projects p join project_stage_discipline_links l on l.project_type_id=p.project_type_id join disciplines d on d.id=l.discipline_id where p.id=$1 and l.project_stage_id=$2',[projectId,phase.project_stage_id])).rows.map(r=>r.code);
+    const requiredTags=(await db.query(`select ${projectEngineerScopesSql("p", "s.id", "s.code")} as scopes
+      from projects p cross join project_stages s where p.id=$1 and s.id=$2`,[projectId,phase.project_stage_id])).rows[0]?.scopes ?? [];
     const coveredTags = new Set(assigned.filter(r=>r.status==='confirmed'&&r.engineer_valid).flatMap(r=>r.assigned_disciplines||[]));
     const quota = phaseCoverageQuota(requiredTags);
     if(!assigned.length || assigned.length > MAX_ENGINEERS_PER_PHASE || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;

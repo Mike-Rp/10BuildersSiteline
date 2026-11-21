@@ -181,8 +181,9 @@ export function qualifyingSpecializations(
     credentials.some(
       (c) =>
         credentialEligible(c, today, noticeDays) &&
-        (c.specializations == null ? legacySpecializations.includes(tag) : c.specializations.includes(tag)) &&
-        (SPECIALIZATION_PROFESSIONS[tag] || []).includes(c.profession),
+        (SPECIALIZATION_PROFESSIONS[tag]?.includes(c.profession)
+          ? (c.specializations == null ? legacySpecializations.includes(tag) : c.specializations.includes(tag))
+          : !!c.specializations?.includes(tag) && !!SPECIALTIES_BY_PROFESSION[c.profession]?.includes(tag)),
     ),
   )
 }

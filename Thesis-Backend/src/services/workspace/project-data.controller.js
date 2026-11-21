@@ -3,6 +3,7 @@ import { readEvidenceQueue } from '../progress/evidence-queue.utility.js';
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
 import { LIST_SELECT, projectListFrom, stripInternal } from "../projects/read.controller.js";
+import { projectEngineerScopesSql } from "../projects/phase-engineer-scopes.utility.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
 import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
@@ -119,8 +120,7 @@ export async function getProjectData(req,res) {
     for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id,{reconcile:true});
    }
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
-     ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
-       WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
+     ${projectEngineerScopesSql("p", "t.project_stage_id", "s.code")} AS required_disciplines,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,to_jsonb(t)->'assigned_disciplines' as assigned_disciplines,t.response_deadline_at,t.responded_at
      from project_phase_team t join projects p on p.id=t.project_id join (${projectWorkflowSql}) w on w.project_id=p.id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id
      left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by w.sort_order`,[ids])).rows;

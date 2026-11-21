@@ -2,6 +2,7 @@ import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import {
   ENGINEER_SPECIALIZATIONS,
   REQUIREMENT_SPECIALIZATIONS,
+  SPECIALIZATION_PROFESSIONS,
   qualifyingSpecializations,
   licenseNumberError,
   credentialEligible,
@@ -95,12 +96,17 @@ export async function credentialSummary(db, userId) {
   const requirements = Object.keys(REQUIREMENT_SPECIALIZATIONS).filter((r) =>
     REQUIREMENT_SPECIALIZATIONS[r].some((t) => qualified.includes(t)),
   )
+  const detailedTags = qualified.filter(tag => !Object.hasOwn(SPECIALIZATION_PROFESSIONS, tag))
+  const detailedRequirements = detailedTags.length ? (await db.query(
+    `select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id
+      where q.user_id=$1 and d.code=any($2::text[]) order by d.code`, [userId, detailedTags],
+  )).rows.map(row => row.code) : []
   const valid = credentials.some((c) => credentialEligible(c, localDay()))
   const eligible =
     account.status === "active" &&
     !holds?.assignmentHold &&
     valid &&
-    (account.role !== "spm" || qualified.length > 0)
+    (account.role !== "spm" || requirements.length > 0 || detailedRequirements.length > 0)
   return {
     accountStatus: account.status,
     credentials: credentials.map((c) => ({
@@ -117,7 +123,7 @@ export async function credentialSummary(db, userId) {
     specializations:tags.map(tag=>specializations.find(s=>s.specialization===tag)||{specialization:tag}),
     legacySpecializations:specializations,
     submissions,
-    qualifiedRequirements: requirements,
+    qualifiedRequirements: [...requirements, ...detailedRequirements],
     eligibleForNewAssignment: eligible,
     eligibilityNote: eligible
       ? "Credential requirements satisfied; assignment still requires matching scope, capacity and availability."

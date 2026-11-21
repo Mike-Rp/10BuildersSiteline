@@ -3,6 +3,7 @@ import { assertEligibleManager } from "../../common/utilities/license-eligibilit
 import { prepareEngineerAssignments } from "./engineer-commitments.utility.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
 import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
+import { savedEngineerScopes } from "./phase-engineer-scopes.utility.js"
 
 export async function responsibilitiesInstalled(db) {
   return (
@@ -18,6 +19,7 @@ export async function preparePhaseResponsibilities(
   options = {},
 ) {
   if (!(await responsibilitiesInstalled(db))) return false
+  const requiredScopes = options.requiredScopes ?? await savedEngineerScopes(db, options.projectId)
   const flat = []
   for (const phase of team) {
     if (!Array.isArray(phase.engineers) || !phase.engineers.length)
@@ -30,7 +32,7 @@ export async function preparePhaseResponsibilities(
         422,
         "The first engineer must be the phase coordinator.",
       )
-    const required = (
+    const required = requiredScopes?.[phase.stage] ?? (
       await db.query(
         `select d.code from project_stage_discipline_links l join disciplines d on d.id=l.discipline_id join project_stages s on s.id=l.project_stage_id where l.project_type_id=$1 and s.code=$2 order by d.code`,
         [typeId, phase.stage],
@@ -71,7 +73,7 @@ export async function preparePhaseResponsibilities(
       )
   }
   // Lock the complete team in a consistent order before individual credential checks.
-  await prepareEngineerAssignments(db, typeId, flat, options)
+  await prepareEngineerAssignments(db, typeId, flat, { ...options, requiredScopes })
   for (const row of flat) await assertEligibleManager(db, row.user_id, "spm")
   for (const phase of team)
     phase.assigned_disciplines = phase.engineers[0].assigned_disciplines

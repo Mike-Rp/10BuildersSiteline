@@ -1,6 +1,7 @@
 import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
 import { intakeSize } from "../../domain/inquiry-assessment.js";
 import { prepareInquiryLead } from "./inquiry-staffing.js";
+import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
 import { HttpError } from "../../common/utilities/access.utility.js";
@@ -140,9 +141,10 @@ export const createIntake = async (req, res) => {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
-      await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true});
+      const requiredScopes = inquiry ? await configuredInquiryScopes(client, intake.project_type, phases) : undefined;
+      await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true,requiredScopes});
       const inquiryLead = inquiry ? await prepareInquiryLead(client, phase_team, phases, projectType.rows[0].id,
-        intake.project_type, inquiry.details.opm_workflow.review) : null;
+        intake.project_type, inquiry.details.opm_workflow.review, null, requiredScopes) : null;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
@@ -164,7 +166,7 @@ export const createIntake = async (req, res) => {
       const project = inserted.rows[0];
       if (inquiry) {
         await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
-          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,engineerScopes:requiredScopes,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
         project.lifecycle_status = "spm_review";
         for (const [code,fileId] of [["owner_contract",req.body.contract_file_id],["registered_plans",req.body.plans_file_id]]) {
           if (!fileId && code === "registered_plans") continue;

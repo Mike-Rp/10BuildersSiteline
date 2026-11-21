@@ -1,6 +1,7 @@
 import { HttpError } from "../../common/utilities/access.utility.js"
 import { readVerifiedProgress } from "../progress/verified.utility.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
+import { savedEngineerScopes } from "./phase-engineer-scopes.utility.js"
 import {
   responsibilitiesInstalled,
   savePhaseResponsibilities,
@@ -60,6 +61,7 @@ export async function prepareEngineerAssignments(
     lock = true,
     legacyReview = false,
     existingCommitments,
+    requiredScopes,
   } = {},
 ) {
   if (existingCommitments === undefined && !(await commitmentsInstalled(db)))
@@ -72,6 +74,7 @@ export async function prepareEngineerAssignments(
       ])
   const existing = existingCommitments ?? (await engineerCommitments(db, ids))
   const singleProject = await responsibilitiesInstalled(db)
+  const scopes = requiredScopes ?? await savedEngineerScopes(db, projectId)
   for (const row of team) {
     const other = existing.filter(
       (r) => r.user_id === row.user_id && r.project_id !== projectId,
@@ -87,13 +90,17 @@ export async function prepareEngineerAssignments(
         "This engineer already has two unfinished project commitments.",
       )
     const qualified = (
-      await db.query(
+      await (scopes?.[row.stage] ? db.query(
+        `select distinct d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id
+        where q.user_id=$1 and d.code=any($2::text[]) order by d.code`,
+        [row.user_id, scopes[row.stage]],
+      ) : db.query(
         `select distinct d.code from engineer_qualified_scopes q
     join project_stage_discipline_links l on l.discipline_id=q.discipline_id and l.project_type_id=$1
     join project_stages s on s.id=l.project_stage_id join disciplines d on d.id=q.discipline_id
     where q.user_id=$2 and s.code=$3 order by d.code`,
         [typeId, row.user_id, row.stage],
-      )
+      ))
     ).rows.map((r) => r.code)
     const conflicts = other.filter((r) => r.phase === row.stage)
     const free = qualified.filter(

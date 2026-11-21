@@ -4,6 +4,7 @@ import { requireUser, handleError, HttpError, isUuid } from "../../common/utilit
 import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { getOpm, getSpm } from "./recommend.controller.js";
+import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { assessInquiry, inquirySize, technicalOptions, arrangementOptions, MIN_INQUIRY_DURATION_DAYS } from "../../domain/inquiry-assessment.js";
 
@@ -341,7 +342,11 @@ export function mountInquiries(router) {
     const selected = confirmedPhases(phases, req.body.phases);
     const candidates = {};
     const candidateBlockers = {};
-    const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers);
+    const blockedCandidates = {};
+    const scopes = await configuredInquiryScopes({ query: execute }, type, selected);
+    const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers, {
+      requiredScopes: scopes, blockedCandidates,
+    });
     for (const phase of selected) {
       if (!Object.hasOwn(candidates, phase)) {
         candidates[phase] = [];
@@ -355,6 +360,6 @@ export function mountInquiries(router) {
       WHERE id=$1 AND opm_id=$2 AND status='approved' AND details #>> '{opm_workflow,assessment,id}'=$4`,
       [row.id, actor.id, JSON.stringify(staffing), assessment.id]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
-    return { phases, estimate, team, candidates, candidateBlockers, staffing };
+    return { phases, estimate, team, candidates, candidateBlockers, blockedCandidates, staffing };
   }));
 }

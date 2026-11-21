@@ -28,10 +28,11 @@ type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
 type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
+type BlockedCandidate = Candidate & { reason: "availability" | "schedule" | "commitments" }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
-type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; missing_specializations?: string[] }
+type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability"
-type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
+type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>; blockedCandidates?: Record<string, BlockedCandidate[]>;
   staffing?: {assessment_id:string; phases:string[]; contract_file_id:string} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
 const classifications = ["Normal", "Priority", "Urgent"]
@@ -164,6 +165,7 @@ function AdminInquiryHistory({ row }: { row: Inquiry }) {
 const consultationLabel = (details: Details) => timing.find(([value]) => value === Number(details.consultation))?.[1] || "—"
 
 function requiredAreas(entry?: Phase) {
+  if (entry?.required_specializations) return entry.required_specializations
   return [...new Set([
     ...(entry?.missing_specializations || []),
     ...(entry?.engineers || []).flatMap(person => person.assigned_disciplines),
@@ -210,11 +212,12 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
   </section>
 }
 
-function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck }: {
+function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, adding, setAdding, onChange, onRecheck }: {
   stage: string
   entry?: Phase
   suggested?: Phase
   choices: Candidate[]
+  blocked: BlockedCandidate[]
   blocker?: CandidateBlocker
   adding: boolean
   setAdding: (value: boolean) => void
@@ -226,7 +229,12 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
     { user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines || [] },
   ] : [])
   const required = requiredAreas(suggested)
-  const missing = required.filter(area => !engineers.some(person => person.assigned_disciplines.includes(area)))
+  const owners = new Map(required.flatMap(area => {
+    const owner = choices.find(candidate => candidate.qualifiedTags.includes(area) && engineers.some(person =>
+      person.user_id === candidate.id && person.assigned_disciplines.includes(area)))
+    return owner ? [[area, owner.name] as const] : []
+  }))
+  const missing = required.filter(area => !owners.has(area))
   const quota = phaseCoverageQuota(required)
   const coverage = required.length - missing.length
   const update = (next: Engineer[]) => onChange({
@@ -260,10 +268,20 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   }
   return <section className="inquiry-card inquiry-staffing">
     <div className="inquiry-staff-heading"><h3>{stage}</h3>
-      {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} areas covered · minimum {quota} (50%)</span>}
+      {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} scopes covered · minimum {quota}</span>}
     </div>
     {missing.length > 0 && <p className="inquiry-coverage-warning"><strong>{missing.length} coverage {missing.length === 1 ? "gap" : "gaps"} in {stage}.</strong> Still needed: {missing.join(", ")}</p>}
     <div className={`inquiry-staff-layout${required.length ? " with-coverage" : ""}`}>
+    {!!required.length && <aside className="inquiry-summary-card inquiry-phase-coverage">
+      <h4>Phase scope coverage</h4>
+      <ul>{required.map(area => {
+        const owner = owners.get(area)
+        return <li key={area} className={owner ? "covered" : "gap"}>
+          <Icon name={owner ? "check" : "alert"} size={16} />
+          <span>{area}</span><strong>{owner || "Unassigned"}</strong>
+        </li>
+      })}</ul>
+    </aside>}
     <div className="inquiry-form-stack">
     <div className="inquiry-staff-heading">
       <strong>Assigned engineers · {engineers.length}</strong>
@@ -315,14 +333,15 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
         <button className="button" type="button" onClick={() => setAdding(false)}>Cancel</button>
       </article>}
     </div>
+    {!!blocked.length && <details className="inquiry-summary-card inquiry-blocked-engineers">
+      <summary>Unavailable matches ({blocked.length})</summary>
+      <ul>{blocked.map(candidate => <li key={candidate.id}>
+        <strong>{candidate.name}</strong>
+        <span className="inquiry-pill pending">{{schedule:"Schedule conflict",commitments:"Existing commitments",availability:"Unavailable"}[candidate.reason]}</span>
+        <small>{candidate.qualifiedTags.join(", ")}</small>
+      </li>)}</ul>
+    </details>}
     </div>
-    {!!required.length && <aside className="inquiry-summary-card inquiry-phase-coverage">
-      <h4>Phase coverage</h4>
-      <ul>{required.map(area => {
-        const covered = !missing.includes(area)
-        return <li key={area} className={covered ? "covered" : "gap"}><Icon name={covered ? "check" : "alert"} size={16} />{area} <span className="sr-only">{covered ? "covered" : "unfilled"}</span></li>
-      })}</ul>
-    </aside>}
     </div>
   </section>
 }
@@ -958,7 +977,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
-          <div><h3>Build the project team</h3><p className="inquiry-muted">Review staffing by phase and assign qualified engineers to cover responsibilities.</p></div>
+          <div><h3>Assign engineers by phase</h3><p className="inquiry-muted">{row.details.name} · {row.details.project_type}</p></div>
           <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
           <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage} onClick={() => {
@@ -968,7 +987,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           </div>
           <StaffingCards stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
             suggested={planning.team?.find(entry => entry.stage === staffingPhase)}
-            choices={planning.candidates[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
+            choices={planning.candidates[staffingPhase] || []} blocked={planning.blockedCandidates?.[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
           {!canSend && <p className="inquiry-muted">Fill every selected phase and meet its minimum coverage before sending assignment offers.</p>}

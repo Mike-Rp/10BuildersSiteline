@@ -40,6 +40,7 @@ export const DEDICATED_MIGRATIONS = Object.freeze({
   "025-independent-spm-workspaces.sql": "Apply explicitly before enabling independent SPM workspaces; requires 020",
   "027-workflow-reliability.sql": "Apply explicitly after reviewed 025/026; see docs/WORKFLOW-RELIABILITY.md",
   "026-credential-specializations.sql": "Apply explicitly before per-credential specialization entry; requires 015",
+  "032-inquiry-engineer-specialties.sql": "Apply after 027 and 031 to enable detailed specialties on new inquiry assignments",
 })
 
 const LEGACY_NAME_ALIASES = Object.freeze({

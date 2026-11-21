@@ -2,6 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js";
 import { matchingInquiryTags, selectInquiryLead } from "../../domain/inquiry-lead.js";
 import { experienceForProjectSql } from "../accounts/experience.utility.js";
 import { responsibilitiesInstalled } from "./phase-responsibilities.utility.js";
+import { savedEngineerScopes } from "./phase-engineer-scopes.utility.js";
 
 export async function scheduleConflicts(db, ids, {start, end}, projectId = null) {
   const rows = await db.query(`
@@ -22,7 +23,7 @@ export async function scheduleConflicts(db, ids, {start, end}, projectId = null)
 }
 
 // Call after phase coverage and eligibility checks, while the assignment users are locked.
-export async function prepareInquiryLead(db, team, phases, typeId, type, schedule, projectId = null) {
+export async function prepareInquiryLead(db, team, phases, typeId, type, schedule, projectId = null, requiredScopes) {
   const ids = [...new Set(team.flatMap(phase => [phase.user_id, ...(phase.engineers ?? []).map(e => e.user_id)]))];
   if ((await scheduleConflicts(db, ids, schedule, projectId)).size)
     throw new HttpError(409, "A selected Site PM has a conflicting project schedule. Refresh the allocation.");
@@ -31,14 +32,20 @@ export async function prepareInquiryLead(db, team, phases, typeId, type, schedul
 
   const experience = await db.query(`SELECT u.id, ${experienceForProjectSql("$1")} AS years
     FROM users u WHERE u.id=ANY($2::uuid[])`, [type, ids]);
-  const qualifications = await db.query(`
+  const savedScopes = requiredScopes ?? await savedEngineerScopes(db, projectId);
+  const qualifications = savedScopes ? await db.query(`
+    SELECT q.user_id,array_agg(DISTINCT d.code ORDER BY d.code) AS tags
+    FROM engineer_qualified_scopes q JOIN disciplines d ON d.id=q.discipline_id
+    WHERE q.user_id=ANY($1::uuid[]) GROUP BY q.user_id`, [ids]) : await db.query(`
     SELECT s.code AS stage,q.user_id,array_agg(DISTINCT d.code ORDER BY d.code) AS tags
     FROM engineer_qualified_scopes q
     JOIN project_stage_discipline_links l ON l.discipline_id=q.discipline_id AND l.project_type_id=$1
     JOIN disciplines d ON d.id=q.discipline_id JOIN project_stages s ON s.id=l.project_stage_id
     WHERE q.user_id=ANY($2::uuid[]) AND s.code=ANY($3::text[]) GROUP BY s.code,q.user_id`, [typeId,ids,phases]);
-  const scopes = new Map(qualifications.rows.map(row => [`${row.stage}:${row.user_id}`, row.tags]));
-  const eligible = (stage, id) => scopes.get(`${stage}:${id}`) ?? [];
+  const scopes = new Map(qualifications.rows.map(row => [savedScopes ? row.user_id : `${row.stage}:${row.user_id}`, row.tags]));
+  const eligible = (stage, id) => savedScopes
+    ? (scopes.get(id) ?? []).filter(tag => savedScopes[stage]?.includes(tag))
+    : scopes.get(`${stage}:${id}`) ?? [];
   for (const phase of team) {
     if (phase.engineers?.length) continue; // Multi-engineer scopes have already passed preparePhaseResponsibilities.
     const tags = eligible(phase.stage, phase.user_id);

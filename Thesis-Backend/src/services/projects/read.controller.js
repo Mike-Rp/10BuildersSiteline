@@ -1,5 +1,6 @@
 import execute from "../../common/utilities/query.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
+import { projectEngineerScopesSql } from "./phase-engineer-scopes.utility.js";
 import { participantsSql, phaseAssignments } from "../progress/assignment.utility.js";
 import {
   handleError, sendOk, sendError, requireUser, hasProjectAccess, isUuid, paging,
@@ -162,8 +163,7 @@ export const getProjectById = async (req, res) => {
           ORDER BY assigned_at`, [id]),
       execute(
         `SELECT t.project_stage_id AS stage_id, s.code AS stage, w.sort_order,
-                ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
-                  WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
+                ${projectEngineerScopesSql("p", "t.project_stage_id", "s.code")} AS required_disciplines,
                 t.spm_user_id, u.full_name AS spm_name, t.status, t.is_lead
            FROM project_phase_team t
            JOIN projects p ON p.id=t.project_id
