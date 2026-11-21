@@ -161,7 +161,7 @@ export const updatePhaseTeam = async (req, res) => {
   }
 };
 
-export const getOpm = async (project_type, excludedId = null, db = {query: execute}) => {
+export const getOpmCandidates = async (project_type, excludedId = null, db = {query: execute}) => {
 
   const query = `
       WITH search_params AS (
@@ -214,14 +214,11 @@ export const getOpm = async (project_type, excludedId = null, db = {query: execu
     `;
   const result = await db.query(query, [project_type, Array.isArray(excludedId) ? excludedId : excludedId ? [excludedId] : []]);
 
-  if (result.rowCount === 0) {
-    return null;
-  }
-
-  const randomIndex = 0; // Refreshing suggestions must not bypass relevant experience priority.
-
-  return mapSingle(result.rows[randomIndex], 'id');
+  return result.rows.map(row => mapSingle(row, 'id'));
 }
+
+export const getOpm = async (projectType, excludedId, db) =>
+  (await getOpmCandidates(projectType, excludedId, db))[0] ?? null;
 
 export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers, {
   requiredScopes, blockedCandidates, db = { query: execute },

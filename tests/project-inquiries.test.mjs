@@ -89,18 +89,30 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     await decision(row,admin,"send",{opm_id:manager.id})
     return {manager,token}
   }
-  const delayed = await call(root,{token:admin,json:{...details,land_area:"",classification:"Normal",immediate_consultation:"no"}})
-  assert.equal(delayed.status,"draft")
-  assert.equal(delayed.opm_id,null)
+  const candidatesPath = `${root}/opm-candidates?project_type=Residential`
+  const candidates = await call(candidatesPath,{token:admin})
+  assert.ok(candidates.length)
+  await call(root,{token:admin,status:422,json:{...details,phone:"0912345678"}})
+  await call(root,{token:admin,status:422,json:{...details,phone:"09123456A89"}})
+  const regular = {...details,phone:"+639123456789",land_area:"",classification:"Urgent",immediate_consultation:"no"}
+  await call(root,{token:admin,status:409,json:{...regular,expected_opm_id:null}})
+  const delayed = await call(root,{token:admin,json:{...regular,expected_opm_id:candidates[0].id}})
+  assert.equal(delayed.status,"offered")
+  assert.equal(delayed.opm_id,candidates[0].id)
+  assert.equal(delayed.opm_name,candidates[0].name)
+  assert.equal(delayed.details.phone,"+639123456789")
+  assert.equal(delayed.details.classification,"Normal")
+  assert.equal(delayed.details.consultation,1440)
   assert.equal(delayed.details.land_area,undefined)
 
   const cancelled = await call(root,{token:admin,json:{...details,project_type:"Mixed-Use",classification:"Priority",immediate_consultation:"yes"}})
   assert.equal(cancelled.status,"offered")
   assert.ok(cancelled.opm_name)
   assert.equal(cancelled.routing_history[0].kind,"offered")
-  assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE title='Consultation request'")).rows[0].count,1)
+  assert.equal((await db.query("SELECT count(*)::int AS count FROM notifications WHERE title='Consultation request'")).rows[0].count,2)
   const [{email:firstEmail}] = (await db.query("SELECT email FROM users WHERE id=$1",[cancelled.opm_id])).rows
   const firstToken = await login(firstEmail,"staff")
+  await call(candidatesPath,{token:firstToken,status:403})
   const offered = (await call(root,{token:firstToken})).find(item=>item.id===cancelled.id)
   assert.equal(offered.details.classification,"Priority")
   assert.equal(offered.routing_history,undefined)

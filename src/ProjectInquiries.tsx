@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { api, downloadBlob } from "./api/client"
+import { ApiError, api, downloadBlob } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
 import type { Project } from "./model"
@@ -57,6 +57,12 @@ const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZo
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
+const inquiryPlaceholders: Record<string, string> = {
+  client_name: "Lastname, FirstName", phone: "09123456789 or +639123456789", email: "name@gmail.com",
+  name: "Maple Residence", address: "Street, barangay, city",
+  land_area: "e.g. 300 (optional)", lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
+}
+type InquiryOpmCandidate = { id: string; name: string; experience_years: number }
 
 function inquiryReference(row: Inquiry) {
   return `10BL-${row.created_at?.slice(0, 4) || row.updated_at?.slice(0, 4) || inquiryDay.format(new Date()).slice(0, 4)}-${row.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`
@@ -131,6 +137,7 @@ function AdminInquirySummary({ row }: { row: Inquiry }) {
     ["Estimated start", date(row.target_start_date || details.anticipated_start)],
     ["Potential completion", date(row.target_end_date)],
     ["Inquiry classification", details.classification || "—"],
+    ["Assigned Office PM", row.opm_name || "Pending matching"],
   ]
   return <dl className="admin-inquiry-summary-grid">
     {values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
@@ -441,6 +448,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [contractFileId, setContractFileId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
+  const [opmPreview, setOpmPreview] = useState<{ type: string; candidates?: InquiryOpmCandidate[]; error?: string }>()
+  const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
@@ -450,6 +459,16 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     estimated_budget: budget, assessment_id: row?.workflow?.assessment?.id,
   }
   const root = "/projects/inquiries"
+  const previewType = role === "admin" && adminPage === "new" ? String(details.project_type ?? "") : ""
+  useEffect(() => {
+    setOpmPreview(undefined)
+    if (!previewType) return
+    const abort = new AbortController()
+    void api<InquiryOpmCandidate[]>(`${root}/opm-candidates?project_type=${encodeURIComponent(previewType)}`, { signal: abort.signal })
+      .then(candidates => { if (!abort.signal.aborted) setOpmPreview({ type: previewType, candidates }) })
+      .catch(error => { if (!abort.signal.aborted) setOpmPreview({ type: previewType, error: error.message }) })
+    return () => abort.abort()
+  }, [previewType, opmPreviewVersion])
   const change = (key: string, value: string | number) => {
     setDetails(previous => ({ ...previous, [key]: value }))
     setPlanning(undefined)
@@ -676,10 +695,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const adminList = runList(adminInquiryListKey, adminVisibleRows, adminInquiryListConfig)
   function changeAdminInquiryTab(tab: typeof adminInquiryTab) {
     setAdminInquiryTab(tab)
+    setAdminInquiryFilter("all")
     setAdminInquiryStatusFilter("")
     resetInquiryPage()
   }
   function changeAdminInquiryFilter(filter: typeof adminInquiryFilter) {
+    if (adminInquiryTab === "history") setAdminInquiryStatusFilter("")
+    setAdminInquiryTab("current")
     setAdminInquiryFilter(filter)
     resetInquiryPage()
   }
@@ -696,22 +718,32 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }, { all: 0, action: 0, waiting: 0 })
   const statusOptions = [...new Set([...(rows ?? []).map(officeStatus), queueStatus].filter(Boolean))]
   function renderAdminInquiryForm() {
+    const regular = details.immediate_consultation === "no"
+    const matching = opmPreview?.type === previewType ? opmPreview : undefined
+    const candidates = matching?.candidates
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
-      const pattern = key === "phone" ? "09[0-9]{0,9}" : key === "email" ? "[^\\s@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined
-      const hint = key === "phone" ? "Enter up to 11 digits starting with 09." : "Use an @gmail.com address."
+      const pattern = key === "phone" ? "(?:09[0-9]{9}|\\+639[0-9]{9})" : key === "email" ? "[^\\s@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined
+      const hint = key === "phone" ? "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9." : "Use an @gmail.com address."
       const invalid = Boolean(value && pattern && !new RegExp(`^(?:${pattern})$`).test(value))
       const noticeId = `inquiry-${key}-notice`
       return (
       <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
         <input type={type} value={value} required={required} maxLength={maxLength}
-          inputMode={key === "phone" ? "numeric" : undefined}
+          inputMode={key === "phone" ? "tel" : undefined}
           pattern={pattern} title={pattern ? hint : undefined}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? noticeId : undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           max={key === "floor_count" ? 32767 : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
-          placeholder={required ? undefined : "Optional"} onChange={event => change(key, event.target.value)} />
+          placeholder={inquiryPlaceholders[key]} onChange={event => {
+            const typed = event.target.value
+            if (key !== "phone") { change(key, typed); return }
+            const number = typed.replace(/[^0-9+]/g, "")
+            const prefix = number.startsWith("+") ? "+639" : "09"
+            if (/^\+?[0-9]*$/.test(number) && (prefix.startsWith(number) || number.startsWith(prefix)))
+              change(key, number.slice(0, prefix.length + 9))
+          }} />
         {pattern && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{invalid ? hint : ""}</small>}
       </label>
       )
@@ -723,13 +755,22 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     }
     return <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
       <button type="button" className="button" disabled={busy} onClick={close}>Cancel</button>
-      <button type="submit" form="admin-inquiry-form" className="button primary" disabled={busy}>Submit Project Inquiry</button>
+      <button type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit Project Inquiry</button>
     </>}>
       <form id="admin-inquiry-form" className="admin-inquiry-submission" onSubmit={event => {
         event.preventDefault()
-        if (busy) return
+        if (busy || !candidates) return
         void run(async () => {
-          const result = await post<Inquiry>(root, details)
+          let result: Inquiry
+          try {
+            result = await post<Inquiry>(root, { ...details, expected_opm_id: candidates[0]?.id ?? null })
+          } catch (error) {
+            if (error instanceof ApiError && error.code === "INQUIRY_RECOMMENDATION_CHANGED") {
+              setOpmPreview(undefined)
+              setOpmPreviewVersion(version => version + 1)
+            }
+            throw error
+          }
           setRows(previous => [result, ...(previous ?? []).filter(item => item.id !== result.id)])
           setSelected(result.id)
           setSearch("")
@@ -741,7 +782,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <FormSection title="Client information" icon="users" description="Required contact details for the project inquiry.">
             <div className="admin-inquiry-form-grid">
               {input("client_name", "Client name", "text", true, 150)}
-              {input("phone", "Contact number", "tel", true, 11)}
+              {input("phone", "Contact number", "tel")}
               {input("email", "Email address", "email", true, 150)}
             </div>
           </FormSection>
@@ -775,11 +816,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <fieldset className="admin-inquiry-preference">
                 <legend>Does the client wish to speak with an OPM right away? <span className="inquiry-required">*</span></legend>
                 {(["yes", "no"] as const).map(value => <label key={value}>
-                  <input type="radio" name="immediate-consultation" required checked={details.immediate_consultation === value} onChange={() => change("immediate_consultation", value)} />
+                  <input type="radio" name="immediate-consultation" required checked={details.immediate_consultation === value} onChange={() => {
+                    setDetails(previous => ({ ...previous, immediate_consultation: value, consultation: value === "no" ? 1440 : 30,
+                      classification: value === "no" ? "Normal" : previous.classification }))
+                  }} />
                   {value === "yes" ? "Yes" : "No"}
                 </label>)}
               </fieldset>
-              <fieldset className="admin-inquiry-classification">
+              <fieldset className="admin-inquiry-classification" disabled={regular}>
                 <legend>Inquiry classification <span className="inquiry-required">*</span></legend>
                 <div className="admin-inquiry-classification-options">
                   {classifications.map(value => (
@@ -794,7 +838,22 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   ))}
                 </div>
               </fieldset>
+              {regular && <p className="inquiry-muted">Normal · Requested response within 24 hours.</p>}
             </div>
+            <section className="admin-inquiry-opm-preview" aria-label="Available Office PMs" aria-live="polite">
+              <h4>Available Office PMs</h4>
+              {!previewType ? <p>Select a project type to see matching Office PMs.</p>
+                : matching?.error ? <div><p>{matching.error}</p><button type="button" className="button" onClick={() => {
+                  setOpmPreview(undefined)
+                  setOpmPreviewVersion(version => version + 1)
+                }}>Retry Office PM match</button></div>
+                : !candidates ? <p>Checking available Office PMs…</p>
+                : !candidates.length ? <p>No eligible Office PM is available. You can save the inquiry and retry matching later.</p>
+                : <ul>{candidates.map((person, index) => <li key={person.id}>
+                  <div><strong>{person.name}</strong><small>{Number(person.experience_years).toLocaleString(undefined, { maximumFractionDigits: 2 })} years of relevant experience</small></div>
+                  {index === 0 && <span className="inquiry-pill ready">Best match · Receives inquiry</span>}
+                </li>)}</ul>}
+            </section>
           </FormSection>
         </fieldset>
         {feedback}
@@ -925,14 +984,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           {rows && <p>{adminCurrent.length} current inquiries · {adminHistory.length} closed inquiries</p>}
         </div>
       </div>
-      <div className="intake-tabs" role="group" aria-label="Inquiry records">
-        <button type="button" aria-pressed={adminInquiryTab === "current"} onClick={() => changeAdminInquiryTab("current")}>Current inquiries ({adminCurrent.length})</button>
+      <div className="intake-tabs inquiry-log-tabs" role="group" aria-label="Inquiry records">
+        <button type="button" aria-pressed={adminInquiryTab === "current" && adminInquiryFilter === "all"} onClick={() => changeAdminInquiryTab("current")}>Current inquiries ({adminCurrent.length})</button>
         <button type="button" aria-pressed={adminInquiryTab === "history"} onClick={() => changeAdminInquiryTab("history")}>Inquiry history ({adminHistory.length})</button>
+        <button type="button" aria-pressed={adminInquiryTab === "current" && adminInquiryFilter === "action"} onClick={() => changeAdminInquiryFilter("action")}>Needs your action ({adminActionCount})</button>
+        <button type="button" aria-pressed={adminInquiryTab === "current" && adminInquiryFilter === "waiting"} onClick={() => changeAdminInquiryFilter("waiting")}>Waiting for others ({adminWaitingCount})</button>
       </div>
-      {adminInquiryTab === "current" && <IntakeTabs value={adminInquiryFilter}
-        counts={{ all: adminCurrent.length, action: adminActionCount, waiting: adminWaitingCount }}
-        onChange={changeAdminInquiryFilter} allLabel="All inquiries"
-        help="Needs your action shows inquiries you can route, retry, or close. Waiting for others shows inquiries awaiting an Office PM, client decision, or project intake." />}
       <div className="inquiry-log-filters">
         <div className="inquiry-list-search">
           <Icon name="search" size={17} />

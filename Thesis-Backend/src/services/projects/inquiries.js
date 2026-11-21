@@ -3,7 +3,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError, HttpError, isUuid } from "../../common/utilities/access.utility.js";
 import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
-import { getOpm, getSpm } from "./recommend.controller.js";
+import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { assessInquiry, earliestInquiryCompletion, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
@@ -12,8 +12,8 @@ export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
 
 function validateInquiryContact(details, previous) {
-  if (details.phone !== previous?.phone && !/^09[0-9]{0,9}$/.test(details.phone))
-    throw new HttpError(422, "Enter a contact number starting with 09 and containing up to 11 digits.");
+  if (details.phone !== previous?.phone && !/^(?:09[0-9]{9}|\+639[0-9]{9})$/.test(details.phone))
+    throw new HttpError(422, "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9.");
   if (details.email !== previous?.email && !/^[^\s@]+@gmail\.com$/i.test(details.email))
     throw new HttpError(422, "Enter a valid @gmail.com email address.");
 }
@@ -157,8 +157,8 @@ function excludedOpmIds(row) {
 async function matchInquiry(db, row, actorId, requestedId) {
   const details = { ...row.details };
   const candidate = await getOpm(details.project_type, excludedOpmIds(row), db);
-  if (requestedId !== undefined && (!candidate || candidate.id !== requestedId))
-    throw new HttpError(409, "Refresh the OPM recommendation before sending.");
+  if (requestedId !== undefined && (candidate?.id ?? null) !== requestedId)
+    throw new HttpError(409, "The Office PM recommendation changed. Review the updated candidates before submitting.", "INQUIRY_RECOMMENDATION_CHANGED");
   recordRoutingEvent(details, candidate
     ? { kind: "offered", opm: candidate.full_name, opm_id: candidate.id }
     : { kind: "no_match" });
@@ -187,12 +187,25 @@ export function mountInquiries(router) {
       LEFT JOIN users u ON u.id=i.opm_id LEFT JOIN projects p ON p.id=i.project_id WHERE $1='admin' OR (i.opm_id=$2 AND i.status NOT IN ('draft','returned'))
       ORDER BY i.updated_at DESC`, [actor.role, actor.id])).rows.map(row => inquiryResponse(row, actor.role === "admin"))));
 
+  router.get("/inquiries/opm-candidates", endpoint(["admin"], async req => {
+    const type = req.query.project_type;
+    if (!inquiryTypes.includes(type)) throw new HttpError(422, "Select a project type.");
+    return (await getOpmCandidates(type)).map(person => ({
+      id: person.id, name: person.full_name, experience_years: person.experience_years,
+    }));
+  }));
+
   router.post("/inquiries", endpoint(["admin"], (req, actor) => withTransaction(async db => {
-    const details = inquiryDetails(req.body);
+    const input = req.body ?? {};
+    const regular = input.immediate_consultation === "no";
+    const details = inquiryDetails(regular ? { ...input, classification: "Normal", consultation: 1440 } : input);
     validateInquiryContact(details);
+    const expected = input.expected_opm_id;
+    if (expected !== undefined && expected !== null && !isUuid(expected))
+      throw new HttpError(422, "Invalid Office PM recommendation.");
     const row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
       [JSON.stringify(details), actor.id])).rows[0];
-    return inquiryResponse(details.immediate_consultation === "yes" ? await matchInquiry(db, row, actor.id) : row, true);
+    return inquiryResponse(details.immediate_consultation ? await matchInquiry(db, row, actor.id, expected) : row, true);
   })));
 
   router.post("/inquiries/:id/match", endpoint(["admin"], (req, actor) => withTransaction(async db => {
