@@ -4,13 +4,13 @@ import { addDays } from "./model"
 import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquirySize, technicalOptions, MIN_INQUIRY_DURATION_DAYS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
 type ReviewEvent = { at: string; version: number; reason: string; changes: Record<string, { before: string | number | null; after: string | number | null }> }
 export type OfficeWorkflow = {
-  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; estimate: { size: string | null; end: string | null } }
+  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; floorMeasurements?: FloorMeasurements; estimate: { size: string | null; end: string | null } }
   review_history?: ReviewEvent[]
   budget?: number
   budget_history?: { at: string; amount: number }[]
@@ -28,11 +28,22 @@ type Props = {
 }
 
 const clientFields = [["client_name", "Client name"], ["phone", "Contact number"], ["email", "Email address"]] as const
-const projectFields = [
+const projectIdentityFields = [
   ["name", "Project name"], ["project_type", "Project type"], ["address", "Project address / location"],
-  ["lot_area", "Lot area (m²)"], ["floor_count", "Number of floors"], ["floor_area_sqm", "Total floor area (m²)"],
 ] as const
+const projectMeasurementFields = [
+  ["lot_area", "Lot area (m²)"], ["floor_count", "Number of floors"],
+] as const
+const projectFields = [...projectIdentityFields, ...projectMeasurementFields, ["floor_area_sqm", "Total floor area (m²)"]] as const
 const projectTypes = ["Residential", "Commercial", "Mixed-Use"]
+const floorPageSize = 12
+function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
+  return {
+    mode: saved?.mode ?? "same",
+    perFloor: saved?.mode === "same" ? String(saved.areaPerFloor) : String(Number(details.floor_area_sqm) / Number(details.floor_count)),
+    areas: saved?.mode === "individual" ? saved.areas.map(String) : [],
+  }
+}
 const additionalFields = [["land_area", "Land area (m²)"], ...clientFields] as const
 const correctionFields = [...projectFields, ...additionalFields]
 const fieldId = (key: string) => `inquiry-review-${key}`
@@ -89,6 +100,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [fieldError, setFieldError] = useState<{ id: string; message: string }>()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(row.details)
+  const [floorArea, setFloorArea] = useState(() => floorAreaDraft(row.details, review?.floorMeasurements))
+  const [floorPage, setFloorPage] = useState(0)
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
   const [end, setEnd] = useState(review?.end ?? "")
   const earliestStart = today()
@@ -101,6 +114,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [note, setNote] = useState("")
   const [proposalAction, setProposalAction] = useState<"revise" | "withdraw">()
   useEffect(() => { heading.current?.focus() }, [])
+  useEffect(() => {
+    if (fieldError && /^inquiry-review-floor-level-/.test(fieldError.id)) document.getElementById(fieldError.id)?.focus()
+  }, [fieldError, floorPage])
   useEffect(() => {
     if (review) {
       setEditing(false)
@@ -142,31 +158,45 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const reviewing = editing || !review
   const compactReview = page === "review" && reviewing
   const floorCount = Number(draft.floor_count)
-  const scheduleEstimate = compactReview && validStart && hasSizeInputs(draft) &&
-    Number.isInteger(floorCount) && floorCount > 0 && floorCount <= 32767
-    ? assessInquiry(draft, start, end, technical, arrangement)
+  const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
+  const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
+    ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
+  const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
+    ? { mode: "same", areaPerFloor: floorArea.perFloor }
+    : { mode: "individual", areas: floorInputs }, floorCount) : null
+  const measuredDraft = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
+  const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
+    ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement)
     : undefined
-  const earliestCompletion = scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
+  const earliestCompletion = validStart && scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
   const selectedCompletion = end || earliestCompletion || ""
   const budgetSaved = !!workflow?.budget && Number(budget) === workflow.budget
   const original = Object.fromEntries(correctionFields.map(([key]) => {
     const firstChange = workflow?.review_history?.find(event => event.changes[key])
     return [key, firstChange ? firstChange.changes[key].before : row.details[key]]
   }))
-  const changedFromAdmin = (key: string) => fieldValue(key, draft[key]) !== fieldValue(key, original[key])
-  const hasCorrections = correctionFields.some(([key]) => fieldValue(key, draft[key]) !== fieldValue(key, row.details[key]))
+  const changedFromAdmin = (key: string) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, original[key])
+  const hasCorrections = correctionFields.some(([key]) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, row.details[key]))
   const needsReason = hasCorrections || (editing && !!review)
-  const size = compactReview && hasSizeInputs(draft) ? inquirySize(draft) : undefined
+  const size = compactReview && hasSizeInputs(measuredDraft) ? inquirySize(measuredDraft) : undefined
   const originalSize = size && hasSizeInputs(original) ? inquirySize(original) : undefined
   function startEditing() {
     setDraft(row.details)
+    setFloorArea(floorAreaDraft(row.details, review?.floorMeasurements))
+    setFloorPage(0)
     if (review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)) setEnd("")
     setFieldError(undefined)
     setEditing(true)
   }
   function updateDraft(key: string, value: string) {
     setDraft(previous => ({ ...previous, [key]: value }))
-    if (["project_type", "lot_area", "floor_area_sqm", "floor_count"].includes(key)) setEnd("")
+    if (key === "floor_count") setFloorPage(0)
+    if (["project_type", "lot_area", "floor_count"].includes(key)) setEnd("")
+  }
+  function updateFloorArea(value: typeof floorArea) {
+    setFloorArea(value)
+    setEnd("")
+    setFieldError(undefined)
   }
   const describedField = (id: string, description?: string) => ({
     id,
@@ -178,9 +208,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const editField = (key: string, label: string) => {
     const numeric = numericField(key)
     const changed = changedFromAdmin(key)
-    const showSize = key === "floor_area_sqm"
     const id = fieldId(key)
-    const helper = changed || showSize ? `${id}-helper` : undefined
+    const helper = changed ? `${id}-helper` : undefined
     return <div key={key} className={changed ? "office-review-field-changed" : undefined}>
       <label htmlFor={id}>{label}</label>{key === "project_type"
       ? <select {...describedField(id, helper)} required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)}>
@@ -191,14 +220,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           onValueChange={value => updateDraft(key, value)} />
       : <input {...describedField(id, helper)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
-          max={key === "floor_count" ? 32767 : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
+          max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
           required={key !== "land_area"} value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
       {helper && <div className="office-review-field-helper" id={helper}>
         {changed && <span>Admin: {amount(original[key] ?? undefined)}{original[key] != null && ["land_area", "lot_area", "floor_area_sqm"].includes(key) ? " m²" : ""}</span>}
-        {showSize && <span className="office-review-size" aria-live="polite">
-          Project size: {originalSize && originalSize !== size ? `${originalSize} → ` : ""}
-          {size ? <strong>{size}</strong> : "Enter valid areas and project type"}
-        </span>}
       </div>}
       {inlineError(id)}
     </div>
@@ -208,6 +233,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     if (busy) return
     if (!reviewing) {
       if (!budgetSaved) save("budget", { amount: budget })
+      return
+    }
+    if (validFloorCount && !calculatedArea) {
+      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0)
+      const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
+      if (floorArea.mode === "individual") setFloorPage(Math.floor(Math.max(0, invalidFloor) / floorPageSize))
+      setFieldError({ id, message: "Enter a positive area for every floor and check that the total is valid." })
+      document.getElementById(id)?.focus()
       return
     }
     const controls = event.currentTarget.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea")
@@ -236,8 +269,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       }
     }
     setFieldError(undefined)
+    if (!calculatedArea) return
     save("review", { start, end: selectedCompletion, technical, arrangement, amount: budget,
-      ...(hasCorrections ? { correction: draft } : {}), ...(needsReason ? { reason } : {}) })
+      floorMeasurements: calculatedArea.measurements,
+      ...(hasCorrections ? { correction: measuredDraft } : {}), ...(needsReason ? { reason } : {}) })
   }
   const recordCards = <div className="office-workflow-grid">
     <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>
@@ -373,7 +408,58 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         if ((event.target as HTMLElement).id === fieldError?.id) setFieldError(undefined)
       }}>
         {reviewing ? <fieldset className="inquiry-card office-review-form" disabled={busy}>
-          <div className="office-workflow-fields">{projectFields.map(([key, label]) => editField(key, label))}</div>
+          <div className="office-workflow-fields">
+            {projectIdentityFields.map(([key, label]) => editField(key, label))}
+          </div>
+          <section className="office-workflow-subsection" aria-labelledby={fieldId("measurements")}>
+            <h3 id={fieldId("measurements")}>Project measurements</h3>
+            <div className="office-workflow-fields">
+              {projectMeasurementFields.map(([key, label]) => editField(key, label))}
+              <label>Floor sizes<select value={floorArea.mode} onChange={event => {
+                const mode = event.target.value === "individual" ? "individual" : "same"
+                updateFloorArea({ ...floorArea, mode, areas: mode === "individual" && !floorArea.areas.length && validFloorCount
+                  ? Array.from({ length: floorCount }, () => floorArea.perFloor) : floorArea.areas })
+                setFloorPage(0)
+              }}><option value="same">All floors have the same area</option><option value="individual">Enter each floor separately</option></select></label>
+            </div>
+            <div className="office-workflow-fields">
+              {floorArea.mode === "same" ? <div>
+                <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²)</label>
+                <input {...describedField(fieldId("area-per-floor"))} required type="number" min="0" step="any" value={floorArea.perFloor}
+                  onChange={event => updateFloorArea({ ...floorArea, perFloor: event.target.value })} />
+                {inlineError(fieldId("area-per-floor"))}
+              </div> : floorInputs.slice(floorPage * floorPageSize, (floorPage + 1) * floorPageSize).map((value, offset) => {
+                const index = floorPage * floorPageSize + offset
+                const id = fieldId(`floor-level-${index + 1}`)
+                return <div key={id}>
+                  <label htmlFor={id}>Floor {index + 1} area (m²)</label>
+                  <input {...describedField(id)} required type="number" min="0" step="any" value={value} onChange={event => {
+                    const areas = [...floorArea.areas]
+                    areas[index] = event.target.value
+                    updateFloorArea({ ...floorArea, areas })
+                  }} />
+                  {inlineError(id)}
+                </div>
+              })}
+            </div>
+            {floorInputs.length > floorPageSize && <div className="office-workflow-actions office-floor-pagination">
+              <button className="button" type="button" disabled={floorPage === 0} onClick={() => setFloorPage(floorPage - 1)}>Previous floors</button>
+              <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
+              <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
+            </div>}
+            <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
+              <div><span>Total floor area</span><strong>{calculatedArea ? `${calculatedArea.total.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m²` : "Enter the floor areas"}</strong>
+                {changedFromAdmin("floor_area_sqm") && <span className="office-review-field-helper" id={`${fieldId("floor_area_sqm")}-helper`}>Admin: {amount(original.floor_area_sqm ?? undefined)} m²</span>}
+              </div>
+              <div><span>Estimated duration</span><strong>{scheduleEstimate?.planningDays != null && Number.isFinite(scheduleEstimate.planningDays)
+                ? `${scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days` : "Pending measurements"}</strong>
+                {scheduleEstimate && <span>{scheduleEstimate.complexity} complexity</span>}
+              </div>
+              <div><span>Project size</span>
+                <div className="office-review-size">{size ? <>{originalSize && originalSize !== size && `${originalSize} → `}<strong>{size}</strong></> : "Pending measurements"}</div>
+              </div>
+            </div>
+          </section>
           <details className="office-review-additional">
             <summary>Client information and land area</summary>
             <div className="office-workflow-fields">{additionalFields.map(([key, label]) => editField(key, label))}</div>

@@ -84,6 +84,11 @@
 .office-review-field-helper { display: flex; gap: 4px 10px; flex-wrap: wrap; align-items: center; margin-top: 5px; color: var(--color-muted); font-size: .82rem; }
 .office-review-size { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
 .office-review-size strong { display: inline-block; padding: 1px 7px; border-radius: 999px; color: #184986; background: #e0edff; }
+.office-floor-estimate { padding: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); }
+.office-floor-estimate > div { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.office-floor-estimate > div > span { font-size: .86rem; color: var(--color-muted); }
+.office-floor-pagination { align-items: center; padding-top: 0; }
+.office-floor-pagination > span { font-size: .86rem; color: var(--color-muted); }
 .office-review-field-error { color: #9b292d; margin-top: 4px; font-size: .85rem; }
 .office-review-additional summary { width: fit-content; cursor: pointer; color: var(--color-primary); font-size: .9rem; font-weight: 600; }
 .office-review-additional[open] > div { margin-top: 10px; }

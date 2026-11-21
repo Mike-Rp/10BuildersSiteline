@@ -7,7 +7,7 @@ import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
-import { assessInquiry, earliestInquiryCompletion, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -31,7 +31,7 @@ export function inquiryDetails(input) {
   for (const key of ["lot_area", "land_area", "floor_area_sqm", "floor_count"]) {
     if (key === "land_area" && (input[key] == null || input[key] === "")) continue;
     const value = Number(input[key]);
-    if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > 32767)))
+    if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > MAX_INQUIRY_FLOORS)))
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
   }
@@ -297,9 +297,14 @@ export function mountInquiries(router) {
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details);
-        const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
+        const corrected = { ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
-        }) : before;
+        };
+        const areas = input.floorMeasurements === undefined ? undefined :
+          normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count));
+        if (areas === null) throw new HttpError(422, "Enter a positive area for every floor.");
+        if (areas) corrected.floor_area_sqm = areas.total;
+        const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
         const suggestion = assessInquiry(after, input.start, input.end, technical, arrangement);
         validateInquiryCompletion(input.start, input.end, suggestion);
@@ -311,12 +316,16 @@ export function mountInquiries(router) {
           if (previous !== schedule[key]) changes[key] = { before: previous ?? null, after: schedule[key] };
         }
         const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-        if ((input.correction || (workflow.review && Object.keys(changes).length)) && (!reason || reason.length > 1000))
+        if ((input.correction || changes.floor_area_sqm || (workflow.review && Object.keys(changes).length)) && (!reason || reason.length > 1000))
           throw new HttpError(422, "Enter a modification reason of up to 1,000 characters.");
         for (const key of Object.keys(before)) delete details[key];
         Object.assign(details, after);
         const version = (workflow.review?.version ?? 0) + 1;
-        workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd } };
+        // Old callers can still save a total. Clear an old breakdown if it no longer matches those measurements.
+        const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
+          after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
+        workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
+          ...(floorMeasurements ? { floorMeasurements } : {}) };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
         if (input.amount !== undefined) recordInquiryBudget(workflow, input.amount, audit);
