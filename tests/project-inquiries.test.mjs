@@ -104,7 +104,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const offered = (await call(root,{token:firstToken})).find(item=>item.id===cancelled.id)
   assert.equal(offered.details.classification,"Priority")
   assert.equal(offered.routing_history,undefined)
-  assert.equal(offered.match.project_type,"Mixed-Use")
+  assert.equal(offered.match,undefined)
+  assert.equal(offered.details.opm_match,undefined)
   assert.equal((await decision(cancelled,firstToken,"cancel")).status,"returned")
   const retried = (await call(root,{token:admin})).find(item=>item.id===cancelled.id)
   assert.deepEqual(retried.routing_history.slice(0,2).map(event=>event.kind),["offered","declined"])
@@ -134,25 +135,28 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(revised.status,"consulting")
   await decision(row,token,"approve")
   const planning = `${root}/${row.id}/planning`
-  const intake = {...details,floor_area_sqm:200,target_start_date:"2027-01-12",target_end_date:"2027-04-12"}
+  const intake = {...details,floor_area_sqm:200,target_start_date:"2027-01-12",target_end_date:"2027-08-15"}
   await call(planning,{token,status:409,json:intake})
   await save("budget",0,{amount:4500000},409)
   const schedule = {start:intake.target_start_date,end:intake.target_end_date}
   const assessmentInput = {technical:"Several specialized systems",arrangement:"Partially overlapping phases"}
   await save("review",0,{...schedule,end:"2027-02-25",...assessmentInput},422)
-  const initialReview = (await save("review",0,{...schedule,end:"2027-02-26",...assessmentInput})).workflow.review
+  await save("review",0,{...schedule,end:"2027-07-30",...assessmentInput},422)
+  await save("review",0,{...schedule,end:"2027-07-31",amount:4500000.001,...assessmentInput},422)
+  const initialReview = (await save("review",0,{...schedule,end:"2027-07-31",...assessmentInput})).workflow.review
   assert.equal(initialReview.technical,assessmentInput.technical)
   assert.equal(initialReview.arrangement,assessmentInput.arrangement)
-  assert.equal(initialReview.end,"2027-02-26")
-  assert.ok(initialReview.estimate.end > schedule.end)
+  assert.equal(initialReview.end,"2027-07-31")
+  assert.equal(initialReview.estimate.end,initialReview.end)
   await save("assessment",1,assessmentInput,409)
   await save("budget",1,{amount:4500000.001},422)
   await save("budget",1,{amount:4500000})
   const firstAssessment = (await save("assessment",1,assessmentInput)).workflow.assessment
   const correction = {...schedule,correction:{floor_area_sqm:200}}
   await save("review",1,correction,422)
-  const review = (await save("review",1,{...correction,reason:"Client confirmed the revised floor area."})).workflow
+  const review = (await save("review",1,{...correction,amount:4500000,reason:"Client confirmed the revised floor area."})).workflow
   assert.equal(review.assessment,undefined)
+  assert.equal(review.budget,4500000)
   assert.deepEqual(review.review_history.at(-1).changes.floor_area_sqm,{before:180,after:200})
   await save("assessment",1,assessmentInput,409)
   await call(planning,{token,status:409,json:{...intake,estimated_budget:4500000,assessment_id:firstAssessment.id}})
@@ -162,7 +166,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(planning,{token,status:409,json:{...intake,estimated_budget:updatedBudget,assessment_id:beforeBudgetChange.id}})
   const assessed = (await save("assessment",2,assessmentInput)).workflow
   assert.notEqual(assessed.assessment.id,beforeBudgetChange.id)
-  assert.equal(assessed.assessment.durationDays,90)
+  assert.equal(assessed.assessment.durationDays,215)
   assert.equal(assessed.assessment.size,"Medium")
   assert.equal(assessed.assessment.score,8)
   assert.equal(assessed.assessment.planningDays,215)

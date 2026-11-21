@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { api } from "./api/client"
+import { createPortal } from "react-dom"
+import { api, downloadBlob } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
 import type { Project } from "./model"
@@ -9,6 +10,7 @@ import { withPage } from "./listing"
 import { IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
+import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import "./project-inquiries.css"
@@ -170,6 +172,57 @@ function requiredAreas(entry?: Phase) {
     ...(entry?.missing_specializations || []),
     ...(entry?.engineers || []).flatMap(person => person.assigned_disciplines),
   ])].sort()
+}
+
+function staffingIssue(entry: Phase | undefined, required: string[], choices: Candidate[], blocker?: CandidateBlocker) {
+  const assigned = entry?.user_id ? entry.engineers ?? [entry] : []
+  if (!assigned.length) {
+    if (choices.length) return "Assign an eligible Site PM."
+    if (blocker === "schedule") return "Matching engineers have schedule conflicts."
+    if (blocker === "commitments" || blocker === "availability") return "Matching engineers are already committed."
+    if (blocker === "phase_disciplines") return "No specialization requirements are configured for this phase."
+    return required.length ? `No available engineer has a verified match for ${required.join(", ")}.` : "No eligible engineer is available."
+  }
+  if (assigned.some(person => !matchingInquiryTags(
+    person.assigned_disciplines, choices.find(candidate => candidate.id === person.user_id)?.qualifiedTags ?? [],
+  ).length)) return "Review the lineup. An assigned engineer is unavailable or has no verified scope selected."
+  if (!entry?.engineers) return ""
+  const covered = new Set(assigned.flatMap(person => person.assigned_disciplines ?? []))
+  const missing = required.filter(area => !covered.has(area))
+  const needed = phaseCoverageQuota(required) - (required.length - missing.length)
+  if (needed <= 0) return ""
+  const noMatch = missing.filter(area => !choices.some(candidate => candidate.qualifiedTags.includes(area)))
+  return `Cover ${needed} more ${needed === 1 ? "scope" : "scopes"}. ${noMatch.length
+    ? `No available verified match for ${noMatch.join(", ")}.`
+    : `Unassigned: ${missing.join(", ")}.`}`
+}
+
+function ContractPreview({ file, fileId, onClose }: { file?: File; fileId?: string; onClose: () => void }) {
+  const [preview, setPreview] = useState<{ url: string; mime: string }>()
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    let url = ""
+    const localMime = /\.pdf$/i.test(file?.name ?? "") ? "application/pdf"
+      : /\.png$/i.test(file?.name ?? "") ? "image/png" : /\.jpe?g$/i.test(file?.name ?? "") ? "image/jpeg" : ""
+    const content = file ? Promise.resolve(file.slice(0, file.size, localMime))
+      : fileId ? downloadBlob(`/files/${encodeURIComponent(fileId)}/content`) : Promise.resolve(undefined)
+    void content.then(blob => {
+      if (cancelled) return
+      if (!blob || !["application/pdf", "image/png", "image/jpeg"].includes(blob.type)) { setFailed(true); return }
+      url = URL.createObjectURL(blob)
+      setPreview({ url, mime: blob.type })
+    }).catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
+  }, [file, fileId])
+  return <Modal title="Signed contract preview" subtitle={file?.name} wide onClose={onClose}>
+    {preview ? preview.mime === "application/pdf"
+      ? <object className="pdf-preview large" data={`${preview.url}#toolbar=0&navpanes=0`} type="application/pdf" aria-label="Signed contract PDF">
+          <p>This browser cannot display the PDF preview.</p>
+        </object>
+      : <img className="inquiry-contract-image" src={preview.url} alt="Signed client contract" />
+      : <p role="status">{failed ? "The signed contract preview is unavailable." : "Loading signed contract…"}</p>}
+  </Modal>
 }
 
 function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: Phase[]; candidates: Record<string, Candidate[]> }) {
@@ -346,12 +399,16 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
   </section>
 }
 
-export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments, embedded = false, onInquiryCountChange }: {
+export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments, embedded = false, onInquiryCountChange, bannerTarget, onShowInquiries }: {
   role: "admin" | "opm"; onReload: () => unknown; projects?: Project[]
   onOpenDocuments?: (project: Project) => void; onOpenAssignments?: (project: Project) => void
   embedded?: boolean; onInquiryCountChange?: (count: number | undefined) => void
+  bannerTarget?: HTMLElement | null; onShowInquiries?: () => void
 }) {
   const [rows, setRows] = useState<Inquiry[]>()
+  const activeAction = useRef(false)
+  const actionVersion = useRef(0)
+  const lastReadAt = useRef(0)
   const inquiryCount = rows?.length
   useEffect(() => {
     onInquiryCountChange?.(inquiryCount)
@@ -379,7 +436,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
   const [contract, setContract] = useState<File>()
-  const [contractPreview, setContractPreview] = useState("")
+  const contractInput = useRef<HTMLInputElement>(null)
+  const [contractPreviewOpen, setContractPreviewOpen] = useState(false)
   const [contractFileId, setContractFileId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -397,36 +455,58 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setPlanning(undefined)
     setTeam([])
   }
-  const refresh = async () => setRows(await api<Inquiry[]>(root))
+  const refresh = async () => {
+    setRows(await api<Inquiry[]>(root))
+    lastReadAt.current = Date.now()
+  }
   useEffect(() => {
     if (adminPage !== "list") recordHeading.current?.focus()
   }, [adminPage])
-  useEffect(() => {
-    const mime = /.(pdf)$/i.test(contract?.name || "") ? "application/pdf"
-      : /.png$/i.test(contract?.name || "") ? "image/png"
-        : /.jpe?g$/i.test(contract?.name || "") ? "image/jpeg" : ""
-    if (!contract || !mime) {
-      setContractPreview("")
-      return
-    }
-    const url = URL.createObjectURL(contract.slice(0, contract.size, mime))
-    setContractPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [contract])
   useEffect(() => {
     if (dialog === "intake") stepperRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
   }, [dialog, step])
   useEffect(() => {
     let mounted = true
-    void api<Inquiry[]>(root).then(data => { if (mounted) setRows(data) }, e => { if (mounted) setError(String(e.message)) })
-    return () => { mounted = false }
-  }, [])
+    let loading = false
+    async function load(initial = false) {
+      if (loading || activeAction.current) return
+      loading = true
+      const version = actionVersion.current
+      try {
+        const data = await api<Inquiry[]>(root)
+        if (mounted && version === actionVersion.current) {
+          setRows(data)
+          lastReadAt.current = Date.now()
+        }
+      } catch (e) {
+        if (initial && mounted && version === actionVersion.current) setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        loading = false
+      }
+    }
+    void load(true)
+    if (role !== "opm") return () => { mounted = false }
+    const stop = startPolling(load)
+    const onFocus = () => {
+      if (document.visibilityState !== "hidden" && isStale(lastReadAt.current)) void load()
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onFocus)
+    return () => {
+      mounted = false
+      stop()
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onFocus)
+    }
+  }, [role])
   async function run(action: () => Promise<unknown>) {
+    activeAction.current = true
+    actionVersion.current++
     setBusy(true)
     setError("")
     try { await action() }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    finally { setBusy(false) }
+    finally { activeAction.current = false; setBusy(false) }
   }
   function open(item?: Inquiry) {
     setSelected(item?.id || "")
@@ -443,6 +523,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   function closeDialog() {
     if (busy) return
+    setContractPreviewOpen(false)
     setDialog(undefined)
     setError("")
   }
@@ -524,25 +605,41 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     void onReload()
   }
   const canAllocate = !!(contract || contractFileId) && !!row?.workflow?.assessment && phases.length > 0
-  const canSend = canAllocate && phases.every(stage => {
-    const entry = team.find(item => item.stage === stage)
-    if (!entry?.user_id) return false
-    const choices = planning?.candidates?.[stage] ?? []
-    const assigned = entry.engineers ?? [entry]
-    if (assigned.some(person => !matchingInquiryTags(
-      person.assigned_disciplines, choices.find(candidate => candidate.id === person.user_id)?.qualifiedTags ?? [],
-    ).length)) return false
-    if (!entry.engineers) return true
-    const required = requiredAreas(planning?.team?.find(item => item.stage === stage))
-    const covered = new Set(entry.engineers.flatMap(person => person.assigned_disciplines))
-    return entry.engineers.every(person => person.assigned_disciplines.length) &&
-      required.filter(area => covered.has(area)).length >= phaseCoverageQuota(required)
-  })
+  const staffingIssues = step === 3 ? phases.flatMap(stage => {
+    const reason = staffingIssue(team.find(item => item.stage === stage),
+      requiredAreas(planning?.team?.find(item => item.stage === stage)),
+      planning?.candidates?.[stage] ?? [], planning?.candidateBlockers?.[stage])
+    return reason ? [{ stage, reason }] : []
+  }) : []
+  const firstStaffingIssue = staffingIssues[0]
+  const canSend = canAllocate && !staffingIssues.length
   const feedback = <>
     {busy && <p role="status">Saving or loading inquiry…</p>}
     {error && <p role="alert">{error}</p>}
   </>
   const admin = role === "admin"
+  const pendingInquiries = admin ? [] : (rows ?? []).filter(item => item.status === "offered")
+  const newestInquiry = pendingInquiries[0]
+  const pendingBanner = newestInquiry && !officePage && <section className="opm-new-inquiries" aria-labelledby="opm-new-inquiries-title">
+    <span className="inquiry-list-icon" aria-hidden="true"><Icon name="bell" /></span>
+    <div className="opm-new-inquiries-copy">
+      <h2 id="opm-new-inquiries-title" aria-live="polite">{pendingInquiries.length === 1 ? "New project inquiry" : `${pendingInquiries.length} new project inquiries`}</h2>
+      <p>{newestInquiry.details.name || "Untitled project"} · Awaiting your response</p>
+    </div>
+    <div className="opm-new-inquiries-actions">
+      {pendingInquiries.length > 1 && <button type="button" className="button" disabled={busy} onClick={() => {
+        setSearch("")
+        setQueueView("action")
+        setQueueStatus(statuses.offered)
+        setQueueType("")
+        onShowInquiries?.()
+      }}>View all new inquiries</button>}
+      <button type="button" className="button primary" disabled={busy} onClick={() => {
+        onShowInquiries?.()
+        openOfficeInquiry(newestInquiry)
+      }}>{pendingInquiries.length === 1 ? "Review inquiry" : "Review newest inquiry"}</button>
+    </div>
+  </section>
   const query = search.trim().toLowerCase()
   const projectsById = new Map(projects.map(project => [project.id, project]))
   const setupByInquiry = new Map((rows ?? []).flatMap(item => {
@@ -560,7 +657,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const officeBucket = (item: Inquiry) => setupByInquiry.get(item.id)?.bucket ?? officeAction(item.status)?.bucket
   const matchesSearch = (item: Inquiry) => !query ||
     [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : officeStatus(item),
-      admin ? inquiryReference(item) : ""]
+      inquiryReference(item)]
       .some(value => String(value ?? "").toLowerCase().includes(query))
   const visibleRows = rows?.filter(matchesSearch)
   const adminHistory = (rows ?? []).filter(item => ["converted", "dropped"].includes(item.status))
@@ -748,10 +845,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </section>
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
+    {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
     {officePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${officePage}`} row={row} page={officePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
-          pendingCount={rows?.filter(item => item.status === "offered").length ?? 0}
+          pendingCount={pendingInquiries.length}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           decide={(action, input) => void run(() => decision(action, input))}
           save={(action, input) => void run(() => saveWorkflow(action, input))} />
@@ -766,6 +864,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       })}>Refresh</button>
       {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
     </header>
+    {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
       <div className="confirmation-intake-filters">
         <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
@@ -918,7 +1017,15 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         if (planning?.candidates) setStep(3)
         else void run(allocate)
       }}>Continue to staffing</button>}
-      {step === 3 && <button className="button primary inquiry-send-offers" disabled={busy || !canSend} onClick={() => void run(submit)}>Send assignment offers</button>}
+      {step === 3 && <>
+        {firstStaffingIssue && <p id="inquiry-offer-blocker" className="inquiry-offer-blocker" role="status">
+          <strong>{firstStaffingIssue.stage}</strong> · {firstStaffingIssue.reason}
+          {staffingIssues.length > 1 && ` ${staffingIssues.length - 1} more ${staffingIssues.length === 2 ? "phase needs" : "phases need"} review.`}
+        </p>}
+        <button className="button primary inquiry-send-offers" disabled={busy || !canSend}
+          aria-describedby={firstStaffingIssue ? "inquiry-offer-blocker" : undefined}
+          onClick={() => void run(submit)}>Send assignment offers</button>
+      </>}
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
         <ol ref={stepperRef} className="inquiry-stepper" aria-label="Project intake steps">
@@ -960,17 +1067,21 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               </label>)}
             </div>
             <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement.">
-              <label>Signed Client Contract Agreement<input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={event => {
-                setContract(event.target.files?.[0])
+              <input ref={contractInput} type="file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                setContract(file)
                 setContractFileId(undefined)
                 setPlanning({ ...planning, candidates: undefined })
                 setTeam([])
-              }} /></label>
-              {!contract && contractFileId && <p>Signed client contract agreement attached.</p>}
-              {contract && <div className="inquiry-sent-notice inquiry-contract-preview">
+              }} />
+              <button type="button" className="button primary" onClick={() => contractInput.current?.click()}>
+                <Icon name="upload" size={17} />{contract || contractFileId ? "Replace signed contract" : "Upload signed contract"}
+              </button>
+              {(contract || contractFileId) && <div className="inquiry-sent-notice inquiry-contract-preview">
                 <span className="inquiry-list-icon"><Icon name="doc" /></span>
-                <div><strong>{contract.name}</strong><small>Contract attached</small></div>
-                {contractPreview && <a className="button" href={contractPreview} target="_blank" rel="noopener noreferrer">View contract</a>}
+                <div><strong>{contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract attached</small></div>
+                <button type="button" className="button" onClick={() => setContractPreviewOpen(true)}>View contract</button>
               </div>}
             </FormSection>
             {!canAllocate && <p className="inquiry-muted">Attach the signed contract and select at least one phase to continue.</p>}
@@ -990,11 +1101,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             choices={planning.candidates[staffingPhase] || []} blocked={planning.blockedCandidates?.[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
-          {!canSend && <p className="inquiry-muted">Fill every selected phase and meet its minimum coverage before sending assignment offers.</p>}
+          {staffingIssues.length > 1 && <details className="inquiry-summary-card inquiry-blocked-engineers">
+            <summary>Phases that need staffing review ({staffingIssues.length})</summary>
+            <ul>{staffingIssues.map(({ stage, reason }) => <li key={stage}>
+              <button type="button" className="button" onClick={() => { setStaffingPhase(stage); setAddingEngineer(false) }}>{stage}</button>
+              <small>{reason}</small>
+            </li>)}</ul>
+          </details>}
         </fieldset>}
         {feedback}
       </div>
     </Modal>}
+    {dialog === "intake" && contractPreviewOpen && <ContractPreview file={contract} fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
     {admin && adminPage === "new" && renderAdminInquiryForm()}
     {!dialog && !officePage && adminPage !== "new" && feedback}
   </section>

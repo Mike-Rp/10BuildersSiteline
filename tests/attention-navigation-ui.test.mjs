@@ -89,6 +89,25 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     await act(()=>cardButton("Upload required documents").click())
     assert.equal(w.location.pathname,"/opm/documents")
     assert.match(document.querySelector("main").textContent,/Required documents/)
+
+    const inquiry = { id: "a9bd9cc9-c4ad-4000-8000-000000000000", created_at: "2026-11-20T03:00:00Z",
+      status: "offered", details: { name: "Maple Residence", project_type: "Residential", consultation: 30 },
+      match: { project_type: "Residential", experience_years: 7 } }
+    const fetch = globalThis.fetch
+    previous.set("fetch", Object.getOwnPropertyDescriptor(globalThis, "fetch"))
+    globalThis.fetch = (url, options) => String(url).endsWith("/projects/inquiries")
+      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }] }))
+      : fetch(url, options)
+    await render(office,"/opm/project-intake")
+    const newInquiryBanner = document.querySelector(".opm-new-inquiries")
+    assert.ok(newInquiryBanner, "New inquiries are visible on the default intake tab")
+    assert.match(newInquiryBanner.textContent,/New project inquiry.*Maple Residence/)
+    assert.equal(document.querySelector('#project-intake-tab-mine').getAttribute("aria-selected"),"true")
+    await act(()=>newInquiryBanner.querySelector("button").click())
+    const pendingInquiry = document.querySelector(".office-workflow")
+    assert.match(pendingInquiry.textContent,/Pending inquiry/)
+    assert.match(pendingInquiry.textContent,/Inquiry reference 10BL-2026-A9BD9CC9C4AD/)
+    assert.doesNotMatch(pendingInquiry.textContent,/Why this match|Relevant experience|Matched project type/)
   } finally {
     await act(()=>root.unmount()); await server.close(); dom.window.close()
     for (const [key,descriptor] of previous) descriptor ? Object.defineProperty(globalThis,key,descriptor) : delete globalThis[key]

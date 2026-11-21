@@ -319,6 +319,7 @@ export default function RoleWorkspace({
     () => routePage === "Project inquiries" ? "inquiries" : "mine",
   )
   const [inquiryCount, setInquiryCount] = useState<number>()
+  const [inquiryBannerTarget, setInquiryBannerTarget] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
     if (legacyIntakeRoute) setConfirmTab(routePage === "Project inquiries" ? "inquiries" : "mine")
   }, [legacyIntakeRoute, routePage])
@@ -3903,6 +3904,7 @@ export default function RoleWorkspace({
         return (
           <>
             {header("Project intake")}
+            <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
             <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Project intake views">
               {([
                 ["inquiries", "Project inquiries", inquiryCount, "plus"],
@@ -3926,6 +3928,7 @@ export default function RoleWorkspace({
             <div role="tabpanel" id="project-intake-panel-inquiries" aria-labelledby="project-intake-tab-inquiries" hidden={confirmTab !== "inquiries"}>
               <ProjectInquiries key={actor.id} role="opm" embedded onReload={onReload}
                 projects={projects} onOpenDocuments={openDocuments} onInquiryCountChange={setInquiryCount}
+                bannerTarget={inquiryBannerTarget} onShowInquiries={() => setConfirmTab("inquiries")}
                 onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
             </div>
             <div role="tabpanel" id="project-intake-panel-responses" aria-labelledby="project-intake-tab-responses" hidden={confirmTab !== "responses"}>

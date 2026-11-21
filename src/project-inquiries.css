@@ -3,6 +3,12 @@
 .inquiries-page-heading > div { flex: 1; min-width: min(100%, 230px); }
 .project-inquiries.opm-inquiries { max-width: 1320px; gap: 22px; }
 .opm-inquiry-queue { display: grid; gap: 14px; min-width: 0; }
+.opm-new-inquiries { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; border: 1px solid #bfd5eb; border-inline-start: 4px solid #2a648f; border-radius: 12px; background: #e7f3ff; color: #173a58; }
+.opm-inquiry-banner-slot:not(:empty) { margin-bottom: 16px; }
+.opm-new-inquiries-copy { flex: 1 1 185px; min-width: 0; overflow-wrap: anywhere; }
+.opm-new-inquiries-copy h2 { font-size: 1.2rem; margin: 0 0 4px; }
+.opm-new-inquiries-copy p { margin: 0; }
+.opm-new-inquiries-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .opm-inquiry-filters { display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); align-items: end; width: min(100%, 760px); gap: 12px; }
 .opm-inquiry-filters .inquiry-list-search { width: 100%; }
 .opm-inquiry-filters label { color: var(--color-muted); }
@@ -31,7 +37,8 @@
 .office-workflow-heading p, .office-workflow-card p { color: var(--color-muted); }
 .office-workflow-heading .inquiry-muted { font-size: .85rem; }
 .office-workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.office-workflow-grid.assessment { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.office-workflow-grid.assessment { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.office-workflow-grid.assessment > .office-workflow-card { align-content: start; }
 .office-workflow-card { display: grid; gap: 14px; padding: clamp(14px, 2vw, 24px); border-color: var(--color-line); box-shadow: 0 2px 6px #172b4d09; }
 .office-workflow-card .inquiry-section-heading { padding-bottom: 10px; border-bottom: 1px solid var(--color-line); }
 .office-workflow-card h2 { font-size: 1.14rem; }
@@ -42,6 +49,8 @@
 .office-workflow-facts dd { font-size: .92rem; }
 .office-workflow-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .office-workflow-form { display: grid; gap: 14px; min-width: 0; }
+.office-workflow-subsection { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--color-line); }
+.office-workflow-subsection h3 { font-size: 1rem; }
 .office-workflow-form label { font-size: .9rem; font-weight: 600; }
 .office-workflow-form :is(input, select, textarea) { min-height: 40px; font-weight: 400; }
 .office-workflow-form textarea { min-height: 80px; }
@@ -294,7 +303,6 @@
 .inquiry-accepted-notice > .button, .inquiry-opm-review .inquiry-sent-notice time, .inquiry-contract-preview > a { margin-inline-start: auto; }
 .inquiry-opm-review time, .inquiry-intake-progress { color: var(--color-muted); font-size: .85rem; }
 .inquiry-intake-progress { align-self: center; margin-inline-end: auto; }
-#root .inquiry-decline { color: #9b292d; border-color: #e1b9ba; }
 :is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-form-section:has(.inquiry-section-heading) { padding: 16px; box-shadow: none; overflow: visible; }
 :is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-section-heading h3 { padding: 0; background: transparent; }
 :is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-form-section:has(.inquiry-section-heading) > div { padding: 0; }
@@ -336,6 +344,8 @@
 .inquiry-blocked-engineers ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .inquiry-blocked-engineers li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; }
 .inquiry-blocked-engineers li small { flex-basis: 100%; }
+.inquiry-offer-blocker { flex: 1 0 100%; padding: 10px 12px; border-radius: 8px; background: #fff3df; color: #694419; overflow-wrap: anywhere; }
+.inquiry-contract-image { display: block; max-width: 100%; max-height: 65vh; margin-inline: auto; object-fit: contain; }
 .inquiry-phase-coverage li.covered { background: #e5f3eb; color: #215941; }
 
 .inquiry-stepper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); list-style: none; }

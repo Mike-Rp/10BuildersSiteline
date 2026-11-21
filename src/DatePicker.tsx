@@ -36,7 +36,7 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
     const candidate = dateParts(value) ? value : dateParts(start) ? start : localToday()
     const anchor = highlightMin && (!dateParts(value) || value < min || value > max)
       ? dateParts(min)!
-      : dateParts(value) || dateParts(start) || dateParts(candidate < min ? min : candidate > max ? max : candidate)!
+      : dateParts(candidate < min ? min : candidate > max ? max : candidate)!
     setView({ year: anchor.getFullYear(), month: anchor.getMonth() })
   }
   const anchorYear = view?.year || Number(localToday().slice(0, 4))
@@ -46,6 +46,12 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
   const offset = view ? calendarDate(view.year, view.month, 1).getDay() : 0
   const days = view ? calendarDate(view.year, view.month + 1, 0).getDate() : 0
   const monthKey = view ? isoDate(view.year, view.month, 1).slice(0, 7) : ""
+  const minMonth = min.slice(0, 7)
+  const maxMonth = max.slice(0, 7)
+  function selectableMonth(year: number, month: number) {
+    const key = isoDate(year, month, 1).slice(0, 7)
+    return key >= minMonth && key <= maxMonth
+  }
   function moveMonth(direction: number) {
     if (!view) return
     const next = calendarDate(view.year, view.month + direction, 1)
@@ -70,10 +76,14 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
         </div>
         <div className="completion-calendar-selectors">
           <label>Month<select value={view.month} onChange={event => setView({ ...view, month: Number(event.target.value) })}>
-            {months.map((month, index) => <option key={month} value={index}>{month}</option>)}
+            {months.map((month, index) => <option key={month} value={index} disabled={!selectableMonth(view.year, index)}>{month}</option>)}
           </select></label>
-          <label>Year<select value={view.year} onChange={event => setView({ ...view, year: Number(event.target.value) })}>
-            {years.map(year => <option key={year} value={year}>{year}</option>)}
+          <label>Year<select value={view.year} onChange={event => {
+            const year = Number(event.target.value)
+            const allowed = months.flatMap((_, index) => selectableMonth(year, index) ? [index] : [])
+            if (allowed.length) setView({ year, month: Math.min(Math.max(view.month, allowed[0]), allowed[allowed.length - 1]) })
+          }}>
+            {years.map(year => <option key={year} value={year} disabled={!months.some((_, index) => selectableMonth(year, index))}>{year}</option>)}
           </select></label>
         </div>
         <div className="completion-calendar-days" role="group" aria-label={`${months[view.month]} ${view.year} dates`}>

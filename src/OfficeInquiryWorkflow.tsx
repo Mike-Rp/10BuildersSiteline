@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Icon } from "./ui"
 import { addDays } from "./model"
 import DatePicker from "./DatePicker"
-import { arrangementOptions, assessInquiry, technicalOptions, MIN_INQUIRY_DURATION_DAYS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, technicalOptions, MIN_INQUIRY_DURATION_DAYS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -17,7 +17,6 @@ export type OfficeWorkflow = {
 }
 export type OfficeRecord = {
   details: Details; workflow?: OfficeWorkflow; status: string; opm_name?: string;
-  match?: { experience_years?: number; project_type: string };
 }
 type Props = {
   row: OfficeRecord; page: OfficePage; reference: string; consultation: string; busy: boolean; error: string; pendingCount: number;
@@ -73,15 +72,12 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const review = workflow?.review
   const assessment = workflow?.assessment
   const heading = useRef<HTMLHeadingElement>(null)
-  const budgetField = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(row.details)
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
   const [end, setEnd] = useState(review?.end ?? "")
   const earliestStart = today()
-  const earliestCompletion = start >= earliestStart && start <= latestInquiryStart
-    ? addDays(start, MIN_INQUIRY_DURATION_DAYS)
-    : undefined
+  const validStart = /^\d{4}-\d{2}-\d{2}$/.test(start) && start >= earliestStart && start <= latestInquiryStart
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
   const [technical, setTechnical] = useState(assessment?.technical ?? review?.technical ?? technicalOptions[0])
@@ -109,7 +105,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     proposal: "Client proposal", review: "Review and edit project information", assessment: "Assess project size, complexity, and duration",
   }[page]
   const descriptions = {
-    pending: "Review the system recommendation. Rejected inquiries advance to the next eligible Office PM.",
+    pending: "Review the consultation request and choose whether to accept the inquiry.",
     received: `${name} is now in your accepted inquiries.`,
     accepted: "Review the client and project information submitted with this inquiry.",
     proposal: "Record the outcome of the proposal discussed with the client.",
@@ -125,8 +121,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Classification", row.details.classification || "Normal"],
   ]
   const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
+  const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
+  const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
   const scheduleDetails = editing ? draft : row.details
-  const scheduleEstimate = page === "review" && (editing || !review) && earliestCompletion &&
+  const scheduleEstimate = page === "review" && (editing || !review) && validStart &&
     ["Residential", "Commercial", "Mixed-Use"].includes(String(scheduleDetails.project_type)) &&
     ["lot_area", "floor_area_sqm", "floor_count"].every(key => {
       const value = Number(scheduleDetails[key])
@@ -134,15 +132,28 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     })
     ? assessInquiry(scheduleDetails, start, end, technical, arrangement)
     : undefined
+  const earliestCompletion = scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
+  const selectedCompletion = end || earliestCompletion || ""
+  const reviewing = editing || !review
+  const budgetSaved = !!workflow?.budget && Number(budget) === workflow.budget
+  function startEditing() {
+    setDraft(row.details)
+    if (review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)) setEnd("")
+    setEditing(true)
+  }
+  function updateDraft(key: string, value: string) {
+    setDraft({ ...draft, [key]: value })
+    if (["project_type", "lot_area", "floor_area_sqm", "floor_count"].includes(key)) setEnd("")
+  }
   const editField = (key: string, label: string) => {
     const numeric = /^(land_area|lot_area|floor_area_sqm|floor_count)$/.test(key)
     return <label key={key}>{label}{key === "project_type"
-      ? <select required value={draft[key]} onChange={event => setDraft({ ...draft, [key]: event.target.value })}>
+      ? <select required value={draft[key]} onChange={event => updateDraft(key, event.target.value)}>
         {["Residential", "Commercial", "Mixed-Use"].map(type => <option key={type}>{type}</option>)}
       </select>
       : <input type={numeric ? "number" : key === "email" ? "email" : key === "phone" ? "tel" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0.01 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
-          required={key !== "land_area"} value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: event.target.value })} />}
+          required={key !== "land_area"} value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
     </label>
   }
   const recordCards = <div className="office-workflow-grid">
@@ -161,30 +172,29 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>{label}</button>)}
     </nav>}
     <header className="office-workflow-heading">
-      <div><p className="inquiry-muted">{reference} · Office PM</p><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{descriptions[page]}</p></div>
+      <div><p className="inquiry-muted">Inquiry reference {reference}</p><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{descriptions[page]}</p></div>
       {page === "accepted" && <button type="button" className="button primary" onClick={() => navigate(accepted ? "review" : "proposal")}>
         {accepted ? "Review project information" : "Open proposal"}
       </button>}
-      {page === "review" && !editing && <button type="button" className="button" disabled={busy} onClick={() => {
-        setDraft(row.details)
-        setEditing(true)
-      }}>Edit project information</button>}
+      {page === "review" && !editing && <button type="button" className="button" disabled={busy} onClick={startEditing}>Edit project information</button>}
+      {page === "assessment" && preview && <div className="office-workflow-actions">
+        {assessment
+          ? <button type="button" className="button primary" disabled={busy} onClick={startStaffing}>Continue to construction phases</button>
+          : <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
+              onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
+      </div>}
     </header>
     {error && <p className="office-workflow-error" role="alert">{error}</p>}
     {busy && <p role="status">Saving or loading inquiry…</p>}
 
     {page === "pending" && <div className="office-workflow-grid">
-      <Card title="Recommended Office Project Manager" icon="users">
-        <h3>{row.opm_name || "Your Office PM account"}</h3>
+      <Card title="Consultation request" icon="users">
         <Facts values={[
-          ["Matched project type", row.match?.project_type || row.details.project_type],
-          ...(row.match?.experience_years != null ? [["Relevant experience", `${row.match.experience_years} years`] as [string, string]] : []),
           ["Inquiry urgency", row.details.classification || "Normal"],
           ["Preferred consultation timing", consultation],
         ]} />
-        {row.match && <Notice><strong>Why this match?</strong><p>The system matched the project type and ranked eligible, available Office PMs by relevant experience.</p></Notice>}
         <div className="office-workflow-actions">
-          <button type="button" className="button inquiry-decline" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>
+          <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>
           <button type="button" className="button primary" disabled={busy} onClick={() => decide("confirm")}>Accept inquiry</button>
         </div>
       </Card>
@@ -207,7 +217,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       {recordCards}
     </>}
 
-    {(page === "proposal" || page === "review") && <div className="office-workflow-grid">
+    {page === "proposal" && <>
       <Card title="Client proposal" icon="doc">
         <span className={`inquiry-pill ${accepted ? "ready" : "pending"}`}>{accepted ? "Approved" : "Pending client approval"}</span>
         <h3>{name}</h3>
@@ -237,11 +247,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>}
             <div className="office-workflow-actions">
               {proposalAction ? <button type="button" className="button" onClick={() => setProposalAction(undefined)}>Cancel</button> : <>
-                <button type="button" className="button inquiry-decline" onClick={() => setProposalAction("withdraw")}>Record client decline</button>
-                <button type="button" className="button" onClick={() => setProposalAction("revise")}>Record revision request</button>
+                <button type="button" className="button danger" onClick={() => setProposalAction("withdraw")}>Client Dropped Project</button>
+                <button type="button" className="button" onClick={() => setProposalAction("revise")}>Revision Request</button>
               </>}
-              <button className="button primary" type="submit">
-                {proposalAction === "revise" ? "Save revision request" : proposalAction === "withdraw" ? "Save client decline" : "Mark proposal approved"}
+              <button className={`button ${proposalAction === "withdraw" ? "danger" : "primary"}`} type="submit">
+                {proposalAction === "revise" ? "Save revision request" : proposalAction === "withdraw" ? "Confirm client dropped project" : "Mark proposal approved"}
               </button>
             </div>
           </fieldset>
@@ -251,49 +261,30 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         </div>}
       </Card>
 
-      <Card title="Total allocated project budget (PHP)" icon="doc">
-        <p>Record the single amount authorized by the client.</p>
-        {(page !== "review" || !review || editing) && <Notice tone="warning">
-          {accepted ? "Confirm the project information and dates to unlock the budget." : "Budget entry unlocks after client approval and project information review."}
-        </Notice>}
-        <form onSubmit={event => {
-          event.preventDefault()
-          save("budget", { amount: budget })
-        }}>
-          <fieldset className="office-workflow-form" disabled={busy || page !== "review" || !review || editing}>
-            <label>Authorized amount (₱)<input type="number" ref={budgetField} required min="0.01" max="999999999999.99" step="0.01"
-              value={budget} onChange={event => setBudget(event.target.value)} /></label>
-            <div className="office-workflow-actions">
-              {!!workflow?.budget && <button type="button" className="button" disabled={Number(budget) !== workflow.budget}
-                onClick={() => navigate("assessment")}>Continue to assessment</button>}
-              <button type="submit" className="button primary" disabled={Number(budget) === workflow?.budget}>
-                {workflow?.budget ? "Update authorized amount" : "Save allocated budget"}
-              </button>
-            </div>
-          </fieldset>
-        </form>
-        {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
-          <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
-        </details>}
-      </Card>
-    </div>}
+    </>}
 
     {page === "review" && <>
       <Notice tone="success"><strong>Proposal approved</strong>
         <p>{review ? `Project information reviewed · Version ${review.version}` : "The assigned Office PM can now confirm or correct the project information."}</p>
       </Notice>
-      {!editing && recordCards}
+      {!editing && <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>}
       <form className="office-workflow-form" onSubmit={event => {
         event.preventDefault()
-        save("review", { start, end, ...(editing || !review ? { technical, arrangement } : {}),
+        if (!reviewing) {
+          if (!budgetSaved) save("budget", { amount: budget })
+          return
+        }
+        if (!earliestCompletion || selectedCompletion < earliestCompletion) return
+        save("review", { start, end: selectedCompletion, technical, arrangement, amount: budget,
           ...(editing ? { correction: draft, reason } : {}) })
       }}>
         <fieldset className="office-workflow-form" disabled={busy}>
-          {editing && <>
-            <Card title="Edit client information" icon="users"><div className="office-workflow-fields">{clientFields.map(([key, label]) => editField(key, label))}</div></Card>
-            <Card title="Edit project information" icon="building"><div className="office-workflow-fields">{projectFields.map(([key, label]) => editField(key, label))}</div></Card>
-          </>}
-          {(editing || !review) && <Card title="Estimated project dates" icon="calendar">
+          {editing && <Card title="Edit client information" icon="users"><div className="office-workflow-fields">{clientFields.map(([key, label]) => editField(key, label))}</div></Card>}
+          <Card title={editing ? "Edit project information" : "Project information"} icon="building">
+          {editing ? <div className="office-workflow-fields">{projectFields.map(([key, label]) => editField(key, label))}</div>
+            : <><Facts values={projectFacts} />{row.details.overview && <p>{row.details.overview}</p>}</>}
+          {reviewing && <section className="office-workflow-subsection">
+            <h3>Estimated project dates</h3>
             <div className="office-workflow-fields">
               <div>
                 <label htmlFor="inquiry-start-date">Estimated start date</label>
@@ -301,38 +292,40 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                   calendarSubtitle="Choose today or a later date."
                   required disabled={busy} min={earliestStart} max={latestInquiryStart} value={start} onValueChange={value => {
                     setStart(value)
-                    if (value && value <= latestInquiryStart && end && end < addDays(value, MIN_INQUIRY_DURATION_DAYS)) setEnd("")
+                    setEnd("")
                   }} />
               </div>
               <div>
                 <label htmlFor="inquiry-completion-date">Estimated completion date</label>
                 <DatePicker id="inquiry-completion-date" calendarTitle="Estimated completion date"
-                  calendarSubtitle={earliestCompletion && `Select ${formatDay(earliestCompletion)} or later. Minimum duration is ${MIN_INQUIRY_DURATION_DAYS} calendar days.`}
-                  required disabled={busy || !earliestCompletion} value={end} min={earliestCompletion} highlightMin onValueChange={setEnd} />
-                <p>{earliestCompletion ? `Earliest completion: ${formatDay(earliestCompletion)} (${MIN_INQUIRY_DURATION_DAYS} calendar days after start).` : "Select a valid estimated start date first."}</p>
+                  calendarSubtitle={earliestCompletion && `Select ${formatDay(earliestCompletion)} or later.`}
+                  required disabled={busy || !earliestCompletion} value={selectedCompletion} min={earliestCompletion} highlightMin onValueChange={setEnd} />
+                <p>{earliestCompletion ? `Earliest completion: ${formatDay(earliestCompletion)}`
+                  : validStart ? "Review project inputs for a completion estimate within the supported date range." : "Select a valid estimated start date first."}</p>
               </div>
             </div>
             <div className="office-workflow-fields">
-              <label>Technical requirements<select value={technical} onChange={event => setTechnical(event.target.value)}>
+              <label>Technical requirements<select value={technical} onChange={event => { setTechnical(event.target.value); setEnd("") }}>
                 {technicalOptions.map(option => <option key={option}>{option}</option>)}
               </select></label>
-              <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>
+              <label>Project phase arrangement<select value={arrangement} onChange={event => { setArrangement(event.target.value); setEnd("") }}>
                 {arrangementOptions.map(option => <option key={option}>{option}</option>)}
               </select></label>
             </div>
-            {scheduleEstimate?.suggestedEnd && scheduleEstimate.planningDays != null &&
-              <div className="office-workflow-result duration">
-                <strong>Suggested completion {formatDay(scheduleEstimate.suggestedEnd)}</strong>
-                <p>{scheduleEstimate.size} · {scheduleEstimate.complexity} complexity · {scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days ({durationLabel(scheduleEstimate.planningDays)})</p>
-                {earliestCompletion && scheduleEstimate.suggestedEnd >= earliestCompletion
-                  ? <button type="button" className="button" onClick={() => setEnd(scheduleEstimate.suggestedEnd!)}>Use suggested date</button>
-                  : <p>Choose a completion date that meets the minimum duration.</p>}
-              </div>}
-          </Card>}
-          {editing && <Card title="Modification reason" icon="doc">
+          </section>}
+          {editing && <section className="office-workflow-subsection">
             <label>Reason for modifications<textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></label>
             <p>Saving corrections requires a fresh assessment before staffing.</p>
-          </Card>}
+          </section>}
+          <section className="office-workflow-subsection">
+            <h3>Budget allocation</h3>
+            <label>Authorized amount (₱)<input type="number" required min="0.01" max="999999999999.99" step="0.01"
+              value={budget} onChange={event => setBudget(event.target.value)} /></label>
+            {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
+              <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
+            </details>}
+          </section>
+          </Card>
           <div className="office-workflow-actions office-workflow-action-bar">
             {editing && <button type="button" className="button" onClick={() => {
               setEditing(false)
@@ -340,11 +333,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               setEnd(review?.end ?? "")
               setTechnical(assessment?.technical ?? review?.technical ?? technicalOptions[0])
               setArrangement(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
+              setBudget(String(workflow?.budget ?? ""))
               setReason("")
             }}>Cancel</button>}
-            {editing || !review ? <button type="submit" className="button primary">
-              {editing ? "Save corrected information" : "Information is accurate"}
-            </button> : <button type="button" className="button primary" onClick={() => budgetField.current?.focus()}>Continue to budget section</button>}
+            {reviewing ? <button type="submit" className="button primary" disabled={!earliestCompletion || selectedCompletion < earliestCompletion}>
+              Save project information and budget
+            </button> : budgetSaved
+              ? <button type="button" className="button primary" onClick={() => navigate("assessment")}>Continue to assessment</button>
+              : <button type="submit" className="button primary">Save allocated budget</button>}
           </div>
         </fieldset>
       </form>
@@ -357,10 +353,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       </details>}
     </>}
 
-    {page === "assessment" && preview && review && <div className="office-workflow-grid assessment">
+    {page === "assessment" && preview && review && <>
+    {assessmentNeedsDates && <Notice tone="warning">
+      <p>{minimumReviewedEnd
+        ? `This assessment requires a completion date of ${formatDay(minimumReviewedEnd)} or later.`
+        : "The estimated completion is outside the supported date range."} Review the requirements and estimated dates in Project information.</p>
+      <button type="button" className="button" onClick={() => navigate("review")}>Review project information</button>
+    </Notice>}
+    <div className="office-workflow-grid assessment">
       <Card title="Project size classification" icon="building">
         <Facts values={[["Lot area (m²)", row.details.lot_area], ["Floor area (m²)", row.details.floor_area_sqm], ["Floors", row.details.floor_count]]} />
-        <div className="office-workflow-result"><span>Automatic result</span><strong>{preview.size}</strong>
+        <div className="office-workflow-result"><strong>{preview.size}</strong>
           <p>{preview.planningDays != null ? "Uses the higher size category from lot area and total floor area." : "Size recorded when this assessment was completed."}</p></div>
       </Card>
       <Card title="Complexity classification" icon="doc">
@@ -380,13 +383,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <p>Reviewed schedule: {formatDay(review.start)} – {formatDay(review.end)} ({preview.durationDays.toLocaleString("en-PH")} calendar days)</p>
         </div>
         {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>Choose construction phases to continue to Site PM staffing.</p></Notice>}
-        <div className="office-workflow-actions">
-          {assessment
-            ? <button type="button" className="button primary" disabled={busy} onClick={startStaffing}>Continue to construction phases</button>
-            : <button type="button" className="button primary" disabled={busy}
-                onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
-        </div>
       </Card>
-    </div>}
+    </div></>}
   </div>
 }

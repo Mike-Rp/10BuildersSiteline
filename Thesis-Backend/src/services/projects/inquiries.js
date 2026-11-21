@@ -6,7 +6,7 @@ import { mirrorLegacyNotifications } from "../notifications/notification.utility
 import { getOpm, getSpm } from "./recommend.controller.js";
 import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
-import { assessInquiry, inquirySize, technicalOptions, arrangementOptions, MIN_INQUIRY_DURATION_DAYS } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -86,6 +86,24 @@ export function confirmedPhases(available, submitted) {
   return available.filter(phase => submitted.includes(phase));
 }
 
+function validateInquiryCompletion(start, end, estimate) {
+  const minimum = earliestInquiryCompletion(start, estimate);
+  if (!minimum) throw new HttpError(422, "The estimated completion is outside the supported date range. Review the project information or start date.");
+  if (end < minimum) throw new HttpError(422, `Choose an estimated completion date of ${minimum} or later based on the calculated duration.`);
+}
+
+function recordInquiryBudget(workflow, input, audit) {
+  const amount = Number(input);
+  if (!["number", "string"].includes(typeof input) || !Number.isFinite(amount) ||
+      amount < 0.01 || amount > 999999999999.99 || Math.round(amount * 100) / 100 !== amount)
+    throw new HttpError(422, "Enter a positive PHP amount with at most two decimal places.");
+  if (amount !== workflow.budget) {
+    workflow.budget_history = [...(workflow.budget_history ?? []), { ...audit, amount }];
+    workflow.budget = amount;
+    delete workflow.assessment;
+  }
+}
+
 export async function notifyInquiry(db, actorId, recipientId, title, detail, projectId = null) {
   const result = await db.query(`WITH notice AS (
     INSERT INTO activity_log(activity_type_id,title,detail,actor_user_id,related_project_id)
@@ -113,7 +131,7 @@ function inquiryResponse(row, includeHistory = false) {
   const { routing_history, opm_workflow, opm_match, ...details } = row.details;
   return { ...row, details, ...(includeHistory
     ? { routing_history }
-    : { workflow: opm_workflow, match: opm_match }) };
+    : { workflow: opm_workflow }) };
 }
 
 export function staffingAssessment(row, input) {
@@ -262,21 +280,20 @@ export function mountInquiries(router) {
         if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
         if (input.start < today) throw new HttpError(422, "Choose an estimated start date of today or later.");
-        if ((Date.parse(input.end) - Date.parse(input.start)) / 86400000 < MIN_INQUIRY_DURATION_DAYS)
-          throw new HttpError(422, `Choose an estimated completion date at least ${MIN_INQUIRY_DURATION_DAYS} calendar days after the start date.`);
-        const technical = input.technical ?? workflow.review?.technical;
-        const arrangement = input.arrangement ?? workflow.review?.arrangement;
-        if ((technical !== undefined || arrangement !== undefined) &&
-            (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement)))
+        const technical = input.technical ?? workflow.review?.technical ?? technicalOptions[0];
+        const arrangement = input.arrangement ?? workflow.review?.arrangement ?? arrangementOptions[0];
+        if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details);
         const after = input.correction ? inquiryDetails({ ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
         }) : before;
         if (input.correction) validateInquiryContact(after, before);
+        const suggestion = assessInquiry(after, input.start, input.end, technical, arrangement);
+        validateInquiryCompletion(input.start, input.end, suggestion);
         const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
           .filter(key => before[key] !== after[key]).map(key => [key, { before: before[key] ?? null, after: after[key] ?? null }]));
-        const schedule = { start: input.start, end: input.end, ...(technical && arrangement ? { technical, arrangement } : {}) };
+        const schedule = { start: input.start, end: input.end, technical, arrangement };
         for (const key of Object.keys(schedule)) {
           const previous = workflow.review?.[key] ?? (key === "start" ? before.anticipated_start : undefined);
           if (previous !== schedule[key]) changes[key] = { before: previous ?? null, after: schedule[key] };
@@ -287,25 +304,15 @@ export function mountInquiries(router) {
         for (const key of Object.keys(before)) delete details[key];
         Object.assign(details, after);
         const version = (workflow.review?.version ?? 0) + 1;
-        const suggestion = technical && arrangement
-          ? assessInquiry(after, schedule.start, schedule.end, technical, arrangement)
-          : null;
-        workflow.review = { ...schedule, version, estimate: { size: suggestion?.size ?? inquirySize(after), end: suggestion?.suggestedEnd ?? null } };
+        workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd } };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
+        if (input.amount !== undefined) recordInquiryBudget(workflow, input.amount, audit);
         break;
       }
       case "budget": {
         if (!workflow.review) throw new HttpError(409, "Confirm the project information before saving the budget.");
-        const amount = Number(input.amount);
-        if (!["number", "string"].includes(typeof input.amount) || !Number.isFinite(amount) ||
-            amount < 0.01 || amount > 999999999999.99 || Math.round(amount * 100) / 100 !== amount)
-          throw new HttpError(422, "Enter a positive PHP amount with at most two decimal places.");
-        if (amount !== workflow.budget) {
-          workflow.budget_history = [...(workflow.budget_history ?? []), { ...audit, amount }];
-          workflow.budget = amount;
-          delete workflow.assessment;
-        }
+        recordInquiryBudget(workflow, input.amount, audit);
         break;
       }
       case "assessment": {
@@ -314,8 +321,9 @@ export function mountInquiries(router) {
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const { start, end } = workflow.review;
         if (workflow.assessment?.technical !== input.technical || workflow.assessment?.arrangement !== input.arrangement) {
-          workflow.assessment = { ...assessInquiry(details, start, end, input.technical, input.arrangement),
-            id: randomUUID(), completed_at: audit.at };
+          const estimate = assessInquiry(details, start, end, input.technical, input.arrangement);
+          validateInquiryCompletion(start, end, estimate);
+          workflow.assessment = { ...estimate, id: randomUUID(), completed_at: audit.at };
         }
         break;
       }

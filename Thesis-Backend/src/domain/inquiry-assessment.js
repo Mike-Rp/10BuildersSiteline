@@ -42,3 +42,11 @@ export function assessInquiry(details, start, end, technical, arrangement) {
     suggestedEnd: finish.getUTCFullYear() <= 9999 ? finish.toISOString().slice(0, 10) : null,
   };
 }
+
+export function earliestInquiryCompletion(start, estimate) {
+  if (!estimate.suggestedEnd) return null;
+  const minimum = new Date(Date.parse(start) + MIN_INQUIRY_DURATION_DAYS * 86400000);
+  if (!(minimum.getUTCFullYear() <= 9999)) return null;
+  const minimumDate = minimum.toISOString().slice(0, 10);
+  return estimate.suggestedEnd > minimumDate ? estimate.suggestedEnd : minimumDate;
+}
