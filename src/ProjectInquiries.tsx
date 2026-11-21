@@ -14,6 +14,8 @@ import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { clientActivationLabel, clientActivationStatus, type ClientActivationStatus } from "./client-activation"
+import MobileNumberInput from "./MobileNumberInput"
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import "./project-inquiries.css"
 
 const projectTypes = [
@@ -59,7 +61,7 @@ const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZo
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
 const inquiryPlaceholders: Record<string, string> = {
-  client_name: "Lastname, FirstName", phone: "09123456789 or +639123456789", email: "name@example.com",
+  client_name: "Lastname, FirstName", email: "name@example.com",
   name: "Maple Residence", address: "Street, barangay, city",
   land_area: "e.g. 300 (optional)", lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
 }
@@ -729,27 +731,27 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const candidates = matching?.candidates
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
-      const pattern = key === "phone" ? "(?:09[0-9]{9}|\\+639[0-9]{9})" : key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
-      const hint = key === "phone" ? "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9." : "Enter a valid personal or business email address."
+      if (key === "phone") {
+        const invalid = Boolean(value && !isPhilippineMobile(value))
+        return <label><span>{label} <span className="inquiry-required">*</span></span>
+          <MobileNumberInput required value={value} onValueChange={number => change(key, number)}
+            aria-invalid={invalid || undefined} aria-describedby={invalid ? "inquiry-phone-notice" : undefined} />
+          <small id="inquiry-phone-notice" className="inquiry-input-notice" aria-live="polite">{invalid ? PH_MOBILE_ERROR : ""}</small>
+        </label>
+      }
+      const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
+      const hint = "Enter a valid personal or business email address."
       const invalid = Boolean(value && pattern && !new RegExp(`^(?:${pattern})$`).test(value))
       const noticeId = `inquiry-${key}-notice`
       return (
       <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
         <input type={type} value={value} required={required} maxLength={maxLength}
-          inputMode={key === "phone" ? "tel" : undefined}
           pattern={pattern} title={pattern ? hint : undefined}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? noticeId : undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           max={key === "floor_count" ? 32767 : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
-          placeholder={inquiryPlaceholders[key]} onChange={event => {
-            const typed = event.target.value
-            if (key !== "phone") { change(key, typed); return }
-            const number = typed.replace(/[^0-9+]/g, "")
-            const prefix = number.startsWith("+") ? "+639" : "09"
-            if (/^\+?[0-9]*$/.test(number) && (prefix.startsWith(number) || number.startsWith(prefix)))
-              change(key, number.slice(0, prefix.length + 9))
-          }} />
+          placeholder={inquiryPlaceholders[key]} onChange={event => change(key, event.target.value)} />
         {pattern && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{invalid ? hint : ""}</small>}
       </label>
       )

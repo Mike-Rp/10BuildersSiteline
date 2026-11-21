@@ -1,4 +1,4 @@
-export const COMPANY_PHONE_PATTERN = "[0-9]{11}";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "./mobile-number.js";
 export const COMPANY_EMAIL_PATTERN = "[A-Za-z0-9][A-Za-z0-9._%+\\-]*@gmail\\.com";
 
 export function companyRegistrationErrors(company) {
@@ -6,8 +6,8 @@ export function companyRegistrationErrors(company) {
     if (typeof company?.name !== "string" || !company.name.trim() || company.name.trim().length > 150)
         errors.name = "Enter a company name using 150 characters or fewer.";
     if (company?.foremen === undefined) {
-        if (typeof company?.phone !== "string" || !/^\d{11}$/.test(company.phone))
-            errors.phone = "Enter an 11-digit contact number.";
+        if (!isPhilippineMobile(company?.phone))
+            errors.phone = PH_MOBILE_ERROR;
     } else if (!Array.isArray(company.foremen) || company.foremen.length < 1 || company.foremen.length > 2) {
         errors.foremen = "Provide one primary foreman and at most one backup foreman.";
     } else {
@@ -18,7 +18,7 @@ export function companyRegistrationErrors(company) {
             if (index === 1 && !name && !phone && (typeof foreman.name === "string" || foreman.name === undefined) && (typeof foreman.phone === "string" || foreman.phone === undefined)) return;
             const label = index === 0 ? "primary" : "backup";
             if (!name || name.length > 150) errors[`foreman${index + 1}Name`] = `Enter the ${label} foreman's full name using 150 characters or fewer.`;
-            if (!/^\d{11}$/.test(phone)) errors[`foreman${index + 1}Phone`] = `Enter an 11-digit mobile number for the ${label} foreman.`;
+            if (!isPhilippineMobile(phone)) errors[`foreman${index + 1}Phone`] = `The ${label} foreman's number is invalid. ${PH_MOBILE_ERROR}`;
         });
     }
     if (typeof company?.email !== "string" || company.email.trim().length > 254 || !/^[a-z0-9][a-z0-9._%+\-]*@gmail\.com$/i.test(company.email.trim()))

@@ -290,7 +290,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("Admin registers pending companies while Site PM registration is rejected",async()=>{
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const company={...state.companies[0],id:randomUUID(),name:"Admin registered company",email:"registered@gmail.com",phone:"09171234567",foremen:undefined,primaryTrade:"Electrical",verificationDecision:"pending",documents:[],manpowerDocuments:[]}
-    for(const phone of ["123","091712345678"]) await assert.rejects(createCompany({...company,phone}),/11-digit/)
+    for(const phone of ["123","091712345678"]) await assert.rejects(createCompany({...company,phone}),/Philippine mobile number/)
     const result=await createCompany(company)
     const saved=(await loadState(user)).companies.find(c=>c.id===result.id)
     assert.equal(saved.status,"pending");assert.equal(saved.primaryTrade,"Electrical");assert.deepEqual(saved.activeProjectIds,[])

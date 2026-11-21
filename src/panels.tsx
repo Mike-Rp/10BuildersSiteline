@@ -4,6 +4,8 @@ import PhaseEngineerAllocation,{recommendPhaseEngineers,phaseCoverageMissing,pha
 import RegistrationCredentials, { RegistrationVerification, registrationCredentialErrors, validateRegistrationCredentials, type RegistrationCredentialErrors } from "./RegistrationCredentials"
 import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
+import MobileNumberInput from "./MobileNumberInput"
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { uploadFile, type UploadKind } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
 import ClientSearch from "./ClientSearch"
@@ -623,7 +625,7 @@ export function AccountForm({
     if (generatedIdentity && !nameParts.first.trim()) nameIssues.firstName = "Enter a first name."
     if (generatedIdentity && !nameParts.last.trim()) nameIssues.lastName = "Enter a last name."
     if (Object.keys(nameIssues).length) { setFieldErrors(nameIssues); setError("Enter the required name details."); return }
-    if (draft.phone && !/^\d{11}$/.test(draft.phone)) { const message = "Contact number must contain exactly 11 digits."; setFieldErrors({ phone: message }); setError(message); return }
+    if (draft.phone && !isPhilippineMobile(draft.phone)) { setFieldErrors({ phone: PH_MOBILE_ERROR }); setError(PH_MOBILE_ERROR); return }
 
     const err = accountError(submittedDraft, state, generatedIdentity)
     if (err) {
@@ -740,11 +742,7 @@ export function AccountForm({
           />
         </Field>}
         <Field label="Contact number" error={fieldErrors.phone}>
-          <input
-            value={draft.phone}
-            type="tel" inputMode="numeric" maxLength={11} pattern="[0-9]{11}" title="Enter exactly 11 digits" onChange={(e) => patch({ phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
-            placeholder="09123456789"
-          />
+          <MobileNumberInput value={draft.phone} onValueChange={phone => patch({ phone })} />
         </Field>
       </div>
       {registeringEngineer && <RegistrationCredentials value={credentialDraft} errors={credentialErrors} onChange={value => { setCredentialDraft(value); clearValidation() }} onBusy={setUploadingCredential} onError={setError} />}

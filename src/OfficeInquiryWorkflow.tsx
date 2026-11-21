@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { Icon, Modal } from "./ui"
 import { addDays } from "./model"
 import DatePicker from "./DatePicker"
+import MobileNumberInput from "./MobileNumberInput"
+import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquirySize, technicalOptions, MIN_INQUIRY_DURATION_DAYS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
@@ -185,7 +187,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         <option value="">Select a project type</option>
         {projectTypes.map(type => <option key={type}>{type}</option>)}
       </select>
-      : <input {...describedField(id, helper)} type={numeric ? "number" : key === "email" ? "email" : key === "phone" ? "tel" : "text"}
+      : key === "phone" ? <MobileNumberInput {...describedField(id, helper)} required value={String(draft[key] ?? "")}
+          onValueChange={value => updateDraft(key, value)} />
+      : <input {...describedField(id, helper)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
           max={key === "floor_count" ? 32767 : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
           required={key !== "land_area"} value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
@@ -217,9 +221,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         const value = control.value.trim()
         if (control.id === "inquiry-start-date" && !validStart) message = "Choose a valid estimated start date of today or later."
         else if (control.required && !value && !control.validity.badInput) message = "Complete this required field."
-        else if (!control.validity.valid) message = control.validationMessage
+        else if (!control.validity.valid) message = key === "phone" ? PH_MOBILE_ERROR : control.validationMessage
         else if (numericField(key) && value && Number(value) <= 0) message = "Enter a value greater than zero."
-        else if (key === "phone" && value !== row.details.phone && !/^(?:09[0-9]{9}|\+639[0-9]{9})$/.test(value)) message = "Enter a mobile number starting with 09 (11 digits) or +639 (13 characters)."
         else if (key === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) message = "Enter a valid personal or business email address."
       }
       if (message) {

@@ -1,6 +1,7 @@
 import { Field } from "./ui"
 import type { Company } from "./model"
-import { COMPANY_EMAIL_PATTERN, COMPANY_PHONE_PATTERN, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import { COMPANY_EMAIL_PATTERN, type CompanyRegistrationErrors } from "../Thesis-Backend/src/domain/company-registration.js"
+import MobileNumberInput from "./MobileNumberInput"
 import "./company-foremen.css"
 export default function CompanyRegistrationFields({draft, patch, fieldErrors = {}, busy = false}: {draft: Pick<Company,"name"|"email"|"foremen">; patch: (values: Partial<Company>) => void; fieldErrors?: CompanyRegistrationErrors; busy?: boolean}) {
 const patchForeman=(index:number, values: Partial<{name:string;phone:string}>)=>{const foremen=(draft.foremen || [{name:"",phone:""},{name:"",phone:""}]).map((foreman,position)=>position===index?{...foreman,...values}:foreman);patch({foremen,contact:foremen[0].name,phone:foremen[0].phone})}
@@ -38,7 +39,9 @@ return <>
           return <section key={index} className={`foreman-contact-card${index === 0 ? " primary" : ""}`} role="group" aria-label={label}>
             <div className="foreman-contact-heading"><h4>{label}</h4><span>{index === 0 ? "Required" : "Optional"}</span></div>
             <Field label={index === 0 ? "Full name *" : "Full name"} error={nameError}><input aria-label={`${label} full name`} required={required} maxLength={150} disabled={busy} value={foreman.name} placeholder={index === 0 ? "Enter full name" : "Enter backup foreman name"} onChange={event => patchForeman(index, { name: event.target.value })} /></Field>
-            <Field label={index === 0 ? "Mobile number *" : "Mobile number"} error={phoneError} hint={index === 0 ? "Enter exactly 11 digits." : undefined}><input aria-label={`${label} mobile number`} required={required} type="tel" inputMode="numeric" maxLength={11} pattern={COMPANY_PHONE_PATTERN} disabled={busy} value={foreman.phone} placeholder="09XXXXXXXXX" onChange={event => patchForeman(index, { phone: event.target.value.replace(/\D/g, "").slice(0, 11) })} /></Field>
+            <Field label={index === 0 ? "Mobile number *" : "Mobile number"} error={phoneError}>
+              <MobileNumberInput aria-label={`${label} mobile number`} required={required} disabled={busy} value={foreman.phone} onValueChange={phone => patchForeman(index, { phone })} />
+            </Field>
             {index === 1 && <p>Leave both blank, or complete both fields.</p>}
           </section>
         })}</div>

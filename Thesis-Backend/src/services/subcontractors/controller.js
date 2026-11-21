@@ -1,5 +1,6 @@
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { COMMITMENTS_SQL } from "../workspace/subcontractor-allocation.utility.js";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -280,6 +281,7 @@ export const addWorker = async (req, res) => {
     const b = req.body || {};
     if (!isUuid(id)) return sendError(res, "Invalid subcontractor id.", 400);
     if (!b.full_name || !String(b.full_name).trim()) return sendError(res, "full_name is required.", 400);
+    if (b.phone != null && b.phone !== "" && !isPhilippineMobile(b.phone)) return sendError(res, PH_MOBILE_ERROR, 400);
     if (b.license_expiry && Number.isNaN(Date.parse(b.license_expiry))) return sendError(res, "license_expiry must be a valid date.", 400);
 
     const exists = await execute(`SELECT 1 FROM subcontractors WHERE id = $1 AND COALESCE(is_deleted,false) = false`, [id]);
@@ -311,6 +313,7 @@ export const updateWorker = async (req, res) => {
     const { id } = req.params;
     const b = req.body || {};
     if (!isUuid(id)) return sendError(res, "Invalid worker id.", 400);
+    if (b.phone != null && b.phone !== "" && !isPhilippineMobile(b.phone)) return sendError(res, PH_MOBILE_ERROR, 400);
     if (b.status !== undefined && !["active", "inactive"].includes(b.status)) return sendError(res, "status must be 'active' or 'inactive'.", 400);
     if (b.availability_status !== undefined && !["assigned", "available"].includes(b.availability_status)) {
       return sendError(res, "availability_status must be 'assigned' or 'available'.", 400);

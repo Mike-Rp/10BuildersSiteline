@@ -7,6 +7,7 @@ import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import {validateSpecializations,requireCredentialTags} from '../licenses/credential-specializations.utility.js';
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "./experience.utility.js";
@@ -202,7 +203,7 @@ async function insertAccountRecord(client, actor, body) {
   if (role === "client" && clientEmailError(email)) throw new HttpError(400, clientEmailError(email));
   if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
-  if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
+  if (phone !== null && phone !== "" && !isPhilippineMobile(phone)) throw new HttpError(400, PH_MOBILE_ERROR);
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
   const associated=Array.isArray(body.initial_credentials)&&body.initial_credentials.some(c=>c?.specializations!==undefined);
   if (associated) {
@@ -362,7 +363,7 @@ export const updateAccount = async (req, res) => {
     const fullName = pick(b, "full_name", "fullName");
     if (fullName !== undefined && (!String(fullName).trim() || String(fullName).length > 150)) return sendError(res, "full_name must be 1-150 characters.", 400);
     if (b.email !== undefined && !EMAIL_RE.test(b.email)) return sendError(res, "A valid email is required.", 400);
-    if (b.phone !== undefined && b.phone !== null && b.phone !== "" && (typeof b.phone !== "string" || !/^\d{11}$/.test(b.phone))) return sendError(res, "Contact number must contain exactly 11 digits.", 400);
+    if (b.phone !== undefined && b.phone !== null && b.phone !== "" && !isPhilippineMobile(b.phone)) return sendError(res, PH_MOBILE_ERROR, 400);
 
     const data = await withTransaction(async (client) => {
       const found = await client.query(

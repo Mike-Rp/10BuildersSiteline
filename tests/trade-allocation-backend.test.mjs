@@ -239,7 +239,7 @@ test(
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidLocationId, operatingLocation: { ...codedCebu, psgcCode: "1380600000" } } }), /location catalog/)
     assert.equal((await db.query("select 1 from subcontractors where id=$1", [invalidLocationId])).rowCount, 0, "invalid geographic combinations do not create a partial company")
     const invalidForemanId = randomUUID()
-    await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidForemanId, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
+    await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, id: invalidForemanId, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /Philippine mobile number/)
     assert.equal((await db.query("select id from subcontractors where id=$1", [invalidForemanId])).rows.length, 0, "invalid contacts must not partially create a company")
     await assert.rejects(api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, proposedDisciplines: ["Invented trade"] } }), /configured discipline catalog/)
     await api("/subcontractors/registrations", { method: "POST", json: { ...suggestion, proposedDisciplines: ["Civil", "Façade", "Waterproofing"] } })
@@ -272,7 +272,7 @@ test(
     const preservedCompany = (await loadState(user)).companies.find(company => company.id === suggestedId)
     assert.deepEqual(preservedCompany.foremen, foremen, "general company updates must preserve both stored foremen")
     assert.equal(preservedCompany.phone, foremen[0].phone)
-    await assert.rejects(directoryApi(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...preservedCompany, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /11-digit mobile/)
+    await assert.rejects(directoryApi(`/subcontractors/${suggestedId}/workspace`, { method: "PUT", json: { ...preservedCompany, foremen: [foremen[0], { name: "Incomplete backup", phone: "" }] } }), /Philippine mobile number/)
     // A complete Admin registration verifies in one transaction; invalid evidence leaves no company.
     const registeredProof = randomUUID()
     await uploadFile(registeredProof, new File([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6L8AAAAASUVORK5CYII=", "base64")], "registration-proof.png", {type:"image/png"}))

@@ -1,0 +1,18 @@
+.mobile-number-input {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  align-items: stretch;
+}
+.mobile-number-prefix {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding-inline: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-number-input input { flex: 1; min-width: 0; }

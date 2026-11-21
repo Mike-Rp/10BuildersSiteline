@@ -6,14 +6,15 @@ import { mirrorLegacyNotifications } from "../notifications/notification.utility
 import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { assessInquiry, earliestInquiryCompletion, technicalOptions, arrangementOptions } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
 
 function validateInquiryContact(details, previous) {
-  if (details.phone !== previous?.phone && !/^(?:09[0-9]{9}|\+639[0-9]{9})$/.test(details.phone))
-    throw new HttpError(422, "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9.");
+  if (details.phone !== previous?.phone && !isPhilippineMobile(details.phone))
+    throw new HttpError(422, PH_MOBILE_ERROR);
 }
 
 export function inquiryDetails(input) {

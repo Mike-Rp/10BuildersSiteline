@@ -58,7 +58,7 @@ test("Company creation shows a persistent directory notice only after a successf
     await enter('Company name *','Naay Construction')
     await enter('Company email *','naay@gmail.com')
     await enter('Primary foreman full name','Mika Cruz')
-    await enter('Primary foreman mobile number','09987654345')
+    await enter('Primary foreman mobile number','987654345')
     await enter('Primary company category *','Structural / Rebar')
     await click([...document.querySelectorAll('label')].find(label=>label.textContent.trim()==='Civil')?.querySelector('input'))
     const {dismissActionResult}=await server.ssrLoadModule('/src/action-feedback.ts')
