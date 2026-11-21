@@ -12,7 +12,6 @@ import EstimatedCompletionDate from "./EstimatedCompletionDate"
 import ProjectScopeReview from "./ProjectScopeReview"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import { defaultMixedUseScope, mixedUsePhaseReview, mixedUseScopeError, normalizeMixedUseScope } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
-import { CLIENT_EMAIL_PATTERN, clientEmailError } from "../Thesis-Backend/src/domain/client-email.js"
 import { recordedProgress, type ProgressProject } from "./progress"
 import {
   useEffect,
@@ -34,7 +33,6 @@ import "./company-availability-display.css"
 import { normalizeExperience, experienceText } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import {
   accountError,
-  clientForEmail,
   dateLabel,
   DISCIPLINES,
   DOC_LABELS,
@@ -542,16 +540,12 @@ export function Chart({
 export function AccountForm({
   state,
   account,
-  clientOnly = false,
   onSave,
-  onUseExisting,
   onClose,
 }: {
   state: State
   account?: Account
-  clientOnly?: boolean
   onSave: (a: Account, pass?: string) => void | Promise<void>
-  onUseExisting?: (a: Account) => void
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<Account>(
@@ -560,10 +554,10 @@ export function AccountForm({
       name: "",
       email: "",
       phone: "",
-      role: clientOnly ? "client" : "spm",
+      role: "spm",
       scope: [],
       projectTypes: [],
-      status: clientOnly ? "pending-setup" : "invited",
+      status: "invited",
       added: today(),
       license: "",
       expiry: "",
@@ -571,7 +565,7 @@ export function AccountForm({
     },
   )
   const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
-  const generatedIdentity = !account && !clientOnly
+  const generatedIdentity = !account
   function updateName(part: "first" | "middle" | "last", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
@@ -581,8 +575,8 @@ export function AccountForm({
     }))
     clearValidation()
   }
-  const [pass, setPass] = useState(password())
-  const registeringEngineer = !account && !clientOnly && ["spm", "opm"].includes(draft.role)
+  const [pass, setPass] = useState(() => account ? "" : password())
+  const registeringEngineer = !account && ["spm", "opm"].includes(draft.role)
   const [credentialDraft, setCredentialDraft] = useState<Partial<Account>>({
     initialCredentials: [{ clientKey:uid(),profession: "", license_number: "", license_expiry: "", file_id: "", fileName: "",specializations:[] }],
     credentialDecision: "pending",
@@ -608,10 +602,6 @@ export function AccountForm({
     clearValidation()
   }
   const [emailError, setEmailError] = useState("")
-  const requiresClientEmail = !account && draft.role === "client"
-  const existingClient = clientOnly
-    ? clientForEmail(state, draft.email, draft.id)
-    : undefined
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (savingRef.current || uploadingCredential) return
@@ -625,9 +615,6 @@ export function AccountForm({
       const issue = validateRegistrationCredentials(creationCredentials)
       if (issue) { setError(issue); return }
     }
-    const invalidClientEmail = requiresClientEmail && !generatedIdentity ? clientEmailError(draft.email) : ""
-    setEmailError(invalidClientEmail)
-    if (invalidClientEmail) { setError(""); return }
     if (["opm", "spm"].includes(draft.role)) {
       try { normalizeExperience(draft.experienceByType || {}) } catch (reason) { const message = (reason as Error).message; setExperienceError(message); setError(message); return }
       if (!account && !Object.keys(draft.experienceByType || {}).length) { const message = "Record experience for at least one project type. Enter 0 years and 0 months for a new engineer."; setExperienceError(message); setError(message); return }
@@ -638,17 +625,7 @@ export function AccountForm({
     if (Object.keys(nameIssues).length) { setFieldErrors(nameIssues); setError("Enter the required name details."); return }
     if (draft.phone && !/^\d{11}$/.test(draft.phone)) { const message = "Contact number must contain exactly 11 digits."; setFieldErrors({ phone: message }); setError(message); return }
 
-    const err = clientOnly
-      ? !draft.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())
-        ? "A client name and valid email are required."
-        : state.accounts.some(
-              (a) =>
-                a.id !== draft.id &&
-                a.email.trim().toLowerCase() === draft.email.trim().toLowerCase(),
-            )
-          ? "This email is already in use. Select the existing client instead."
-          : ""
-      : accountError(requiresClientEmail ? { ...submittedDraft, email: draft.email.trim() } : submittedDraft, state, generatedIdentity)
+    const err = accountError(submittedDraft, state, generatedIdentity)
     if (err) {
       const issues: Record<string, string> = {}
       if (/email/i.test(err)) {
@@ -672,7 +649,7 @@ export function AccountForm({
           ...submittedDraft,
           ...(registeringEngineer ? creationCredentials : {}),
           name: draft.name.trim(),
-          email: requiresClientEmail ? draft.email.trim().toLowerCase() : draft.email.trim(),
+          email: draft.email.trim(),
           phone: draft.phone.trim(),
         },
         account ? undefined : pass,
@@ -717,8 +694,7 @@ export function AccountForm({
     <form onSubmit={submit} noValidate aria-busy={saving}>
       <fieldset disabled={saving || uploadingCredential} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
-        {!clientOnly && (
-          <Field label="Account role" wide>
+        <Field label="Account role" wide>
             {account ? <input readOnly value={ROLE_NAMES[account.role]} /> : <select
               value={draft.role}
               onChange={(e) =>
@@ -737,13 +713,12 @@ export function AccountForm({
                 </option>
               ))}
             </select>}
-          </Field>
-        )}
+        </Field>
         {generatedIdentity ? <>
           <Field label="First name *" error={fieldErrors.firstName}><input required autoComplete="given-name" value={nameParts.first} onChange={e => updateName("first", e.target.value)} placeholder="First name" /></Field>
           <Field label="Middle name"><input autoComplete="additional-name" value={nameParts.middle} onChange={e => updateName("middle", e.target.value)} placeholder="Middle name (optional)" /></Field>
           <Field label="Last name *" error={fieldErrors.lastName}><input required autoComplete="family-name" value={nameParts.last} onChange={e => updateName("last", e.target.value)} placeholder="Last name" /></Field>
-        </> : <Field label={clientOnly ? "Client / company name *" : "Full name *"} error={fieldErrors.name}>
+        </> : <Field label="Full name *" error={fieldErrors.name}>
           <input
             required
             value={draft.name}
@@ -751,19 +726,17 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        {!generatedIdentity && <Field label="Email address *" error={emailError || fieldErrors.email} hint={requiresClientEmail ? "Use the client's @10builders.com account address." : undefined}>
+        {!generatedIdentity && <Field label="Email address *" error={emailError || fieldErrors.email}>
           <input
             required
             type="email"
             maxLength={254}
-            pattern={requiresClientEmail ? CLIENT_EMAIL_PATTERN : undefined}
             value={draft.email}
             onChange={(e) => {
               patch({ email: e.target.value })
               clearValidation()
-              setEmailError(requiresClientEmail ? clientEmailError(e.target.value) : "")
             }}
-            placeholder={requiresClientEmail ? "lastname.firstname@10builders.com" : "name@company.com"}
+            placeholder="name@company.com"
           />
         </Field>}
         <Field label="Contact number" error={fieldErrors.phone}>
@@ -773,19 +746,9 @@ export function AccountForm({
             placeholder="09123456789"
           />
         </Field>
-        {clientOnly && (
-          <Field label="Contact person">
-            <input
-              name="contact-person"
-              value={draft.contactPerson || ""}
-              onChange={(e) => patch({ contactPerson: e.target.value })}
-              placeholder="Primary client contact"
-            />
-          </Field>
-        )}
       </div>
       {registeringEngineer && <RegistrationCredentials value={credentialDraft} errors={credentialErrors} onChange={value => { setCredentialDraft(value); clearValidation() }} onBusy={setUploadingCredential} onError={setError} />}
-      {!clientOnly && draft.role === "spm" && !registeringEngineer && !draft.hasCredentialSpecializations && (
+      {draft.role === "spm" && !registeringEngineer && !draft.hasCredentialSpecializations && (
         <section className="form-section">
           <h3>
             Areas of specialization <span>Choose 1–3</span>
@@ -810,14 +773,14 @@ export function AccountForm({
           {fieldErrors.projectTypes && <p className="field-error" role="alert">{fieldErrors.projectTypes}</p>}
         </section>
       )}
-      {!clientOnly && ["opm", "spm"].includes(draft.role) && <Field label="Job title">
+      {["opm", "spm"].includes(draft.role) && <Field label="Job title">
         <select value={draft.jobTitle ?? ""} onChange={event => patch({ jobTitle: event.target.value })}>
           <option value="">Select a job title (optional)</option>
           {ENGINEER_JOB_TITLES.map(title => <option key={title}>{title}</option>)}
         </select>
       </Field>}
-      {!clientOnly && ["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} validationError={experienceError} onChange={experienceByType => { patch({ experienceByType }) }} />}
-      {draft.role === "client" && !clientOnly && (
+      {["opm", "spm"].includes(draft.role) && <ProjectExperienceFields key={account?.id || draft.role} value={draft.experienceByType} validationError={experienceError} onChange={experienceByType => { patch({ experienceByType }) }} />}
+      {draft.role === "client" && (
         <section className="form-section">
           <h3>
             Linked projects <span>At least one required</span>
@@ -841,7 +804,7 @@ export function AccountForm({
         </section>
       )}
       {registeringEngineer && <RegistrationVerification value={credentialDraft} noteError={verificationNoteError} onChange={value => { setCredentialDraft(value); clearValidation() }} />}
-      {!account && !clientOnly && (
+      {!account && (
         <section className="form-section">
           <h3>Temporary credentials</h3>
           <div className="password-display">
@@ -854,44 +817,17 @@ export function AccountForm({
           </p>
         </section>
       )}
-      {clientOnly && (
-        <div className="notice">
-          <Icon name="shield" />
-          <p>
-            Client details are saved for intake. Project access is not activated
-            until all internal setup checks pass.
-          </p>
-        </div>
-      )}
       {error && (
         <p role="alert" aria-live="polite" className="error">
           {error}
         </p>
-      )}
-      {clientOnly && existingClient && onUseExisting && (
-        <div className="existing-client-match">
-          <div>
-            <strong>Existing client found</strong>
-            <p>
-              {existingClient.name} · {existingClient.email}
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            onClick={() => onUseExisting(existingClient)}
-          >
-            Use Existing Client
-          </Button>
-        </div>
       )}
       <div className="modal-actions">
         <Button onClick={onClose} disabled={saving || uploadingCredential}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={saving || uploadingCredential}>
           {uploadingCredential ? "Uploading document…" : saving ? "Saving account…" : account
             ? "Save changes"
-            : clientOnly
-              ? "Save client for project"
-              : registeringEngineer ? "Create account & verify credentials" : "Create account"}
+            : registeringEngineer ? "Create account & verify credentials" : "Create account"}
         </Button>
       </div>
       </fieldset>
@@ -1066,18 +1002,15 @@ export function IntakeForm({
   state,
   project,
   onSubmit,
-  onClient,
   onClose,
 }: {
   state: State
   project?: Project
   onSubmit: (p: Project) => void | Promise<void>
-  onClient: (a: Account) => Account | Promise<Account>
   onClose: () => void
 }) {
   const [step, setStep] = useState(project ? "allocation" : "details")
   const [scopeDraft, setScopeDraft] = useState(project?.phaseScope || defaultMixedUseScope())
-  const [newClient, setNewClient] = useState(false)
   const [error, setError] = useState("")
   const [run, setRun] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -1473,9 +1406,7 @@ export function IntakeForm({
                 </div>
               </section>
             )}
-            <Button onClick={() => setNewClient(true)} icon="plus">
-              Create a client account
-            </Button>
+            <p className="section-description">For a new client, start from Project inquiries so the Office PM can finalize the approved project.</p>
           </div>
           {error && !projectTypeError && <p className="error">{error}</p>}
           <div className="modal-actions">
@@ -1725,29 +1656,6 @@ export function IntakeForm({
             </Button>
           </div>
         </>
-      )}
-      {newClient && (
-        <Modal
-          title="Create client account"
-          subtitle="Save client details without activating project access."
-          onClose={() => setNewClient(false)}
-        >
-          <AccountForm
-            state={state}
-            clientOnly
-            onClose={() => setNewClient(false)}
-            onUseExisting={(client) => {
-              patch({ clientId: client.id })
-              setNewClient(false)
-              setError("")
-            }}
-            onSave={async (a) => {
-              const saved=await onClient(a)
-              patch({ clientId: saved.id })
-              setNewClient(false)
-            }}
-          />
-        </Modal>
       )}
 
     </>

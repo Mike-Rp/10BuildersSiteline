@@ -71,8 +71,10 @@ import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import ProjectInquiries from "./ProjectInquiries"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import ClientActivationPage from "./ClientActivationPage"
+import { CLIENT_ACCOUNT_PENDING, clientActivationLabel } from "./client-activation"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
-import { roleAllowedOnHost } from "./portal-domain"
+import { isClientActivationPath, roleAllowedOnHost } from "./portal-domain"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -451,7 +453,7 @@ function AppInner() {
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
   useEffect(() => {
-    if (!signedOut || checkingSession || restoreError || isLandingPath(routePath)) return
+    if (!signedOut || checkingSession || restoreError || isLandingPath(routePath) || isClientActivationPath(routePath)) return
     const portal = currentLoginPortal()
     changeRoute(loginPath(portal), true, { loginPortal: portal, returnTo: routePath })
   }, [signedOut, checkingSession, restoreError, routePath])
@@ -778,7 +780,8 @@ function AppInner() {
     try {
       user = await apiLogin(email, password, replaceSession, loginPortal)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "ACCOUNT_ALREADY_SIGNED_IN") throw error
+      if (error instanceof ApiError && (error.code === "ACCOUNT_ALREADY_SIGNED_IN" ||
+        (loginPortal === "client" && error.code === CLIENT_ACCOUNT_PENDING))) throw error
       throw new Error(
         error instanceof ApiError &&
           error.status !== 401 &&
@@ -879,12 +882,6 @@ function AppInner() {
       }
       setToast((error as Error).message);throw error
     }
-  }
-  async function saveClient(account:Account) {
-    const saved=await saveApiAccount(account,false)
-    const loaded=await reloadWorkspace()
-    if(saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:"client",viewOnlyLoginLink:true})
-    return loaded.accounts.find(a=>a.id===saved.id)!
   }
   async function addProject(project:Project) {
     try {
@@ -2109,7 +2106,8 @@ function AppInner() {
                           )}
                         </td>
                         <td data-label="Status">
-                          {a.status === "invited" && a.role === "client" ? <span className="team-status-help"><Badge tone="amber">Pending Setup</Badge><InfoPopover title="Pending client setup" label={`Why is ${a.name} pending setup?`}>This client account has been created. “Invited” is an account status, not an email invitation. Client sign-in also requires approval of a linked project.</InfoPopover></span> : <Status status={a.status} />}
+                          <Status status={a.status} />
+                          {a.role === "client" && <p><small>Activation · {clientActivationLabel(a.activationStatus)}</small></p>}
                         </td>
                         <td data-label="Added">{dateLabel(a.added)}</td>
                         <td data-label="Actions">
@@ -2726,16 +2724,17 @@ function AppInner() {
                 <strong>{dateLabel(a.added)}</strong>
               </div>
               <div>
-                <small>DISCIPLINE / SPECIALIZATION</small>
+                <small>{a.role === "client" ? "ASSOCIATED PROJECTS" : "DISCIPLINE / SPECIALIZATION"}</small>
                 <strong>
                   {[
                     ...a.scope.map((s) =>
                       a.role === "client" ? projectFor(s) : s,
                     ),
                     ...a.projectTypes,
-                  ].join(", ") || "Organization-wide"}
+                  ].join(", ") || (a.role === "client" ? "No associated projects" : "Organization-wide")}
                 </strong>
               </div>
+              {a.role === "client" && <div><small>ACTIVATION STATUS</small><strong>{clientActivationLabel(a.activationStatus)}</strong></div>}
               {a.role !== "admin" && <div>
                 <small>{a.role === "client" ? "ACTIVE PROJECTS" : "WORKLOAD"}</small>
                 <strong>
@@ -2774,13 +2773,13 @@ function AppInner() {
             )}
             <div className="profile-actions">
               {a.id===actor.id&&actor.role==='admin'&&<><Button icon="shield" onClick={()=>{setDialog(undefined);setSecurityTab('password');setSecurityOpen(true)}}>Change password</Button><Button onClick={()=>{setDialog(undefined);setSecurityTab('codes');setSecurityOpen(true)}}>Recovery codes</Button></>}
-              <Button
+              {a.role !== "client" && <Button
                 disabled={a.status === "deactivated"}
                 icon="edit"
                 onClick={() => { setPage("Team"); setDialog({ kind: "edit-account", id: a.id }) }}
               >
                 {page === "Team" ? "Edit account" : "Edit in Team & accounts"}
-              </Button>
+              </Button>}
               {a.id !== admin.id &&
                 a.status !== "deactivated" &&
                 (a.role === "client" ? (
@@ -3026,7 +3025,9 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
+    return isClientActivationPath(routePath) && roleAllowedOnHost("client", window.location.hostname)
+      ? <ClientActivationPage />
+      : <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
   if(mustResetPassword)return <PasswordReset onComplete={()=>{resumePath.current=window.location.pathname;setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
@@ -3291,7 +3292,6 @@ function AppInner() {
             project={selectedProject}
             onClose={() => setDialog(undefined)}
             onSubmit={addProject}
-            onClient={saveClient}
           />
         </Modal>
       )}

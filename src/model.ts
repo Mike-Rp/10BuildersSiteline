@@ -200,6 +200,7 @@ export type RegistrationCredential = {
   fileName: string
 }
 export type Account = {
+  activationStatus?: import("./client-activation.ts").ClientActivationStatus
   singleProjectCommitment?: boolean
   engineerCommitments?: {project_id:string; phase:string; tags:string[] | null; status:string}[]
   initialCredentials?: RegistrationCredential[]

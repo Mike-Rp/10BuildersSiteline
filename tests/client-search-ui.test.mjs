@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { emptyState } from "../src/model.ts"
 
-test("client creation requires a company address, preserves intake details, and retains generated company emails", async () => {
+test("intake directs new clients to inquiries and Team stays staff-only for account creation", async () => {
   const [{ JSDOM }, { createServer }, React] = await Promise.all([import("jsdom"), import("vite"), import("react")])
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" }), previous = new Map(), w = dom.window
   for (const [key, value] of Object.entries({ window: w, document: w.document, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -12,52 +12,18 @@ test("client creation requires a company address, preserves intake details, and 
   const { createRoot } = await import("react-dom/client"), root = createRoot(document.getElementById("root"))
   try {
     const { IntakeForm, AccountForm } = await server.ssrLoadModule("/src/panels.tsx")
-    const state = emptyState(), saved = []
+    const state = emptyState()
     const button = text => [...document.querySelectorAll("button")].find(element => element.textContent.trim() === text)
-    const click = text => React.act(async () => { assert.ok(button(text), text); button(text).click() })
     const field = text => document.getElementById([...document.querySelectorAll("label")].find(label => label.textContent === text)?.htmlFor || "")
-    const type = (label, value) => React.act(() => {
-      const input = field(label); assert.ok(input, label)
-      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(input, value)
-      input.dispatchEvent(new w.Event("input", { bubbles: true }))
-    })
-    await React.act(() => root.render(React.createElement(IntakeForm, { state, onSubmit() {}, onClient: account => { saved.push(account); state.accounts.push(account); return account }, onClose() {} })))
-    await click("Create a client account")
-    await type("Client / company name *", "Sample Client")
-    await type("Contact person", "Primary contact")
-    await type("Contact number", "09171234567")
-    assert.match(document.body.textContent, /Project access is not activated/)
-    assert.equal(field("Email address *").placeholder, "lastname.firstname@10builders.com")
-    for (const email of ["mikahiro@gmail.com", "mikahiro@yahoo.com", "mikahiro@10builders.com.evil", "mikahiro@not10builders.com", "", "mikahiro@@10builders.com"]) {
-      await type("Email address *", email)
-      await click("Save client for project")
-      assert.equal(saved.length, 0)
-      assert.equal(field("Email address *").getAttribute("aria-invalid"), "true")
-      const description = document.getElementById(field("Email address *").getAttribute("aria-describedby"))
-      assert.match(description.textContent, /Enter a valid @10builders\.com email address/)
-      assert.equal(field("Client / company name *").value, "Sample Client")
-      assert.equal(field("Contact person").value, "Primary contact")
-      assert.equal(field("Contact number").value, "09171234567")
-    }
-    await type("Email address *", "  Hiro.Mika@10BUILDERS.COM  ")
-    assert.equal(field("Email address *").getAttribute("aria-invalid"), null)
-    await click("Save client for project")
-    assert.equal(saved.length, 1)
-    assert.equal(saved[0].email, "hiro.mika@10builders.com")
-    assert.equal(saved[0].status, "pending-setup")
-    assert.deepEqual(saved[0].scope, [])
-    assert.ok([...document.querySelectorAll(".selected-client-details input")].some(input => input.value === "hiro.mika@10builders.com"))
-    // Existing records remain selectable instead of forcing a new account.
-    const legacy = { ...saved[0], id: "legacy-client", email: "legacy@company.test" }
+    await React.act(() => root.render(React.createElement(IntakeForm, { state, onSubmit() {}, onClose() {} })))
+    assert.equal(button("Create a client account"), undefined)
+    assert.match(document.body.textContent, /For a new client, start from Project inquiries/)
+    const legacy = { id: "legacy-client", name: "Sample Client", email: "legacy@company.test", role: "client",
+      status: "active", scope: [], projectTypes: [], docs: [], phone: "" }
     state.accounts.push(legacy)
-    let used
-    await React.act(() => root.render(React.createElement(AccountForm, { state, clientOnly: true, onSave() { throw Error("Must use existing") }, onUseExisting: account => { used = account }, onClose() {} })))
-    await type("Email address *", legacy.email)
-    await click("Use Existing Client")
-    assert.equal(used.id, legacy.id)
     await React.act(() => root.render(React.createElement(AccountForm, { key: "existing", state, account: legacy, onSave() {}, onClose() {} })))
     assert.equal(field("Email address *").getAttribute("pattern"), null)
-    // Clients are created only through project intake: the Team account form offers staff roles only.
+    // Client provisioning is outside the Team account form.
     await React.act(() => root.render(React.createElement(AccountForm, { key: "generated", state, onSave() { throw Error("No save expected") }, onClose() {} })))
     const roles = [...field("Account role").options].map(option => option.value)
     assert.ok(!roles.includes("client"), "Team cannot create Client accounts")
@@ -71,7 +37,7 @@ test("client creation requires a company address, preserves intake details, and 
   }
 })
 
-test("intake client search opens only after typing, paginates, selects real IDs, and preserves modal and account creation", async () => {
+test("intake client search opens only after typing, paginates, selects real IDs, and preserves the selected account", async () => {
   const {JSDOM}=await import("jsdom")
   const {createServer}=await import("vite")
   const {default:React,act}=await import("react")
@@ -93,7 +59,7 @@ test("intake client search opens only after typing, paginates, selects real IDs,
     clients[4].id="11111111-ad00-4000-8000-111111111111"
     state.accounts=[...clients,{...clients[0],id:"blocked",name:"Blocked Aguilar",status:"suspended"},{...clients[0],id:"inactive",name:"Inactive Aguilar",status:"deactivated"},{...clients[0],id:"staff",name:"Staff Aguilar",role:"opm"}]
     let closed=0
-    await act(()=>root.render(React.createElement(Modal,{title:"New project intake",onClose:()=>closed++},React.createElement(IntakeForm,{state,onSubmit:()=>{},onClient:a=>a,onClose:()=>closed++}))))
+    await act(()=>root.render(React.createElement(Modal,{title:"New project intake",onClose:()=>closed++},React.createElement(IntakeForm,{state,onSubmit:()=>{},onClose:()=>closed++}))))
     const get=selector=>document.querySelector(selector)
     const search=()=>get('.client-search input')
     const type=async value=>act(()=>{
@@ -134,13 +100,9 @@ test("intake client search opens only after typing, paginates, selects real IDs,
     assert.equal(get('.selected-client-details'),null,"typing a replacement invalidates the previous selection")
     await act(()=>get('[data-client-select]').click())
     assert.equal(search().value,"Carlo Aguilar")
-    const create=[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Create a client account'))
-    await act(()=>create.click())
-    assert.equal(document.querySelectorAll('[aria-modal="true"]').length,2,"existing create-account dialog still opens")
-    const nested=[...document.querySelectorAll('[aria-modal="true"]')].at(-1)
-    await act(()=>nested.querySelector('[aria-label="Close dialog"]').click())
-    assert.equal(document.querySelectorAll('[aria-modal="true"]').length,1)
-    assert.equal(search().value,"Carlo Aguilar","canceling account creation preserves selection")
+    assert.equal([...document.querySelectorAll('button')].some(b => b.textContent.includes('Create a client account')), false)
+    assert.equal(document.querySelectorAll('[aria-modal="true"]').length, 1)
+    assert.equal(search().value, "Carlo Aguilar")
     await act(()=>get('[aria-label="Change selected client"]').click())
     assert.equal(search().value,"")
     assert.equal(get('.client-search-results'),null)

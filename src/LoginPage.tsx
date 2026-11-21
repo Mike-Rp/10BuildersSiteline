@@ -8,6 +8,8 @@ import { SIGN_IN_MESSAGES, validateSignInFields, lockoutDeadline, formatCountdow
 import "./login-page.css"
 import LoginBanner from "./LoginBanner"
 import {AdminRecoveryForm} from './AdminAccountSecurity'
+import { CLIENT_ACTIVATION_PATH } from "./portal-domain"
+import { CLIENT_ACCOUNT_PENDING } from "./client-activation"
 
 export default function LoginPage({
   checkingSession = false,
@@ -100,6 +102,10 @@ export default function LoginPage({
         return
       }
       setDeviceChoice(false)
+      if (!internal && reason instanceof ApiError && reason.code === CLIENT_ACCOUNT_PENDING) {
+        setError("Your client account is pending activation. Activate it before signing in.")
+        return
+      }
       const deadline = lockoutDeadline(localAttemptStore(), email)
       if (deadline) { setNow(Date.now()); setLockedUntil(deadline); return }
       setError(
@@ -259,7 +265,8 @@ export default function LoginPage({
                 </small>
               )}
               <p className="login-help">
-                <a href="#password-reset" onClick={event => { event.preventDefault(); if(admin){setAdminRecoveryOpen(true);return} setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>
+                {internal && <a href="#password-reset" onClick={event => { event.preventDefault(); if(admin){setAdminRecoveryOpen(true);return} setResetOpen(true); setResetStep("name"); setResetFirstName(""); setResetMiddleName(""); setResetLastName(""); setResetEmail(""); setResetMessage(""); setResetError("") }}>Forgot password?</a>}
+                {!internal && <a href={CLIENT_ACTIVATION_PATH}>Activate your client account</a>}
               </p>
               {remaining > 0 ? (
                 <div className="login-error" role="alert">
@@ -284,7 +291,7 @@ export default function LoginPage({
                     : admin ? "Sign in to administration" : staff ? "Sign in to workspace" : "Sign in to your project"}
               </Button>
             </form>
-            {internal ? <p className="admin-restricted-note"><Icon name="lock" size={15} /><span>{admin ? "Restricted to authorized 10 Builders administrators." : "Access is based on your assigned account role."}</span></p> : <p className="client-login-note">Use the client account issued by 10 Builders.</p>}
+            {internal ? <p className="admin-restricted-note"><Icon name="lock" size={15} /><span>{admin ? "Restricted to authorized 10 Builders administrators." : "Access is based on your assigned account role."}</span></p> : <p className="client-login-note">Use your registered email and SiteLine password. Contact 10 Builders if you need help accessing your account.</p>}
           </div>
 
         </section>

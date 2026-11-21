@@ -63,7 +63,16 @@ test("login portals enforce database roles before creating or replacing sessions
       const after=(await db.query('select u.last_login_at,t.token from users u join users_token t on t.user_id=u.id where u.id=$1',[user.id])).rows[0]
       assert.deepEqual(after,before,'A wrong portal must not update login timestamps or replace a valid session')
     }
-    if(role!=='admin'){
+    if(role==='admin'){
+      const client=accounts.find(account=>account.role==='client')
+      const reset=await fetch(base+'/accounts/'+client.id+'/regenerate-password',{
+        method:'POST',headers:{...authHeaders,'Content-Type':'application/json'},body:JSON.stringify({adminPassword:'Password@123'}),
+      })
+      assert.equal(reset.status,403)
+      const restricted=await reset.json()
+      assert.match(restricted.error.message,/Clients must set their own/)
+      assert.equal(restricted.data?.temp_password,undefined)
+    } else {
       const protectedPage=await fetch(base+'/accounts/password-reset-requests',{headers:{Authorization:'Bearer '+accepted.body.data.token}})
       assert.equal(protectedPage.status,403,'Signing in as staff or client never grants admin API permissions')
     }

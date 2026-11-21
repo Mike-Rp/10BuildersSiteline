@@ -14,8 +14,6 @@ const classifications = ["Normal", "Priority", "Urgent"];
 function validateInquiryContact(details, previous) {
   if (details.phone !== previous?.phone && !/^(?:09[0-9]{9}|\+639[0-9]{9})$/.test(details.phone))
     throw new HttpError(422, "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9.");
-  if (details.email !== previous?.email && !/^[^\s@]+@gmail\.com$/i.test(details.email))
-    throw new HttpError(422, "Enter a valid @gmail.com email address.");
 }
 
 export function inquiryDetails(input) {

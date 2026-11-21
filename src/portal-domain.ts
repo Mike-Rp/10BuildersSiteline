@@ -3,6 +3,8 @@ import { resolveWorkspaceRoute } from "./workspace-routing.ts"
 // These domains serve the same deployment. Unknown hosts (local/preview) keep
 // path-based portal selection so development never navigates to production.
 export type DomainPortal = "admin" | "client" | "staff"
+export const CLIENT_ACTIVATION_PATH = "/client/activate"
+export const isClientActivationPath = (path: string) => /^\/client\/activate\/?$/i.test(path)
 export const PORTAL_ORIGINS = {
   admin: "https://admin.10buildline.site",
   client: "https://10buildline.site",
@@ -28,6 +30,7 @@ export function portalDomainRedirect(location: Pick<Location, "hostname" | "path
   if (!current) return
   const { pathname } = location
   if (pathname === "/" || /^\/api(?:\/|$)/i.test(pathname)) return
+  if (current === "client" && isClientActivationPath(pathname)) return
   const loginAlias = current === "client" ? /^\/client\/login\/?$/i
     : current === "admin" ? /^\/(?:login|admin\/login)\/?$/i
     : /^\/(?:login|(?:admin|staff)\/login)\/?$/i

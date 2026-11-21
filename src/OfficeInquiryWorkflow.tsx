@@ -220,7 +220,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         else if (!control.validity.valid) message = control.validationMessage
         else if (numericField(key) && value && Number(value) <= 0) message = "Enter a value greater than zero."
         else if (key === "phone" && value !== row.details.phone && !/^(?:09[0-9]{9}|\+639[0-9]{9})$/.test(value)) message = "Enter a mobile number starting with 09 (11 digits) or +639 (13 characters)."
-        else if (key === "email" && value !== row.details.email && !/^[^\s@]+@gmail\.com$/i.test(value)) message = "Enter a valid @gmail.com email address."
+        else if (key === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) message = "Enter a valid personal or business email address."
       }
       if (message) {
         const target = control.disabled ? event.currentTarget.querySelector<HTMLInputElement>("#inquiry-start-date") : control

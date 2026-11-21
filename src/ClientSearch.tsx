@@ -104,7 +104,7 @@ export default function ClientSearch({ id, clients, value, onChange, disabled = 
           setOpen(false)
         }}>Select</Button>
       </div>)}
-      {!matches.length && <p className="client-search-empty">No clients found. Try another name or email, or create a client account below.</p>}
+      {!matches.length && <p className="client-search-empty">No clients found. Try another name or email.</p>}
       {matches.length > 3 && <div className="client-search-pages">
         <Button disabled={currentPage === 0} onClick={(event) => { setPage(currentPage - 1); scrollListAfterChange(event.currentTarget) }} aria-label="Previous client results">Previous</Button>
         <span>Page {currentPage + 1} of {pages}</span>

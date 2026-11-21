@@ -103,8 +103,12 @@ test("all three login pages use the approved branding and their own server entry
       assert.equal(requests.at(-1).body.email,'person@example.test')
       assert.match(document.querySelector('.login-error').textContent,/correct sign-in page/)
       assert.equal(client.getToken(),'')
-      await act(()=>document.querySelector('.login-help a').click())
-      assert.ok(document.querySelector(admin?'[role="dialog"][aria-label="Recover administrator access"]':'[role="dialog"][aria-label="Request a password reset"]'))
+      if (internal) {
+        await act(()=>document.querySelector('.login-help a').click())
+        assert.ok(document.querySelector(admin?'[role="dialog"][aria-label="Recover administrator access"]':'[role="dialog"][aria-label="Request a password reset"]'))
+      } else {
+        assert.equal(document.querySelector('.login-help a').getAttribute("href"), "/client/activate")
+      }
       await act(()=>root.render(null))
     }
   } finally {

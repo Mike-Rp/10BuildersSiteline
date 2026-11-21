@@ -42,10 +42,10 @@ export default function PasswordResetRequests({ children }: { children: (request
     {children(requests,(id,requestedAt)=>{void open(id,requestedAt)})}
     {loadError && <p role="alert" className="error">{loadError}</p>}
     {error && !selected && <p role="alert" className="error">{error}</p>}
-    {selected && <Modal title={selected.status==='completed' ? 'Completed password reset' : 'Reset account password'} subtitle={selected.email} onClose={()=>{if(!busy){setSelected(undefined);setPassword("")}}}>
+    {selected && <Modal title={selected.role === "client" ? "Client access request" : selected.status==='completed' ? 'Completed password reset' : 'Reset account password'} subtitle={selected.email} onClose={()=>{if(!busy){setSelected(undefined);setPassword("")}}}>
       <p><strong>{selected.full_name}</strong></p>
       <p>Requested: {new Date(selected.requested_at).toLocaleString('en-PH')}{selected.status!=='completed' && ` · ${waitLabel(selected.requested_at)}`}</p>
-      {selected.status==='completed' ? <><p>Password reset completed {selected.completed_at ? new Date(selected.completed_at).toLocaleString('en-PH') : ''}{selected.completed_by_name ? ` by ${selected.completed_by_name}` : ''}. The temporary password is not retained in this history.</p><Button onClick={()=>setSelected(undefined)}>Close</Button></> : <form onSubmit={async event=>{
+      {selected.role === "client" ? <><p>Clients set their own SiteLine password. Follow the client account recovery process.</p><Button onClick={()=>setSelected(undefined)}>Close</Button></> : selected.status==='completed' ? <><p>Password reset completed {selected.completed_at ? new Date(selected.completed_at).toLocaleString('en-PH') : ''}{selected.completed_by_name ? ` by ${selected.completed_by_name}` : ''}. The temporary password is not retained in this history.</p><Button onClick={()=>setSelected(undefined)}>Close</Button></> : <form onSubmit={async event=>{
         event.preventDefault();setBusy(true);setError("")
         try {
           const result=await api<{temp_password:string}>(`/accounts/${selected.id}/regenerate-password`,{method:'POST',json:{adminPassword:password,requestedAt:selected.requested_at}})

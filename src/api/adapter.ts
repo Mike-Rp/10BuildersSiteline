@@ -19,6 +19,7 @@ import {
   type Role,
   type State,
 } from "../model.ts"
+import { clientActivationStatus } from "../client-activation.ts"
 
 export type Dto = Record<string, any>
 
@@ -97,6 +98,7 @@ export function mapAccount(
     jobTitle: detail?.job_title ?? a.job_title ?? undefined,
     experienceByType: detail?.experience_by_type ?? a.experience_by_type,
     status: accountStatus(a.status),
+    activationStatus: role === "client" ? clientActivationStatus(detail?.activation_status ?? a.activation_status) : undefined,
     added: day(a.date_added),
     license: license?.license_number ?? "",
     expiry: day(license?.license_expiry),

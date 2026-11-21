@@ -13,6 +13,7 @@ import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
+import { clientActivationLabel, clientActivationStatus, type ClientActivationStatus } from "./client-activation"
 import "./project-inquiries.css"
 
 const projectTypes = [
@@ -28,7 +29,7 @@ const fields = [
 ] as const
 type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
-type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string }
+type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string; client_account_status?: ClientActivationStatus }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
 type BlockedCandidate = Candidate & { reason: "availability" | "schedule" | "commitments" }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
@@ -58,7 +59,7 @@ const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZo
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
 const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
 const inquiryPlaceholders: Record<string, string> = {
-  client_name: "Lastname, FirstName", phone: "09123456789 or +639123456789", email: "name@gmail.com",
+  client_name: "Lastname, FirstName", phone: "09123456789 or +639123456789", email: "name@example.com",
   name: "Maple Residence", address: "Street, barangay, city",
   land_area: "e.g. 300 (optional)", lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
 }
@@ -428,6 +429,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [selected, setSelected] = useState("")
   const [dialog, setDialog] = useState<"intake" | "details">()
   const [officePage, setOfficePage] = useState<OfficePage>()
+  const [finalizedClient, setFinalizedClient] = useState<{ name: string; status?: ClientActivationStatus; refreshFailed?: boolean }>()
   const [showOfficeApproval, setShowOfficeApproval] = useState(false)
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
@@ -617,14 +619,15 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   async function submit() {
     const fileId = await uploadIntakeContract()
-    await post("/projects/intake", {
+    const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: fileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
     })
-    await refresh()
+    setFinalizedClient({ name: result.project.name, status: clientActivationStatus(result.client_account_status) })
     setDialog(undefined)
     navigateOffice()
-    void onReload()
+    try { await Promise.all([refresh(), onReload()]) }
+    catch { setFinalizedClient(current => current && { ...current, refreshFailed: true }) }
   }
   const canAllocate = !!(contract || contractFileId) && !!row?.workflow?.assessment && phases.length > 0
   const staffingIssues = step === 3 ? phases.flatMap(stage => {
@@ -726,8 +729,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const candidates = matching?.candidates
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
-      const pattern = key === "phone" ? "(?:09[0-9]{9}|\\+639[0-9]{9})" : key === "email" ? "[^\\s@]+@[gG][mM][aA][iI][lL]\\.[cC][oO][mM]" : undefined
-      const hint = key === "phone" ? "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9." : "Use an @gmail.com address."
+      const pattern = key === "phone" ? "(?:09[0-9]{9}|\\+639[0-9]{9})" : key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
+      const hint = key === "phone" ? "Enter 11 digits starting with 09, or +63 followed by 10 digits starting with 9." : "Enter a valid personal or business email address."
       const invalid = Boolean(value && pattern && !new RegExp(`^(?:${pattern})$`).test(value))
       const noticeId = `inquiry-${key}-notice`
       return (
@@ -1063,10 +1066,22 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
         <InquiryDetails details={row.details} includeClient />
+        {row.project_id && <p>Client account · <strong>{clientActivationLabel(row.client_account_status)}</strong></p>}
         <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
         {row.reason && <p>Withdrawal reason: {row.reason}</p>}
         {row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
         {row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
+      </div>
+    </Modal>}
+    {finalizedClient && <Modal title="Project finalized" subtitle={finalizedClient.name} onClose={() => setFinalizedClient(undefined)}
+      footer={<button type="button" className="button primary" onClick={() => setFinalizedClient(undefined)}>Done</button>}>
+      <div className="inquiry-summary-card">
+        <h3>Client account</h3>
+        <p role="status"><strong>{clientActivationLabel(finalizedClient.status)}</strong></p>
+        {finalizedClient.status === "verification_required" && <p>Account ownership needs verification before client access can be linked.</p>}
+        {!finalizedClient.status && <p>The server did not report the client account status.</p>}
+        <p>Site PM staffing can continue independently of client activation.</p>
+        {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
       </div>
     </Modal>}
 

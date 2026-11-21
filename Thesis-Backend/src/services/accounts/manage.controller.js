@@ -441,8 +441,9 @@ export const regeneratePassword = async (req, res) => {
     const data = await withTransaction(async (client) => {
       const admin = (await client.query("select password_hash from users where id=$1", [actor.id])).rows[0];
       if (typeof req.body?.adminPassword !== "string" || !(await bcrypt.compare(req.body.adminPassword, admin.password_hash))) throw new HttpError(403, "Administrator password is incorrect.");
-      const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
+      const target = (await client.query("select r.code as role from users u join roles r on r.id=u.role_id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
       if (!target) throw new HttpError(404, "Account not found.");
+      if (target.role === "client") throw new HttpError(403, "Clients must set their own SiteLine password.");
       const resetMeta = (await client.query("select metadata from workspace_account_metadata where user_id=$1",[id])).rows[0]?.metadata || {};
       if(req.body?.requestedAt !== undefined && resetMeta.passwordResetRequestedAt !== req.body.requestedAt) {
         const done = (resetMeta.passwordResetHistory || []).find(h => h.requestedAt === req.body.requestedAt);
