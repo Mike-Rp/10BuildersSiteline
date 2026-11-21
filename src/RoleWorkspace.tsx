@@ -3490,7 +3490,8 @@ export default function RoleWorkspace({
           setDeclineReason("")
           setDialog({ kind: "decline", projectId: project.id, phase: pending[0].phase })
         }}>Decline {pending[0].phase} phase</Button>}
-        <Button variant="primary" icon="check" disabled={saving || !!blocker} title={blocker || undefined}
+        <Button variant="primary" icon="check" disabled={saving || !!blocker}
+          aria-describedby={blocker ? "site-offer-acceptance-blocker" : undefined}
           onClick={async () => {
             if (await act({ type: "accept_assignment", projectId: project.id }, "Your pending Site PM assignments are confirmed.")) close()
           }}>{actor.id === lead ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}</Button>
@@ -3518,7 +3519,7 @@ export default function RoleWorkspace({
             </section>
             <section className="site-offer-card"><h3>Project at a glance</h3>{projectFacts}</section>
           </div>
-          {blocker ? <div className="site-offer-blocker"><Icon name="shield" /><p>{blocker}</p></div>
+          {blocker ? <div className="site-offer-blocker"><Icon name="shield" /><p id="site-offer-acceptance-blocker">{blocker}</p></div>
             : <p>Accepting confirms {pending.length === 1 ? "your pending phase assignment" : `all ${pending.length} pending phase assignments`} for this project.</p>}
           {project.inquiryOrigin && missingDocuments.length > 0 && <p>Office PM uploads pending: {missingDocuments.join(", ")}.</p>}
         </> : <>

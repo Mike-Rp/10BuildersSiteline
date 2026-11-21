@@ -33,6 +33,7 @@
 #root .site-offer-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; padding: 16px 24px; border-top: 1px solid var(--color-line); background: var(--surface-subtle); }
 #root .site-offer-footer-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-inline-start: auto; }
 #root .site-offer-footer .button { white-space: normal; }
+#root .site-offer-footer .button.primary:disabled { background: var(--color-canvas); border-color: var(--color-line); color: var(--color-muted); box-shadow: none; cursor: not-allowed; }
 #root .staff-overview .urgent-action-banner { background: #fbedec; border-color: #d9a5a1; border-left-color: #9b3434; padding: 16px; margin-bottom: 16px; }
 #root .staff-overview :is(.urgent-banner-eyebrow, .urgent-banner-icon, .urgent-banner-copy h2) { color: #9b3434; }
 #root .staff-dashboard-content { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; gap: 16px; }
