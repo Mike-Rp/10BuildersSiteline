@@ -221,7 +221,9 @@ function staffingIssue(entry: Phase | undefined, required: string[], choices: Ca
     : `Unassigned: ${missing.join(", ")}.`}`
 }
 
-function ContractPreview({ file, fileId, onClose, onConfirm }: { file?: File; fileId?: string; onClose: () => void; onConfirm?: () => void }) {
+function ContractPreview({ file, fileId, onClose, onConfirm, busy, error }: {
+  file?: File; fileId?: string; onClose: () => void; onConfirm?: () => void; busy?: boolean; error?: string
+}) {
   const [preview, setPreview] = useState<{ url: string; mime: string }>()
   const [failed, setFailed] = useState(false)
   useEffect(() => {
@@ -241,10 +243,11 @@ function ContractPreview({ file, fileId, onClose, onConfirm }: { file?: File; fi
   }, [file, fileId])
   return <Modal title={onConfirm ? "Confirm signed contract" : "Signed contract preview"} subtitle={file?.name} wide onClose={onClose}
     footer={onConfirm && <>
-      <button type="button" className="button" onClick={onClose}>Cancel</button>
-      <button type="button" className="button primary" disabled={!preview} onClick={onConfirm}>Confirm this file</button>
+      <button type="button" className="button" disabled={busy} onClick={onClose}>Cancel</button>
+      <button type="button" className="button primary" disabled={!preview || busy} onClick={onConfirm}>{busy ? "Saving contract…" : "Confirm this file"}</button>
     </>}>
     {onConfirm && <p>Review the file and confirm it is the signed agreement for this project.</p>}
+    {error && <p role="alert">{error}</p>}
     {preview ? preview.mime === "application/pdf"
       ? <object className="pdf-preview large" data={`${preview.url}#toolbar=0&navpanes=0`} type="application/pdf" aria-label="Signed contract PDF">
           <p>This browser cannot display the PDF preview.</p>
@@ -486,16 +489,15 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
-  const [contract, setContract] = useState<File>()
-  const [pendingContract, setPendingContract] = useState<File>()
+  const [pendingContract, setPendingContract] = useState<{ file: File; uploadedId?: string }>()
   const contractInput = useRef<HTMLInputElement>(null)
   const [contractPreviewOpen, setContractPreviewOpen] = useState(false)
-  const [contractFileId, setContractFileId] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [opmPreview, setOpmPreview] = useState<{ type: string; candidates?: InquiryOpmCandidate[]; error?: string }>()
   const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
+  const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
   const budget = row?.workflow?.budget
@@ -581,9 +583,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setPlanning(undefined)
     setTeam([])
     setPhases([])
-    setContract(undefined)
     setPendingContract(undefined)
-    setContractFileId(undefined)
+    setContractPreviewOpen(false)
     setError("")
     setStep(2)
     setAddingEngineer(false)
@@ -642,15 +643,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
       setPhases(result.staffing?.phases ?? result.phases)
-      setContractFileId(result.staffing?.contract_file_id)
     }
     setStep(2)
     setDialog("intake")
   }
   async function allocate(recheck = false) {
-    const fileId = await uploadIntakeContract()
+    if (!contractFileId) throw new Error("Attach the signed client contract agreement in Project information.")
     const additional = planning?.staffing?.additional_scopes
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId,
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: contractFileId,
       ...(additional ? { additional_scopes: Object.fromEntries(Object.entries(additional).filter(([stage]) => phases.includes(stage))) } : {}),
     })
     setPlanning(result)
@@ -663,26 +663,33 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (!planning?.additional_scope_options?.[staffingPhase]?.includes(scope)) return
     const previous = planning.staffing?.additional_scopes ?? {}
     const additional_scopes = { ...previous, [staffingPhase]: [...new Set([...(previous[staffingPhase] ?? []), scope])] }
-    const fileId = await uploadIntakeContract()
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId, additional_scopes })
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: contractFileId, additional_scopes })
     if (!result.staffing?.additional_scopes?.[staffingPhase]?.includes(scope) || !result.candidates?.[staffingPhase] ||
       !requiredAreas(result.team?.find(phase => phase.stage === staffingPhase)).includes(scope)) {
       throw new Error("The server did not confirm the additional phase scope.")
     }
     setPlanning(result)
   }
-  async function uploadIntakeContract() {
-    if (contractFileId) return contractFileId
-    if (!contract) throw new Error("Attach the signed client contract agreement.")
-    const id = crypto.randomUUID()
-    await uploadFile(id, contract)
-    setContractFileId(id)
-    return id
+  async function confirmContract() {
+    if (!pendingContract) return
+    const id = pendingContract.uploadedId ?? crypto.randomUUID()
+    if (!pendingContract.uploadedId) {
+      await uploadFile(id, pendingContract.file)
+      setPendingContract({ ...pendingContract, uploadedId: id })
+    }
+    const updated = await post<Inquiry>(`${root}/${selected}/workflow`, {
+      action: "contract", version: row?.workflow?.review?.version ?? 0,
+      contract_file_id: id, expected_contract_file_id: contractFileId ?? null,
+    })
+    updateInquiry(updated)
+    setPendingContract(undefined)
+    setPlanning(undefined)
+    setTeam([])
   }
   async function submit() {
-    const fileId = await uploadIntakeContract()
+    if (!contractFileId) throw new Error("Attach the signed client contract agreement in Project information.")
     const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
-      ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: fileId,
+      ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: contractFileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
       ...(planning?.staffing?.additional_scopes ? { additional_scopes: planning.staffing.additional_scopes } : {}),
     })
@@ -692,7 +699,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     try { await Promise.all([refresh(), onReload()]) }
     catch { setFinalizedClient(current => current && { ...current, refreshFailed: true }) }
   }
-  const canAllocate = !!(contract || contractFileId) && !!row?.workflow?.assessment && phases.length > 0
+  const canAllocate = !!contractFileId && !!row?.workflow?.assessment && phases.length > 0
   const staffingIssues = step === 3 ? phases.flatMap(stage => {
     const entry = team.find(item => item.stage === stage)
     const choices = planning?.candidates?.[stage] ?? []
@@ -993,6 +1000,28 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
+          hasSignedContract={!!contractFileId}
+          signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
+            <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
+              const file = event.target.files?.[0]
+              event.target.value = ""
+              if (!file) return
+              if (!file.size || !/\.(pdf|png|jpe?g)$/i.test(file.name)) {
+                setError("Choose a nonempty PDF, PNG, or JPEG signed contract.")
+                return
+              }
+              setError("")
+              setPendingContract({ file })
+            }} />
+            <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
+              <Icon name="upload" size={17} />{contractFileId ? "Replace signed contract" : "Upload signed contract"}
+            </button>
+            {contractFileId && <div className="inquiry-sent-notice inquiry-contract-preview">
+              <span className="inquiry-list-icon"><Icon name="doc" /></span>
+              <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract confirmed</small></div>
+              <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setContractPreviewOpen(true) }}>View contract</button>
+            </div>}
+          </FormSection>}
           decide={(action, input) => void run(() => decision(action, input))}
           save={(action, input) => void run(() => saveWorkflow(action, input))} />
       : <>
@@ -1244,28 +1273,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 }} />{stage}
               </label>)}
             </div>
-            <FormSection title="Signed contract" icon="doc" description="Attach the executed agreement.">
-              <input ref={contractInput} type="file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
-                const file = event.target.files?.[0]
-                if (!file) return
-                event.target.value = ""
-                if (!file.size || !/\.(pdf|png|jpe?g)$/i.test(file.name)) {
-                  setError("Choose a nonempty PDF, PNG, or JPEG signed contract.")
-                  return
-                }
-                setError("")
-                setPendingContract(file)
-              }} />
-              <button type="button" className="button primary" onClick={() => contractInput.current?.click()}>
-                <Icon name="upload" size={17} />{contract || contractFileId ? "Replace signed contract" : "Upload signed contract"}
-              </button>
-              {(contract || contractFileId) && <div className="inquiry-sent-notice inquiry-contract-preview">
-                <span className="inquiry-list-icon"><Icon name="doc" /></span>
-                <div><strong>{contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract confirmed</small></div>
-                <button type="button" className="button" onClick={() => setContractPreviewOpen(true)}>View contract</button>
-              </div>}
-            </FormSection>
-            {!canAllocate && <p className="inquiry-muted">Attach the signed contract and select at least one phase to continue.</p>}
+            {!phases.length && <p className="inquiry-muted">Select at least one phase to continue.</p>}
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
@@ -1297,15 +1305,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         {feedback}
       </div>
     </Modal>}
-    {dialog === "intake" && pendingContract && <ContractPreview file={pendingContract} onClose={() => setPendingContract(undefined)}
-      onConfirm={() => {
-        setContract(pendingContract)
-        setPendingContract(undefined)
-        setContractFileId(undefined)
-        setPlanning(current => current && { ...current, candidates: undefined })
-        setTeam([])
-      }} />}
-    {dialog === "intake" && contractPreviewOpen && <ContractPreview file={contract} fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
+    {officePage === "review" && pendingContract && <ContractPreview file={pendingContract.file} busy={busy} error={error}
+      onClose={() => { if (!busy) { setPendingContract(undefined); setError("") } }}
+      onConfirm={() => void run(confirmContract)} />}
+    {officePage === "review" && contractPreviewOpen && contractFileId && <ContractPreview fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
     {admin && adminPage === "new" && renderAdminInquiryForm()}
     {!dialog && !officePage && adminPage !== "new" && feedback}
   </section>

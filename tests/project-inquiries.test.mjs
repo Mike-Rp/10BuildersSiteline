@@ -204,6 +204,13 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     return (await call("/files",{token,form})).id
   }
   const documents = {contract_file_id:await upload("signed.pdf")}
+  if (multiEngineer) {
+    const savedContract = (await save("contract", 2, documents)).workflow
+    assert.deepEqual(savedContract.signed_contract,{id:documents.contract_file_id,name:"signed.pdf"})
+    assert.equal(savedContract.assessment.id,assessed.assessment.id)
+    await save("contract", 2, documents, 409)
+    await call(planning,{token,status:409,json:{...planInput,contract_file_id:await upload("stale.pdf"),phases}})
+  }
   const recommended = await call(planning,{token,json:{...planInput,...documents,phases}})
   const resumed = await call(planning,{token,json:planInput})
   assert.deepEqual(resumed.staffing,{assessment_id:assessed.assessment.id,phases,contract_file_id:documents.contract_file_id})

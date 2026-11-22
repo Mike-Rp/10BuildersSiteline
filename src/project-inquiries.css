@@ -113,6 +113,40 @@
 .office-workflow { display: grid; gap: 18px; min-width: 0; }
 .office-workflow-back { justify-self: start; }
 .office-workflow-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); }
+.office-intake-record { border: 1px solid #c7dbe9; border-radius: 12px; background: #f4f9fc; box-shadow: 0 4px 14px #17385712; overflow: hidden; }
+.office-intake-record-toolbar, .office-intake-record-header, .office-intake-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.office-intake-record-toolbar { padding: 8px 14px; border-bottom: 1px solid #d4e2ed; }
+.office-intake-record-toolbar > .inquiry-muted { margin-inline-end: auto; overflow-wrap: anywhere; font-size: .85rem; }
+.office-intake-record-header { padding: clamp(14px, 2vw, 22px); background: linear-gradient(105deg, #f4f9fc, #e1edf6); }
+.office-intake-record-header > div { min-width: 0; overflow-wrap: anywhere; }
+.office-intake-record-header h1 { margin: 0; font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
+.office-intake-record-header p { margin: 4px 0 0; color: var(--color-muted); }
+.office-intake-record-header .office-workflow-facts { display: flex; flex-wrap: wrap; gap: 1px; margin: 0; border: 1px solid #cbddeb; border-radius: 8px; background: #cbddeb; overflow: hidden; }
+.office-intake-record-header .office-workflow-facts > div { flex: 1 1 auto; padding: 9px 12px; background: #f5f9fc; }
+.office-intake-record-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; border-top: 1px solid #d4e2ed; border-radius: 0; background: #f8fbfd; }
+.office-intake-record-nav > .button { justify-content: start; gap: 8px; min-width: 0; padding-inline: 8px; text-align: start; white-space: normal; }
+.office-intake-record-nav > .button strong, .office-intake-record-nav > .button small { display: block; }
+.office-intake-record-nav > .button small { font-size: .74rem; font-weight: 400; }
+.office-intake-step-marker { display: grid; place-items: center; flex: 0 0 25px; height: 25px; border-radius: 50%; background: #e3edf5; color: #325776; font-size: .76rem; }
+.office-intake-step-marker[data-complete=true] { background: #dbefe4; color: #27684d; }
+.office-intake-record-nav > [aria-current=step] .office-intake-step-marker { background: #ffffff35; color: #fff; }
+.office-intake-section-heading h2 { margin: 6px 0 0; font-size: clamp(1.2rem, 2vw, 1.5rem); }
+.office-intake-records > .office-workflow-card, .office-proposal-grid > .office-workflow-card { border-block-start: 4px solid #36739e; box-shadow: 0 4px 12px #17385712; }
+.office-intake-records > .office-workflow-card:first-child { border-block-start-color: #448b73; }
+.office-intake-records .office-workflow-facts, .office-proposal-grid .office-workflow-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid #d6e3ee; border-radius: 8px; background: #d6e3ee; overflow: hidden; }
+.office-intake-records .office-workflow-facts > div, .office-proposal-grid .office-workflow-facts > div { padding: 10px 12px; background: #f7fafc; }
+.office-workflow-grid.office-proposal-grid { grid-template-columns: minmax(0, 43fr) minmax(0, 57fr); align-items: stretch; }
+.office-proposal-grid > .office-workflow-card { align-content: start; }
+.office-proposal-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px; border: 1px solid #d3e3ef; border-radius: 8px; background: #edf5fa; }
+.office-proposal-summary h3 { flex: 1 1 150px; margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.office-proposal-summary .inquiry-list-icon { font-size: .8rem; font-weight: 700; }
+.office-proposal-scope { display: grid; gap: 5px; padding: 12px; border-radius: 8px; background: #edf5fa; overflow-wrap: anywhere; }
+.office-proposal-scope h3 { margin: 0; font-size: .9rem; }
+.office-proposal-grid .office-workflow-actions { padding-top: 12px; border-top: 1px solid #d6e3ee; }
+@media (max-width: 900px) {
+  .office-intake-record-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .office-workflow-grid.office-proposal-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .office-workflow-heading { display: flex; gap: 14px; justify-content: space-between; align-items: end; flex-wrap: wrap; }
 .office-workflow-heading h1 { font-size: clamp(1.85rem, 3.3vw, 2.65rem); line-height: 1.16; overflow-wrap: anywhere; margin-block: 4px; }
 .office-workflow-heading p, .office-workflow-card p { color: var(--color-muted); }

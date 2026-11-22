@@ -34,6 +34,12 @@ test("proposal approval opens mandatory review with live size and inline validat
       }
       if (path.endsWith("/workflow")) {
         const input = JSON.parse(init.body)
+        if (input.action === "contract") {
+          assert.equal(input.expected_contract_file_id, inquiry.workflow?.signed_contract?.id ?? null)
+          inquiry = { ...inquiry, workflow: { ...inquiry.workflow,
+            signed_contract: { id: input.contract_file_id, name: uploadedContracts.at(-1) } } }
+          return Response.json({ data: inquiry })
+        }
         if (input.action === "assessment") {
           inquiry = { ...inquiry, workflow: { ...inquiry.workflow, assessment: {
             id: "assessment", technical: input.technical, arrangement: input.arrangement, size: "Medium", complexity: "Moderate",
@@ -45,6 +51,7 @@ test("proposal approval opens mandatory review with live size and inline validat
         inquiry = {
           ...inquiry, details: { ...inquiry.details, ...submitted.correction },
           workflow: {
+            ...inquiry.workflow,
             budget: Number(submitted.amount), review: { ...submitted, version: 1 },
             review_history: [{ version: 1, at: start, reason: submitted.reason, changes: { floor_area_sqm: { before: 120, after: 180 } } }],
           },
@@ -57,7 +64,7 @@ test("proposal approval opens mandatory review with live size and inline validat
         const scopes = ["Structural Engineering", "Mechanical", "Acoustic", ...(input.additional_scopes?.Design ?? [])]
         return Response.json({ data: {
           phases: ["Design"], estimate: { size: "Medium", end: submitted.end },
-          staffing: { assessment_id: "assessment", phases: ["Design"], contract_file_id: "contract", additional_scopes: input.additional_scopes },
+          staffing: { assessment_id: "assessment", phases: ["Design"], contract_file_id: inquiry.workflow.signed_contract.id, additional_scopes: input.additional_scopes },
           ...(input.phases && { additional_scope_options: { Design: [supplemental] },
             team: [{ stage: "Design", user_id: "ana", required_specializations: scopes, engineers: [
               { user_id: "ana", assigned_disciplines: ["Structural Engineering"] },
@@ -105,13 +112,36 @@ test("proposal approval opens mandatory review with live size and inline validat
   })
   await act(() => root.render(React.createElement(ProjectInquiries, { role: "opm", onReload() {} })))
   await click(document.querySelector('button[aria-label$="for Maple Residence"]'))
-  assert.match(document.querySelector(".office-workflow h1").textContent, /Client proposal/i)
-  await click(button("Accepted inquiry"))
+  const recordStep = label => [...document.querySelectorAll(".office-intake-record-nav button")]
+    .find(item => item.querySelector("strong").textContent === label)
+  assert.equal(document.querySelector(".office-intake-record h1").textContent, "Maple Residence")
+  assert.equal(recordStep("Client proposal").getAttribute("aria-current"), "step")
+  assert.equal(recordStep("Project information & budget").disabled, true)
+  assert.equal(recordStep("Project assessment").disabled, true)
+  assert.equal(document.querySelectorAll(".office-proposal-grid > .office-workflow-card").length, 2)
+  await click(recordStep("Accepted inquiry"))
   assert.equal(document.querySelectorAll(".record-cards > .office-workflow-card").length, 2)
   assert.doesNotMatch(document.querySelector(".record-cards").textContent, /Land area/i)
-  await click(button("Open proposal"))
+  await click(button("Open client proposal"))
   await click(button("Mark proposal approved"))
   assert.match(document.querySelector(".office-review-toast").textContent, /Proposal approved/)
+  const chooseContract = name => act(async () => {
+    const input = document.querySelector('.office-review-form input[type="file"]')
+    Object.defineProperty(input, "files", { value: [new File(["contract"], name, { type: "application/pdf" })], configurable: true })
+    input.dispatchEvent(new window.Event("change", { bubbles: true }))
+  })
+  const confirmation = () => document.querySelector('[aria-label="Confirm signed contract"]')
+  await chooseContract("discarded.pdf")
+  assert.match(confirmation().textContent, /discarded.pdf/)
+  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
+  assert.deepEqual(uploadedContracts, [])
+  await chooseContract("signed.pdf")
+  assert.match(confirmation().textContent, /signed.pdf/)
+  await click(button("Confirm this file"))
+  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
+  await chooseContract("replacement.pdf")
+  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
+  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
   const measurements = document.querySelector('section[aria-labelledby="inquiry-review-measurements"]')
   assert.equal(document.querySelector("#inquiry-review-land_area"), null)
   assert.ok(measurements.closest(".office-review-form"))
@@ -203,8 +233,15 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.ok([...scoreBreakdown.querySelectorAll("meter")].every(meter => meter.max === 3))
   assert.ok([...document.querySelectorAll(".office-assessment-basis")].some(node => node.textContent.includes("View duration calculation")))
 
+  await click(button("Client proposal"))
+  assert.match(document.querySelector(".office-proposal-grid .office-workflow-notice.success").textContent, /Proposal approved/)
+  assert.equal(button("Mark proposal approved"), undefined)
+  assert.equal(recordStep("Project assessment").disabled, false)
+  await click(recordStep("Project assessment"))
+
   await click(button("Project information & budget"))
   await click(button("Edit project information"))
+  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
   assert.equal(document.querySelector("#inquiry-review-floor-level-2").value, "80")
   assert.doesNotMatch(document.querySelector(".office-floor-estimate").textContent, /Admin:/)
   assert.match(document.querySelector(".office-review-size").textContent, /Small → Medium/)
@@ -212,25 +249,10 @@ test("proposal approval opens mandatory review with live size and inline validat
   await click(button("Continue to assessment"))
   await click(button("Complete assessment"))
   await click(button("Continue to construction phases"))
-  const chooseContract = name => act(async () => {
-    const input = document.querySelector('input[type="file"]')
-    Object.defineProperty(input, "files", { value: [new File(["contract"], name, { type: "application/pdf" })], configurable: true })
-    input.dispatchEvent(new window.Event("change", { bubbles: true }))
-  })
-  await chooseContract("discarded.pdf")
-  const confirmation = () => document.querySelector('[aria-label="Confirm signed contract"]')
-  assert.match(confirmation().textContent, /discarded.pdf/)
-  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
-  assert.deepEqual(uploadedContracts, [])
-  await chooseContract("signed.pdf")
-  assert.match(confirmation().textContent, /signed.pdf/)
-  await click(button("Confirm this file"))
-  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
-  await chooseContract("replacement.pdf")
-  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
-  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
+  assert.equal(document.querySelector('input[type="file"]'), null)
   await click(button("Continue to staffing"))
   assert.deepEqual(uploadedContracts, ["signed.pdf"])
+  assert.equal(staffingRequest.contract_file_id, inquiry.workflow.signed_contract.id)
   assert.match(document.querySelector(".inquiry-lineup-table tbody tr:first-child").textContent, /Kurt Gonzales.*2 years.*Lead SPM/)
   assert.match(document.querySelector(".inquiry-coverage-warning").textContent, /No eligible Site PM found for Acoustic.*meets its minimum coverage of 2/)
   assert.match(document.body.textContent, /Technical requirements · Extensive specialized systems/)

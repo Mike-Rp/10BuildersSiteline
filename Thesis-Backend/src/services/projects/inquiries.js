@@ -67,9 +67,10 @@ export function validSchedule(start, end) {
 
 export async function assertInquiryUpload(db, actorId, fileId, lock = false) {
   if (!isUuid(fileId)) throw new HttpError(422, "Upload a valid project document.");
-  const uploaded = await db.query(`SELECT id FROM stored_files WHERE id=$1 AND uploaded_by=$2
+  const uploaded = await db.query(`SELECT id, original_name, content_type FROM stored_files WHERE id=$1 AND uploaded_by=$2
     AND purpose='upload' AND project_id IS NULL ${lock ? "FOR UPDATE" : ""}`, [fileId, actorId]);
   if (!uploaded.rowCount) throw new HttpError(422, "Select a new document uploaded to your account.");
+  return uploaded.rows[0];
 }
 
 export async function inquiryPhases(db, type) {
@@ -288,6 +289,17 @@ export function mountInquiries(router) {
       throw new HttpError(409, "The project record changed. Reopen the inquiry to load the latest version.");
     const audit = { by: actor.id, at: new Date().toISOString() };
     switch (input.action) {
+      case "contract": {
+        const previousId = workflow.signed_contract?.id ?? workflow.staffing?.contract_file_id ?? null;
+        if ((input.expected_contract_file_id ?? null) !== previousId)
+          throw new HttpError(409, "The signed contract changed. Refresh the inquiry before replacing it.");
+        const file = await assertInquiryUpload(db, actor.id, input.contract_file_id, true);
+        if (!["application/pdf", "image/png", "image/jpeg"].includes(file.content_type))
+          throw new HttpError(422, "Choose a PDF, PNG, or JPEG signed contract.");
+        workflow.signed_contract = { id: file.id, name: file.original_name };
+        if (workflow.staffing) workflow.staffing = { ...workflow.staffing, contract_file_id: file.id };
+        break;
+      }
       case "review": {
         if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
@@ -371,6 +383,9 @@ export function mountInquiries(router) {
       const configuration = await inquiryScopeConfiguration({ query: execute }, type, phases, saved?.additional_scopes || {});
       return { phases, estimate, staffing: saved, ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
     }
+    const signedContractId = row.details.opm_workflow.signed_contract?.id ?? null;
+    if (signedContractId && req.body.contract_file_id !== signedContractId)
+      throw new HttpError(409, "The signed contract changed. Reopen staffing with the confirmed contract.");
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
     const selected = confirmedPhases(phases, req.body.phases);
     const candidates = {};
@@ -394,8 +409,9 @@ export function mountInquiries(router) {
     // A correction or conversion can finish while the recommendations are being calculated.
     const saved = await execute(`UPDATE project_inquiries
       SET details=jsonb_set(details,'{opm_workflow,staffing}',$3::jsonb), updated_at=now()
-      WHERE id=$1 AND opm_id=$2 AND status='approved' AND details #>> '{opm_workflow,assessment,id}'=$4`,
-      [row.id, actor.id, JSON.stringify(staffing), assessment.id]);
+      WHERE id=$1 AND opm_id=$2 AND status='approved' AND details #>> '{opm_workflow,assessment,id}'=$4
+        AND (details #>> '{opm_workflow,signed_contract,id}') IS NOT DISTINCT FROM $5::text`,
+      [row.id, actor.id, JSON.stringify(staffing), assessment.id, signedContractId]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
     return { phases, estimate, team, candidates, candidateBlockers, blockedCandidates, staffing,
       ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
