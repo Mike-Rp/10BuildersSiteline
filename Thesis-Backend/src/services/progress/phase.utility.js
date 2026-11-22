@@ -147,7 +147,7 @@ export async function recordPhaseHistory(client, project, pct, note, userId, opt
      VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $7, $7, $8, $9) RETURNING id, recorded_at`,
     [project.id, project.current_stage_id, pct, note, isIssue, !isIssue, userId, issueCategories, entryType]);
   // A phase that reaches 100% is credited to whoever holds it (and to the engineer who took it over).
-  if (Number(pct) === 100) await markPhaseCompleted(client, project.id, project.current_stage_id);
+  if (entryType !== "handoff" && Number(pct) === 100) await markPhaseCompleted(client, project.id, project.current_stage_id);
   if (updateProject) {
     // Reviewing an older stage must not overwrite the current stage's cached percentage.
     await client.query(

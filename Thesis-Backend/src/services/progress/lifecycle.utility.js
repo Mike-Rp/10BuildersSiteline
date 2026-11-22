@@ -1,7 +1,15 @@
 // All callers hold the project row lock for the surrounding transaction.
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
+export async function unfinishedPhaseResponsibilities(db, projectId, stageId) {
+  if (!await responsibilitiesInstalled(db)) return false;
+  const result = await db.query(
+    `SELECT 1 FROM project_phase_responsibilities
+     WHERE project_id=$1 AND project_stage_id=$2 AND status<>'released'
+       AND (status<>'confirmed' OR completion_status<>'approved') LIMIT 1`, [projectId, stageId]);
+  return result.rowCount > 0;
+}
+
 export async function blockingReviews(db, projectId) {
-  if(await responsibilitiesInstalled(db) && (await db.query(`select 1 from project_phase_responsibilities r join projects p on p.id=r.project_id where r.project_id=$1 and r.project_stage_id=p.current_stage_id and r.status<>'released' and (r.status<>'confirmed' or r.completion_status<>'approved') limit 1`,[projectId])).rowCount)return true;
   const pending = await db.query(
     `SELECT 1 FROM project_phase_updates WHERE project_id=$1 AND status='pending'
      UNION ALL SELECT 1 FROM pending_rework_requests WHERE project_id=$1 AND status='pending'

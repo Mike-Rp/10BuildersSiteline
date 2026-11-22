@@ -2651,11 +2651,10 @@ function AppInner() {
     )
   }
   function accountDetails(a: Account, docsOnly = false) {
-    const projects = state.projects.filter(
-      (p) =>
-        p.opmId === a.id ||
-        p.team.some((t) => t.accountId === a.id) ||
-        (a.role === "client" && a.scope.includes(p.id)),
+    const projects = state.projects.filter((p) =>
+      a.role === "client"
+        ? (p.clientAccounts?.some((client) => client.id === a.id) ?? a.scope.includes(p.id))
+        : p.opmId === a.id || p.team.some((t) => t.accountId === a.id),
     )
     const activeEmployeeProjects = activeAssignmentsForAccount(state, a.id)
     const resignationRecords = [
@@ -2700,7 +2699,10 @@ function AppInner() {
                   ].join(", ") || "Organization-wide"}
                 </strong>
               </div>
-              {a.role !== "admin" && <div>
+              {a.role === "client" ? <div>
+                <small>ACTIVE SITES</small>
+                <strong>{projects.filter((p) => p.status === "active").length}</strong>
+              </div> : a.role !== "admin" && <div>
                 <small>WORKLOAD</small>
                 <strong>
                   {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}

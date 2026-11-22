@@ -1,6 +1,7 @@
 import { readEvidenceQueue } from '../progress/evidence-queue.utility.js';
 
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
+import { errorlog } from "../../common/utilities/logger.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
 import { LIST_SELECT, projectListFrom, stripInternal } from "../projects/read.controller.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
@@ -50,20 +51,23 @@ export async function reconcilePhaseHandoffs(req,res) {
     }
     // Every mutation uses the same lock order as activity review. Re-read after
     // acquiring the lock so simultaneous refreshes never advance the same phase twice.
-    const project=(await db.query(`SELECT p.*,s.code AS current_stage FROM projects p
-     LEFT JOIN project_stages s ON s.id=p.current_stage_id WHERE p.id=$1
-     AND p.lifecycle_status='active' AND NOT COALESCE(p.is_deleted,false) FOR UPDATE OF p`,[candidate.id])).rows[0];
-    if(!project || Number(project.current_stage_id)!==Number(candidate.current_stage_id))continue;
-    const totals=(await readVerifiedProgress(db,[project.id])).get(project.id);
-    const current=totals?.phases.find(phase=>phase.id===String(project.current_stage_id));
-    if(!verifiedComplete(current))continue;
-    // Final-phase completion remains with the existing closeout workflow.
-    const next=(await db.query(`SELECT 1 FROM (${projectWorkflowSql}) w WHERE w.project_id=$1
-     AND w.sort_order>(SELECT sort_order FROM (${projectWorkflowSql}) current WHERE project_id=$1 AND project_stage_id=$2) LIMIT 1`,
-     [project.id,project.current_stage_id])).rowCount;
-    if(!next)continue;
-    const handoff=await transitionPhase(db,project,null);
-    results.push({project_id:project.id,from:project.current_stage,...handoff});
+    await db.query("SAVEPOINT project_handoff");
+    try {
+     const project=(await db.query(`SELECT p.*,s.code AS current_stage FROM projects p
+      LEFT JOIN project_stages s ON s.id=p.current_stage_id WHERE p.id=$3
+      AND p.lifecycle_status='active' AND NOT COALESCE(p.is_deleted,false) AND ${scope} FOR UPDATE OF p`,
+      [user.role,user.id,candidate.id])).rows[0];
+     if(project && Number(project.current_stage_id)===Number(candidate.current_stage_id)) {
+      const handoff=await transitionPhase(db,project,null);
+      if(handoff.state!=="final") results.push({project_id:project.id,from:project.current_stage,...handoff});
+     }
+    } catch(error) {
+     await db.query("ROLLBACK TO SAVEPOINT project_handoff");
+     errorlog(`Phase handoff failed for project ${candidate.id}: ${error.message}`);
+     results.push({project_id:candidate.id,from:candidate.current_stage,advanced:false,
+      reason:"Automatic handoff could not be checked. The system will retry on a staff workspace refresh."});
+    }
+    await db.query("RELEASE SAVEPOINT project_handoff");
    }
    return results;
   });
@@ -77,11 +81,13 @@ export async function getProjectData(req,res) {
   const user=await requireUser(req,res,["admin","opm","spm","client"]);if(!user)return;
   const data=await withTransaction(async db=>{
    await db.query("select set_config('app.current_user_id',$1,true)",[user.id]);
-   const projects=(await db.query(`select ${LIST_SELECT} ${await projectListFrom(db)}
+   const staff=user.role!=="client";
+   const clientContactSelect=staff?"":`, (select u.full_name from users u
+    where u.id=p.suggested_opm_id and not coalesce(u.is_deleted,false)) as office_pm_name`;
+   const projects=(await db.query(`select ${LIST_SELECT}${clientContactSelect} ${await projectListFrom(db)}
     where not coalesce(p.is_deleted,false) and ${scope} order by p.name,p.id`,[user.role,user.id])).rows;
    const ids=projects.map(p=>p.id);
    if(!ids.length)return [];
-   const staff=user.role!=="client";
    // Only contacts linked to the already-authorized projects; never a global client directory.
    const clientAccounts=staff?group((await db.query(`select l.project_id,u.id,u.full_name,u.email,u.phone,
     m.metadata->>'contactPerson' as contact_person

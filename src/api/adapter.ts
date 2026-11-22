@@ -346,6 +346,7 @@ export function mapProject(parts: ProjectParts): Project {
     }))} : {}),
     status,
     opmId: list.suggested_opm_id || "",
+    officePmName: list.office_pm_name || undefined,
     team,
     phase: list.current_stage || team[0]?.phase || "Mobilization",
     // The backend derives % from approved checklist items; an archived project is finished.

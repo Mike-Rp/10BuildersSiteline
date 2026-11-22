@@ -180,12 +180,19 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.deepEqual(names((await asUser("maria.santos@rosariabiz.ph")).state), ["Brookfield Warehouse Ext.", "Cavite Cold Storage Facility", "Rosaria Business Park"])
   })
 
-  await t.test("a client only gets client-visible documents and no company directory", async () => {
-    const { state } = await asUser("f.uy@aldenheights-hoa.com")
+  await t.test("a client gets shared documents and the assigned Office PM's name", async () => {
+    const { state, user } = await asUser("f.uy@aldenheights-hoa.com")
     assert.equal(state.companies.length, 0)
     const docs = state.projects[0].docs
     assert.equal(docs.filter((d) => d.uploaded && d.clientVisible).length, 4)
     assert.equal(docs.filter((d) => d.uploaded && !d.clientVisible).length, 0, "internal documents are not returned")
+    const [part] = await api("/workspace/project-data")
+    const office = (await db.query("select u.id,u.full_name from projects p join users u on u.id=p.suggested_opm_id where p.id=$1",[part.list.id])).rows[0]
+    assert.equal(part.list.office_pm_name,office.full_name)
+    assert.equal(Object.hasOwn(part.list,"suggested_opm_id"),false)
+    assert.equal(Object.hasOwn(part.detail,"suggested_opm_id"),false)
+    assert.equal(state.accounts.some(account=>account.id===office.id),false)
+    assert.deepEqual(clientProjectViews(state,user.id)[0].contacts[0],{name:office.full_name,role:"Office Project Manager"})
   })
 
   await t.test("monitoring returns only linked client contacts within staff project scope, with no account credentials", async () => {

@@ -110,7 +110,7 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
     }
   }
   if(!openingSet&&covered)opening=reportBalance(state).project;
-  if(coverage&&coverage<=period.cutoff)closing=reportBalance(state).project;
+  if(coverage&&coverage<period.cutoff)closing=reportBalance(state).project;
   const reliableMovement=covered&&!incompleteBalances&&opening.percentage!==null&&closing.percentage!==null;
   const completedPhases=covered?[...completions.values()].map(p=>({...p,stillComplete:reportBalance(state).phases.find(phase=>phase.id===p.id)?.percentage===100})):null;
   const pending=covered?{
@@ -121,9 +121,16 @@ export function buildMonthlyReport({baseline,events=[],period,project,role,visib
     reports:(state.project_phase_updates||[]).filter(r=>r.status==="pending"&&phaseVisible(r.selected_stage_id)).length,
     rework:(state.pending_rework_requests||[]).filter(r=>r.status==="pending"&&phaseVisible(r.project_stage_id)).length,
   }:null;
+  const limitations=[];
+  if(!coverage) limitations.push("This project has no historical reporting baseline.");
+  else if(coverage>=period.cutoff) limitations.push("Historical reporting began at or after the reporting cutoff.");
+  else {
+    if(!covered) limitations.push("Historical reporting began partway through the selected period. Full-period totals are unavailable.");
+    if((covered&&opening.percentage===null)||closing.percentage===null||incompleteBalances) limitations.push(HISTORY_UNAVAILABLE);
+  }
   const result={project:{id:project.id,name:project.name,type:project.type,status:project.status},period,coverageFrom:coverage,
     opening,closing,netChange:opening.percentage!==null&&closing.percentage!==null&&opening.total===closing.total&&!scopeChanges?closing.percentage-opening.percentage:null,
-    completedPhases,limitations:covered&&opening.percentage!==null&&closing.percentage!==null&&!incompleteBalances?[]:[HISTORY_UNAVAILABLE],createdAfterPeriod:new Date(project.created_at)>=new Date(period.cutoff)};
+    completedPhases,limitations,createdAfterPeriod:new Date(project.created_at)>=new Date(period.cutoff)};
   if(role==="client")return {...result,projection:"client",updates:(state.project_progress_history||[]).filter(h=>h.is_client_visible===true&&["update","handoff"].includes(h.entry_type)&&h.recorded_at&&inPeriod(new Date(h.recorded_at).toISOString(),period)).map(h=>({date:new Date(h.recorded_at).toISOString(),phase:phaseName(state,h.project_stage_id),record:"Shared project update",text:h.note||""}))};
   const detailRestricted=role==="spm";
   return {...result,projection:detailRestricted?"site":"staff",scopeLabel:detailRestricted?"Project progress; activity details and pending reviews limited to your assigned phases.":"All authorized project activity.",

@@ -172,6 +172,9 @@ export function clientProjectViews(
         hasWithdrawnApprovalAwaitingCorrectedEvidence: hasUnapprovedCorrectedEvidence(p.phase, activities, p.history),
         today,
       })
+      const hasSharedPhaseProgress = p.history.some(entry =>
+        entry.phase === p.phase && entry.clientVisible !== false && !entry.issue && entry.progress > 0,
+      )
       return {
         id: p.id,
         name: p.name,
@@ -182,7 +185,7 @@ export function clientProjectViews(
         start: p.start,
         end: p.end,
         phase: p.phase,
-        currentPhaseStatus: clientPhaseStatus(phaseStatus),
+        currentPhaseStatus: phaseStatus === "Not started" && hasSharedPhaseProgress ? "Ongoing" : clientPhaseStatus(phaseStatus),
         phases: projectPhaseNames(p),
         progress: p.progress,
         overallProgress: p.overallProgress ?? p.verifiedProgress?.project.percentage ?? null,
@@ -190,7 +193,7 @@ export function clientProjectViews(
         completedAt: work.completedAt,
         contacts: [
           {
-            name: office?.name || "Office PM not on file",
+            name: p.officePmName || office?.name || "Office PM not on file",
             role: "Office Project Manager",
           },
           {

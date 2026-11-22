@@ -287,6 +287,7 @@ export type Project = {
   clientAccounts?: { id: string; name: string; email: string; phone: string; contactPerson?: string }[]
   status: "active" | "pending" | "changes_requested" | "draft" | "completed" | "declined" | "expired"
   opmId: string
+  officePmName?: string
   team: {
     phase: string
     accountId: string

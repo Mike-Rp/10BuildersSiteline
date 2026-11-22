@@ -182,8 +182,11 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const correction=await call(b,root+'/checklist-items/'+itemIds[0]+'/submit',{method:'POST',json:{file_ids:[corrected.id]},status:201})
   await approve(correction)
   for(const id of itemIds.slice(1)){const ev=await call(b,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:[b1.id]},status:201});await approve(ev)}
+  const waiting=(await call(opm,'/workspace/reconcile-phase-handoffs',{method:'POST',json:{}})).find(row=>row.project_id===projectId)
+  assert.equal(waiting.reasonCode,'engineer_responsibilities')
   await complete(b,br,'submit_completion',b1.id);await complete(opm,br,'approve_completion')
   assert.equal((await pg.query('select current_stage_id from projects where id=$1',[projectId])).rows[0].current_stage_id,stages[1].id)
+  assert.equal((await db.query("select count(*)::int as n from project_progress_history where project_id=$1 and entry_type='handoff'",[projectId])).rows[0].n,1)
   const totals=(await readVerifiedProgress(db,[projectId])).get(projectId)
   assert.equal(totals.phases.find(p=>p.id===String(stages[0].id)).percentage,100)
   assert.equal(totals.construction[0].complete,true)
@@ -254,6 +257,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const history=await call(opm,root+'/evidence-history')
   assert.ok(history.some(e=>String(e.evidence_id)===String(pending.id)&&e.submitted_by===c.id&&e.status==='approved'&&e.files.length===2))
   const download=await fetch(base+root+'/phase-files/'+files[0].id,{headers:{Authorization:'Bearer '+opm.token}});assert.equal(download.status,200)
+  for(const submission of evidence.slice(2)) await approve(submission)
   assert.equal((await db.query('select spm_user_id from project_phase_team where project_id=$1 and is_lead',[projectId])).rows[0].spm_user_id,a.id)
   await db.query("update users set status='active' where id=$1",[c.id])
  })
@@ -291,7 +295,23 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const preview=await call(opm,root+'/evidence/'+orphan.id+'/review-preview')
   assert.equal(preview.before.phase.percentage,100);assert.equal(preview.after.phase.percentage,100)
   assert.equal(preview.before.project.earned,preview.after.project.earned)
+  await db.query("update project_phase_team set status='pending' where project_id=$1 and project_stage_id=$2",[projectId,stages[2].id])
   await approve(orphan)
+  await db.query("update project_phase_team set status='confirmed' where project_id=$1 and project_stage_id=$2",[projectId,stages[2].id])
+  await pg.exec(`create function test_reject_handoff() returns trigger language plpgsql as $$
+   begin raise exception 'Simulated handoff history failure'; end $$;
+   create trigger test_reject_handoff before insert on project_progress_history for each row
+   when (new.project_id='${projectId}' and new.entry_type='handoff') execute function test_reject_handoff();`)
+  try {
+   const failed=(await call(opm,'/workspace/reconcile-phase-handoffs',{method:'POST',json:{}})).find(row=>row.project_id===projectId)
+   assert.equal(failed.advanced,false)
+   assert.match(failed.reason,/will retry/)
+   assert.equal((await db.query('select current_stage_id from projects where id=$1',[projectId])).rows[0].current_stage_id,stages[1].id)
+  } finally {
+   await pg.exec('drop trigger test_reject_handoff on project_progress_history; drop function test_reject_handoff();')
+  }
+  const reconciled=(await call(opm,'/workspace/reconcile-phase-handoffs',{method:'POST',json:{}})).find(row=>row.project_id===projectId)
+  assert.equal(reconciled.current_stage_id,stages[2].id)
   const stable=(await db.query('select submitted_by,file_id from project_phase_evidence where id=$1',[orphan.id])).rows[0]
   assert.deepEqual(stable,{submitted_by:c.id,file_id:originalFile})
   await call(b,root+'/evidence-history',{status:403})

@@ -68,7 +68,10 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
   // Catch up completed phases from older sessions and retry resolved blockers
   // before reading the confirmed workflow position. This never sends a phase or percentage.
   const handoffs = me.role === "client" ? [] : await api<{project_id:string;from:string;advanced:boolean;reason?:string}[]>(
-    "/workspace/reconcile-phase-handoffs", {method:"POST",json:{}})
+    "/workspace/reconcile-phase-handoffs", {method:"POST",json:{}}).catch(error => {
+      if (error instanceof ApiError && (error.status === 0 || error.status === 404 || error.status >= 500)) return []
+      throw error
+    })
   const [projectData, subcontractors, notifications, workspace] = await Promise.all([
     api<Omit<ProjectParts,"clientId"|"register">[]>("/workspace/project-data"),
     me.role === "client" ? Promise.resolve([] as Dto[]) : optional(apiList<Dto>("/subcontractors"), []),

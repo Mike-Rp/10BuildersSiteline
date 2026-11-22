@@ -75,6 +75,23 @@ test("an unavailable backend rejects login and data loading instead of returning
   assert.equal(getToken(), "")
 })
 
+test("staff can load real project data when automatic handoff reconciliation fails", async (t) => {
+  setApiBase("http://database-test/api/v1")
+  setToken("")
+  t.mock.method(globalThis, "fetch", async (url) => {
+    const path = new URL(url).pathname
+    if (path.endsWith("/reconcile-phase-handoffs")) return Response.json({ message: "Handoff check unavailable" }, { status: 503 })
+    if (path.endsWith("/project-data")) {
+      const list = { id: "live-site", name: "Active site", project_type: "Residential", lifecycle_status: "active" }
+      return Response.json({ data: [{ list, detail: list, documents: [], history: [], photos: [], notes: [], assignments: [], contracts: [] }] })
+    }
+    if (path.endsWith("/workspace")) return Response.json({ data: {} })
+    return Response.json({ data: [] })
+  })
+  const state = await loadState({ id: "db-admin", role: "admin" })
+  assert.deepEqual(state.projects.map(project => project.id), ["live-site"])
+})
+
 test("legacy shortcut credentials go to the server and cannot bypass a rejected login", async (t) => {
   setApiBase("http://database-test/api/v1")
   setToken("")
