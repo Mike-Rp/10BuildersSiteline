@@ -222,7 +222,7 @@
 .office-review-wide { grid-column: 1 / -1; }
 .office-review-form label { display: block; margin-bottom: 4px; }
 .office-review-form :is(input, select)[aria-invalid="true"] { border-color: #a8272f; }
-#root .office-review-field-changed :is(input, select):not([aria-invalid="true"]) { border-color: #d4a054; background: #fffcf5; }
+#root .office-review-field-changed :is(input, select):not([aria-invalid="true"]) { border-color: #b47c30; background: #fff4df; }
 .office-review-edited { display: inline-block; margin-inline-start: 7px; padding: 1px 7px; border-radius: 999px; background: #fff0d4; color: #775019; font-size: .75rem; }
 .office-review-field-helper { display: flex; gap: 4px 10px; flex-wrap: wrap; align-items: center; margin-top: 5px; color: var(--color-muted); font-size: .82rem; }
 .office-review-size { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }

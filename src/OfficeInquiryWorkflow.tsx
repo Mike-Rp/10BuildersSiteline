@@ -191,8 +191,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     return [key, firstChange ? firstChange.changes[key].before : row.details[key]]
   }))
   const changedFromAdmin = (key: string) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, original[key])
-  const editedAreaPerFloor = floorArea.perFloor !== null && !!perFloor &&
-    Number(perFloor) !== Number(original.floor_area_sqm) / Number(original.floor_count)
+  const originalAverageArea = Number(original.floor_area_sqm) / Number(original.floor_count)
+  const areaWasEdited = (value: string) => value !== "" && Number(value) !== originalAverageArea
+  const editedAreaPerFloor = floorArea.perFloor !== null && areaWasEdited(perFloor)
   const hasCorrections = correctionFields.some(([key]) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, row.details[key]))
   const needsReason = hasCorrections || (editing && !!review)
   const size = compactReview && hasSizeInputs(measuredDraft) ? inquirySize(measuredDraft) : undefined
@@ -226,22 +227,18 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     const numeric = numericField(key)
     const changed = changedFromAdmin(key)
     const id = fieldId(key)
-    const helper = changed ? `${id}-helper` : undefined
     return <div key={key} className={changed ? "office-review-field-changed" : undefined}>
       <label htmlFor={id}>{label}{changed && <span className="office-review-edited">Edited</span>}</label>{key === "project_type"
-      ? <select {...describedField(id, helper)} required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)}>
+      ? <select {...describedField(id)} required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)}>
         <option value="">Select a project type</option>
         {projectTypes.map(type => <option key={type}>{type}</option>)}
       </select>
-      : key === "phone" ? <MobileNumberInput {...describedField(id, helper)} required value={String(draft[key] ?? "")}
+      : key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
           onValueChange={value => updateDraft(key, value)} />
-      : <input {...describedField(id, helper)} type={numeric ? "number" : key === "email" ? "email" : "text"}
+      : <input {...describedField(id)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
           max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
           required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
-      {helper && <div className="office-review-field-helper" id={helper}>
-        {changed && <span>Admin: {amount(original[key] ?? undefined)}{original[key] != null && ["lot_area", "floor_area_sqm"].includes(key) ? " m²" : ""}</span>}
-      </div>}
       {inlineError(id)}
     </div>
   }
@@ -465,8 +462,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               </div> : floorInputs.slice(floorPage * floorPageSize, (floorPage + 1) * floorPageSize).map((value, offset) => {
                 const index = floorPage * floorPageSize + offset
                 const id = fieldId(`floor-level-${index + 1}`)
-                return <div key={id}>
-                  <label htmlFor={id}>Floor {index + 1} area (m²)</label>
+                const changed = areaWasEdited(value)
+                return <div key={id} className={changed ? "office-review-field-changed" : undefined}>
+                  <label htmlFor={id}>Floor {index + 1} area (m²){changed && <span className="office-review-edited">Edited</span>}</label>
                   <input {...describedField(id)} required type="number" min="0" step="any" value={value} onChange={event => {
                     const areas = [...floorArea.areas]
                     areas[index] = event.target.value
@@ -483,7 +481,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             </div>}
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <div><span>Total floor area</span><strong>{calculatedArea ? `${calculatedArea.total.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m²` : "Enter the floor areas"}</strong>
-                {changedFromAdmin("floor_area_sqm") && <span className="office-review-field-helper" id={`${fieldId("floor_area_sqm")}-helper`}>Admin: {amount(original.floor_area_sqm ?? undefined)} m²</span>}
               </div>
               <div><span>Project size</span>
                 <div className="office-review-size">{size ? <>{originalSize && originalSize !== size && `${originalSize} → `}<strong>{size}</strong></> : "Pending measurements"}</div>
