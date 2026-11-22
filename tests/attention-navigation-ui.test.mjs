@@ -3,6 +3,7 @@ import test from "node:test"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import { initialState } from "./fixtures/demo-state.ts"
+import { DOC_LABELS } from "../src/model.ts"
 
 test("staff badges and missing banners link to acceptance, photo reviews and assignment controls on desktop and mobile", { timeout: 60000 }, async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost/opm/dashboard", pretendToBeVisual: true })
@@ -97,8 +98,15 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     previous.set("fetch", Object.getOwnPropertyDescriptor(globalThis, "fetch"))
     const setupInquiry = { ...inquiry, id: "setup", project_id: "Concurrent intake", project_status: "spm_review",
       status: "converted", details: { ...inquiry.details, name: "Concurrent intake" } }
+    const finishedInquiry = { ...setupInquiry, id: "finished", project_id: "Finished inquiry",
+      details: { ...inquiry.details, name: "Finished inquiry" } }
+    state.projects.push(project("Finished inquiry", {
+      inquiryOrigin: true,
+      docs: DOC_LABELS.slice(0, 6).map((label, id) => ({ id: String(id), label, uploaded: true })),
+      team: [{ phase: "Mobilization", accountId: site.id, status: "confirmed", isLead: true }],
+    }))
     globalThis.fetch = (url, options) => String(url).endsWith("/projects/inquiries")
-      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }, setupInquiry] }))
+      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }, setupInquiry, finishedInquiry] }))
       : fetch(url, options)
     await render(office,"/opm/project-intake")
     const newInquiryBanner = document.querySelector(".opm-new-inquiries")
@@ -114,6 +122,8 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     await render(office,"/opm/project-inquiries")
     const cards = [...document.querySelectorAll(".opm-inquiry-card")]
     assert.equal(cards.length, 3)
+    assert.equal(document.querySelector("#project-intake-tab-inquiries span").textContent, "3")
+    assert.doesNotMatch(cards.map(card => card.textContent).join(" "), /Finished inquiry/)
     const currentStep = card => card.querySelector('[aria-current="step"]').textContent
     assert.equal(currentStep(cards[0]), "Office PM review")
     assert.equal(currentStep(cards[1]), "Project assessment")

@@ -460,10 +460,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const activeAction = useRef(false)
   const actionVersion = useRef(0)
   const lastReadAt = useRef(0)
-  const inquiryCount = rows?.length
-  useEffect(() => {
-    onInquiryCountChange?.(inquiryCount)
-  }, [inquiryCount, onInquiryCountChange])
   const [search, setSearch] = useState("")
   const [queueView, setQueueView] = useState<IntakeView>("all")
   const [queueStatus, setQueueStatus] = useState("")
@@ -748,15 +744,22 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const status = confirmed ? "Site PM assignments accepted" : needsReassignment
       ? "Site PM assignment needs review" : "Awaiting Site PM acceptance"
     const bucket: IntakeView | undefined = needsDocuments || needsReassignment ? "action" : confirmed ? undefined : "waiting"
-    return [[item.id, { project, status, bucket, needsDocuments }] as const]
+    return [[item.id, { project, status, bucket, needsDocuments, complete: confirmed && !needsDocuments }] as const]
   }))
+  const officeRows = rows?.filter(item => {
+    const setup = setupByInquiry.get(item.id)
+    return setup ? !setup.complete : item.status !== "converted"
+  })
+  const inquiryCount = officeRows?.length
+  useEffect(() => {
+    onInquiryCountChange?.(inquiryCount)
+  }, [inquiryCount, onInquiryCountChange])
   const officeStatus = (item: Inquiry) => setupByInquiry.get(item.id)?.status ?? statusLabel(item)
   const officeBucket = (item: Inquiry) => setupByInquiry.get(item.id)?.bucket ?? officeAction(item.status)?.bucket
   const matchesSearch = (item: Inquiry) => !query ||
     [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : officeStatus(item),
       inquiryReference(item)]
       .some(value => String(value ?? "").toLowerCase().includes(query))
-  const visibleRows = rows?.filter(matchesSearch)
   const adminHistory = (rows ?? []).filter(item => ["converted", "dropped"].includes(item.status))
   const adminCurrent = (rows ?? []).filter(item => !["converted", "dropped"].includes(item.status))
   const adminActionCount = adminCurrent.filter(item => adminInquiryActions[adminInquiryStatus(item)]).length
@@ -783,18 +786,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setAdminInquiryFilter(filter)
     resetInquiryPage()
   }
-  const queueRows = visibleRows?.filter(item =>
+  const queueRows = officeRows?.filter(item => matchesSearch(item) &&
     (queueView === "all" || officeBucket(item) === queueView) &&
     (!queueStatus || officeStatus(item) === queueStatus) &&
     (!queueType || item.details.project_type === queueType)
   )
-  const queueCounts = (rows ?? []).reduce((counts, item) => {
+  const queueCounts = (officeRows ?? []).reduce((counts, item) => {
     counts.all++
     const bucket = officeBucket(item)
     if (bucket) counts[bucket]++
     return counts
   }, { all: 0, action: 0, waiting: 0 })
-  const statusOptions = [...new Set([...(rows ?? []).map(officeStatus), queueStatus].filter(Boolean))]
+  const statusOptions = [...new Set([...(officeRows ?? []).map(officeStatus), queueStatus].filter(Boolean))]
   function renderAdminInquiryForm() {
     const regular = details.immediate_consultation === "no"
     const matching = opmPreview?.type === previewType ? opmPreview : undefined
@@ -1029,7 +1032,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             const project = setup?.project
             const uploaded = project ? registeredCount(project) : null
             const name = item.details.name || "Untitled project"
-            const milestone = setup ? 4 : item.status === "converted" ? inquiryMilestones.length : inquiryMilestone(item)
+            const milestone = setup ? 4 : inquiryMilestone(item)
             const needsAction = officeBucket(item) === "action"
             const actionContext = item.status === "approved"
               ? item.workflow?.assessment ? "Assessment completed" : item.workflow?.budget ? "Assessment in progress" : "Project information needs review"
@@ -1067,8 +1070,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           })}
       </ul> : <div className="opm-inquiry-empty">
         <Icon name="folder" size={24} />
-        <p>{rows?.length ? "No inquiries match the current filters." : rows ? "No consultation requests yet." : error ? "Inquiries could not be loaded." : "Loading inquiries…"}</p>
-        {!!rows?.length && <button className="button" type="button" onClick={() => { setSearch(""); setQueueStatus(""); setQueueType(""); setQueueView("all") }}>Clear filters</button>}
+        <p>{officeRows?.length ? "No inquiries match the current filters." : officeRows ? "No open inquiries." : error ? "Inquiries could not be loaded." : "Loading inquiries…"}</p>
+        {!!officeRows?.length && <button className="button" type="button" onClick={() => { setSearch(""); setQueueStatus(""); setQueueType(""); setQueueView("all") }}>Clear filters</button>}
       </div>}
     </section>}
     {admin && <section className="inquiry-list-panel" aria-labelledby="existing-inquiries-heading">
