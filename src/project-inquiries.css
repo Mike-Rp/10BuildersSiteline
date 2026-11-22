@@ -148,7 +148,47 @@
 .office-workflow-result strong { color: var(--color-primary); font-size: 1.55rem; line-height: 1.15; }
 .office-workflow-result span { color: #236b68; font-size: .85rem; font-weight: 650; }
 .office-workflow-result p { font-size: .88rem; }
-.office-workflow-result.duration { text-align: center; padding-block: 22px; }
+.office-workflow-card[data-assessment-metric] { --assessment-accent: #37799e; --assessment-wash: #eaf4fb; border-block-start: 4px solid var(--assessment-accent); }
+.office-workflow-card[data-assessment-metric=complexity] { --assessment-accent: #755294; --assessment-wash: #f3eef7; }
+.office-workflow-card[data-assessment-metric=duration] { --assessment-accent: #357c64; --assessment-wash: #edf7f3; }
+.office-workflow-card[data-assessment-metric] .inquiry-section-heading { min-width: 0; }
+.office-workflow-card[data-assessment-metric] .inquiry-list-icon { color: var(--assessment-accent); background: var(--assessment-wash); }
+.office-workflow-card[data-assessment-metric] .office-workflow-result { background: var(--assessment-wash); border-color: color-mix(in srgb, var(--assessment-accent) 25%, transparent); }
+.office-workflow-card[data-assessment-metric=size] > .office-workflow-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-line); }
+.office-workflow-card[data-assessment-metric=size] > .office-workflow-facts > div { padding: 10px; background: #f6f9fc; }
+.office-assessment-size, .office-assessment-complexity { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.office-assessment-size > div, .office-assessment-complexity > div:last-child { display: grid; gap: 5px; }
+.office-workflow-result .office-assessment-size-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #265981; color: white; box-shadow: 0 0 0 4px #edf6ff, 0 0 0 5px #b5d2e8; }
+.office-assessment-size-scale { position: relative; display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 0; list-style: none; color: var(--color-muted); font-size: .8rem; }
+.office-assessment-size-scale li { position: relative; display: grid; justify-items: center; gap: 8px; }
+.office-assessment-size-scale::after { content: ""; position: absolute; inset-inline: 10px; bottom: 4px; height: 2px; background: #c2d6e7; }
+.office-assessment-size-scale li::after { content: ""; z-index: 1; width: 10px; height: 10px; border: 2px solid #6b9aba; border-radius: 50%; background: white; }
+.office-assessment-size-scale li[aria-current] { color: #265981; font-weight: 700; }
+.office-assessment-size-scale li[aria-current]::after { background: #265981; border-color: #265981; box-shadow: 0 0 0 3px #dcebf7; }
+.office-assessment-size-note, .office-assessment-schedule p { font-size: .85rem; }
+.office-assessment-complexity { grid-template-columns: auto minmax(0, 1fr); }
+.office-assessment-ring { display: grid; place-items: center; width: 76px; aspect-ratio: 1; padding: 6px; border-radius: 50%; }
+.office-assessment-ring > span { display: grid; place-content: center; width: 100%; height: 100%; text-align: center; border-radius: 50%; background: white; color: #52356f; font-size: 1.3rem; line-height: 1.1; }
+.office-assessment-ring small { font-size: .75rem; }
+.office-assessment-complexity > div:last-child :is(span, strong) { color: #52356f; }
+.office-assessment-score-list { display: grid; gap: 6px; }
+.office-assessment-score-list > div { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+.office-assessment-score-list dt { font-size: .82rem; }
+.office-assessment-score-list dd { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; font-size: .8rem; }
+.office-assessment-score-list meter { width: 100%; height: .65rem; }
+.office-assessment-score-list meter::-webkit-meter-bar { background: #e5ddea; border: 0; }
+.office-assessment-score-list meter::-webkit-meter-optimum-value { background: #755294; }
+.office-assessment-score-list meter::-moz-meter-bar { background: #755294; }
+.office-workflow-result.duration { text-align: center; padding-block: 18px; }
+.office-workflow-result.duration strong { color: #225d4a; }
+.office-assessment-schedule { display: grid; gap: 7px; }
+.office-assessment-schedule .office-workflow-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.office-assessment-schedule .office-workflow-facts > div:last-child { text-align: end; }
+.office-assessment-date-line { position: relative; margin: 3px 3px 4px; height: 3px; background: #438f77; }
+.office-assessment-date-line::before, .office-assessment-date-line::after { content: ""; position: absolute; top: 50%; translate: 0 -50%; width: 11px; height: 11px; border: 2px solid white; border-radius: 50%; background: #357c64; box-shadow: 0 0 0 1px #83bca9; }
+.office-assessment-date-line::before { inset-inline-start: -3px; }
+.office-assessment-date-line::after { inset-inline-end: -3px; }
+.office-assessment-basis { padding: 8px 10px; border: 1px solid var(--color-line); border-radius: 8px; }
 .office-assessment-basis summary { cursor: pointer; font-weight: 600; }
 .office-assessment-basis > :not(summary) { margin-block-start: 8px; }
 .office-workflow-history { border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; background: var(--surface-subtle); }

@@ -1,17 +1,30 @@
-#root .role-workspace .panel.opm-confirmation-card { border: 1px solid #cbdbe8; border-radius: 14px; background: #fff; margin-bottom: 16px; min-width: 0; }
-#root .role-workspace .opm-confirmation-card > .panel-header { align-items: flex-start; padding: 18px 18px 10px; min-height: 0; border-bottom: 0; gap: 12px 18px; flex-wrap: wrap; }
+#root .role-workspace .panel.opm-confirmation-card { border: 1px solid #cbdbe8; border-inline-start: 5px solid #4d82ab; border-radius: 14px; background: #fff; box-shadow: 0 4px 14px #17385714; margin-bottom: 16px; min-width: 0; overflow: hidden; }
+#root .role-workspace .panel.opm-confirmation-card[data-attention=true] { border-inline-start-color: #d6a13c; }
+#root .role-workspace .opm-confirmation-card > .panel-header { align-items: center; padding: 16px 18px; min-height: 0; border-bottom: 1px solid #d9e5ee; background: #f2f7fb; gap: 12px 18px; flex-wrap: wrap; }
 #root .role-workspace .opm-confirmation-card > .panel-header > div:first-child { flex: 1 1 260px; min-width: 0; }
 #root .role-workspace .opm-confirmation-card > .panel-header h2 { font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
 #root .role-workspace .opm-confirmation-card > .panel-header p { font-size: 14px; margin-top: 5px; }
-#root .role-workspace .opm-confirmation-header-status { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px 18px; }
+#root .role-workspace .opm-confirmation-header-status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; }
 #root .role-workspace .opm-confirmation-dates { padding-left: 16px; margin: 0; border-left: 1px solid var(--color-line); font-size: 13px; color: var(--color-muted); }
 #root .role-workspace .opm-confirmation-dates > div { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 #root .role-workspace .opm-confirmation-dates dd { margin: 0; color: var(--color-ink); }
-#root .role-workspace .opm-confirmation-card > .role-card-content { padding: 8px 18px 18px; }
+#root .role-workspace .opm-confirmation-card > .role-card-content { padding: 16px 18px 18px; }
+.opm-confirmation-identity { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.opm-confirmation-identity > div { min-width: 0; overflow-wrap: anywhere; }
+.opm-confirmation-avatar, .opm-confirmation-tile-icon, .opm-confirmation-next-icon {
+  display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px;
+  border-radius: 9px; color: #265a81; background: #e2eef7;
+}
+.opm-confirmation-avatar { font-size: .9rem; font-weight: 700; }
+.opm-confirmation-avatar.lead { border-radius: 50%; background: #375b95; color: #fff; }
+.opm-confirmation-caption { display: block; color: #516b84; font-size: .72rem; font-weight: 650; letter-spacing: .055em; text-transform: uppercase; }
 .opm-intake-progress { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-bottom: 16px; }
-.opm-intake-progress > div { min-width: 0; border: 1px solid #d5e2ee; border-radius: 10px; padding: 14px; background: #f6f9fc; }
-.opm-intake-progress h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; }
-.opm-intake-progress p { margin: 6px 0 8px; }
+.opm-intake-progress > button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; min-width: 0; border: 1px solid #d5e2ee; border-radius: 10px; padding: 13px; background: #f5f9fc; color: var(--color-ink); text-align: start; cursor: pointer; }
+.opm-intake-progress > button:hover { border-color: #91aec6; background: #edf5fc; }
+.opm-intake-progress > button > svg { color: #4f6f8d; }
+.opm-intake-progress > button[data-complete=true] .opm-confirmation-tile-icon { color: #247251; background: #dff1e7; }
+.opm-confirmation-tile-copy { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.opm-confirmation-tile-copy strong { overflow-wrap: anywhere; }
 .opm-intake-progress > small { grid-column: 1 / -1; color: #45617d; }
 @media (max-width: 600px) {
   .opm-intake-progress { grid-template-columns: minmax(0, 1fr); }
@@ -24,14 +37,19 @@
 #root .role-workspace .opm-confirmation-card .role-intake-timeline li.done > span { background: #193b59; border-color: #193b59; color: #fff; }
 #root .role-workspace .opm-confirmation-card .role-intake-timeline li.current > span { background: #fff; border: 5px solid #193b59; box-shadow: none; }
 #root .role-workspace .opm-confirmation-card .role-intake-timeline strong { max-width: none; font-size: 13px; line-height: 1.45; }
-#root .role-workspace .opm-confirmation-next-action { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px 18px; padding: 12px; border-radius: 10px; background: #edf5fc; }
-#root .role-workspace .opm-confirmation-next-copy { min-width: 0; flex: 1 1 320px; }
+#root .role-workspace .opm-confirmation-next-action { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px 18px; padding: 12px; border: 1px solid #d3e3f0; border-radius: 10px; background: #edf5fc; }
+#root .role-workspace .opm-confirmation-next-action[data-blocked=true] { border-color: #ead1a2; background: #fff8e9; }
+.opm-confirmation-next-action[data-blocked=true] .opm-confirmation-next-icon { background: #f8e7c2; color: #875b20; border-radius: 50%; }
+#root .role-workspace .opm-confirmation-next-copy { display: flex; align-items: center; gap: 11px; min-width: 0; flex: 1 1 320px; }
+.opm-confirmation-next-copy > div { min-width: 0; overflow-wrap: anywhere; }
+.opm-confirmation-next-copy h3 { margin: 2px 0 0; font-size: 1rem; }
 #root .role-workspace .opm-confirmation-next-copy p { margin: 6px 0 4px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 #root .role-workspace .opm-confirmation-next-copy small { color: var(--color-muted); font-size: 13px; line-height: 1.5; }
 #root .role-workspace .opm-confirmation-next-action .role-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 #root .role-workspace .opm-confirmation-card .button { min-height: 42px; font-size: 14px; padding: 9px 13px; white-space: normal; }
-#root .role-workspace .opm-confirmation-card .role-project-facts { margin: 12px 0; gap: 8px 20px; font-size: 14px; }
-#root .role-workspace .opm-confirmation-card .role-project-facts > span { font-size: 14px; }
+.opm-confirmation-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.opm-confirmation-footer .opm-confirmation-identity small { display: block; color: var(--color-muted); }
+#root .opm-confirmation-card .opm-confirmation-footer .opm-confirmation-views { margin-top: 0; }
 @media(max-width: 640px) {
   #root .role-workspace .opm-confirmation-card > .panel-header { padding: 14px 14px 8px; }
   #root .role-workspace .opm-confirmation-card > .role-card-content { padding: 8px 14px 14px; }

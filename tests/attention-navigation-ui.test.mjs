@@ -101,6 +101,28 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     assert.equal(w.location.pathname,"/opm/documents")
     assert.match(document.querySelector("main").textContent,/Required documents/)
 
+    const blockedProject = project("Client link pending", {
+      inquiryOrigin: true,
+      clientId: "",
+      docs: DOC_LABELS.slice(0, 6).map((label, id) => ({ id: String(id), label, name: "document.pdf", date: "2026-11-20", owner: office.name, uploaded: true })),
+      team: [{ phase: "Mobilization", accountId: site.id, status: "confirmed", isLead: true }],
+      projectCompanyAllocation: { version: 1, status: "accepted", revision: 1, history: [] },
+    })
+    state.projects.push(blockedProject)
+    await render(office,"/opm/project-intake")
+    const blockedCard = [...document.querySelectorAll(".opm-confirmation-card")].find(card => card.textContent.includes(blockedProject.name))
+    const blocker = blockedCard.querySelector('.opm-confirmation-next-action[data-blocked="true"]')
+    assert.match(blocker.textContent, /Activation blocker.*Client account unavailable.*Responsible: Administrator/)
+    assert.equal(blockedCard.querySelectorAll('.opm-intake-progress button[data-complete="true"]').length, 2)
+    assert.match(blockedCard.querySelector("footer").textContent, /Lead Site PM.*View Site PM team by phase.*Read-only/)
+    await act(() => blockedCard.querySelectorAll(".opm-intake-progress button")[1].click())
+    const blockedStatus = document.querySelector('[aria-label="Site PM assignment status"]')
+    assert.match(blockedStatus.textContent, /Client link pending/)
+    await act(() => [...blockedStatus.querySelectorAll("button")].find(button => button.textContent === "Close").click())
+    await act(() => blockedCard.querySelector(".opm-intake-progress button").click())
+    assert.equal(w.location.pathname, "/opm/documents")
+    state.projects.pop()
+
     const inquiry = { id: "a9bd9cc9-c4ad-4000-8000-000000000000", created_at: "2026-11-20T03:00:00Z",
       status: "offered", details: { name: "Maple Residence", project_type: "Residential", consultation: 30,
         client_name: "Arbor Living Inc.", address: "Riverside District" },

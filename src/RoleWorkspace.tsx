@@ -794,13 +794,28 @@ export default function RoleWorkspace({
     const accepted = assignments.filter(person => person.status === "confirmed").length
     const declined = assignments.some(person => person.status === "declined")
     const documentsComplete = registeredComplete(p)
+    const assignmentsComplete = teamConfirmed(p)
+    const clientBlocked = guidance?.stage === "Client account prerequisite"
+    const lead = leadId(p)
+    const leadName = lead ? actorName(lead) : "Unassigned"
+    const floorArea = Number(p.area)
+    const areaLabel = p.area && Number.isFinite(floorArea) ? floorArea.toLocaleString("en-PH") : p.area
+    const openAssignmentStatus = parallelIntake && assignments.length
+      ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses
     return (
-      <Panel
+      <section
         key={p.id}
-        className={`opm-confirmation-card ${guidance?.kind === "action" ? "action-required" : ""}`}
-        title={p.name}
-        subtitle={`${p.type} · ${p.area} sqm · ${p.floors} floors`}
-        actions={
+        className="panel opm-confirmation-card"
+        data-attention={clientBlocked || guidance?.kind === "action"}
+      >
+        <header className="panel-header">
+          <div className="opm-confirmation-identity">
+            <span className="opm-confirmation-avatar" aria-hidden="true">{initials(p.name)}</span>
+            <div>
+              <h2>{p.name}</h2>
+              <p>{p.type}{areaLabel && ` · ${areaLabel} m²`}{p.floors && ` · ${p.floors} ${Number(p.floors) === 1 ? "floor" : "floors"}`}</p>
+            </div>
+          </div>
           <div className="opm-confirmation-header-status">
           <div className="button-group">
             {guidance?.kind === "action" && (
@@ -823,33 +838,44 @@ export default function RoleWorkspace({
             <div><dt>Estimated End:</dt><dd>{p.end ? dateLabel(p.end) : "Not recorded"}</dd></div>
           </dl>
           </div>
-        }
-      >
+        </header>
         <div className="role-card-content">
           {parallelIntake ? (
             <div className="opm-intake-progress" aria-label="Intake progress">
-              <div>
-                <h3><Icon name="folder" size={17} />Required documents</h3>
-                <p>{registeredCount(p)} of 6 uploaded</p>
-                <Badge tone={documentsComplete ? "green" : "amber"}>{documentsComplete ? "Complete" : "Uploads pending"}</Badge>
-              </div>
-              <div>
-                <h3><Icon name="users" size={17} />Site PM acceptance</h3>
-                <p>{assignments.length ? `${accepted} of ${assignments.length} assignments accepted` : "No assignments recorded"}</p>
-                <Badge tone={declined ? "red" : teamConfirmed(p) ? "green" : "amber"}>
-                  {declined ? "Reassignment needed" : teamConfirmed(p) ? "Accepted" : assignments.length ? "Awaiting responses" : "Staffing pending"}
-                </Badge>
-              </div>
+              <button type="button" data-complete={documentsComplete} onClick={() => openDocuments(p)}>
+                <span className="opm-confirmation-tile-icon"><Icon name="doc" size={22} /></span>
+                <span className="opm-confirmation-tile-copy">
+                  <span className="opm-confirmation-caption">Required documents</span>
+                  <strong>{registeredCount(p)} of 6 uploaded</strong>
+                  <Badge tone={documentsComplete ? "green" : "amber"}>{documentsComplete ? "Complete" : "Uploads pending"}</Badge>
+                </span>
+                <Icon name="chevron" size={17} />
+              </button>
+              <button type="button" data-complete={assignmentsComplete} onClick={openAssignmentStatus}>
+                <span className="opm-confirmation-tile-icon"><Icon name="users" size={22} /></span>
+                <span className="opm-confirmation-tile-copy">
+                  <span className="opm-confirmation-caption">Site PM acceptance</span>
+                  <strong>{assignments.length ? `${accepted} of ${assignments.length} assignments accepted` : "No assignments recorded"}</strong>
+                  <Badge tone={declined ? "red" : assignmentsComplete ? "green" : "amber"}>
+                    {declined ? "Reassignment needed" : assignmentsComplete ? "Accepted" : assignments.length ? "Awaiting responses" : "Staffing pending"}
+                  </Badge>
+                </span>
+                <Icon name="chevron" size={17} />
+              </button>
               {!documentsComplete && assignments.some(person => person.status === "pending") && (
                 <small>Site PMs can accept their assignments while documents are being uploaded. The Lead Site PM responds first.</small>
               )}
             </div>
           ) : timeline(p)}
-          <div className="opm-confirmation-next-action">
+          <div className="opm-confirmation-next-action" data-blocked={clientBlocked}>
             {guidance && <div className="opm-confirmation-next-copy" aria-label={`${p.name} intake next step`}>
-              <span className={`intake-stage ${guidance.kind}`}>{stageLabel(guidance, p)}</span>
-              <p><strong>Next Action:</strong> {guidance.next}</p>
-              <small>Responsible: {guidance.who} · {guidance.kind === "action" ? "Needs your action" : "Waiting / prerequisites"}</small>
+              <span className="opm-confirmation-next-icon"><Icon name={clientBlocked ? "shield" : "clock"} size={21} /></span>
+              <div>
+                <span className="opm-confirmation-caption">{clientBlocked ? "Activation blocker" : "Next action"}</span>
+                <h3>{stageLabel(guidance, p)}</h3>
+                <p>{guidance.next}</p>
+                <small>Responsible: {guidance.who} · {guidance.kind === "action" ? "Needs your action" : "Waiting / prerequisites"}</small>
+              </div>
             </div>}
           {p.status === "changes_requested" || p.status === "draft" ? (
             <div className="notice">
@@ -907,16 +933,12 @@ export default function RoleWorkspace({
                     ? "View project documents"
                     : parallelIntake ? "Upload required documents" : "Open required documents"}
                 </Button>
-                <Button onClick={parallelIntake && assignments.length ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses}>
+                <Button onClick={openAssignmentStatus}>
                   {parallelIntake && assignments.length ? "View assignment status" : guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
                 </Button>
               </div>
             </>
           )}
-          </div>
-          <div className="role-project-facts">
-            <span><Icon name="users" size={17} />Lead: {actorName(leadId(p))}</span>
-            {!parallelIntake && <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>}
           </div>
           {work.deadline && (
             <div className="deadline-inline">
@@ -927,12 +949,20 @@ export default function RoleWorkspace({
               </span>
             </div>
           )}
-          <div className="opm-confirmation-views">
-            <Button icon="users" onClick={() => setConfirmationView({ projectId: p.id, view: "team" })}>View Site PM team by phase</Button>
-            {p.opmAccepted && p.opmId === actor.id && <Button icon="folder" onClick={() => setConfirmationView({ projectId: p.id, view: "subcontractors" })}>View subcontractor allocation · Read-only</Button>}
-          </div>
+          <footer className="opm-confirmation-footer">
+            <div className="opm-confirmation-identity">
+              <span className="opm-confirmation-avatar lead" aria-hidden="true">{lead ? initials(leadName) : <Icon name="users" size={18} />}</span>
+              <div><span className="opm-confirmation-caption">Lead Site PM</span><strong>{leadName}</strong>
+                {!parallelIntake && <small>{registeredCount(p)}/6 documents</small>}
+              </div>
+            </div>
+            <div className="opm-confirmation-views">
+              <Button icon="users" onClick={() => setConfirmationView({ projectId: p.id, view: "team" })}>View Site PM team by phase</Button>
+              {p.opmAccepted && p.opmId === actor.id && <Button icon="folder" onClick={() => setConfirmationView({ projectId: p.id, view: "subcontractors" })}>View subcontractor allocation · Read-only</Button>}
+            </div>
+          </footer>
         </div>
-      </Panel>
+      </section>
     )
   }
   function dashboard() {

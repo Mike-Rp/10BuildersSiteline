@@ -36,6 +36,7 @@ const projectMeasurementFields = [
 ] as const
 const projectFields = [...projectIdentityFields, ...projectMeasurementFields, ["floor_area_sqm", "Total floor area (m²)"]] as const
 const projectTypes = ["Residential", "Commercial", "Mixed-Use"]
+const projectSizes = ["Small", "Medium", "Large"]
 const floorPageSize = 12
 function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
   const averageArea = Number(details.floor_area_sqm) / Number(details.floor_count)
@@ -71,8 +72,10 @@ const durationLabel = (days: number) => {
     remainder && `${remainder} ${remainder === 1 ? "month" : "months"}`].filter(Boolean).join(" and ")
 }
 
-function Card({ title, icon, children }: { title: string; icon?: string; children: ReactNode }) {
-  return <section className="inquiry-card office-workflow-card">
+function Card({ title, icon, assessmentMetric, children }: {
+  title: string; icon?: string; assessmentMetric?: "size" | "complexity" | "duration"; children: ReactNode
+}) {
+  return <section className="inquiry-card office-workflow-card" data-assessment-metric={assessmentMetric}>
     <header className="inquiry-section-heading">
       {icon && <span className="inquiry-list-icon"><Icon name={icon} /></span>}
       <h2>{title}</h2>
@@ -135,7 +138,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const accepted = row.status === "approved"
   const title = {
     pending: "Pending inquiry", received: pendingCount ? "Inquiry accepted" : "No pending inquiries", accepted: name,
-    proposal: "Client proposal", review: "Edit project information", assessment: "Assess project size, complexity, and duration",
+    proposal: "Client proposal", review: "Edit project information", assessment: "Project assessment",
   }[page]
   const descriptions = {
     pending: "Review the consultation request and choose whether to accept the inquiry.",
@@ -591,36 +594,60 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       <button type="button" className="button" onClick={() => navigate("review")}>Review project information</button>
     </Notice>}
     <div className="office-workflow-grid assessment">
-      <Card title="Project size classification" icon="building">
-        <Facts values={[["Project type", row.details.project_type], ["Lot area (m²)", row.details.lot_area], ["Total floor area (m²)", row.details.floor_area_sqm], ["Floors", row.details.floor_count]]} />
-        <div className="office-workflow-result"><strong>{preview.size}</strong>
-          <p>{assessmentBasis ? "Uses the higher size category from the reviewed lot area and total floor area."
-            : "Size recorded when this assessment was completed."}</p>
-          {assessmentBasis?.size === "Large" && <p>Large if the lot exceeds {assessmentNumber.format(assessmentBasis.medium[0])} m² or the total floor area exceeds {assessmentNumber.format(assessmentBasis.medium[1])} m² for this project type.</p>}
+      <Card title="Project size classification" icon="building" assessmentMetric="size">
+        <Facts values={[
+          ["Project type", amount(row.details.project_type)],
+          ["Lot area", row.details.lot_area ? `${assessmentNumber.format(Number(row.details.lot_area))} m²` : "Not provided"],
+          ["Total floor area", row.details.floor_area_sqm ? `${assessmentNumber.format(Number(row.details.floor_area_sqm))} m²` : "Not provided"],
+          ["Floors", amount(row.details.floor_count)],
+        ]} />
+        <div className="office-workflow-result office-assessment-size">
+          <div><span>Classification</span><strong>{preview.size}</strong>
+            <p>{assessmentBasis ? "Uses the higher size category from the reviewed lot area and total floor area."
+              : "Size recorded when this assessment was completed."}</p>
+          </div>
+          <span className="office-assessment-size-mark" aria-hidden="true">{preview.size.charAt(0)}</span>
         </div>
+        {projectSizes.includes(preview.size) && <ul className="office-assessment-size-scale" aria-label="Project size categories">
+          {projectSizes.map(size => <li key={size} aria-current={size === preview.size ? "true" : undefined}>{size}</li>)}
+        </ul>}
+        {assessmentBasis?.size === "Large" && <p className="office-assessment-size-note">Large if the lot exceeds {assessmentNumber.format(assessmentBasis.medium[0])} m² or the total floor area exceeds {assessmentNumber.format(assessmentBasis.medium[1])} m² for this project type.</p>}
       </Card>
-      <Card title="Complexity classification" icon="doc">
+      <Card title="Complexity classification" icon="doc" assessmentMetric="complexity">
         <fieldset className="office-workflow-form" disabled={busy || !!assessment}>
           <label>Technical requirements<select value={technical} onChange={event => setTechnical(event.target.value)}>{technicalOptions.map(option => <option key={option}>{option}</option>)}</select></label>
           <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>{arrangementOptions.map(option => <option key={option}>{option}</option>)}</select></label>
         </fieldset>
-        <div className="office-workflow-result"><span>Complexity score · {preview.score}/15</span><strong>{preview.complexity}</strong>
-          {assessmentBasis ? <details className="office-assessment-basis"><summary>View score breakdown</summary>
-            <Facts values={[
+        <div className="office-workflow-result office-assessment-complexity">
+          <div className="office-assessment-ring" style={{ backgroundImage: `conic-gradient(#755294 ${preview.score / 15 * 100}%, #dfd9e6 0)` }}>
+            <span>{preview.score}<small>/ 15</small></span>
+          </div>
+          <div><span>Complexity score</span><strong>{preview.complexity}</strong></div>
+        </div>
+        {assessmentBasis ? <details className="office-assessment-basis"><summary>View score breakdown</summary>
+          <dl className="office-assessment-score-list">
+            {([
               ["Project type", assessmentBasis.typePoints], ["Project size", assessmentBasis.sizePoints],
               ["Number of floors", assessmentBasis.floorPoints], ["Technical requirements", assessmentBasis.technicalPoints],
               ["Phase arrangement", assessmentBasis.overlapPoints],
-            ]} />
-            <p>Low is up to 7 points, Moderate is 8–11, and High is 12–15.</p>
-          </details> : <p>Planning score recorded when this assessment was completed.</p>}</div>
+            ] as const).map(([label, points]) => <div key={label}>
+              <dt>{label}</dt><dd><meter value={points} min={0} max={3} aria-hidden="true" /><span>{points}/3</span></dd>
+            </div>)}
+          </dl>
+          <p>Low is 5–7 points, Moderate is 8–11, and High is 12–15.</p>
+        </details> : <p>Planning score recorded when this assessment was completed.</p>}
       </Card>
-      <Card title="Estimated project duration" icon="calendar">
+      <Card title="Estimated project duration" icon="clock" assessmentMetric="duration">
         <div className="office-workflow-result duration">
           {preview.planningDays != null && <><strong>About {durationLabel(preview.planningDays)}</strong>
             <span>{preview.planningDays.toLocaleString("en-PH")} estimated calendar days</span></>}
-          {preview.durationMultiplier != null && <p>Schedule multiplier ×{Number(preview.durationMultiplier.toFixed(3))}</p>}
+          {preview.durationMultiplier != null && <p>Schedule multiplier ×{preview.durationMultiplier.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</p>}
+        </div>
+        <div className="office-assessment-schedule">
+          <Facts values={[["Reviewed start", formatDay(review.start)], ["Reviewed completion", formatDay(review.end)]]} />
+          <div className="office-assessment-date-line" aria-hidden="true" />
+          <p>{preview.durationDays.toLocaleString("en-PH")} reviewed calendar days</p>
           {preview.suggestedEnd && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
-          <p>Reviewed schedule: {formatDay(review.start)} – {formatDay(review.end)} ({preview.durationDays.toLocaleString("en-PH")} calendar days)</p>
         </div>
         {assessmentBasis && <details className="office-assessment-basis"><summary>View duration calculation</summary>
           <p>({assessmentNumber.format(Number(row.details.floor_area_sqm))} m² × {assessmentBasis.rate} days/m² + {assessmentNumber.format(assessmentBasis.extraFloorDays)} days for floors above the first) × {assessmentBasis.complexityFactor} × {assessmentBasis.overlapFactor}, rounded up.</p>
