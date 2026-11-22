@@ -3395,12 +3395,6 @@ function AppInner() {
           />
         </Modal>
       )}
-      {engineerReassignment && (() => {
-        const project = state.projects.find(row => row.id === engineerReassignment.projectId)
-        return project ? <SuggestedReassignment project={project} phase={engineerReassignment.phase}
-          userId={engineerReassignment.accountId} onClose={() => setEngineerReassignment(undefined)}
-          onSaved={async () => { await reloadWorkspace(); setEngineerReassignment(undefined) }} /> : null
-      })()}
       {overrideTarget && (
         <OverrideDialog
           target={overrideTarget}
@@ -3512,6 +3506,12 @@ function AppInner() {
           }
         }} />}
 
+      {engineerReassignment && (() => {
+        const project = state.projects.find(row => row.id === engineerReassignment.projectId)
+        return project ? <SuggestedReassignment project={project} phase={engineerReassignment.phase}
+          userId={engineerReassignment.accountId} onClose={() => setEngineerReassignment(undefined)}
+          onSaved={async () => { await reloadWorkspace(); setEngineerReassignment(undefined) }} /> : null
+      })()}
     </div>
   )
 }

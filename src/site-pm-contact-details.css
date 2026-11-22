@@ -1,7 +1,21 @@
-#root .site-pm-roster-contacts { display: grid; gap: 10px; min-width: 0; }
-#root .site-pm-roster-contact { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
-#root .site-pm-roster-contact > span { flex: 1 1 140px; overflow-wrap: anywhere; font-size: 14px; }
-#root .site-pm-roster-contact .button { min-height: 40px; font-size: 13px; padding: 8px 11px; }
+#root .role-roster-compact > div { display: grid; grid-template-columns: minmax(160px, .75fr) minmax(0, 2fr); align-items: start; gap: 18px 28px; padding: 18px 0; }
+#root .role-roster-compact > div > div { min-width: 0; }
+#root .site-pm-roster-contacts { display: grid; gap: 0; min-width: 0; }
+#root .site-pm-roster-contact { display: grid; grid-template-columns: minmax(0, 1fr) 125px 100px; align-items: center; gap: 8px 14px; padding: 10px 0; }
+#root .site-pm-roster-contact + .site-pm-roster-contact { border-top: 1px solid var(--color-line); }
+#root .site-pm-roster-person { min-width: 0; }
+#root .site-pm-roster-name { display: inline; border: 0; background: transparent; padding: 0; min-height: 32px; color: var(--color-primary); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+#root .site-pm-roster-name:hover { text-decoration: underline; }
+#root .site-pm-roster-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 3px; }
+#root .site-pm-roster-contact > .badge { width: fit-content; min-width: 0; justify-self: start; margin: 0; }
+#root .site-pm-roster-contact .button { min-height: 34px; font-size: 13px; padding: 6px 10px; justify-self: end; }
+@media (max-width: 850px) {
+  #root .role-roster-compact > div { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+@media (max-width: 480px) {
+  #root .site-pm-roster-contact { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+  #root .site-pm-roster-contact > .button { grid-column: 2; }
+}
 #root .site-pm-contact-details { min-width: 0; }
 #root .site-pm-contact-details > h3 { margin: 0; overflow-wrap: anywhere; }
 #root .site-pm-contact-details > p { margin: 6px 0 14px; color: var(--color-muted); }

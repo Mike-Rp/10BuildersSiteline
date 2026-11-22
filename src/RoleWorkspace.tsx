@@ -748,7 +748,7 @@ export default function RoleWorkspace({
   function assignmentRoster(p: Project, allowReassign = false, showContacts = isOpm) {
     const engineerName = (id: string) => state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
     return (
-      <div className="role-roster">
+      <div className={`role-roster${showContacts ? " role-roster-compact" : ""}`}>
         {p.team.map((t) => {
           const summary = phaseEngineerSummary(t)
           return (
@@ -770,10 +770,12 @@ export default function RoleWorkspace({
                 const deadline = engineer?.responseDeadline
                 const overdue = status === "pending" && !!deadline && Date.parse(deadline) <= urgencyNow
                 return <div className="site-pm-roster-contact" key={id}>
-                  <span>{name}{deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</span>
+                  <div className="site-pm-roster-person"><button type="button" className="site-pm-roster-name"
+                    aria-label={`View contact details for ${name} in ${t.phase}`}
+                    onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>{name}</button>
+                    {deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</div>
                   <Status value={overdue ? "response overdue" : status} />
-                  <Button icon="users" aria-label={`View contact details for ${name} in ${t.phase}`} onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>View Contact Details</Button>
-                  {status !== "confirmed" && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Review Reassignment</Button>}
+                  {(status === "declined" || overdue) && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Reassign</Button>}
                 </div>
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}
@@ -4214,16 +4216,6 @@ export default function RoleWorkspace({
         const project = projects.find(p => p.id === inquiryAssignmentProjectId)
         return project ? inquiryAssignmentStatus(project) : null
       })()}
-      {isOpm && suggestedReassignment && (() => {
-        const project = projects.find(p => p.id === suggestedReassignment.projectId)
-        if (!project) return null
-        return <SuggestedReassignment key={`${project.id}:${suggestedReassignment.phase}:${suggestedReassignment.accountId}`} project={project} phase={suggestedReassignment.phase} userId={suggestedReassignment.accountId} onClose={() => setSuggestedReassignment(undefined)} onSaved={async () => { await onReload(); setMessage("Replacement offer sent; Site PM acceptance is required.") }} />
-      })()}
-      {isOpm && sitePmContact && (() => {
-        const project = projects.find(p => p.id === sitePmContact.projectId)
-        if (!project?.team.some(row => row.accountId === sitePmContact.accountId || row.engineers?.some(engineer => engineer.accountId === sitePmContact.accountId))) return null
-        return <SitePmContactDetails key={`${project.id}:${sitePmContact.accountId}`} project={project} account={state.accounts.find(account => account.id === sitePmContact.accountId)} onClose={() => setSitePmContact(undefined)} />
-      })()}
       {isOpm && confirmationView && (() => {
         const project = projects.find(p => p.id === confirmationView.projectId)
         if (!project || (confirmationView.view === "subcontractors" && (!project.opmAccepted || project.opmId !== actor.id))) return null
@@ -4524,6 +4516,16 @@ export default function RoleWorkspace({
           </div>
         </div>
       )}
+      {isOpm && suggestedReassignment && (() => {
+        const project = projects.find(p => p.id === suggestedReassignment.projectId)
+        if (!project) return null
+        return <SuggestedReassignment key={`${project.id}:${suggestedReassignment.phase}:${suggestedReassignment.accountId}`} project={project} phase={suggestedReassignment.phase} userId={suggestedReassignment.accountId} onClose={() => setSuggestedReassignment(undefined)} onSaved={async () => { await onReload(); setMessage("Replacement offer sent; Site PM acceptance is required.") }} />
+      })()}
+      {isOpm && sitePmContact && (() => {
+        const project = projects.find(p => p.id === sitePmContact.projectId)
+        if (!project?.team.some(row => row.accountId === sitePmContact.accountId || row.engineers?.some(engineer => engineer.accountId === sitePmContact.accountId))) return null
+        return <SitePmContactDetails key={`${project.id}:${sitePmContact.accountId}`} project={project} account={state.accounts.find(account => account.id === sitePmContact.accountId)} onClose={() => setSitePmContact(undefined)} />
+      })()}
     </div>
   )
 }

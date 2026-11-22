@@ -68,7 +68,7 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
         {canChooseReplacement && <fieldset disabled={busy || done} className="reassignment-candidates"><legend>Select an eligible replacement</legend>
           {data.candidates.map(candidate => <label key={candidate.id} className={selected === candidate.id ? "selected" : ""}>
             <input type="radio" name="replacement" value={candidate.id} required checked={selected === candidate.id} onChange={() => setSelected(candidate.id)} />
-            <span><strong>{candidate.name}</strong><span className="reassignment-tags">{candidate.tags.map(tag => <span key={tag}>{tag}</span>)}</span><small>Verified credentials · Covers all responsibilities in this offer</small></span><Badge tone="green">Eligible</Badge>
+            <span><strong>{candidate.name}</strong><span className="reassignment-tags">{candidate.tags.map(tag => <span key={tag}>{tag}</span>)}</span></span>
           </label>)}
         </fieldset>}
         {canChooseReplacement && <>

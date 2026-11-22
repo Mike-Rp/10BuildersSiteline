@@ -11,11 +11,14 @@ test("OPM monitoring offers per-engineer reassignment using server candidates", 
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
   }
+  const getItem = w.Storage.prototype.getItem
+  w.Storage.prototype.getItem = function (key) { return String(key).startsWith("10buildline:workspace-guide:") ? "seen" : getItem.call(this, key) }
   w.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} })
   w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {}
   const requests = []
   t.mock.method(globalThis, "fetch", async url => {
     requests.push(String(url))
+    if (String(url).endsWith("/auth/me")) return Response.json({ data: { workspace_guide_seen: true } })
     return Response.json({ data: { available: true, canReassign: true, phase: "Design", userId: "a5", name: "Declined Engineer", status: "declined", tags: ["Structural"], version: "test", candidates: [{ id: "replacement", name: "Server Qualified Engineer", tags: ["Structural"] }] } })
   })
   const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
@@ -42,4 +45,12 @@ test("OPM monitoring offers per-engineer reassignment using server candidates", 
   await act(async () => { actions[0].click(); await new Promise(resolve => setTimeout(resolve, 20)) })
   assert.ok(requests.some(url => url.includes('/reassignment-options?phase=Design&userId=a5')))
   assert.match(document.body.textContent, /Server Qualified Engineer/)
+  const dialogs = [...document.querySelectorAll('[role="dialog"]')]
+  assert.equal(dialogs.at(-1).getAttribute('aria-label'), 'Review reassignment', 'Replacement dialog appears above project monitoring')
+  assert.ok(dialogs.some(dialog => dialog.getAttribute('aria-label') === 'Project monitoring'))
+  assert.ok(dialogs.at(-1).contains(document.activeElement), 'Keyboard focus moves to replacement dialog')
+  await act(() => dialogs.at(-1).querySelector('[aria-label="Close dialog"]').click())
+  assert.equal([...document.querySelectorAll('[role="dialog"]')].at(-1).getAttribute('aria-label'), 'Project monitoring')
+  assert.equal(document.querySelectorAll('.site-pm-roster-contact > button[aria-label^="View contact details"]').length, 0)
+  assert.ok(document.querySelector('.site-pm-roster-name'))
 })
