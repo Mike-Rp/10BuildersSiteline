@@ -429,7 +429,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <span className="inquiry-pill">Live estimate</span>
           </header>
           <details className="office-review-additional">
-            <summary>Client information</summary>
+            <summary>
+              <span>Client information</span>
+              <span className="office-review-disclosure-icon" aria-hidden="true"><Icon name="chevron" size={18} /></span>
+            </summary>
             <div className="office-workflow-fields">{clientFields.map(([key, label]) => editField(key, label))}</div>
           </details>
           <div className="office-workflow-fields">
