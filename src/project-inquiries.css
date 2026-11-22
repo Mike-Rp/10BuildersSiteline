@@ -127,10 +127,21 @@
 .office-intake-record-nav > .button { justify-content: start; gap: 8px; min-width: 0; padding-inline: 8px; text-align: start; white-space: normal; }
 .office-intake-record-nav > .button strong, .office-intake-record-nav > .button small { display: block; }
 .office-intake-record-nav > .button small { font-size: .74rem; font-weight: 400; }
+#root .project-inquiries .office-intake-record-nav > [aria-current=step] :is(strong, small) { color: #fff; }
 .office-intake-step-marker { display: grid; place-items: center; flex: 0 0 25px; height: 25px; border-radius: 50%; background: #e3edf5; color: #325776; font-size: .76rem; }
 .office-intake-step-marker[data-complete=true] { background: #dbefe4; color: #27684d; }
 .office-intake-record-nav > [aria-current=step] .office-intake-step-marker { background: #ffffff35; color: #fff; }
 .office-intake-section-heading h2 { margin: 6px 0 0; font-size: clamp(1.2rem, 2vw, 1.5rem); }
+.office-intake-section-heading p { margin: 4px 0 0; }
+.office-reviewed-intake > .office-workflow-card { border-block-start: 4px solid #36739e; box-shadow: 0 4px 12px #17385712; }
+.office-reviewed-intake .inquiry-section-heading { flex-wrap: wrap; }
+.office-reviewed-intake .inquiry-section-heading > .button { margin-inline-start: auto; }
+.office-reviewed-intake > .office-workflow-card > .office-workflow-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid #d6e3ee; border-radius: 8px; background: #d6e3ee; overflow: hidden; }
+.office-reviewed-intake > .office-workflow-card > .office-workflow-facts > div { min-width: 0; padding: 12px; background: #f7fafc; }
+.office-reviewed-intake .office-workflow-history > :not(summary) { margin-block-start: 10px; }
+@media (max-width: 600px) {
+  .office-reviewed-intake > .office-workflow-card > .office-workflow-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .office-intake-records > .office-workflow-card, .office-proposal-grid > .office-workflow-card { border-block-start: 4px solid #36739e; box-shadow: 0 4px 12px #17385712; }
 .office-intake-records > .office-workflow-card:first-child { border-block-start-color: #448b73; }
 .office-intake-records .office-workflow-facts, .office-proposal-grid .office-workflow-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid #d6e3ee; border-radius: 8px; background: #d6e3ee; overflow: hidden; }

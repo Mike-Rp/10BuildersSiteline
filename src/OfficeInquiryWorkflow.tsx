@@ -75,13 +75,14 @@ const durationLabel = (days: number) => {
     remainder && `${remainder} ${remainder === 1 ? "month" : "months"}`].filter(Boolean).join(" and ")
 }
 
-function Card({ title, icon, assessmentMetric, children }: {
-  title: string; icon?: string; assessmentMetric?: "size" | "complexity" | "duration"; children: ReactNode
+function Card({ title, icon, assessmentMetric, actions, children }: {
+  title: string; icon?: string; assessmentMetric?: "size" | "complexity" | "duration"; actions?: ReactNode; children: ReactNode
 }) {
   return <section className="inquiry-card office-workflow-card" data-assessment-metric={assessmentMetric}>
     <header className="inquiry-section-heading">
       {icon && <span className="inquiry-list-icon"><Icon name={icon} /></span>}
       <h2>{title}</h2>
+      {actions}
     </header>
     {children}
   </section>
@@ -139,7 +140,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
 
   const name = String(row.details.name || "Project inquiry")
   const accepted = row.status === "approved"
-  const showIntakeRecord = page === "accepted" || page === "proposal"
   const assessmentAvailable = accepted && Boolean(workflow?.budget && review)
   const title = {
     pending: "Pending inquiry", received: pendingCount ? "Inquiry accepted" : "No pending inquiries", accepted: name,
@@ -172,6 +172,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
   const reviewing = editing || !review
   const compactReview = page === "review" && reviewing
+  const showIntakeRecord = page !== "pending" && page !== "received" && !compactReview
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
   const lotArea = Number(draft.lot_area)
@@ -306,13 +307,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["review", "Project information & budget", accepted, assessmentAvailable],
     ["assessment", "Project assessment", assessmentAvailable, Boolean(assessment)],
   ] as const
-  const workflowNav = <nav className={`office-workflow-nav${showIntakeRecord ? " office-intake-record-nav" : ""}`} aria-label="Inquiry workflow">
+  const workflowNav = <nav className="office-workflow-nav office-intake-record-nav" aria-label="Inquiry workflow">
     {steps.map(([key, label, enabled, complete], index) => <button type="button" className="button" key={key}
       disabled={busy || !enabled} aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>
-      {showIntakeRecord ? <>
-        <span className="office-intake-step-marker" data-complete={complete} aria-hidden="true">{complete ? <Icon name="check" size={14} /> : index + 1}</span>
-        <span><strong>{label}</strong><small>{page === key ? "Viewing now" : complete ? "Complete" : enabled ? "Available" : "Unavailable"}</small></span>
-      </> : label}
+      <span className="office-intake-step-marker" data-complete={complete} aria-hidden="true">{complete ? <Icon name="check" size={14} /> : index + 1}</span>
+      <span><strong>{label}</strong><small>{page === key ? "Viewing now" : complete ? "Complete" : enabled ? "Available" : "Unavailable"}</small></span>
     </button>)}
   </nav>
 
@@ -342,17 +341,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         ]} />
       </header>
       {workflowNav}
-    </section> : !compactReview && page !== "pending" && page !== "received" && workflowNav}
+    </section> : null}
     {!compactReview && !showIntakeRecord && <header className="office-workflow-heading">
-      <div><p className="inquiry-muted">Inquiry reference {reference}</p><h1 ref={heading} tabIndex={-1}>{page === "review" ? "Project information and budget" : title}</h1><p>{descriptions[page]}</p></div>
-      {page === "review" && !reviewing && <button type="button" className="button" disabled={busy} onClick={startEditing}>Edit project information</button>}
-      {page === "assessment" && preview && <div className="office-workflow-actions">
-        {assessment
-          ? <button type="button" className="button primary" disabled={busy} onClick={hasSignedContract ? startStaffing : () => navigate("review")}>
-              {hasSignedContract ? "Continue to construction phases" : "Attach signed contract"}</button>
-          : <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
-              onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
-      </div>}
+      <div><p className="inquiry-muted">Inquiry reference {reference}</p><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{descriptions[page]}</p></div>
     </header>}
     {error && <p className="office-workflow-error" role="alert">{error}</p>}
     {busy && <p role="status">Saving or loading inquiry…</p>}
@@ -451,7 +442,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>}
 
     {page === "review" && <>
-      {!reviewing && <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>}
       <div className={reviewing ? "office-review-layout" : undefined}>
         {reviewing && <aside className="inquiry-card office-admin-submission" aria-labelledby="office-admin-submission-title">
           <header className="office-review-panel-heading">
@@ -606,24 +596,38 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <button type="submit" className="button primary">Save and continue</button>
             </div>
           </div>
-        </fieldset> : <fieldset className="office-workflow-form" disabled={busy}>
-          <Card title="Project information" icon="building">
-          <Facts values={projectFacts} />{row.details.overview && <p>{row.details.overview}</p>}
-          <section className="office-workflow-subsection">
-            <h3>Budget allocation</h3>
+        </fieldset> : <fieldset className="office-workflow-form office-reviewed-intake" disabled={busy}>
+          <Card title="Reviewed intake details" icon="building" actions={
+            <button type="button" className="button" onClick={startEditing}>Edit project information</button>
+          }>
+            <Facts values={[
+              ["Project type", amount(row.details.project_type)],
+              ["Lot area (m²)", amount(row.details.lot_area)],
+              ["Number of floors", amount(row.details.floor_count)],
+              ["Total floor area (m²)", amount(row.details.floor_area_sqm)],
+              ["Authorized budget", workflow?.budget == null ? "Not saved" : currency.format(workflow.budget)],
+              ["Technical requirements", review?.technical ?? technicalOptions[0]],
+            ]} />
+            <details className="office-workflow-history"><summary>Client information and schedule</summary>
+              <Facts values={[...clientFacts, ...projectFacts.filter(([label]) =>
+                ["Project address / location", "Estimated start", "Estimated completion", "Classification"].includes(label))]} />
+              {row.details.overview && <p>{row.details.overview}</p>}
+            </details>
+          <details className="office-workflow-history" open={!workflow?.budget || undefined}>
+            <summary>Budget allocation</summary>
             <label>Authorized amount (₱)<input type="number" required min="0.01" max="999999999999.99" step="0.01"
               value={budget} onChange={event => setBudget(event.target.value)} /></label>
             {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
               <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
             </details>}
-          </section>
-          </Card>
-          {signedContract}
+          </details>
           <div className="office-workflow-actions office-workflow-action-bar">
             {budgetSaved
               ? <button type="button" className="button primary" onClick={() => navigate("assessment")}>Continue to assessment</button>
               : <button type="submit" className="button primary">Save allocated budget</button>}
           </div>
+          </Card>
+          {signedContract}
         </fieldset>}
       </form>
       </div>
@@ -637,6 +641,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </>}
 
     {page === "assessment" && preview && review && <>
+    <header className="office-intake-section-heading">
+      <div><h2>{title}</h2><p className="inquiry-muted">{descriptions.assessment}</p></div>
+      {assessment
+        ? <button type="button" className="button primary" disabled={busy} onClick={hasSignedContract ? startStaffing : () => navigate("review")}>
+            {hasSignedContract ? "Continue to construction phases" : "Attach signed contract"}</button>
+        : <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
+            onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
+    </header>
     {assessmentNeedsDates && <Notice tone="warning">
       <p>{minimumReviewedEnd
         ? `This assessment requires a completion date of ${formatDay(minimumReviewedEnd)} or later.`
