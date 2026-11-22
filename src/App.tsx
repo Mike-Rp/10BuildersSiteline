@@ -1,3 +1,4 @@
+import SuggestedReassignment from "./SuggestedReassignment"
 import { scrollListAfterChange } from "./navigation-scroll"
 import WorkspaceGuide from "./WorkspaceGuide"
 import { resolveAdminSearchDestination, type AdminSearchDestination } from "./admin-search-destination"
@@ -419,6 +420,7 @@ function AppInner() {
   const [archiveDays, setArchiveDays] = useState(60)
   const [roleFilter, setRoleFilter] = useState("all")
   const [licenseFilter, setLicenseFilter] = useState("all")
+  const [engineerReassignment, setEngineerReassignment] = useState<{ projectId: string; phase: string; accountId: string }>()
   const [overrideTarget, setOverrideTarget] = useState<OverrideTarget>()
   const [renewalsOpen, setRenewalsOpen] = useState(false)
   const [activityFilter, setActivityFilter] = useState("all")
@@ -2436,6 +2438,11 @@ function AppInner() {
                               <small>{e.assignedDisciplines.join(", ") || "Any discipline"}</small>
                             </span>
                             <Status status={e.status} pendingLabel="Awaiting Site PM" />
+                            {e.status !== "confirmed" && p.status !== "completed" && <Button
+                              aria-label={`Review reassignment for ${nameFor(e.accountId)} in ${t.phase}`}
+                              onClick={() => setEngineerReassignment({ projectId: p.id, phase: t.phase, accountId: e.accountId })}>
+                              Review reassignment
+                            </Button>}
                             <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
                           </div>
                         ))}
@@ -2459,23 +2466,17 @@ function AppInner() {
                       ) : (
                         <span className="locked-label">Awaiting engineers</span>
                       )
-                    ) : phaseStatus !== "confirmed" && p.status !== "completed" ? (
-                      <select
-                        aria-label={`Reassign ${t.phase}`}
-                        value=""
-                        onChange={(e) => reassign(p, t.phase, e.target.value)}
-                      >
-                        <option value="">Reassign…</option>
-                        {spmCandidates(state, p.type, t.phase, p.id).map(
-                          (c) => (
-                            <option key={c.account.id} value={c.account.id}>
-                              {c.account.name} · {c.matched}/{c.total} tags
-                              {p.end && c.account.expiry && c.account.expiry < p.end
-                                ? ` · license expires ${dateLabel(c.account.expiry)}`
-                                : ""}
-                            </option>
-                          ),
-                        )}
+                    ) : phaseStatus !== "confirmed" && p.status !== "completed" && t.accountId ? (
+                      <Button aria-label={`Review reassignment for ${nameFor(t.accountId)} in ${t.phase}`}
+                        onClick={() => setEngineerReassignment({ projectId: p.id, phase: t.phase, accountId: t.accountId })}>
+                        Review reassignment
+                      </Button>
+                    ) : !t.accountId && phaseStatus !== "confirmed" && p.status !== "completed" ? (
+                      <select aria-label={`Reassign ${t.phase}`} value="" onChange={event => reassign(p, t.phase, event.target.value)}>
+                        <option value="">Assign Site PM…</option>
+                        {spmCandidates(state, p.type, t.phase, p.id).map(candidate => <option key={candidate.account.id} value={candidate.account.id}>
+                          {candidate.account.name} · {candidate.matched}/{candidate.total} tags
+                        </option>)}
                       </select>
                     ) : (
                       <span className="locked-label">
@@ -3394,6 +3395,12 @@ function AppInner() {
           />
         </Modal>
       )}
+      {engineerReassignment && (() => {
+        const project = state.projects.find(row => row.id === engineerReassignment.projectId)
+        return project ? <SuggestedReassignment project={project} phase={engineerReassignment.phase}
+          userId={engineerReassignment.accountId} onClose={() => setEngineerReassignment(undefined)}
+          onSaved={async () => { await reloadWorkspace(); setEngineerReassignment(undefined) }} /> : null
+      })()}
       {overrideTarget && (
         <OverrideDialog
           target={overrideTarget}

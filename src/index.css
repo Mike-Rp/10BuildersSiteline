@@ -555,6 +555,7 @@ tr.team-needs-attention > td:first-child { box-shadow: inset 3px 0 #b7791f; }
 .phase-engineer-row > .license-warning { grid-column: 1 / -1; align-items: flex-start; margin-top: 2px; line-height: 1.5; }
 .phase-engineer-row .license-warning > svg { flex-shrink: 0; margin-top: 3px; }
 .phase-engineer-row strong { font-weight: 600; }
+.phase-engineer-row > .button { grid-column: 1 / -1; justify-self: start; }
 @container (max-width: 650px) {
   .phase-assignments > div, .phase-assignments > .phase-assignment-multiple { grid-template-columns: minmax(0, 1fr) auto; }
   .phase-assignments > div > span:first-child { grid-column: 1 / -1; }

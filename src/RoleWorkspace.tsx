@@ -745,7 +745,7 @@ export default function RoleWorkspace({
       </ol>
     )
   }
-  function assignmentRoster(p: Project, allowReassign = false, showContacts = false) {
+  function assignmentRoster(p: Project, allowReassign = false, showContacts = isOpm) {
     const engineerName = (id: string) => state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
     return (
       <div className="role-roster">
