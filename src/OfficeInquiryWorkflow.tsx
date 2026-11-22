@@ -38,11 +38,23 @@ const projectFields = [...projectIdentityFields, ...projectMeasurementFields, ["
 const projectTypes = ["Residential", "Commercial", "Mixed-Use"]
 const floorPageSize = 12
 function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
+  const averageArea = Number(details.floor_area_sqm) / Number(details.floor_count)
   return {
     mode: saved?.mode ?? "same",
-    perFloor: saved?.mode === "same" ? String(saved.areaPerFloor) : String(Number(details.floor_area_sqm) / Number(details.floor_count)),
+    perFloor: saved?.mode === "same" ? String(saved.areaPerFloor) : null,
+    submittedAverage: Number.isFinite(averageArea) && averageArea > 0 ? averageArea : null,
     areas: saved?.mode === "individual" ? saved.areas.map(String) : [],
   }
+}
+
+function suggestedAreaPerFloor(lot: Details[string], submittedLot: Details[string], submittedAverage: number | null) {
+  const lotArea = Number(lot)
+  const originalLotArea = Number(submittedLot)
+  if (!Number.isFinite(lotArea) || lotArea <= 0 || submittedAverage === null) return ""
+  if (lotArea === originalLotArea || !Number.isFinite(originalLotArea) || originalLotArea <= 0) return String(submittedAverage)
+
+  const scaledArea = lotArea * Math.min(submittedAverage / originalLotArea, 1)
+  return String(Math.min(lotArea, Number(scaledArea.toFixed(2)) || scaledArea))
 }
 const additionalFields = [["land_area", "Land area (m²)"], ...clientFields] as const
 const correctionFields = [...projectFields, ...additionalFields]
@@ -159,10 +171,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const compactReview = page === "review" && reviewing
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
+  const perFloor = floorArea.perFloor ?? suggestedAreaPerFloor(draft.lot_area, row.details.lot_area, floorArea.submittedAverage)
   const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
-    ? { mode: "same", areaPerFloor: floorArea.perFloor }
+    ? { mode: "same", areaPerFloor: perFloor }
     : { mode: "individual", areas: floorInputs }, floorCount) : null
   const measuredDraft = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
   const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
@@ -418,15 +431,18 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <label>Floor sizes<select value={floorArea.mode} onChange={event => {
                 const mode = event.target.value === "individual" ? "individual" : "same"
                 updateFloorArea({ ...floorArea, mode, areas: mode === "individual" && !floorArea.areas.length && validFloorCount
-                  ? Array.from({ length: floorCount }, () => floorArea.perFloor) : floorArea.areas })
+                  ? Array.from({ length: floorCount }, () => perFloor) : floorArea.areas })
                 setFloorPage(0)
               }}><option value="same">All floors have the same area</option><option value="individual">Enter each floor separately</option></select></label>
             </div>
             <div className="office-workflow-fields">
               {floorArea.mode === "same" ? <div>
                 <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²)</label>
-                <input {...describedField(fieldId("area-per-floor"))} required type="number" min="0" step="any" value={floorArea.perFloor}
+                <input {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required type="number" min="0" step="any" value={perFloor}
                   onChange={event => updateFloorArea({ ...floorArea, perFloor: event.target.value })} />
+                {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
+                  Suggested from the submitted measurements and adjusted when lot area changes. Enter the actual area if known.
+                </div>}
                 {inlineError(fieldId("area-per-floor"))}
               </div> : floorInputs.slice(floorPage * floorPageSize, (floorPage + 1) * floorPageSize).map((value, offset) => {
                 const index = floorPage * floorPageSize + offset
