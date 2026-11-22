@@ -21,9 +21,8 @@
 }
 .opm-inquiry-pipeline-label { margin: 0 0 5px; color: var(--color-muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .opm-inquiry-pipeline :is(h1, h2) { margin: 0; font-size: clamp(1.25rem, 2vw, 1.6rem); }
-.opm-inquiry-pipeline .opm-inquiry-refresh { gap: 8px; }
 .opm-inquiry-pipeline .confirmation-intake-filters { margin: 0; padding: 0; }
-.opm-inquiry-filters {
+.opm-inquiry-filters, .opm-inquiry-pipeline .list-toolbar-controls {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
   align-items: end;
@@ -36,6 +35,10 @@
 }
 .opm-inquiry-filters .inquiry-list-search { width: 100%; }
 .opm-inquiry-filters label { min-width: 0; color: var(--color-muted); }
+.opm-inquiry-pipeline .list-toolbar-controls:not(:has(> .list-filter + .list-filter)) { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.opm-inquiry-pipeline .list-toolbar-controls > .search-field { width: 100%; min-width: 0; }
+.opm-inquiry-pipeline .list-filter select { width: 100%; min-width: 0; }
+.opm-inquiry-pipeline .list-toolbar-controls > .button { grid-column: 1 / -1; justify-self: start; }
 .opm-inquiry-count { margin: 0; font-size: .9rem; font-weight: 650; }
 .opm-inquiry-cards { container-type: inline-size; display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .opm-inquiry-card {
@@ -228,8 +231,10 @@
 }
 
 @media (max-width: 640px) {
-  .opm-inquiry-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .opm-inquiry-filters, .opm-inquiry-pipeline .list-toolbar-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .opm-inquiry-filters .inquiry-list-search { grid-column: 1 / -1; }
+  .opm-inquiry-pipeline .list-toolbar-controls > .search-field { grid-column: 1 / -1; }
+  .opm-inquiry-pipeline .list-toolbar-controls:not(:has(> .list-filter + .list-filter)) { grid-template-columns: minmax(0, 1fr); }
 }
 .inquiry-form-stack, .inquiry-dialog-content { display: grid; gap: 14px; min-width: 0; }
 .inquiry-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; background: var(--color-surface); min-width: 0; }

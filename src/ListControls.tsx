@@ -156,12 +156,14 @@ export function ListToolbar<T>({
   showSearch = true,
   debounceMs = 0,
   extra,
+  wrapControls,
 }: {
   list: ListView<T>
   placeholder?: string
   noun?: string
   // Extra controls placed with the filters (for example a sort choice).
   extra?: ReactNode
+  wrapControls?: (controls: ReactNode) => ReactNode
   // Off when the page already has its own search box (for example the document browser).
   showSearch?: boolean
   // Wait this long after typing stops before searching (server-side lists use 300).
@@ -184,8 +186,7 @@ export function ListToolbar<T>({
         debounceMs,
       )
   }
-  return (
-    <div className="list-toolbar" role="search" aria-label={placeholder}>
+  const controls = (
       <div className="list-toolbar-controls">
         {showSearch && (
           <div className="search-field">
@@ -238,6 +239,10 @@ export function ListToolbar<T>({
           </Button>
         )}
       </div>
+  )
+  return (
+    <div className="list-toolbar" role="search" aria-label={placeholder}>
+      {wrapControls ? wrapControls(controls) : controls}
       <p className="list-count" role="status" aria-live="polite">
         {list.status.state === "loading"
           ? "Loading…"

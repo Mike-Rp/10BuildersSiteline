@@ -37,7 +37,7 @@ import SitePhotoGallery from "./SitePhotoGallery"
 import { NotificationSaveStatus, type NotificationSaveState } from "./useNotificationSettings"
 import type { LoginGreeting } from "./dashboard-greeting"
 import ReworkReview from "./ReworkReview"
-import IntakeGuidance, { IntakeTabs, stageLabel } from "./IntakeGuidance"
+import IntakeGuidance, { IntakePipelinePanel, IntakeTabs, stageLabel } from "./IntakeGuidance"
 import "./opm-confirmation-cards.css"
 import "./staff-dashboard.css"
 import "./spm-progress-history.css"
@@ -3050,9 +3050,11 @@ export default function RoleWorkspace({
     })
     return (
       <>
+        <ListToolbar list={actionList} placeholder="Search Site PM responses" noun="project"
+          wrapControls={controls => <IntakePipelinePanel title="Site PM responses" label="Assignment tracking">{controls}</IntakePipelinePanel>} />
         <ListSection
           list={actionList}
-          placeholder="Search Site PM responses"
+          toolbar={false}
           noun="project"
           touch={!isOpm}
           empty={
@@ -3898,7 +3900,7 @@ export default function RoleWorkspace({
             <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
             <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Project intake views">
               {([
-                ["inquiries", "Project inquiries", inquiryCount, "plus"],
+                ["inquiries", "Project inquiries", inquiryCount, null],
                 ["mine", "Intake overview", intakes.length, "check"],
                 ["responses", "Site PM responses", responsesNeedingAction.length, "users"],
               ] as const).map(([value, label, count, icon]) => (
@@ -3912,7 +3914,7 @@ export default function RoleWorkspace({
                   className={confirmTab === value ? "active" : ""}
                   onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
-                  <Icon name={icon} size={17} /> {label} {count !== undefined && <span>{count}</span>}
+                  {icon && <Icon name={icon} size={17} />} {label} {count !== undefined && <span>{count}</span>}
                 </button>
               ))}
             </div>
@@ -3927,16 +3929,28 @@ export default function RoleWorkspace({
             </div>
             <div role="tabpanel" id="project-intake-panel-mine" aria-labelledby="project-intake-tab-mine" hidden={confirmTab !== "mine"}>
               {confirmTab === "mine" && (
-              <><div className="confirmation-intake-filters"><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /></div><ListSection
-                list={intakesList}
-                placeholder="Search confirmations"
-                noun="project"
-                touch={!isOpm}
-                empty={
-                  <Empty title={!intakes.length ? "No intake assignments" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"} />
-                }
-                render={(items) => <>{items.map(confirmationCard)}</>}
-              /></>
+                <>
+                  <ListToolbar list={intakesList} placeholder="Search confirmations" noun="project"
+                    wrapControls={controls => <IntakePipelinePanel title="Intake overview" label="Intake pipeline">
+                      <div className="confirmation-intake-filters">
+                        <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => {
+                          setIntakeView(value)
+                          updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1))
+                        }} />
+                      </div>
+                      {controls}
+                    </IntakePipelinePanel>} />
+                  <ListSection
+                    list={intakesList}
+                    toolbar={false}
+                    noun="project"
+                    touch={!isOpm}
+                    empty={
+                      <Empty title={!intakes.length ? "No intake assignments" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"} />
+                    }
+                    render={(items) => <>{items.map(confirmationCard)}</>}
+                  />
+                </>
               )}
             </div>
           </>

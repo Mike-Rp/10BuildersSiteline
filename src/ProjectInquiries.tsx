@@ -8,7 +8,7 @@ import type { Project } from "./model"
 import { phaseEngineerSummary, registeredComplete, registeredCount, teamConfirmed } from "./workflows"
 import { ListPager, runList, updateListQuery, useListMemory } from "./ListControls"
 import { withPage } from "./listing"
-import { IntakeTabs } from "./IntakeGuidance"
+import { IntakePipelinePanel, IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { isStale, startPolling } from "./refresh-interval"
@@ -1005,17 +1005,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </header>}
     {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
-      <div className="opm-inquiry-pipeline">
-        <header className="inquiries-page-heading">
-          <div>
-            <p className="opm-inquiry-pipeline-label">Inquiry pipeline</p>
-            {embedded ? <h2>Project inquiries</h2> : <h1>Project inquiries</h1>}
-          </div>
-          <button type="button" className="button opm-inquiry-refresh" disabled={busy} onClick={() => void run(async () => {
+      <IntakePipelinePanel title="Project inquiries" label="Inquiry pipeline" heading={embedded ? "h2" : "h1"}
+        actions={<button type="button" className="button icon-button" aria-label="Refresh inquiries" title="Refresh inquiries"
+            disabled={busy} onClick={() => void run(async () => {
             await refresh()
             await onReload()
-          })}><Icon name="arrow" size={16} />Refresh list</button>
-        </header>
+          })}><Icon name="refresh" size={18} /></button>}>
         <div className="confirmation-intake-filters">
           <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
             help="Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action." />
@@ -1034,7 +1029,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
           </select></label>
         </div>
-      </div>
+      </IntakePipelinePanel>
       {queueRows && <p className="opm-inquiry-count" role="status">{queueRows.length} {queueRows.length === 1 ? "project inquiry" : "project inquiries"}</p>}
       {queueRows?.length ? <ul className="opm-inquiry-cards" aria-label="Assigned project inquiries">
           {queueRows.map(item => {

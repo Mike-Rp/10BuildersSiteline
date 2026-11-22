@@ -2,6 +2,19 @@ import type { Account, Project, State } from "./model"
 import { intakeGuidance, isIntakeHistory, intakeHistoryLabel, type IntakeGuidance as Guidance, type IntakeView } from "./intake-guidance"
 import { clientSubconAgreement, openClientSubconIssue, registeredCount } from "./workflows"
 import InfoPopover from "./InfoPopover"
+import type { ReactNode } from "react"
+
+export function IntakePipelinePanel({ title, label, heading: Heading = "h2", actions, children }: {
+  title: string; label: string; heading?: "h1" | "h2"; actions?: ReactNode; children: ReactNode
+}) {
+  return <div className="opm-inquiry-pipeline">
+    <header className="inquiries-page-heading">
+      <div><p className="opm-inquiry-pipeline-label">{label}</p><Heading>{title}</Heading></div>
+      {actions}
+    </header>
+    {children}
+  </div>
+}
 
 export function IntakeTabs({ value, counts, onChange, allLabel = "All intake", waitingLabel = "Waiting for others", help }: {
   value: IntakeView; counts: Record<IntakeView, number>; onChange: (value: IntakeView) => void; allLabel?: string; waitingLabel?: string; help?: string
