@@ -105,6 +105,8 @@ test("proposal approval opens mandatory review with live size and inline validat
   })
   await act(() => root.render(React.createElement(ProjectInquiries, { role: "opm", onReload() {} })))
   await click(document.querySelector('button[aria-label$="for Maple Residence"]'))
+  assert.match(document.querySelector(".office-workflow h1").textContent, /Client proposal/i)
+  await click(button("Accepted inquiry"))
   assert.equal(document.querySelectorAll(".record-cards > .office-workflow-card").length, 2)
   assert.doesNotMatch(document.querySelector(".record-cards").textContent, /Land area/i)
   await click(button("Open proposal"))

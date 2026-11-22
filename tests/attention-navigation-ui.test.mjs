@@ -92,7 +92,8 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     assert.match(document.querySelector("main").textContent,/Required documents/)
 
     const inquiry = { id: "a9bd9cc9-c4ad-4000-8000-000000000000", created_at: "2026-11-20T03:00:00Z",
-      status: "offered", details: { name: "Maple Residence", project_type: "Residential", consultation: 30 },
+      status: "offered", details: { name: "Maple Residence", project_type: "Residential", consultation: 30,
+        client_name: "Arbor Living Inc.", address: "Riverside District" },
       match: { project_type: "Residential", experience_years: 7 } }
     const fetch = globalThis.fetch
     previous.set("fetch", Object.getOwnPropertyDescriptor(globalThis, "fetch"))
@@ -100,13 +101,14 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
       status: "converted", details: { ...inquiry.details, name: "Concurrent intake" } }
     const finishedInquiry = { ...setupInquiry, id: "finished", project_id: "Finished inquiry",
       details: { ...inquiry.details, name: "Finished inquiry" } }
+    const waitingInquiry = { ...inquiry, id: "waiting", status: "consulting", details: { ...inquiry.details, name: "Meridian Market Square" } }
     state.projects.push(project("Finished inquiry", {
       inquiryOrigin: true,
       docs: DOC_LABELS.slice(0, 6).map((label, id) => ({ id: String(id), label, uploaded: true })),
       team: [{ phase: "Mobilization", accountId: site.id, status: "confirmed", isLead: true }],
     }))
     globalThis.fetch = (url, options) => String(url).endsWith("/projects/inquiries")
-      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }, setupInquiry, finishedInquiry] }))
+      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }, setupInquiry, finishedInquiry, waitingInquiry] }))
       : fetch(url, options)
     await render(office,"/opm/project-intake")
     const newInquiryBanner = document.querySelector(".opm-new-inquiries")
@@ -122,16 +124,21 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     await render(office,"/opm/project-inquiries")
     const pipeline = document.querySelector(".opm-inquiry-pipeline")
     assert.match(pipeline.querySelector("header").textContent, /Inquiry pipeline.*Project inquiries.*Refresh list/)
-    assert.equal(pipeline.querySelector('.intake-tabs [aria-pressed="true"]').textContent, "All inquiries (3)")
+    assert.equal(pipeline.querySelector('.intake-tabs [aria-pressed="true"]').textContent, "All inquiries (4)")
     assert.equal(pipeline.querySelector(".opm-inquiry-filters input[type=search]").placeholder, "Search by project, client, or ID")
     const cards = [...document.querySelectorAll(".opm-inquiry-card")]
-    assert.equal(cards.length, 3)
-    assert.equal(document.querySelector("#project-intake-tab-inquiries span").textContent, "3")
+    assert.equal(cards.length, 4)
+    assert.equal(document.querySelector("#project-intake-tab-inquiries span").textContent, "4")
     assert.doesNotMatch(cards.map(card => card.textContent).join(" "), /Finished inquiry/)
     const currentStep = card => card.querySelector('[aria-current="step"]').textContent
-    assert.equal(currentStep(cards[0]), "Office PM review")
-    assert.equal(currentStep(cards[1]), "Project assessment")
-    assert.equal(currentStep(cards[2]), "Project intake")
+    assert.equal(currentStep(cards[0]), "2Office PM review")
+    assert.equal(currentStep(cards[1]), "4Project assessment")
+    assert.equal(currentStep(cards[2]), "5Project intake")
+    assert.equal(currentStep(cards[3]), "3Client proposal")
+    assert.equal(cards[0].querySelector(".opm-inquiry-initials").textContent, "MR")
+    assert.match(cards[0].querySelector(".opm-inquiry-facts").textContent, /Arbor Living Inc\..*Riverside District/)
+    assert.equal(cards[0].querySelector("time").dateTime, inquiry.created_at)
+    assert.match(cards[3].textContent, /Waiting for client.*View proposal status/)
     assert.equal(cards[2].dataset.attention, "true")
     assert.equal(cards[2].querySelector("progress").value, 0)
     assert.match(cards[2].textContent, /Awaiting Site PM acceptance.*0 of 6 uploaded/)

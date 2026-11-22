@@ -52,13 +52,15 @@ const statuses: Record<string,string> = {
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
 const officeActions = {
-  offered: { label: "Review pending inquiry", bucket: "action" },
-  consulting: { label: "View accepted inquiry", bucket: "waiting" },
-  approved: { label: "Continue project assessment", bucket: "action" },
+  offered: { label: "Review inquiry", bucket: "action", context: "Office PM review required" },
+  consulting: { label: "View proposal status", bucket: "waiting", context: "Client proposal response pending" },
+  approved: { label: "Continue project assessment", bucket: "action", context: "Assessment in progress" },
 } as const
+const officeReviewStatus = "Needs your action"
 const officeAction = (status: string) => Object.prototype.hasOwnProperty.call(officeActions, status)
   ? officeActions[status as keyof typeof officeActions] : undefined
 const inquiryDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "Asia/Manila" })
+const inquiryActivityDate = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })
 const inquiryDay = new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" })
 
 const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST", json })
@@ -111,11 +113,11 @@ function inquiryMilestone(item: Inquiry) {
   }
 }
 
-function InquiryProgress({ milestone }: { milestone: number }) {
+function InquiryProgress({ milestone, numbered = false }: { milestone: number; numbered?: boolean }) {
   return <ol className="inquiry-log-progress" aria-label="Inquiry progress">
     {inquiryMilestones.map((label, index) => <li key={label}
       data-complete={index < milestone} aria-current={index === milestone ? "step" : undefined}>
-      <span aria-hidden="true">{index < milestone ? "✓" : ""}</span>{label}
+      <span aria-hidden="true">{index < milestone ? "✓" : numbered ? index + 1 : ""}</span>{label}
     </li>)}
   </ol>
 }
@@ -631,7 +633,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   function openOfficeInquiry(item: Inquiry) {
     open(item)
     if (item.status === "offered") navigateOffice("pending")
-    else if (item.status === "consulting") navigateOffice("accepted")
+    else if (item.status === "consulting") navigateOffice("proposal")
     else if (item.status === "approved") navigateOffice(item.workflow?.assessment ? "assessment" : "review")
     else setDialog("details")
   }
@@ -723,7 +725,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       {pendingInquiries.length > 1 && <button type="button" className="button" disabled={busy} onClick={() => {
         setSearch("")
         setQueueView("action")
-        setQueueStatus(statuses.offered)
+        setQueueStatus(officeReviewStatus)
         setQueueType("")
         onShowInquiries?.()
       }}>View all new inquiries</button>}
@@ -754,7 +756,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   useEffect(() => {
     onInquiryCountChange?.(inquiryCount)
   }, [inquiryCount, onInquiryCountChange])
-  const officeStatus = (item: Inquiry) => setupByInquiry.get(item.id)?.status ?? statusLabel(item)
+  const officeStatus = (item: Inquiry) => setupByInquiry.get(item.id)?.status ??
+    (item.status === "offered" ? officeReviewStatus : item.status === "consulting" ? "Waiting for client" : statusLabel(item))
   const officeBucket = (item: Inquiry) => setupByInquiry.get(item.id)?.bucket ?? officeAction(item.status)?.bucket
   const matchesSearch = (item: Inquiry) => !query ||
     [item.details.name, item.details.client_name, admin ? adminInquiryStatus(item) : officeStatus(item),
@@ -1032,47 +1035,62 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           </select></label>
         </div>
       </div>
-      {queueRows && <p className="inquiry-muted" role="status">{queueRows.length} {queueRows.length === 1 ? "inquiry" : "inquiries"}</p>}
+      {queueRows && <p className="opm-inquiry-count" role="status">{queueRows.length} {queueRows.length === 1 ? "project inquiry" : "project inquiries"}</p>}
       {queueRows?.length ? <ul className="opm-inquiry-cards" aria-label="Assigned project inquiries">
           {queueRows.map(item => {
-            const label = item.status === "approved" && !item.workflow?.budget
-              ? "Review project information" : officeAction(item.status)?.label ?? "View inquiry"
+            const action = officeAction(item.status)
+            const needsReview = item.status === "approved" && !item.workflow?.budget && !item.workflow?.assessment
+            const label = needsReview ? "Review project information" : action?.label ?? "View inquiry"
             const setup = setupByInquiry.get(item.id)
             const project = setup?.project
             const uploaded = project ? registeredCount(project) : null
-            const name = item.details.name || "Untitled project"
+            const name = String(item.details.name || "Untitled project")
+            const initials = name.trim().split(/\s+/u).slice(0, 2).map(word => Array.from(word)[0] ?? "").join("").toLocaleUpperCase()
+            const activity = item.updated_at ?? item.created_at
             const milestone = setup ? 4 : inquiryMilestone(item)
             const needsAction = officeBucket(item) === "action"
-            const actionContext = item.status === "approved"
-              ? item.workflow?.assessment ? "Assessment completed" : item.workflow?.budget ? "Assessment in progress" : "Project information needs review"
-              : inquiryWaiting[item.status]
-            return <li key={item.id} className="opm-inquiry-card" data-attention={needsAction}>
+            const actionContext = setup ? "Required documents" : needsReview ? "Project information needs review"
+              : item.status === "approved" && item.workflow?.assessment ? "Assessment completed" : action?.context
+            const ready = item.status === "approved" && !setup
+            return <li key={item.id} className="opm-inquiry-card" data-attention={needsAction} data-ready={ready}>
               <header className="opm-inquiry-card-header">
-                <div><h3>{name}</h3><p>{item.details.project_type || "Project type unavailable"}{setup && " · Project setup"}</p></div>
+                <div className="opm-inquiry-identity">
+                  <span className="opm-inquiry-initials" aria-hidden="true">{initials}</span>
+                  <div><h3>{name}</h3><p>{item.details.project_type || "Project type unavailable"} · {inquiryReference(item)}{setup && " · Project setup"}</p></div>
+                </div>
                 <span className="inquiry-list-status" data-status={setup ? "setup" : item.status}>{officeStatus(item) || "Status unavailable"}</span>
               </header>
-              <div className="opm-inquiry-card-body" data-has-progress={milestone !== null}>
-                {milestone !== null && <InquiryProgress milestone={milestone} />}
+              <div className="opm-inquiry-card-body">
+                <dl className="opm-inquiry-facts">
+                  <div><dt>Client</dt><dd>{item.details.client_name || "Not provided"}</dd></div>
+                  <div><dt>Last activity</dt><dd>{activity && Number.isFinite(Date.parse(activity))
+                    ? <time dateTime={activity}>{inquiryActivityDate.format(new Date(activity))}</time> : "Not recorded"}</dd></div>
+                  <div><dt>Project location</dt><dd>{item.details.address || "Not provided"}</dd></div>
+                </dl>
+                {milestone !== null && <InquiryProgress milestone={milestone} numbered />}
                 <div className="opm-inquiry-action">
-                  {setup ? <>
-                    <div className="opm-inquiry-document-progress">
-                      <strong>Required documents</strong>
-                      {uploaded !== null ? <>
-                        <span>{uploaded} of 6 uploaded</span>
-                        <progress aria-label="Required documents uploaded" value={uploaded} max={6} />
-                      </> : <span>Status unavailable</span>}
+                  {actionContext && <div className="opm-inquiry-action-context">
+                    <span className="opm-inquiry-action-icon"><Icon name={ready ? "check" : needsAction ? "clock" : "doc"} size={19} /></span>
+                    <div>
+                      <span className="opm-inquiry-action-label">Next action</span>
+                      <strong>{actionContext}</strong>
+                      {setup && <div className="opm-inquiry-document-progress">
+                        {uploaded !== null ? <>
+                          <span>{uploaded} of 6 uploaded</span>
+                          <progress aria-label="Required documents uploaded" value={uploaded} max={6} />
+                        </> : <span>Status unavailable</span>}
+                      </div>}
                     </div>
+                  </div>}
+                  <div className="opm-inquiry-action-buttons">{setup ? <>
                     {setup.needsDocuments && project && <button type="button" className="button primary" disabled={busy}
                       onClick={() => onOpenDocuments?.(project)}>Upload required documents</button>}
-                    <button type="button" className={setup.needsDocuments ? "button" : "button primary"} disabled={busy || !project}
+                    <button type="button" className={needsAction && !setup.needsDocuments ? "button primary" : "button"} disabled={busy || !project}
                       onClick={() => project && onOpenAssignments?.(project)}>View assignment status <Icon name="chevron" size={16} /></button>
-                  </> : <>
-                    {actionContext && <strong>{actionContext}</strong>}
-                    <button type="button" className="button primary" disabled={busy} onClick={() => openOfficeInquiry(item)}
+                  </> : <button type="button" className={needsAction ? "button primary" : "button"} disabled={busy} onClick={() => openOfficeInquiry(item)}
                       aria-label={`${label} for ${name}`}>
                       {label} <Icon name="chevron" size={16} />
-                    </button>
-                  </>}
+                    </button>}</div>
                 </div>
               </div>
             </li>
