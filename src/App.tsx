@@ -2416,7 +2416,7 @@ function AppInner() {
                   const confirmedCount = people?.filter((e) => e.status === "confirmed").length ?? 0
                   const phaseStatus = !people ? t.status : people.every((e) => e.status === "confirmed") ? "confirmed" : people.some((e) => e.status === "declined") ? "declined" : "pending"
                   return (
-                  <div key={t.phase}>
+                  <div key={t.phase} className={people ? "phase-assignment-multiple" : undefined}>
                     <span>
                       <strong>{t.phase}</strong>
                       <small>
@@ -2427,19 +2427,19 @@ function AppInner() {
                       </small>
                     </span>
                     {people ? (
-                      <span className="phase-engineer-list">
+                      <div className="phase-engineer-list">
                         <small>{people.length} engineers in this phase</small>
                         {people.map((e) => (
-                          <span className="phase-engineer-row" key={e.accountId}>
+                          <div className="phase-engineer-row" key={e.accountId}>
                             <span>
                               <strong>{nameFor(e.accountId)}</strong>
                               <small>{e.assignedDisciplines.join(", ") || "Any discipline"}</small>
-                              <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
                             </span>
                             <Status status={e.status} pendingLabel="Awaiting Site PM" />
-                          </span>
+                            <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
+                          </div>
                         ))}
-                      </span>
+                      </div>
                     ) : (
                       <span>
                         {t.accountId ? nameFor(t.accountId) : "Unassigned"}
