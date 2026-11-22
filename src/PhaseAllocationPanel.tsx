@@ -175,6 +175,8 @@ export default function PhaseAllocationPanel({
     .sort(
       (a, b) => a.commitments - b.commitments || a.name.localeCompare(b.name),
     )
+  const allocateForemen = (assignments: Row[]) =>
+    data.companies.reduce((current, selectedCompany) => alternateForemen(current, selectedCompany), assignments)
   const start = (proposal?: Row[]) => {
     const next = remaining.map(
       (p) =>
@@ -185,7 +187,8 @@ export default function PhaseAllocationPanel({
           foremanId: "",
         },
     )
-    setRows(next)
+    const allocated = allocateForemen(next)
+    setRows(next.map((row, index) => row.foremanId ? row : allocated[index]))
     setReplaceId("")
     setCompanyChoice("")
     setRoster([...new Set(next.map((r) => r.companyId).filter(Boolean))])
@@ -355,7 +358,7 @@ export default function PhaseAllocationPanel({
                   if (pair) {
                     setError("")
                     setRoster(pair.companyIds)
-                    setRows(pair.rows.map((r) => ({ ...r, foremanId: "" })))
+                    setRows(allocateForemen(pair.rows.map((r) => ({ ...r, foremanId: "" }))))
                     return
                   }
                   setError(
@@ -475,6 +478,17 @@ export default function PhaseAllocationPanel({
               </Button>
             </div>
           )}
+          <div className="trade-actions">
+            <Button disabled={busy || !rows.some(row => row.companyId)} onClick={() => {
+              const missing = rows.find(row => row.companyId && !company(row.companyId)?.foremen.length)
+              if (missing) {
+                setError(`Add a foreman contact for ${companyName(missing.companyId)} before automatic allocation.`)
+                return
+              }
+              setRows(allocateForemen(rows))
+              setError("")
+            }}>Auto-allocate foremen</Button>
+          </div>
           <div className="phase-assignment-list">
             {remaining.map((p) => {
               const row = rows.find((r) => r.phase === p.name)!

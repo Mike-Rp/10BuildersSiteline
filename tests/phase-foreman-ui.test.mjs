@@ -165,6 +165,10 @@ test("system suggests company only; Lead SPM manually assigns every phase and re
       ["mika", "yak", "mika"],
       "the company's two foremen alternate per phase automatically",
     )
+    await change(phaseRows[1].querySelectorAll("select")[1], "mika")
+    await click(button("Auto-allocate foremen"))
+    assert.deepEqual(phaseRows.map(row => row.querySelectorAll("select")[1].value), ["mika", "yak", "mika"])
+    assert.ok(phaseRows.every(row => row.querySelectorAll("select")[0].value === "A"))
     assert.equal(button("Submit allocation proposal").disabled, true, "a reason is still required")
     for (const [i, row] of phaseRows.entries())
       await change(row.querySelectorAll("select")[1], i < 2 ? "mika" : "yak")
