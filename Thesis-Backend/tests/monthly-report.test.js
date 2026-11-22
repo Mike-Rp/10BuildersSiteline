@@ -1,6 +1,6 @@
 import {test,mock} from "node:test";
 import assert from "node:assert/strict";
-import {HISTORY_UNAVAILABLE,PARTIAL_COVERAGE} from "../src/domain/monthly-report.js";
+import {PARTIAL_COVERAGE} from "../src/domain/monthly-report.js";
 import {reportCsv} from "../src/domain/report-export.js";
 
 const project={id:"p",name:"Green Cross Department",created_at:"2026-11-06T08:06:25.925Z",status:"archived",type:"Commercial"};

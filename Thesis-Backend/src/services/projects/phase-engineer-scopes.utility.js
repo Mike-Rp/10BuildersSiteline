@@ -10,6 +10,28 @@ export async function configuredInquiryScopes(db, type, phases) {
   return scopes;
 }
 
+export async function inquiryScopeConfiguration(db, type, phases, additional = {}) {
+  const base = await configuredInquiryScopes(db, type, phases);
+  if (!base) {
+    if (additional && Object.values(additional).some(tags => tags?.length)) throw new HttpError(409, "Apply the inquiry specialization migration before selecting additional scopes.");
+    return { required: base, additional: {}, options: undefined };
+  }
+  const catalog = (await db.query("SELECT specialty FROM inquiry_engineer_specialties ORDER BY specialty")).rows.map(row => row.specialty);
+  if (!additional || typeof additional !== "object" || Array.isArray(additional) || Object.keys(additional).some(phase => !phases.includes(phase)))
+    throw new HttpError(422, "Additional scopes must belong to confirmed phases.");
+  const options = {}, normalized = {}, required = {};
+  for (const phase of phases) {
+    options[phase] = catalog.filter(tag => !base[phase].includes(tag));
+    const tags = additional[phase] ?? [];
+    if (!Array.isArray(tags) || new Set(tags).size !== tags.length || tags.some(tag => !options[phase].includes(tag)))
+      throw new HttpError(422, `Choose configured additional engineering scopes for ${phase}.`);
+    normalized[phase] = [...tags].sort();
+    required[phase] = [...base[phase], ...normalized[phase]];
+    if (required[phase].length > 9) throw new HttpError(422, `The scopes for ${phase} exceed the supported three engineers with three specialties each.`);
+  }
+  return { required, additional: normalized, options };
+}
+
 export async function savedEngineerScopes(db, projectId) {
   if (!projectId) return undefined;
   const { rows } = await db.query(

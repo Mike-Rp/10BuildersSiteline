@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { loadPhaseCoverage } from "../projects/phase-coverage.utility.js";
+import { ensureProjectCompanyAllocation } from "../workspace/project-company-allocation.utility.js";
 import { assertAcceptancePrerequisites, assertLeadResponded } from "../projects/assignment-prerequisites.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
@@ -362,6 +363,7 @@ const respondToPhase = (newStatus) => async (req, res) => {
       }
       await client.query("UPDATE projects SET updated_by=$2,updated_at=now() WHERE id=$1",[id,user.id]);
       await recordArchiveEvent(client,user.id,"project_phase_team",row.id,"phase_response",{project_id:id,user_id:user.id,stage_id:Number(stageId),response:newStatus==="confirmed" ? "accepted" : "declined",note,reason});
+      if(newStatus==='confirmed')await ensureProjectCompanyAllocation(client,{id},{actorId:user.id});
       return updated.rows[0];
     });
 

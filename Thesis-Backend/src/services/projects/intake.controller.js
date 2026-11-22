@@ -1,7 +1,7 @@
 import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
 import { intakeSize } from "../../domain/inquiry-assessment.js";
 import { prepareInquiryLead } from "./inquiry-staffing.js";
-import { configuredInquiryScopes } from "./phase-engineer-scopes.utility.js";
+import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
 import { HttpError } from "../../common/utilities/access.utility.js";
@@ -52,26 +52,30 @@ export const createIntake = async (req, res) => {
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
-      let inquiry, intake, phases, deadline;
+      let inquiry, intake, phases, deadline, scopeConfiguration;
       if (inquiryId) {
         inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
         if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
         const assessment = staffingAssessment(inquiry, req.body);
-        if (inquiry.project_id) {
-          const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
-          return {project: prior, duplicate: true};
-        }
-        if (inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
+        if (!inquiry.project_id && inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
         const details = inquiryDetails(inquiry.details);
         const {review, budget} = inquiry.details.opm_workflow;
         if (!isUuid(req.body.contract_file_id)) throw new HttpError(422, "Upload the signed client contract agreement.");
         phases = confirmedPhases(await inquiryPhases(client,details.project_type),req.body.phases);
         const confirmed = inquiry.details.opm_workflow.staffing;
-        if (confirmed && (confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
-            confirmed.phases.length !== phases.length || confirmed.phases.some((phase,index) => phase !== phases[index])))
+        if (!confirmed || confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
+            confirmed.phases.length !== phases.length || confirmed.phases.some((phase,index) => phase !== phases[index]))
           throw new HttpError(409, "The confirmed phases or signed agreement changed. Reopen staffing before sending offers.");
+        scopeConfiguration = await inquiryScopeConfiguration(client, details.project_type, phases, req.body.additional_scopes || {});
+        const savedScopes = await inquiryScopeConfiguration(client, details.project_type, phases, confirmed?.additional_scopes || {});
+        if (!confirmed || JSON.stringify(scopeConfiguration.additional) !== JSON.stringify(savedScopes.additional))
+          throw new HttpError(409, "The confirmed engineering scopes changed. Reopen staffing before sending offers.");
+        if (inquiry.project_id) {
+          const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
+          return {project: prior, duplicate: true};
+        }
         tier = assessment.size;
-        intake = {...details, target_start_date:review.start, target_end_date:review.end, estimated_budget:budget, size:assessment.size, assessment};
+        intake = {...details, target_start_date:review.start, target_end_date:review.end, estimated_budget:budget, size:assessment.size, assessment, additional_scopes: scopeConfiguration.additional};
         deadline = businessDeadline((await client.query("SELECT now() AS now")).rows[0].now);
       }
       // A repeat of a new submission returns the project it already created instead of inserting another.
@@ -141,8 +145,12 @@ export const createIntake = async (req, res) => {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
-      const requiredScopes = inquiry ? await configuredInquiryScopes(client, intake.project_type, phases) : undefined;
+      const requiredScopes = scopeConfiguration?.required;
       await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true,requiredScopes});
+      if(scopeConfiguration?.options)for(const phase of phase_team) {
+        const covered=new Set((phase.engineers||[phase]).flatMap(engineer=>engineer.assigned_disciplines||[]));
+        if(requiredScopes[phase.stage].some(scope=>!covered.has(scope)))throw new HttpError(409,`Cover every confirmed engineering scope in ${phase.stage} before sending offers.`);
+      }
       const inquiryLead = inquiry ? await prepareInquiryLead(client, phase_team, phases, projectType.rows[0].id,
         intake.project_type, inquiry.details.opm_workflow.review, null, requiredScopes) : null;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
@@ -166,7 +174,9 @@ export const createIntake = async (req, res) => {
       const project = inserted.rows[0];
       if (inquiry) {
         await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
-          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,engineerScopes:requiredScopes,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,engineerScopes:requiredScopes,additional_scopes:scopeConfiguration.additional,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+        if ((await client.query("SELECT to_regclass('public.project_company_allocations') IS NOT NULL AS ready")).rows[0].ready)
+          await client.query("UPDATE projects SET intake_monitoring_version=1 WHERE id=$1", [project.id]);
         project.lifecycle_status = "spm_review";
         for (const [code,fileId] of [["owner_contract",req.body.contract_file_id],["registered_plans",req.body.plans_file_id]]) {
           if (!fileId && code === "registered_plans") continue;

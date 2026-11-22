@@ -1,4 +1,5 @@
 import execute from "../../common/utilities/query.utility.js";
+import { readProjectCompanyAllocation } from "../workspace/project-company-allocation.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { projectEngineerScopesSql } from "./phase-engineer-scopes.utility.js";
 import { participantsSql, phaseAssignments } from "../progress/assignment.utility.js";
@@ -195,6 +196,7 @@ export const getProjectById = async (req, res) => {
       : null;
     return sendOk(res, "Resource retrieved successfully.", 1, {
       ...base,
+      ...(user.role!=='client'?{project_company_allocation:await readProjectCompanyAllocation({query:execute},project.rows[0],user)}:{}),
       office_pm_contact: officePmContact,
       engineers: engineers.rows,
       phase_team: phaseTeam.rows,

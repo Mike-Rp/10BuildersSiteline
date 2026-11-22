@@ -1,4 +1,5 @@
 import { assertEvidenceHandoverReady } from '../projects/responsibility-handover.utility.js';
+import { ensureProjectCompanyAllocation } from "./project-company-allocation.utility.js";
 import {
   HttpError,
   isProjectOpmOrAdmin,
@@ -332,6 +333,7 @@ export function registerResponsibilityRoutes(router, { endpoint, project }) {
         const current={...p,current_stage:(await db.query("select code from project_stages where id=$1",[p.current_stage_id])).rows[0]?.code};
         if (!await maybeCloseProject(db,current,user.id)) await transitionPhase(db,current,user.id);
       }
+      if(action==='accept')await ensureProjectCompanyAllocation(db,p,{actorId:user.id});
       await recordArchiveEvent(
         db,
         user.id,

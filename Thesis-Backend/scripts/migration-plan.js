@@ -22,6 +22,7 @@ export const RUNNER_MIGRATIONS = Object.freeze([
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({
+  "033-intake-monitoring.sql": "Apply explicitly after 027, 031 and 032; existing projects remain on legacy behavior",
   "031-project-inquiries.sql": "Apply after 014-mixed-use-project-scope.sql to enable the inquiry workflow",
   "028-storage-backed-files.sql": "Apply explicitly before using private Storage-backed files",
   "029-backup-monitoring.sql": "Additive metadata tables: apply explicitly before enabling backup monitoring; see docs/BACKUPS.md",

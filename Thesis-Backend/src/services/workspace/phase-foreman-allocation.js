@@ -20,6 +20,7 @@ async function log(db, p, user, action, detail = {}, requestId = null) {
   )
 }
 async function context(db, p, meta) {
+  if(Number(p.intake_monitoring_version)===1)throw new HttpError(409,"This project uses one company across all phases. Use project-level company allocation.");
   const ctx = await allocationContext(db, p)
   const contactRows = []
   const contactMetadata = []

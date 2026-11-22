@@ -1,4 +1,6 @@
 import { readEvidenceQueue } from '../progress/evidence-queue.utility.js';
+import { readProjectCompanyAllocation } from "./project-company-allocation.utility.js";
+import { readOverlapMonitoring } from "../progress/overlap.utility.js";
 
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -42,7 +44,7 @@ export async function reconcilePhaseHandoffs(req,res) {
    await db.query("select set_config('app.current_user_id',$1,true)",[user.id]);
    const candidates=(await db.query(`select p.id,p.current_stage_id,s.code AS current_stage from projects p
     left join project_stages s on s.id=p.current_stage_id where p.lifecycle_status='active'
-    and not coalesce(p.is_deleted,false) and ${scope} order by p.id`,[user.role,user.id])).rows;
+    and not coalesce(p.is_deleted,false) and to_jsonb(p)->>'intake_monitoring_version' IS DISTINCT FROM '1' and ${scope} order by p.id`,[user.role,user.id])).rows;
    const initial=await readVerifiedProgress(db,candidates.map(project=>project.id));
    const results=[];
    for(const candidate of candidates) {
@@ -187,12 +189,15 @@ export async function getProjectData(req,res) {
      reason: result.reason, reasonCode: result.reasonCode });
    }
    const grouped=[teams,documents,history,photos,notes,checklist,updates,issues,assignments,contracts].map(group);
+   const monitoring=new Map();
+   if(staff)for(const p of projects)monitoring.set(p.id,{allocation:await readProjectCompanyAllocation(db,p,user),overlap:await readOverlapMonitoring(db,p,user)});
    return projects.map(p=>{
+    const capabilities=monitoring.get(p.id)||{};
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
-    return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{}),
+    return {list,detail:{...list,phase_team:phaseTeam,...(capabilities.allocation?{project_company_allocation:capabilities.allocation}:{}),...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{}),
      ...(user.role==="opm"?{site_pm_contacts:(sitePmContacts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
-     overview:staff?{checklist:{items},review_queue:reviewGroups.get(p.id)||[],pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
+     overview:staff?{...(capabilities.overlap?{overlap_monitoring:capabilities.overlap}:{}),checklist:{items},review_queue:reviewGroups.get(p.id)||[],pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
      assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{overallProgress:verified.get(p.id)?.project.percentage ?? null})};
    });
   });

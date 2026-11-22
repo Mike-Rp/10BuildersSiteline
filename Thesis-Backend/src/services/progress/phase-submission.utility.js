@@ -2,9 +2,13 @@ import { HttpError } from "../../common/utilities/access.utility.js";
 import { readChecklist } from "./phase.utility.js";
 import { validateFiles } from "./phase-update.utility.js";
 import { assertAssignmentWritable, multiSpmInstalled } from "./assignment.utility.js";
+import { monitoringProject } from "../projects/intake-monitoring.utility.js";
+import { assertOverlapSubmission } from "./overlap.utility.js";
 
 export async function submitChecklist(client, project, user, submission, updateId = null, checklist = null) {
-  const assignment=await assertAssignmentWritable(client,user,project);
+  const monitored=await monitoringProject(client,project);
+  const overlap=monitored?await assertOverlapSubmission(client,project,user,submission.responsibility_id,submission.item_id):null;
+  const assignment=overlap?{responsibility_id:overlap.responsibility.id}:await assertAssignmentWritable(client,user,project);
   checklist ??= await readChecklist(client, project.id, project.current_stage_id, {userId:user.id});
   const item = checklist.items.find(i => String(i.id) === String(submission.item_id));
   if (!item) throw new HttpError(404, "Checklist item not found in the selected stage.");
@@ -23,7 +27,12 @@ export async function submitChecklist(client, project, user, submission, updateI
     throw new HttpError(400,"Upload fresh corrected evidence for this rework activity.");
   }
   const fileIds=[...new Set(submission.file_ids ?? (submission.file_id ? [submission.file_id] : []))];
+  if(monitored&&!fileIds.length)throw new HttpError(400,'Attach evidence for this responsibility submission.');
   await validateFiles(client, project, user.id, fileIds);
+  if(monitored&&fileIds.length) {
+    const matching=await client.query('SELECT id FROM project_phase_files WHERE id=ANY($1::uuid[]) AND responsibility_id=$2 AND checklist_item_id=$3',[fileIds,assignment.responsibility_id,item.id]);
+    if(matching.rowCount!==fileIds.length)throw new HttpError(400,'Files must be linked to this checklist item and responsibility.');
+  }
   if (fileIds.length > 1 && !await multiSpmInstalled(client)) throw new HttpError(409,"Apply migration 025 to enable multiple attachments.");
   const result = await client.query(
     `INSERT INTO project_phase_evidence
@@ -34,6 +43,7 @@ export async function submitChecklist(client, project, user, submission, updateI
   if (assignment.responsibility_id && (await client.query("select to_regclass('public.project_request_receipts') is not null as ready")).rows[0].ready) {
     await client.query('UPDATE project_phase_evidence SET responsibility_id=$2 WHERE id=$1',[result.rows[0].id,assignment.responsibility_id]);
   }
+  if(monitored) await client.query('UPDATE project_phase_evidence SET monitoring_version=1 WHERE id=$1',[result.rows[0].id]);
   if (fileIds.length && await multiSpmInstalled(client)) await client.query(
     "INSERT INTO project_phase_evidence_files(evidence_id,file_id) SELECT $1,unnest($2::uuid[])",[result.rows[0].id,fileIds]);
   return { ...result.rows[0], checklist_item_id: item.id, file_id: fileIds[0] ?? null, file_ids:fileIds };

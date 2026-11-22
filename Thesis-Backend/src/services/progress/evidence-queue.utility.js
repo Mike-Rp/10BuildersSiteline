@@ -7,6 +7,7 @@ export async function readEvidenceQueue(db, projectIds, { pendingOnly = true } =
   const attachments = await multiSpmInstalled(db);
   return (await db.query(`SELECT i.*,s.code AS stage_code,e.id AS evidence_id,
     e.status,e.file_id,e.submitted_by,e.submitted_at,e.submission_note,e.reviewed_by,e.reviewed_at,e.review_note,
+    to_jsonb(e)->>'responsibility_id' AS responsibility_id,
     e.phase_update_id,e.rework_request_id,u.full_name AS submitted_by_name,
     f.original_name,f.content_type,
     ${attachments ? `(SELECT coalesce(jsonb_agg(jsonb_build_object('id',af.id,'original_name',af.original_name,'content_type',af.content_type,'uploaded_by',af.uploaded_by,'uploaded_at',af.uploaded_at) ORDER BY af.uploaded_at,af.id),'[]'::jsonb)

@@ -18,7 +18,7 @@ export const COMMITMENTS_SQL = `select subcontractor_id, project_id from project
  union select subcontractor_id, current_project_id from subcontractor_workers where status='active' and availability_status='assigned' and current_project_id is not null
  union select subcontractor_id, project_id from project_subcontractor_selections where status='accepted'`
 export const usesTradeAllocation = (p, meta) =>
-  !meta?.clientSubcon && (Number(p.subcontractor_allocation_version) === 1 ||
+  Number(p.intake_monitoring_version)!==1 && !meta?.clientSubcon && (Number(p.subcontractor_allocation_version) === 1 ||
   !!meta?.subcontractorAllocation)
 const fail = (message) => {
   throw new HttpError(409, message)

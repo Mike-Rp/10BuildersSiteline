@@ -11,6 +11,7 @@ import { locationError, normalizeLocation, sameLocationRecord } from "../../doma
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { normalizeClientCompany } from "../../domain/client-company.js";
 import { COMMITMENTS_SQL, allocationCommand, intakeReady, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
+import { ensureProjectCompanyAllocation, decideProjectCompany, validateProjectCompanyAgreement } from "./project-company-allocation.utility.js";
 import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
 import {recoverySummary,generateRecoveryCodes,verifyRecoveryCode,resetWithRecoveryCode,changeAdminPassword} from '../auth/admin-security.controller.js';
 import {registerResponsibilityRoutes} from './phase-responsibilities.js';
@@ -641,6 +642,11 @@ router.put("/projects/:id/workspace", endpoint(["admin"], async (db, user, req) 
         }
     return {};
 }));
+router.post("/projects/:id/project-company-allocation",endpoint(["spm"],async(db,user,req)=>{
+    const p=await project(db,user,req.params.id,true);
+    await assertLicenseActive(user,db);
+    return decideProjectCompany(db,p,user,req.body||{});
+}));
 router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const p = await project(db, user, req.params.id, true), c = req.body;
     let eventTitle = c.type.replaceAll("_", " ");
@@ -652,6 +658,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
     const leader = () => { if (user.role !== "spm" || lead !== user.id)
         throw new HttpError(403, "Only the Lead Site PM can do this."); };
     const meta = (await db.query("select metadata from workspace_project_metadata where project_id=$1", [p.id])).rows[0]?.metadata || {};
+    if(Number(p.intake_monitoring_version)===1&&["save_allocation_plan","auto_allocate_company","set_allocation_location","select_company","replace_company","archive_company","contact_company","respond_company"].includes(c.type))
+      throw new HttpError(409,"Use the project-level company allocation decision flow for this project.");
     if (!meta.clientSubcon && ["save_allocation_plan","auto_allocate_company","set_allocation_location","select_company","replace_company","archive_company","contact_company","respond_company"].includes(c.type)
       && (await db.query("select to_regclass('public.project_phase_foremen') is not null as ready")).rows[0].ready)
       throw new HttpError(409,"Use the phase and foreman allocation flow. Company additions and replacements require the recorded Admin decision.");
@@ -752,6 +760,10 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             // Required phases come from the project-type workflow, never from the saved team rows.
             await assertPhaseCoverage(db, p.id);
             await assertEligibleManager(db, p.suggested_opm_id, "opm");
+            if(Number(p.intake_monitoring_version)===1) {
+                if(c.type!=="upload_agreement")throw new HttpError(409,"Upload the accepted company's signed agreement to activate this project.");
+                await validateProjectCompanyAgreement(db,p,c);
+            }
             if (c.type === "upload_agreement")
                 await linkDocument(db, user, p, "subcontractor_agreement", c.doc?.id);
             else if (!meta.clientSubcon || usesTradeAllocation(p, meta))
@@ -813,6 +825,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         }
         default: throw new HttpError(400, "Unsupported project command.");
     }
+    await ensureProjectCompanyAllocation(db,p,{actorId:user.id});
     await db.query("insert into workspace_project_metadata(project_id,metadata) values($1,$2) on conflict(project_id) do update set metadata=excluded.metadata", [p.id, JSON.stringify(meta)]);
     await event(db, user, p, eventTitle, eventDetail, extraEventRecipients);
     return { project_id: p.id };

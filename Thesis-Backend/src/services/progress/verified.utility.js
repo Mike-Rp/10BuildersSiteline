@@ -3,6 +3,7 @@ import { ensureChecklist } from "./phase.utility.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import { participantsSql } from "./assignment.utility.js";
+import { configureMonitoringDependencies } from "./overlap.utility.js";
 
 // Called at activation, under the existing project transaction/lock. Existing snapshots
 // are never replaced; all newly activated phases are frozen before template edits.
@@ -10,12 +11,14 @@ export async function snapshotProjectChecklists(db, projectId) {
   const stages = await db.query(`SELECT w.project_stage_id FROM projects p
     JOIN (${projectWorkflowSql}) w ON w.project_id=p.id WHERE p.id=$1 ORDER BY w.sort_order`, [projectId]);
   for (const stage of stages.rows) await ensureChecklist(db, projectId, stage.project_stage_id);
+  await configureMonitoringDependencies(db,projectId);
 }
 
 // Read only, over the entire authorized project set, not a paginated evidence list.
 // Missing snapshots stay missing: live templates are never used as a denominator.
 export async function readVerifiedProgress(db, projectIds) {
   if (!projectIds.length) return new Map();
+  const monitoring=(await db.query("select to_regclass('public.project_checklist_responsibilities') is not null as ready")).rows[0].ready;
   const { rows } = await db.query(`WITH workflow AS (
     SELECT project_id,project_type_id,project_stage_id,sort_order,
       row_number() OVER(PARTITION BY project_id ORDER BY sort_order)-1 AS position,
@@ -28,7 +31,8 @@ export async function readVerifiedProgress(db, projectIds) {
     UNION SELECT id,current_stage_id FROM projects WHERE id=ANY($1::uuid[]) AND current_stage_id IS NOT NULL
   ) SELECT ph.project_id,s.id::text AS phase_id,s.code AS name,
     w.project_stage_id IS NOT NULL AS expected,
-    c.project_id IS NOT NULL AS configured,i.id::text || ':' || coalesce(a.user_id::text,'') AS activity_id,i.code,i.required,i.weight,a.user_id AS workspace_user_id,
+    c.project_id IS NOT NULL AS configured,i.id::text || ':' || coalesce(a.user_id::text,'') AS activity_id,i.id AS checklist_item_id,i.code,i.required,i.weight,a.user_id AS workspace_user_id,
+    to_jsonb(p)->>'intake_monitoring_version' AS intake_monitoring_version,
     w.position::int,w.phase_count::int,
     (SELECT position FROM workflow WHERE project_id=p.id AND project_stage_id=p.current_stage_id)::int AS current_position,
     COALESCE((to_jsonb(c)->>'on_hold')::boolean,false) AS on_hold,
@@ -43,6 +47,9 @@ export async function readVerifiedProgress(db, projectIds) {
     LEFT JOIN project_phase_checklists c ON c.project_id=ph.project_id AND c.project_stage_id=ph.project_stage_id
     LEFT JOIN project_phase_checklist_items i ON i.project_id=ph.project_id AND i.project_stage_id=ph.project_stage_id
     LEFT JOIN (${await participantsSql(db)}) a ON a.project_id=ph.project_id AND a.project_stage_id=ph.project_stage_id
+    ${monitoring ? `AND (to_jsonb(p)->>'intake_monitoring_version' IS DISTINCT FROM '1'
+      OR NOT EXISTS(SELECT 1 FROM project_checklist_responsibilities cr WHERE cr.checklist_item_id=i.id)
+      OR EXISTS(SELECT 1 FROM project_checklist_responsibilities cr WHERE cr.checklist_item_id=i.id AND cr.responsibility_id=a.responsibility_id))` : ''}
     LEFT JOIN LATERAL(SELECT status,reviewed_by,reviewed_at FROM project_phase_evidence
       WHERE checklist_item_id=i.id AND project_id=i.project_id AND project_stage_id=i.project_stage_id
         AND (a.completion_status IS NULL OR
@@ -56,15 +63,22 @@ export async function readVerifiedProgress(db, projectIds) {
     if (!phases.has(row.phase_id)) phases.set(row.phase_id, {
       id: row.phase_id, name: row.name, expected: row.expected, configured: row.configured, activities: [], weighting: row.progress_weighting,
       position: row.position, count: row.phase_count, onHold: row.on_hold, started: row.started,
-      currentPosition: row.current_position,
+      currentPosition: row.current_position, monitoring: row.intake_monitoring_version==='1',
     });
     if (row.activity_id) phases.get(row.phase_id).activities.push({
-      id: row.activity_id, code: row.code, required: row.required, weight: row.weight, workspaceUserId:row.workspace_user_id,
+      id: row.intake_monitoring_version==='1'?String(row.checklist_item_id):row.activity_id, code: row.code, required: row.required, weight: row.weight, workspaceUserId:row.workspace_user_id,
       status: row.status, approvalValid: row.approval_valid === true,
     });
   }
   return new Map([...grouped].map(([id, byPhase]) => {
     const phases = [...byPhase.values()];
+    for(const phase of phases)if(phase.monitoring) {
+      const groups=new Map();
+      for(const activity of phase.activities){const rows=groups.get(activity.id)||[];rows.push(activity);groups.set(activity.id,rows);}
+      phase.activities=[...groups.values()].map(rows=>({...rows[0],workspaceUserId:undefined,
+        status:rows.every(row=>row.status==='approved'&&row.approvalValid)?'approved':'missing',
+        approvalValid:rows.every(row=>row.status==='approved'&&row.approvalValid)}));
+    }
     const construction = phases.filter(phase => phase.expected).map(phase => ({
       id: phase.id, name: phase.name, configured: true,
       ...constructionPhaseProgress(phase.position, phase.count, phase.activities, phase),

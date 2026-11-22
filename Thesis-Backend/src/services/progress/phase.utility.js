@@ -8,6 +8,8 @@ import { constructionPhaseProgress } from "../../domain/construction-phase-progr
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
 import { participantsSql, multiSpmInstalled, assertAssignmentWritable } from "./assignment.utility.js";
+import { monitoringProject } from "../projects/intake-monitoring.utility.js";
+import { readResponsibilityChecklist } from "./overlap.utility.js";
 
 export const checklistPct = (approved, required) => {
   if (!Number.isInteger(approved) || !Number.isInteger(required) ||
@@ -117,6 +119,8 @@ export async function readChecklistItems(client, projectIds, {stageId = null, us
 }
 
 export async function readChecklist(client, projectId, stageId, { initialize = true, userId = null } = {}) {
+  const monitored = await monitoringProject(client,{id:projectId});
+  if(monitored) return readResponsibilityChecklist(client,monitored,stageId,{initialize,userId});
   if (initialize) await ensureChecklist(client, projectId, stageId, { reconcile: true });
   const result = {rows:await readChecklistItems(client,[projectId],{stageId,userId})};
   const required = result.rows.filter(i => i.required);

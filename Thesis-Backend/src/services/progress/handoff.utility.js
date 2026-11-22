@@ -2,6 +2,7 @@ import { blockingReviews, unfinishedPhaseResponsibilities, verifiedComplete } fr
 import { readChecklist, recordPhaseHistory } from "./phase.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
 import {responsibilitiesInstalled} from '../projects/phase-responsibilities.utility.js';
+import { monitoringProject } from "../projects/intake-monitoring.utility.js";
 
 // Caller owns the project row lock. Expected blockers return without undoing
 // the activity approval; unexpected database failures still roll back atomically.
@@ -23,7 +24,7 @@ export async function assessPhaseHandoff(db, project, { initialize = false, chec
         (SELECT sort_order FROM (${projectWorkflowSql}) current WHERE current.project_id=p.id AND project_stage_id=$2)
       ORDER BY w.sort_order LIMIT 1`, [project.id, project.current_stage_id]);
   if (!next.rowCount) return { state: "final", advanced: false, reason: "This is the project's final assigned phase. Existing completion checks apply.", code: 409 };
-  if (checkPendingReviews && await blockingReviews(db, project.id)) return blocked("Resolve pending rework, progress and subcontractor reviews before advancing this phase.", "pending_reviews", 409);
+  if (checkPendingReviews && await blockingReviews(db, project.id,Number(project.intake_monitoring_version)===1?{stageId:project.current_stage_id}:{})) return blocked("Resolve pending rework, progress and subcontractor reviews before advancing this phase.", "pending_reviews", 409);
   const owner = await db.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND project_stage_id=$2 AND status='confirmed' AND spm_user_id IS NOT NULL", [project.id, project.current_stage_id]);
   if (!owner.rowCount) return blocked("The current phase SPM must confirm their assignment before handoff.", "current_assignment");
   const phase = next.rows[0];
@@ -51,11 +52,12 @@ export async function autoApproveCompletions(db, project, actorId = null) {
       [row.id, actorId, "Automatically completed: all required checklist items approved."]);
   }
 }
-export async function transitionPhase(db, project, actorId) {
+export async function transitionPhase(db, project, actorId, { explicit = false } = {}) {
+  if(!explicit&&await monitoringProject(db,project))return {advanced:false,state:'manual_confirmation_required',reason:'Confirm phase turnover to advance the official phase.',code:409};
   await autoApproveCompletions(db, project, actorId);
   // Preserve the mutation endpoint's existing conflict precedence even when
   // work is incomplete. The dashboard only escalates otherwise-complete work.
-  if (await blockingReviews(db, project.id)) return { state: "blocked", advanced: false, reason: "Resolve pending rework, progress and subcontractor reviews before advancing this phase.", reasonCode: "pending_reviews", code: 409 };
+  if (await blockingReviews(db, project.id,Number(project.intake_monitoring_version)===1?{stageId:project.current_stage_id}:{})) return { state: "blocked", advanced: false, reason: "Resolve pending rework, progress and subcontractor reviews before advancing this phase.", reasonCode: "pending_reviews", code: 409 };
   const readiness = await assessPhaseHandoff(db, project, { initialize: true, checkPendingReviews: false });
   if (readiness.state !== "ready") return readiness;
   const { phase, upcoming } = readiness;

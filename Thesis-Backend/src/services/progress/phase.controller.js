@@ -14,6 +14,8 @@ import { assertLicenseActive } from "../../common/utilities/license-gate.utility
 import { insertFile, insertFileFromStored } from "./phase-upload.utility.js";
 import { openObject, pipeObject } from "../storage/storage.service.js";
 import { submitChecklist } from "./phase-submission.utility.js";
+import { monitoringProject } from "../projects/intake-monitoring.utility.js";
+import { readOverlapMonitoring, assertOverlapSubmission, approveParallelAccess } from "./overlap.utility.js";
 import { assertAssignmentWritable, phaseAssignments, multiSpmInstalled } from "./assignment.utility.js";
 import { optionalNote, resolveStage, stageOptions, ISSUE_CATEGORIES, updateBody, insertIssue, rejectProgressInput,validateFiles } from "./phase-update.utility.js";
 export { submitPhaseUpdate } from "./phase-update.controller.js";
@@ -83,8 +85,10 @@ export const getPhaseOverview = async (req, res) => {
       const phaseOwner = owner.rows[0] ?? null;
       const pending = await client.query("SELECT * FROM project_phase_updates WHERE project_id = $1 AND status = 'pending' AND ($2::uuid IS NULL OR submitted_by=$2) ORDER BY id DESC LIMIT 1", [p.id,user.role==="spm"?user.id:null]);
       const currentChecklist = selected.id === p.current_stage_id && user.role!=="spm" ? checklist : await readChecklist(client, p.id, p.current_stage_id);
+      const overlap_monitoring=await readOverlapMonitoring(client,p,user);
       return {
         project_id: p.id, project_name: p.name, lifecycle_status: p.lifecycle_status,
+        ...(overlap_monitoring?{overlap_monitoring}:{}),
         current_stage_id: p.current_stage_id, current_stage: p.current_stage,
         phase_owner: phaseOwner, assignments,
         your_phase_is_active: canSubmit,
@@ -110,8 +114,11 @@ async function itemProject(client, user, projectId, itemId, body = {}) {
   if (!item.rowCount) throw new HttpError(404, "Checklist item not found.");
   const stage = await resolveStage(client, body, item.rows[0].project_stage_id, p.project_type_id, p.id);
   if (Number(stage.id) !== Number(item.rows[0].project_stage_id)) throw new HttpError(422, "The checklist item belongs to another stage.");
-  await assertPhaseUnlocked(client, p, stage.id);
-  await assertAssignmentWritable(client,user,p,stage.id);
+  if(await monitoringProject(client,p)) await assertOverlapSubmission(client,p,user,body.responsibility_id,itemId,{checkStatus:false});
+  else {
+    await assertPhaseUnlocked(client, p, stage.id);
+    await assertAssignmentWritable(client,user,p,stage.id);
+  }
   return { ...p, current_stage_id: stage.id, current_stage: stage.code };
 }
 
@@ -121,13 +128,14 @@ export const uploadEvidence = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await itemProject(client, req.user, req.params.id, req.params.itemId, req.body);
       return projectRequest(client,p.id,req.user.id,req.body?.request_id,'evidence-upload:'+req.params.itemId,
-        {stage_id:p.current_stage_id,note:req.body?.submission_note,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},async()=>{
+        {stage_id:p.current_stage_id,responsibility_id:req.body?.responsibility_id,note:req.body?.submission_note,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},async()=>{
       const checklist = await readChecklist(client, p.id, p.current_stage_id, {userId:req.user.id});
       const item = checklist.items.find(i => String(i.id) === req.params.itemId);
       if (["pending", "approved"].includes(item?.status)) throw new HttpError(409, "Only missing or rejected evidence can be uploaded.");
       const file = await insertFile(client, p, req.file, req.user.id);
+      if(await monitoringProject(client,p))await client.query('UPDATE project_phase_files SET responsibility_id=$2,checklist_item_id=$3 WHERE id=$1',[file.id,req.body?.responsibility_id,req.params.itemId]);
       const submission = await submitChecklist(client, p, req.user,
-        { item_id: req.params.itemId, file_id: file.id, submission_note: optionalNote(req.body?.submission_note) }, null, checklist);
+        { item_id: req.params.itemId, responsibility_id:req.body?.responsibility_id, file_id: file.id, submission_note: optionalNote(req.body?.submission_note) }, null, checklist);
       return { ...submission, file };
       });
     });
@@ -143,6 +151,8 @@ export const markChecklistSubmitted = async (req, res) => {
     const body = updateBody({ stage_id: req.body?.stage_id, stage: req.body?.stage, checklist_submissions: [{
       item_id: req.params.itemId, file_id: req.body?.file_id, file_ids:req.body?.file_ids, submission_note: req.body?.submission_note,
     }] });
+    body.responsibility_id=req.body?.responsibility_id;
+    body.checklist_submissions[0].responsibility_id=req.body?.responsibility_id;
     const data = await withTransaction(async client => {
       await assertLicenseActive(user, client);
       const p = await itemProject(client, user, req.params.id, req.params.itemId, body);
@@ -205,7 +215,8 @@ async function reviewableEvidence(client,user,projectId,evidenceId) {
   if(evidence.status!=="pending") {
     throw new HttpError(409,"Evidence is already reviewed or superseded.");
   }
-  await assertPhaseUnlocked(client, p, evidence.project_stage_id);
+  if(!await monitoringProject(client,p)) await assertPhaseUnlocked(client, p, evidence.project_stage_id);
+  else if(user.role!=='admin'&&p.suggested_opm_id!==user.id)throw new HttpError(403,'Only the assigned Office PM can review this project evidence.');
   return {p,evidence};
 }
 
@@ -214,7 +225,10 @@ async function evidenceReviewPreview(client,p,evidence) {
   const overall=(await readVerifiedProgress(client,[p.id])).get(p.id);
   const project=overall.project;
   const phase=checklist.verified;
-  const credited=checklist.items.filter(item=>String(item.evidence_id)===String(evidence.id)&&item.required).length;
+  const monitored=await monitoringProject(client,p);
+  const credited=monitored?checklist.items.filter(item=>String(item.id)===String(evidence.checklist_item_id)&&item.required&&
+    item.responsibility_totals.approved+1===item.responsibility_totals.required).length:
+    checklist.items.filter(item=>String(item.evidence_id)===String(evidence.id)&&item.required).length;
   const added=credited*evidence.weight;
   // Project totals use the project's weighting; the phase keeps its own activity points.
   const projectAdded=added*(overall.scales?.[String(evidence.project_stage_id)]??1);
@@ -269,7 +283,7 @@ const reviewEvidence = decision => async (req, res) => {
       const projectArchived=decision==="approved" && Number(p.current_stage_id)===Number(selected.current_stage_id)
         ? await maybeCloseProject(client,p,user.id) : false;
       if (decision === "approved" && Number(p.current_stage_id) === Number(evidence.project_stage_id)) await autoApproveCompletions(client, p, user.id);
-      const handoff = decision === "approved" && user.role === "opm" && !projectArchived &&
+      const handoff = !await monitoringProject(client,p) && decision === "approved" && user.role === "opm" && !projectArchived &&
         Number(p.current_stage_id) === Number(evidence.project_stage_id) && verifiedComplete(checklist.verified)
         ? await transitionPhase(client, p, user.id) : undefined;
       return { evidence_id: evidence.id, status: decision,project_archived:projectArchived, handoff, stage_pct: checklist.pct, current_pct: handoff?.advanced ? handoff.current_pct : Number(p.current_stage_id) === Number(selected.current_stage_id) ? checklist.pct : p.current_pct,
@@ -286,18 +300,23 @@ export const uploadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       const p = await phaseProject(client, req.user, req.params.id, { active: true });
       await assertProjectSpm(client, req.user, p);
-      const stage = await resolveStage(client, req.body, p.current_stage_id, p.project_type_id, p.id);
-      await assertPhaseUnlocked(client, p, stage.id);
-      await assertAssignmentWritable(client,req.user,p,stage.id);
+      const monitored=await monitoringProject(client,p);
+      const access=monitored?await assertOverlapSubmission(client,p,req.user,req.body?.responsibility_id,req.body?.checklist_item_id,{checkStatus:false}):null;
+      const stage = await resolveStage(client, req.body, access?.item.project_stage_id??p.current_stage_id, p.project_type_id, p.id);
+      if(access&&Number(stage.id)!==Number(access.item.project_stage_id))throw new HttpError(422,'The selected item belongs to another phase.');
+      if(!access){await assertPhaseUnlocked(client, p, stage.id);await assertAssignmentWritable(client,req.user,p,stage.id);}
       // A JSON body with file_id references a file that was already uploaded (directly to
       // storage or in chunks), so a large file never has to be re-sent through this request.
       const storedId = req.file ? undefined : req.body?.file_id;
       return projectRequest(client,p.id,req.user.id,req.body?.request_id,'phase-file',
-        storedId ? {stage_id:stage.id,file_id:storedId}
-          : {stage_id:stage.id,name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')},
-        ()=>storedId
-          ? insertFileFromStored(client, { ...p, current_stage_id: stage.id }, storedId, req.user.id)
-          : insertFile(client, { ...p, current_stage_id: stage.id }, req.file, req.user.id));
+        {stage_id:stage.id,responsibility_id:req.body?.responsibility_id,checklist_item_id:req.body?.checklist_item_id,
+          ...(storedId?{file_id:storedId}:{name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')})},
+        async()=>{
+          if(access)await assertOverlapSubmission(client,p,req.user,req.body.responsibility_id,req.body.checklist_item_id);
+          const saved=storedId?await insertFileFromStored(client,{...p,current_stage_id:stage.id},storedId,req.user.id):await insertFile(client,{...p,current_stage_id:stage.id},req.file,req.user.id);
+          if(access)await client.query('UPDATE project_phase_files SET responsibility_id=$2,checklist_item_id=$3 WHERE id=$1',[saved.id,access.responsibility.id,access.item.id]);
+          return saved;
+        });
     });
     return sendOk(res, "Optional phase file uploaded.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -311,11 +330,12 @@ export const downloadPhaseFile = async (req, res) => {
     const data = await withTransaction(async client => {
       await phaseProject(client, user, req.params.id);
       const file = await client.query(
-        `SELECT original_name, content_type, content,
+        `SELECT original_name, content_type, content,uploaded_by,to_jsonb(f)->>'responsibility_id' AS responsibility_id,
                 to_jsonb(f)->>'storage_bucket' AS storage_bucket, to_jsonb(f)->>'storage_path' AS storage_path
            FROM project_phase_files f
           WHERE id = $1 AND project_id = $2`, [req.params.fileId, req.params.id]);
       if (!file.rowCount) throw new HttpError(404, "File not found.");
+      if(user.role==='spm'&&file.rows[0].responsibility_id&&file.rows[0].uploaded_by!==user.id)throw new HttpError(404,'File not found.');
       return file.rows[0];
     });
     const opened = data.storage_path ? await openObject(data.storage_bucket, data.storage_path) : null;
@@ -351,7 +371,10 @@ export const advancePhase = async (req, res) => {
       const p = await phaseProject(client, user, req.params.id, { active: true });
       if (!(await isProjectOpmOrAdmin(user, p.id, client))) throw new HttpError(403, "Office PM approval is required.");
       await assertLicenseActive(user, client);
-      const handoff = await transitionPhase(client, p, user.id);
+      const monitored=await monitoringProject(client,p);
+      if((monitored||req.body?.expected_stage_id!==undefined)&&String(req.body?.expected_stage_id)!==String(p.current_stage_id))
+        throw new HttpError(409,'The official phase changed. Refresh before confirming turnover.');
+      const handoff = await transitionPhase(client, p, user.id, {explicit:true});
       if (!handoff.advanced) throw new HttpError(handoff.code, handoff.reason);
       return handoff;
     });
@@ -390,13 +413,27 @@ export const configurePhaseTemplate = async (req, res) => {
 
 export const getEvidenceHistory=async(req,res)=>{
   try {
-    const user=await requireUser(req,res,['admin','opm']);if(!user)return;
+    const user=await requireUser(req,res,['admin','opm','spm']);if(!user)return;
     const data=await withTransaction(async db=>{
       const p=await phaseProject(db,user,req.params.id);
-      if(!await isProjectOpmOrAdmin(user,p.id,db))throw new HttpError(403,'Office PM review access is required.');
-      return readEvidenceQueue(db,[p.id],{pendingOnly:false});
+      if(user.role==='spm'&&!await monitoringProject(db,p))throw new HttpError(403,'Office PM review access is required.');
+      if(user.role!=='spm'&&!await isProjectOpmOrAdmin(user,p.id,db))throw new HttpError(403,'Office PM review access is required.');
+      const rows=await readEvidenceQueue(db,[p.id],{pendingOnly:false});
+      return user.role==='spm'?rows.filter(row=>row.submitted_by===user.id):rows;
     });
     res.set('Cache-Control','private, no-store');
     return sendOk(res,'Evidence history retrieved.',data.length,data);
   } catch(error){return handleError(res,error);}
+};
+
+export const approveParallelUploads=async(req,res)=>{
+  try {
+    const user=await requireUser(req,res,['opm']);if(!user)return;
+    const data=await withTransaction(async db=>{
+      const p=await phaseProject(db,user,req.params.id,{active:true});
+      await assertLicenseActive(user,db);
+      return approveParallelAccess(db,p,user,req.body||{});
+    });
+    return sendOk(res,'Parallel upload access approved.',1,data);
+  }catch(error){return handleError(res,error);}
 };
