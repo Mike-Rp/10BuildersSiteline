@@ -32,6 +32,9 @@ const planningRules = {
   Commercial: { small: [300, 250], medium: [1000, 750], rate: 0.95 },
   "Mixed-Use": { small: [300, 300], medium: [1000, 1000], rate: 1.10 },
 };
+const overlapDurationFactors = [1, 0.9, 0.8];
+const complexityForScore = score => score <= 7 ? "Low" : score <= 11 ? "Moderate" : "High";
+const complexityDurationFactors = { Low: 0.85, Moderate: 1, High: 1.30 };
 
 export function inquirySize(details) {
   const { small, medium } = planningRules[details.project_type];
@@ -46,10 +49,12 @@ export function assessInquiry(details, start, end, technical, arrangement) {
   const typePoints = { Residential: 1, Commercial: 2, "Mixed-Use": 3 }[details.project_type];
   const sizePoints = { Small: 1, Medium: 2, Large: 3 }[size];
   const floorPoints = details.floor_count >= 10 ? 3 : details.floor_count >= 4 ? 2 : 1;
-  const score = typePoints + sizePoints + floorPoints +
-    (technicalOptions.indexOf(technical) + 1) + (arrangementOptions.indexOf(arrangement) + 1);
-  const complexity = score <= 7 ? "Low" : score <= 11 ? "Moderate" : "High";
-  const durationMultiplier = { Low: 0.85, Moderate: 1, High: 1.30 }[complexity];
+  const sequentialScore = typePoints + sizePoints + floorPoints + (technicalOptions.indexOf(technical) + 1) + 1;
+  const overlapLevel = Math.max(0, arrangementOptions.indexOf(arrangement));
+  const score = sequentialScore + overlapLevel;
+  const complexity = complexityForScore(score);
+  // Overlap adds coordination complexity and reduces elapsed time from the sequential baseline.
+  const durationMultiplier = complexityDurationFactors[complexityForScore(sequentialScore)] * overlapDurationFactors[overlapLevel];
   const rate = planningRules[details.project_type].rate;
   const planningDays = Math.ceil((Number(details.floor_area_sqm) * rate +
     20 * (Number(details.floor_count) - 1)) * durationMultiplier);

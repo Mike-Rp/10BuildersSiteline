@@ -580,13 +580,13 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>{arrangementOptions.map(option => <option key={option}>{option}</option>)}</select></label>
         </fieldset>
         <div className="office-workflow-result"><span>Complexity score · {preview.score}/15</span><strong>{preview.complexity}</strong>
-          <p>Planning score based on project type, size, floors, technical systems, and phase overlap.</p>
-          {preview.durationMultiplier != null && <p>Duration multiplier ×{preview.durationMultiplier.toFixed(2)}</p>}</div>
+          <p>Planning score based on project type, size, floors, technical systems, and phase overlap.</p></div>
       </Card>
       <Card title="Estimated project duration" icon="calendar">
         <div className="office-workflow-result duration">
           {preview.planningDays != null && <><strong>{durationLabel(preview.planningDays)}</strong>
             <span>{preview.planningDays.toLocaleString("en-PH")} estimated calendar days</span></>}
+          {preview.durationMultiplier != null && <p>Schedule multiplier ×{Number(preview.durationMultiplier.toFixed(3))}</p>}
           {preview.suggestedEnd && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
           <p>Reviewed schedule: {formatDay(review.start)} – {formatDay(review.end)} ({preview.durationDays.toLocaleString("en-PH")} calendar days)</p>
         </div>
