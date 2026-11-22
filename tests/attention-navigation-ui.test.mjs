@@ -120,6 +120,10 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     assert.doesNotMatch(pendingInquiry.textContent,/Why this match|Relevant experience|Matched project type/)
 
     await render(office,"/opm/project-inquiries")
+    const pipeline = document.querySelector(".opm-inquiry-pipeline")
+    assert.match(pipeline.querySelector("header").textContent, /Inquiry pipeline.*Project inquiries.*Refresh list/)
+    assert.equal(pipeline.querySelector('.intake-tabs [aria-pressed="true"]').textContent, "All inquiries (3)")
+    assert.equal(pipeline.querySelector(".opm-inquiry-filters input[type=search]").placeholder, "Search by project, client, or ID")
     const cards = [...document.querySelectorAll(".opm-inquiry-card")]
     assert.equal(cards.length, 3)
     assert.equal(document.querySelector("#project-intake-tab-inquiries span").textContent, "3")

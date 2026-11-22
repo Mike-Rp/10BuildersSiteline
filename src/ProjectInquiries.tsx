@@ -993,35 +993,44 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           decide={(action, input) => void run(() => decision(action, input))}
           save={(action, input) => void run(() => saveWorkflow(action, input))} />
       : <>
-    <header className="inquiries-page-heading">
+    {admin && <header className="inquiries-page-heading">
       <div>{embedded ? <h2>Project inquiries</h2> : <h1>Project inquiries</h1>}
-        {admin && <p>Review saved inquiries or start a new project request.</p>}
+        <p>Review saved inquiries or start a new project request.</p>
       </div>
-      <button className="button" disabled={busy} onClick={() => void run(async () => {
-        await refresh()
-        if (!admin) await onReload()
-      })}>Refresh</button>
-      {admin && <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>}
-    </header>
+      <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
+      <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
+    </header>}
     {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
-      <div className="confirmation-intake-filters">
-        <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
-          help="Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action." />
-      </div>
-      <div className="opm-inquiry-filters">
-        <div className="inquiry-list-search">
-          <Icon name="search" size={17} />
-          <input type="search" aria-label="Search inquiries" placeholder="Search inquiries" value={search} onChange={event => setSearch(event.target.value)} />
+      <div className="opm-inquiry-pipeline">
+        <header className="inquiries-page-heading">
+          <div>
+            <p className="opm-inquiry-pipeline-label">Inquiry pipeline</p>
+            {embedded ? <h2>Project inquiries</h2> : <h1>Project inquiries</h1>}
+          </div>
+          <button type="button" className="button opm-inquiry-refresh" disabled={busy} onClick={() => void run(async () => {
+            await refresh()
+            await onReload()
+          })}><Icon name="arrow" size={16} />Refresh list</button>
+        </header>
+        <div className="confirmation-intake-filters">
+          <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
+            help="Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action." />
         </div>
-        <label>Status<select value={queueStatus} onChange={event => setQueueStatus(event.target.value)}>
-          <option value="">All statuses</option>
-          {statusOptions.map(status => <option key={status}>{status}</option>)}
-        </select></label>
-        <label>Project type<select value={queueType} onChange={event => setQueueType(event.target.value)}>
-          <option value="">All types</option>
-          {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
-        </select></label>
+        <div className="opm-inquiry-filters">
+          <div className="inquiry-list-search">
+            <Icon name="search" size={17} />
+            <input type="search" aria-label="Search inquiries" placeholder="Search by project, client, or ID" value={search} onChange={event => setSearch(event.target.value)} />
+          </div>
+          <label>Status<select value={queueStatus} onChange={event => setQueueStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            {statusOptions.map(status => <option key={status}>{status}</option>)}
+          </select></label>
+          <label>Project type<select value={queueType} onChange={event => setQueueType(event.target.value)}>
+            <option value="">All types</option>
+            {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
+          </select></label>
+        </div>
       </div>
       {queueRows && <p className="inquiry-muted" role="status">{queueRows.length} {queueRows.length === 1 ? "inquiry" : "inquiries"}</p>}
       {queueRows?.length ? <ul className="opm-inquiry-cards" aria-label="Assigned project inquiries">
