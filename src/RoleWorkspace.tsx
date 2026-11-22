@@ -742,6 +742,7 @@ export default function RoleWorkspace({
     )
   }
   function assignmentRoster(p: Project, allowReassign = false, showContacts = false) {
+    const engineerName = (id: string) => state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
     return (
       <div className="role-roster">
         {p.team.map((t) => {
@@ -760,7 +761,7 @@ export default function RoleWorkspace({
             {showContacts ? <div className="site-pm-roster-contacts">
               {(t.engineers?.length ? t.engineers.map(engineer => engineer.accountId) : t.accountId ? [t.accountId] : []).filter((id, index, ids) => ids.indexOf(id) === index).map(id => {
                 const engineer = t.engineers?.find(person => person.accountId === id)
-                const name = state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
+                const name = engineerName(id)
                 const status = engineer?.status || t.status
                 const deadline = engineer?.responseDeadline
                 const overdue = status === "pending" && !!deadline && Date.parse(deadline) <= urgencyNow
@@ -773,8 +774,8 @@ export default function RoleWorkspace({
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}
             </div> : summary.multiple
-              ? <span>{t.engineers!.map((e) => actorName(e.accountId)).join(", ")}</span>
-              : <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>}
+              ? <span>{t.engineers!.map((e) => engineerName(e.accountId)).join(", ")}</span>
+              : <span>{t.accountId ? engineerName(t.accountId) : "Unassigned"}</span>}
             {!showContacts && <span className="phase-status-cell">
               <Status value={t.accountId ? summary.status : "unassigned"} />
               {summary.multiple && summary.waiting > 0 && <small>{waitingLabel(summary.waiting)}</small>}

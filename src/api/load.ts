@@ -131,6 +131,11 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
 
   const details = new Map(parts.map((p) => [p.list.id as string, p.detail]))
   const people = peopleFromProjects(self, projectList, details, accounts)
+  for (const responsibility of (workspace.engineerResponsibilities || []) as Dto[]) {
+    if (responsibility.status === "released" || !responsibility.full_name ||
+        !details.has(responsibility.project_id) || people.accounts.some(account => account.id === responsibility.user_id)) continue
+    people.accounts.push(stubAccount(responsibility.user_id, responsibility.full_name, "spm"))
+  }
   const projects = parts.map((p) =>
     mapProject({ ...p, list:{...p.list,...(workspace.projects?.[p.list.id]||{})}, detail:{...p.detail,workspace:workspace.projects?.[p.list.id]||{},selections:(workspace.selections||[]).filter((s:Dto)=>s.project_id===p.list.id)}, clientId: people.clientIds.get(p.list.id) || "", register: registerFileUrl }),
   )

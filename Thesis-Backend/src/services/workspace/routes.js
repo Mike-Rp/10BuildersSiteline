@@ -300,7 +300,7 @@ router.get("/workspace", endpoint(null, async (db, user) => {
     const phaseAllocationAvailable = (await db.query("select to_regclass('public.project_phase_foremen') is not null as ready")).rows[0].ready;
     const engineerAvailability = await commitmentsInstalled(db) && ['admin','spm'].includes(user.role) ? await engineerCommitments(db,user.role==='admin'?accountDetails.filter(a=>a.role==='spm').map(a=>a.id):[user.id]) : undefined;
     const multiEngineerAllocationAvailable=await responsibilitiesInstalled(db);
-    const engineerResponsibilities=multiEngineerAllocationAvailable&&user.role!=='client'?(await db.query('select r.*,s.code as phase from project_phase_responsibilities r join project_stages s on s.id=r.project_stage_id where r.project_id=any($1::uuid[])',[allowed])).rows:[];
+    const engineerResponsibilities=multiEngineerAllocationAvailable&&user.role!=='client'?(await db.query('select r.*,s.code as phase,u.full_name from project_phase_responsibilities r join project_stages s on s.id=r.project_stage_id left join users u on u.id=r.user_id where r.project_id=any($1::uuid[])',[allowed])).rows:[];
     return { multiEngineerAllocationAvailable,engineerResponsibilities,engineerAvailability, backendPhases, referenceDisciplines, tradeAllocationAvailable, phaseAllocationAvailable, accountDetails: Object.fromEntries(accountDetails.map(a => [a.id, a])),
         rules: (await db.query("select rules from workspace_settings where singleton")).rows[0]?.rules,
         preferences: accountMeta.find(a => a.id === user.id)?.metadata?.preferences,

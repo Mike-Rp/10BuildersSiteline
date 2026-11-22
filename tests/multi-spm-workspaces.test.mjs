@@ -101,6 +101,11 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const spmPart=(await call(b,'/workspace/project-data')).find(project=>project.list.id===projectId)
   assert.ok(spmPart)
   assert.ok(!Object.hasOwn(spmPart.detail,'site_pm_contacts'))
+  const workspace = await call(b,'/workspace')
+  for (const person of [a,b,c]) {
+   const assignment = workspace.engineerResponsibilities.find(row=>row.project_id===projectId&&row.user_id===person.id)
+   assert.equal(assignment.full_name,person.full_name)
+  }
  })
  const aPhotoId=randomUUID()
  async function upload(user,stage=stages[0]){const form=new FormData();form.set('file',new Blob(['%PDF-test'],{type:'application/pdf'}),'evidence.pdf');form.set('stage_id',stage.id);return call(user,root+'/phase-files',{method:'POST',body:form,status:201})}

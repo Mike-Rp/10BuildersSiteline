@@ -92,6 +92,34 @@ test("staff can load real project data when automatic handoff reconciliation fai
   assert.deepEqual(state.projects.map(project => project.id), ["live-site"])
 })
 
+test("staff phase rosters resolve supporting engineers from scoped responsibility records", async (t) => {
+  setApiBase("http://database-test/api/v1")
+  setToken("")
+  const list = { id: "site", name: "Roster test", project_type: "Residential", lifecycle_status: "active" }
+  const assignments = [
+    { id: 1, project_id: "site", phase: "Design", user_id: "lead", full_name: "Lead Engineer", status: "confirmed" },
+    { id: 2, project_id: "site", phase: "Design", user_id: "peer", full_name: "Supporting Engineer", status: "pending" },
+    { id: 3, project_id: "other-site", phase: "Design", user_id: "foreign", full_name: "Other Engineer", status: "pending" },
+    { id: 4, project_id: "site", phase: "Design", user_id: "released", full_name: "Former Engineer", status: "released" },
+  ]
+  t.mock.method(globalThis, "fetch", async url => {
+    const path = new URL(url).pathname
+    if (path.endsWith("/project-data")) return Response.json({ data: [{ list, detail: { ...list,
+      phase_team: [{ stage: "Design", spm_user_id: "lead", spm_name: "Lead Engineer", status: "confirmed" }] },
+      documents: [], history: [], photos: [], notes: [], assignments: [], contracts: [] }] })
+    if (path.endsWith("/workspace")) return Response.json({ data: { multiEngineerAllocationAvailable: true, engineerResponsibilities: assignments } })
+    if (path.endsWith("/licenses/me")) return Response.json({ data: { status: "valid" } })
+    return Response.json({ data: [] })
+  })
+  for (const role of ["admin", "opm", "spm"]) {
+    const state = await loadState({ id: "viewer", role })
+    const engineers = state.projects[0].team[0].engineers
+    assert.deepEqual(engineers.map(engineer => state.accounts.find(account => account.id === engineer.accountId)?.name),
+      ["Lead Engineer", "Supporting Engineer"], role)
+    assert.equal(state.accounts.some(account => ["foreign", "released"].includes(account.id)), false)
+  }
+})
+
 test("legacy shortcut credentials go to the server and cannot bypass a rejected login", async (t) => {
   setApiBase("http://database-test/api/v1")
   setToken("")
