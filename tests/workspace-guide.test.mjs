@@ -66,6 +66,10 @@ test("guide supports first visit, skipping, role topics, navigation and replay",
       assert.ok(guideTopics(role).every(t => t.steps.length > 0))
     }
     assert.ok(!guideTopics("client").some(t => /Review evidence/.test(t.title)))
+    const adminInquiry = guideTopics("admin").find(t => t.title === "Submit and track a project inquiry")
+    assert.equal(adminInquiry.steps[0].control, "New project inquiry")
+    assert.equal(adminInquiry.steps[0].page, "Project inquiries")
+    assert.doesNotMatch(JSON.stringify(guideTopics("admin")), /New project intake/)
     await click("Workspace guide")
     await React.act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })))
     assert.equal(document.querySelector('[role="dialog"]'), null)

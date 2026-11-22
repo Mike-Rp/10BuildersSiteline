@@ -1,3 +1,4 @@
+import ProjectClientAccount from "./ProjectClientAccount"
 import SuggestedReassignment from "./SuggestedReassignment"
 import { scrollListAfterChange } from "./navigation-scroll"
 import WorkspaceGuide from "./WorkspaceGuide"
@@ -1576,7 +1577,6 @@ function AppInner() {
       onCompletedProjects={() => {navigate("Archive");setTab("closed")}}
       resetRequestFocus={resetRequestFocus}
       onNavigate={navigate}
-      onNewIntake={() => setDialog({ kind: "intake" })}
       onMonthlyReport={() => setMonthlySummaryOpen(true)}
       onActivity={() => navigate("Activity log")}
       onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
@@ -1650,16 +1650,7 @@ function AppInner() {
     if (page === "Project intake")
       return (
         <>
-          {pageHeading(
-            "Project intake",
-            <Button
-              variant="primary"
-              icon="plus"
-              onClick={() => setDialog({ kind: "intake" })}
-            >
-              New project intake
-            </Button>,
-          )}
+          {pageHeading("Project intake")}
           <Panel
             title="Project Intake Log"
             subtitle={`${intake.length} current intake records · ${intakeHistory.length} completed intake records`}
@@ -2505,6 +2496,7 @@ function AppInner() {
       .filter(Boolean) as Account[]
     return (
       <>
+        {!docsOnly && <ProjectClientAccount projectId={p.id} onSaved={reloadWorkspace} />}
         {docsOnly && <>
         <div className="detail-hero">
           <span className="project-symbol">
@@ -3282,9 +3274,9 @@ function AppInner() {
         </main>
       </div>
       {securityOpen&&<AdminAccountSecurity initialTab={securityTab} onClose={()=>setSecurityOpen(false)} onPasswordChanged={endSession}/>}
-      {dialog?.kind === "intake" && (
+      {dialog?.kind === "intake" && selectedProject && (
         <Modal
-          title={selectedProject ? "Resubmit project" : "New project intake"}
+          title="Resubmit project"
           wide
           onClose={() => setDialog(undefined)}
         >
@@ -3328,6 +3320,7 @@ function AppInner() {
       {dialog?.kind === "intake-record" && selectedProject && <Modal title="Project Intake Record" subtitle={selectedProject.name} wide onClose={() => setDialog(undefined)}>
         <IntakeRecord state={state} project={selectedProject} actor={actor} onOpenActive={() => { navigate("Active sites"); setDialog({ kind: "project", id: selectedProject.id }) }} />
         {!isIntakeHistory(selectedProject) && <>
+          <ProjectClientAccount projectId={selectedProject.id} onSaved={reloadWorkspace} />
           {projectAssignments(selectedProject)}
         </>}
       </Modal>}

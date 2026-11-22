@@ -1,3 +1,4 @@
+import ProjectClientAccount from "./ProjectClientAccount"
 import ProjectInquiries from "./ProjectInquiries"
 import WorkspaceGuide from "./WorkspaceGuide"
 import AttachmentPreview from "./AttachmentPreview"
@@ -3595,7 +3596,7 @@ export default function RoleWorkspace({
       <>
         <ExtensionWorkflow actor={actor} projectId={p.id} />
         <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} showClient />
-        <ProjectClientDetails project={p} accounts={state.accounts} />
+        {isOpm ? <ProjectClientAccount projectId={p.id} onSaved={onReload} /> : <ProjectClientDetails project={p} accounts={state.accounts} />}
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}

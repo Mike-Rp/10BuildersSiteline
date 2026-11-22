@@ -1,3 +1,4 @@
+import ProjectClientAccount from "./ProjectClientAccount"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { ApiError, api, downloadBlob } from "./api/client"
@@ -13,7 +14,7 @@ import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
-import { clientActivationLabel, clientActivationStatus, type ClientActivationStatus } from "./client-activation"
+import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import "./project-inquiries.css"
@@ -431,7 +432,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [selected, setSelected] = useState("")
   const [dialog, setDialog] = useState<"intake" | "details">()
   const [officePage, setOfficePage] = useState<OfficePage>()
-  const [finalizedClient, setFinalizedClient] = useState<{ name: string; status?: ClientActivationStatus; refreshFailed?: boolean }>()
+  const [finalizedClient, setFinalizedClient] = useState<{ projectId: string; name: string; refreshFailed?: boolean }>()
   const [showOfficeApproval, setShowOfficeApproval] = useState(false)
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
@@ -625,7 +626,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: fileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
     })
-    setFinalizedClient({ name: result.project.name, status: clientActivationStatus(result.client_account_status) })
+    setFinalizedClient({ projectId: result.project.id, name: result.project.name })
     setDialog(undefined)
     navigateOffice()
     try { await Promise.all([refresh(), onReload()]) }
@@ -1068,7 +1069,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
         <InquiryDetails details={row.details} includeClient />
-        {row.project_id && <p>Client account · <strong>{clientActivationLabel(row.client_account_status)}</strong></p>}
+        {row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
         <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
         {row.reason && <p>Withdrawal reason: {row.reason}</p>}
         {row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
@@ -1077,14 +1078,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </Modal>}
     {finalizedClient && <Modal title="Project finalized" subtitle={finalizedClient.name} onClose={() => setFinalizedClient(undefined)}
       footer={<button type="button" className="button primary" onClick={() => setFinalizedClient(undefined)}>Done</button>}>
-      <div className="inquiry-summary-card">
-        <h3>Client account</h3>
-        <p role="status"><strong>{clientActivationLabel(finalizedClient.status)}</strong></p>
-        {finalizedClient.status === "verification_required" && <p>Account ownership needs verification before client access can be linked.</p>}
-        {!finalizedClient.status && <p>The server did not report the client account status.</p>}
-        <p>Site PM staffing can continue independently of client activation.</p>
-        {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
-      </div>
+      <ProjectClientAccount projectId={finalizedClient.projectId} onSaved={onReload} />
+      <p>Complete client account setup before project activation.</p>
+      {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
 
     {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(row.details.name)} wide onClose={closeDialog} footer={<>

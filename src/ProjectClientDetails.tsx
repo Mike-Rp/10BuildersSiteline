@@ -10,6 +10,6 @@ export default function ProjectClientDetails({ project, accounts }: { project: P
       <div><dt>Contact number</dt><dd>{client.phone || "Not on file"}</dd></div>
       <div><dt>Email address</dt><dd>{client.email || "Not on file"}</dd></div>
       {client.contactPerson && <div><dt>Contact person</dt><dd>{client.contactPerson}</dd></div>}
-    </dl>) : <p className="role-muted">No linked client account is available. Ask the Administrator to check this project’s client assignment.</p>}
+    </dl>) : <p className="role-muted">No linked client account is available. Ask the assigned Office PM or Admin to complete client account setup.</p>}
   </section>
 }

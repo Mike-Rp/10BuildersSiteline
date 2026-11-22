@@ -9,9 +9,7 @@ type Role = "admin" | "opm" | "spm" | "client"
 type Step = TourStep
 type Topic = { title: string; description: string; steps: Step[] }
 const targets: Record<string, Partial<Step>> = {
-  "Start a project intake": { control: "New project intake", detail: "This button opens the project intake form. Use it to enter the client, project type, dates, and building details. Opening the form does not create or submit a project." },
-  "Review project details": { selector: '.modal input[name="name"], .modal input[placeholder="e.g. Residential development"]', detail: "This field names the project. Complete the project type, dates, area, floors, and client in this form before moving to allocation. Open New project intake first if the form is closed." },
-  "Review staffing and agreements": { control: "Generate allocation", detail: "This button moves from project details to the proposed allocation. Check eligible personnel and required agreements before saving or handing off. Complete the intake fields first; this guide will not generate or save an allocation for you." },
+  "Start a project inquiry": { control: "New project inquiry", detail: "This button opens the project inquiry form. Record the client's contact information and project requirements, then review the Office PM routing before submitting." },
   "Find your projects": { selector: '.active-sites input[placeholder="Search by project name…"]', detail: "This search field filters the displayed projects by name. Use it to find your site, then open that project's details. It does not change project records." },
   "Find reports and records": { selector: '.as-details, .as-list button[aria-label^="View project details:"]', detail: "This button opens this project's details and available records. Check the project name before opening it. Available documents and actions depend on your role." },
   "Open your phase workspace": { control: "Open phase workspace", detail: "This button opens your assigned phase's checklist, evidence controls, and field updates. It does not submit anything. Only writable, assigned phases accept changes." },
@@ -34,9 +32,9 @@ export function guideTopics(role: Role): Topic[] {
   const records = step("Find reports and records", "Open a project to find the documents and reports available to your role. Check the selected project before downloading records.", "Active sites")
   const settings = step("Manage your preferences", "Review your notification and account preferences. Changes to your account should be made from your own workspace.", role === "admin" ? "Settings" : "Preferences")
   const intake = [
-    step("Start a project intake", "Select New project intake to enter the project details. Opening the form does not submit a project.", "Project intake"),
-    step("Review project details", "Enter the project type, dates, floor area, floors, and client. Check the information before generating allocation.", "Project intake"),
-    step("Review staffing and agreements", "Check the proposed personnel, eligibility, and required signed agreements. Resolve missing requirements before handing off the intake.", "Project intake"),
+    step("Start a project inquiry", "Record the client's details and project requirements for Office PM review.", "Project inquiries"),
+    step("Track inquiry review", "Open an inquiry to check its assigned Office PM and review status. The assigned Office PM finalizes the approved inquiry into a project.", "Project inquiries"),
+    step("Review finalized intake", "Open Review intake record to check personnel, eligibility, and agreements. Complete Client account setup here or in project monitoring before project activation.", "Project intake"),
   ]
   const field = [
     sites,
@@ -55,7 +53,7 @@ export function guideTopics(role: Role): Topic[] {
   const topic = (title: string, description: string, steps: Step[]): Topic => ({ title, description, steps })
   if (role === "admin") return [
     topic("Quick workspace overview", "Find your main tools and next actions", [step("Your dashboard", "Review priority items and follow-up actions. Use the sidebar to move between project intake, active sites, records, and organization tools.", "Dashboard"), sites, step("Find people and records", "Use Directory for engineers and subcontractors, Documents for records, and Team for account administration.", "Directory"), settings]),
-    topic("Create a project intake", "Enter details, review staffing, and prepare handoff", intake),
+    topic("Submit and track a project inquiry", "Record requirements and review the finalized intake", intake),
     topic("Review personnel allocation", "Check eligibility, coverage, and agreements", [intake[2]]),
     topic("Monitor an active project", "Find project status and pending work", [sites, records]),
     topic("Manage accounts and resources", "Find people and project records", [step("Manage team accounts", "Find the account in Team and check its role and status before making changes.", "Team"), step("Browse resources", "Use Directory to find engineer and subcontractor records. Open Documents for saved project and engineer documents.", "Directory")]),

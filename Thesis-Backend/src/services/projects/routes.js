@@ -6,13 +6,14 @@ import { requireRoles } from "../../common/utilities/access.utility.js";
 import { createIntake, uploadContract, uploadSubconContract } from "./intake.controller.js";
 import { getRecommendations, rerunRecommendations, swapOpm, updatePhaseTeam } from "./recommend.controller.js";
 import { createIntakeDraft,getIntakeLog } from "./intake-log.controller.js";
-import { createIntakeClient,selectIntakeClient } from "./intake-client.controller.js";
+import { createIntakeClient,selectIntakeClient,getProjectClientAccount } from "./intake-client.controller.js";
 import { mountInquiries } from "./inquiries.js";
 const router = Router();
 mountInquiries(router);
 router.get("/intake-log",getIntakeLog);
 router.post("/intake/drafts",createIntakeDraft);
 router.post("/intake/client-account",createIntakeClient);
+router.get("/:id/client-account",getProjectClientAccount);
 router.post("/:id/client",selectIntakeClient);
 
 router.get('/recommendations', async (req, res) => {

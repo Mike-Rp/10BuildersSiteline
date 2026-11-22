@@ -4,12 +4,12 @@ import { createAccountRecord } from "../accounts/manage.controller.js";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 
 const allowed = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
-async function intakeProject(db,id) {
+async function intakeProject(db,id,editable=true) {
   if(!isUuid(id)) throw new HttpError(400,"A saved draft project_id is required.");
   const found=await db.query(
-    "SELECT id,client_name,lifecycle_status FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[id]);
+    "SELECT id,client_name,lifecycle_status,suggested_opm_id,to_jsonb(projects)->'inquiry_intake' AS inquiry_details FROM projects WHERE id=$1 AND COALESCE(is_deleted,false)=false FOR UPDATE",[id]);
   if(!found.rowCount) throw new HttpError(404,"Project not found.");
-  if(!allowed.includes(found.rows[0].lifecycle_status)) throw new HttpError(409,"Client selection is locked after intake approval.");
+  if(editable&&!allowed.includes(found.rows[0].lifecycle_status)) throw new HttpError(409,"Client selection is locked after intake approval.");
   return found.rows[0];
 }
 async function attach(db,p,user,company,actorId) {
@@ -21,7 +21,7 @@ async function attach(db,p,user,company,actorId) {
 }
 export const createIntakeClient = async (req,res) => {
   try {
-    const actor=await requireUser(req,res,["admin"]);
+    const actor=await requireUser(req,res,["admin","opm"]);
     if(!actor) return;
     const b=req.body || {};
     const company=b.company_name ?? b.client_name;
@@ -36,6 +36,9 @@ export const createIntakeClient = async (req,res) => {
     if (phone !== null && phone !== "" && !isPhilippineMobile(phone)) return sendError(res, PH_MOBILE_ERROR, 400);
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,b.project_id);
+      if (actor.role!=="admin"&&p.suggested_opm_id!==actor.id) throw new HttpError(403,"Only Admin or the assigned Office PM can manage this project's client account.");
+      await db.query("select set_config('app.current_user_id',$1,true)",[actor.id]);
+      await db.query("select pg_advisory_xact_lock(hashtext($1))",[`client-email:${email}`]);
       const existing=await db.query(
         `SELECT u.id,u.full_name,u.email,u.phone,u.status,u.is_deleted,r.code AS role FROM users u
          JOIN roles r ON r.id=u.role_id WHERE lower(u.email::text)=$1 FOR UPDATE OF u`,[email]);
@@ -51,6 +54,24 @@ export const createIntakeClient = async (req,res) => {
     });
     return sendOk(res,"Client saved in Team Accounts and connected to the project.",1,data,data.reused ? 200 : 201);
   } catch(error) { return handleError(res,error); }
+};
+export const getProjectClientAccount = async (req,res) => {
+  try {
+    const actor=await requireUser(req,res,["admin","opm"]);
+    if(!actor) return;
+    const data=await withTransaction(async db=>{
+      const p=await intakeProject(db,req.params.id,false);
+      if (actor.role!=="admin"&&p.suggested_opm_id!==actor.id) throw new HttpError(403,"Only Admin or the assigned Office PM can manage this project's client account.");
+      const clients=(await db.query(`SELECT u.id,u.full_name,u.email,u.phone,u.status FROM user_client_project_links l
+        JOIN users u ON u.id=l.user_id JOIN roles r ON r.id=u.role_id
+        WHERE l.project_id=$1 AND r.code='client' AND NOT COALESCE(u.is_deleted,false) ORDER BY u.full_name,u.id`,[p.id])).rows;
+      const details=p.inquiry_details||{};
+      return {clients,editable:allowed.includes(p.lifecycle_status),defaults:{company_name:p.client_name||"",
+        contact_person:details.primary_contact||details.client_name||p.client_name||"",email:details.email||"",phone:details.phone||""}};
+    });
+    res.set("Cache-Control","private, no-store");
+    return sendOk(res,"Project client account loaded.",1,data);
+  } catch(error) {return handleError(res,error);}
 };
 export const selectIntakeClient = async (req,res) => {
   try {

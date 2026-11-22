@@ -1,0 +1,5 @@
+.project-client-account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 16px 0; }
+.project-client-account-fields input { width: 100%; min-width: 0; }
+.project-client-account-fields small { display: block; margin-top: 5px; color: var(--color-muted); }
+.project-client-account-record { display: grid; gap: 5px; padding: 12px 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .project-client-account-fields { grid-template-columns: minmax(0, 1fr); } }
