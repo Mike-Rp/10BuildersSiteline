@@ -5,7 +5,7 @@
 #root .site-pm-roster-contact + .site-pm-roster-contact { border-top: 1px solid var(--color-line); }
 #root .site-pm-roster-person { min-width: 0; }
 #root .site-pm-roster-name { display: inline; border: 0; background: transparent; padding: 0; min-height: 32px; color: var(--color-primary); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
-#root .site-pm-roster-name:hover { text-decoration: underline; }
+#root button.site-pm-roster-name:hover { text-decoration: underline; }
 #root .site-pm-roster-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 3px; }
 #root .site-pm-roster-contact > .badge { width: fit-content; min-width: 0; justify-self: start; margin: 0; }
 #root .site-pm-roster-contact .button { min-height: 34px; font-size: 13px; padding: 6px 10px; justify-self: end; }
@@ -28,3 +28,5 @@
 @media (max-width: 640px) {
   #root .role-roster > div > .site-pm-roster-contacts { flex-basis: 100%; min-width: 0; }
 }
+
+#root .site-pm-roster-person > span.site-pm-roster-name { display: inline-block; cursor: default; }

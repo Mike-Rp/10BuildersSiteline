@@ -105,7 +105,6 @@ import {
   projectPhaseNames,
   ROLE_NAMES,
   PROJECT_TYPES,
-  spmCandidates,
   uid,
   today,
   type Account,
@@ -137,8 +136,6 @@ import {
   registeredCount,
   REVIEW_MS,
   teamConfirmed,
-  phaseEngineerSummary,
-  waitingLabel,
   visibleEvents,
   workflowFor,
   type WorkflowCommand,
@@ -745,12 +742,12 @@ export default function RoleWorkspace({
       </ol>
     )
   }
-  function assignmentRoster(p: Project, allowReassign = false, showContacts = isOpm) {
+  function assignmentRoster(p: Project) {
+    const showContacts = isOpm
     const engineerName = (id: string) => state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
     return (
-      <div className={`role-roster${showContacts ? " role-roster-compact" : ""}`}>
+      <div className="role-roster role-roster-compact">
         {p.team.map((t) => {
-          const summary = phaseEngineerSummary(t)
           return (
           <div key={t.phase}>
             <div>
@@ -762,7 +759,7 @@ export default function RoleWorkspace({
                     "Phase responsibility"}
               </small>
             </div>
-            {showContacts ? <div className="site-pm-roster-contacts">
+            <div className="site-pm-roster-contacts">
               {(t.engineers?.length ? t.engineers.map(engineer => engineer.accountId) : t.accountId ? [t.accountId] : []).filter((id, index, ids) => ids.indexOf(id) === index).map(id => {
                 const engineer = t.engineers?.find(person => person.accountId === id)
                 const name = engineerName(id)
@@ -770,52 +767,16 @@ export default function RoleWorkspace({
                 const deadline = engineer?.responseDeadline
                 const overdue = status === "pending" && !!deadline && Date.parse(deadline) <= urgencyNow
                 return <div className="site-pm-roster-contact" key={id}>
-                  <div className="site-pm-roster-person"><button type="button" className="site-pm-roster-name"
+                  <div className="site-pm-roster-person">{showContacts ? <button type="button" className="site-pm-roster-name"
                     aria-label={`View contact details for ${name} in ${t.phase}`}
-                    onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>{name}</button>
+                    onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>{name}</button> : <span className="site-pm-roster-name">{name}</span>}
                     {deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</div>
                   <Status value={overdue ? "response overdue" : status} />
-                  {(status === "declined" || overdue) && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Reassign</Button>}
+                  {showContacts && (status === "declined" || overdue) && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Reassign</Button>}
                 </div>
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}
-            </div> : summary.multiple
-              ? <span>{t.engineers!.map((e) => engineerName(e.accountId)).join(", ")}</span>
-              : <span>{t.accountId ? engineerName(t.accountId) : "Unassigned"}</span>}
-            {!showContacts && <span className="phase-status-cell">
-              <Status value={t.accountId ? summary.status : "unassigned"} />
-              {summary.multiple && summary.waiting > 0 && <small>{waitingLabel(summary.waiting)}</small>}
-            </span>}
-            {allowReassign && !showContacts && !summary.multiple &&
-              t.status !== "confirmed" &&
-              p.status !== "completed" && (
-                <select
-                  aria-label={`Reassign ${p.name} ${t.phase}`}
-                  disabled={saving}
-                  value=""
-                  onChange={async (e) =>
-                    await act(
-                      {
-                        type: "reassign_phase",
-                        projectId: p.id,
-                        phase: t.phase,
-                        accountId: e.target.value,
-                      },
-                      "Phase reassigned; acceptance is required.",
-                    )
-                  }
-                >
-                  <option value="">Reassign phase…</option>
-                  {(() => {
-                    const candidates = spmCandidates(state, p.type, t.phase, p.id)
-                    return candidates.length ? candidates.map((c) => (
-                      <option key={c.account.id} value={c.account.id}>
-                        {c.account.name} · {c.matched}/{c.total} tags
-                      </option>
-                    )) : <option disabled value="__none">No eligible replacement Site PMs</option>
-                  })()}
-                </select>
-              )}
+            </div>
           </div>
           )
         })}
@@ -2979,7 +2940,7 @@ export default function RoleWorkspace({
               </p>
             </div>
           )}
-          {assignmentRoster(p, true, isOpm)}
+          {assignmentRoster(p)}
           {workflowFor(p).responses.length > 0 && (
             <details className="role-details">
               <summary>Response history</summary>
@@ -3664,7 +3625,7 @@ export default function RoleWorkspace({
         {p.status === "pending" && timeline(p)}
         <section className="detail-section">
           <h3>Personnel by phase</h3>
-          {assignmentRoster(p, isOpm && p.status !== "completed")}
+          {assignmentRoster(p)}
         </section>
         {isOpm && p.opmId === actor.id && (
           <section className="detail-section">

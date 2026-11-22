@@ -38,7 +38,7 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
     : undefined
   async function confirm(event: React.FormEvent) {
     event.preventDefault()
-    if (lock.current || done || !data?.canReassign || !selected || !note.trim()) return
+    if (lock.current || done || !data?.canReassign || !selected) return
     lock.current = true; setBusy(true); setError("")
     try {
       await api(`/projects/${project.id}/reassign-offer`, { method: "POST", json: { phase, userId, newUserId: selected, version: data.version, note: note.trim() } })
@@ -72,7 +72,7 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
           </label>)}
         </fieldset>}
         {canChooseReplacement && <>
-          <Field label="Reason for reassignment"><textarea aria-label="Reason for reassignment" value={note} required maxLength={2000} rows={2} disabled={busy || done} onChange={event => setNote(event.target.value)} placeholder="Record the reason and any contact attempts." /></Field>
+          <Field label="Reason for reassignment (optional)"><textarea aria-label="Reason for reassignment" value={note} maxLength={2000} rows={2} disabled={busy || done} onChange={event => setNote(event.target.value)} placeholder="Add a reason or contact notes, if needed." /></Field>
           <div className="reassignment-next"><strong>After you confirm</strong><ul><li>The previous offer closes and stays in history.</li><li>The replacement receives an internal notification and a new three-calendar-day response window.</li><li>The replacement must accept these responsibilities before becoming confirmed.</li></ul></div>
         </>}
       </>}
@@ -81,7 +81,7 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
       <div className="modal-actions">
         <Button disabled={busy} onClick={onClose}>{!done && canChooseReplacement ? "Cancel" : "Close"}</Button>
         {!done && <Button disabled={busy} onClick={() => setReload(previous => previous + 1)}>Refresh Suggestions</Button>}
-        {!done && canChooseReplacement && <Button type="submit" variant="primary" disabled={busy || !selected || !note.trim()}>{busy ? "Sending…" : "Send replacement offer"}</Button>}
+        {!done && canChooseReplacement && <Button type="submit" variant="primary" disabled={busy || !selected}>{busy ? "Sending…" : "Send replacement offer"}</Button>}
       </div>
     </form>
   </Modal>

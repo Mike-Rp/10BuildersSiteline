@@ -66,8 +66,9 @@ export function registerEngineerReassignmentRoutes(router, { endpoint, project, 
     await authorize(db, user, p)
     if (user.role === "opm") await eligible(db, user.id, "opm")
     if (!(await installed(db))) throw new HttpError(409, "Apply database migration 023 first.")
-    const { phase, userId, newUserId, note, version: expected } = req.body || {}
-    if (typeof note !== "string" || !note.trim() || note.length > 10000 || !isUuid(newUserId) || newUserId === userId) throw new HttpError(422, "Select a replacement and provide a reassignment reason.")
+    const { phase, userId, newUserId, note = "", version: expected } = req.body || {}
+    if (!isUuid(newUserId) || newUserId === userId) throw new HttpError(422, "Select a replacement Site PM.")
+    if (typeof note !== "string" || note.length > 10000) throw new HttpError(422, "Reassignment notes must be text of at most 10,000 characters.")
     const row = await offer(db, p.id, phase, userId)
     if (expected !== version(row)) throw new HttpError(409, "This offer has changed. Reload the suggestions and review it again.")
     const clock = new Date((await db.query("select now() as now")).rows[0].now)

@@ -53,4 +53,16 @@ test("OPM monitoring offers per-engineer reassignment using server candidates", 
   assert.equal([...document.querySelectorAll('[role="dialog"]')].at(-1).getAttribute('aria-label'), 'Project monitoring')
   assert.equal(document.querySelectorAll('.site-pm-roster-contact > button[aria-label^="View contact details"]').length, 0)
   assert.ok(document.querySelector('.site-pm-roster-name'))
+  const siteActor = { ...state.accounts.find(account => account.id === "a4"), expiry: "2099-01-01" }
+  w.history.replaceState({}, "", "/spm/active-sites")
+  await act(() => root.render(React.createElement(Workspace, { key: "spm", state, actor: siteActor, onCommand: async () => ({ ok: true }), onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
+  await act(() => document.querySelector('.as-details').click())
+  const siteDesign = [...document.querySelectorAll('.role-roster-compact > div')].find(row => row.querySelector('strong')?.textContent === 'Design')
+  const rows = [...siteDesign.querySelectorAll('.site-pm-roster-contact')]
+  assert.equal(rows.length, 2, 'SPM sees one row per assigned engineer')
+  assert.deepEqual(rows.map(row => row.querySelector('.badge').textContent), ['confirmed', 'declined'])
+  assert.ok(rows.every(row => row.querySelector('.site-pm-roster-person').textContent.trim()))
+  assert.equal(siteDesign.querySelectorAll('button').length, 0, 'SPM personnel rows are read-only')
+  assert.equal(siteDesign.querySelectorAll('.phase-status-cell').length, 0, 'Individual statuses replace the aggregate phase badge')
+
 })
