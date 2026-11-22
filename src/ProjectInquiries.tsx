@@ -27,7 +27,7 @@ const projectTypes = [
 const fields = [
   ["client_name", "Client name", "text"], ["email", "Email", "email"], ["phone", "Phone", "tel"],
   ["name", "Project name", "text"], ["address", "Project address", "text"],
-  ["land_area", "Land area (m²)", "number"], ["lot_area", "Lot area (m²)", "number"],
+  ["lot_area", "Lot area (m²)", "number"],
   ["floor_area_sqm", "Total floor area (m²)", "number"], ["floor_count", "Number of floors", "number"],
 ] as const
 type Details = Record<string, string | number>
@@ -66,7 +66,7 @@ const adminInquiryDraft = { consultation: 30, classification: "Normal", immediat
 const inquiryPlaceholders: Record<string, string> = {
   client_name: "Lastname, FirstName", email: "name@example.com",
   name: "Maple Residence", address: "Street, barangay, city",
-  land_area: "e.g. 300 (optional)", lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
+  lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
 }
 type InquiryOpmCandidate = { id: string; name: string; experience_years: number }
 
@@ -138,7 +138,7 @@ function AdminInquirySummary({ row }: { row: Inquiry }) {
     ? inquiryDate.format(new Date(value)) : "To be determined by Office PM"
   const values = [
     ["Client", details.client_name], ["Contact", details.phone], ["Email", details.email],
-    ["Project type", details.project_type], ["Land area", area(details.land_area)], ["Lot area", area(details.lot_area)],
+    ["Project type", details.project_type], ["Lot area", area(details.lot_area)],
     ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count], ["Location", details.address],
     ["Estimated start", date(row.target_start_date || details.anticipated_start)],
     ["Potential completion", date(row.target_end_date)],
@@ -210,7 +210,7 @@ function staffingIssue(entry: Phase | undefined, required: string[], choices: Ca
     : `Unassigned: ${missing.join(", ")}.`}`
 }
 
-function ContractPreview({ file, fileId, onClose }: { file?: File; fileId?: string; onClose: () => void }) {
+function ContractPreview({ file, fileId, onClose, onConfirm }: { file?: File; fileId?: string; onClose: () => void; onConfirm?: () => void }) {
   const [preview, setPreview] = useState<{ url: string; mime: string }>()
   const [failed, setFailed] = useState(false)
   useEffect(() => {
@@ -228,7 +228,12 @@ function ContractPreview({ file, fileId, onClose }: { file?: File; fileId?: stri
     }).catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
   }, [file, fileId])
-  return <Modal title="Signed contract preview" subtitle={file?.name} wide onClose={onClose}>
+  return <Modal title={onConfirm ? "Confirm signed contract" : "Signed contract preview"} subtitle={file?.name} wide onClose={onClose}
+    footer={onConfirm && <>
+      <button type="button" className="button" onClick={onClose}>Cancel</button>
+      <button type="button" className="button primary" disabled={!preview} onClick={onConfirm}>Confirm this file</button>
+    </>}>
+    {onConfirm && <p>Review the file and confirm it is the signed agreement for this project.</p>}
     {preview ? preview.mime === "application/pdf"
       ? <object className="pdf-preview large" data={`${preview.url}#toolbar=0&navpanes=0`} type="application/pdf" aria-label="Signed contract PDF">
           <p>This browser cannot display the PDF preview.</p>
@@ -239,16 +244,17 @@ function ContractPreview({ file, fileId, onClose }: { file?: File; fileId?: stri
 }
 
 function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: Phase[]; candidates: Record<string, Candidate[]> }) {
-  const people = new Map(Object.values(candidates).flat().map(person => [person.id, person]))
-  const experience = new Map([...people].map(([id, person]) => [id, Number(person.experienceYears ?? 0)]))
-  const eligibleTagsFor = (stage: string, id: string) => candidates[stage]?.find(person => person.id === id)?.qualifiedTags ?? []
+  const phaseCandidate = (stage: string, id: string) => candidates[stage]?.find(person => person.id === id)
+  const firstPhase = candidates[phases[0]] ?? []
+  const experience = new Map(firstPhase.map(person => [person.id, Number(person.experienceYears ?? 0)]))
+  const eligibleTagsFor = (stage: string, id: string) => phaseCandidate(stage, id)?.qualifiedTags ?? []
   const lead = selectInquiryLead(phases, team, experience, eligibleTagsFor)
   const years = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2, style: "unit", unit: "year", unitDisplay: "long" })
   return <section className="inquiry-card inquiry-lineup">
     <h3>Staffing lineup</h3>
     <div className="inquiry-lineup-lead">
       {lead ? <>
-        <strong>Proposed Lead SPM · {people.get(lead.id)?.name || "Site PM"}</strong>
+        <strong>Proposed Lead SPM · {phaseCandidate(lead.stage, lead.id)?.name || "Site PM"}</strong>
         <p>{lead.stage} · {years.format(lead.years)} of relevant experience</p>
         <p><span className="inquiry-pill ready">Phase requirement matched</span> {lead.tags.join(", ")}</p>
       </> : <p>Assign an eligible Site PM to the first included phase to propose a lead.</p>}
@@ -260,13 +266,17 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
           const entry = team.find(item => item.stage === stage)
           const assigned = entry?.engineers ?? (entry?.user_id ? [{ user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines }] : [])
           if (!assigned.length) return <tr key={stage}><td>{stage}</td><td colSpan={4}>Unfilled</td></tr>
-          return assigned.map(({ user_id: id, assigned_disciplines }) => {
+          const ordered = lead?.stage === stage
+            ? [...assigned.filter(person => person.user_id === lead.id), ...assigned.filter(person => person.user_id !== lead.id)]
+            : assigned
+          return ordered.map(({ user_id: id, assigned_disciplines }) => {
             const isLead = lead?.id === id && lead.stage === stage
+            const person = phaseCandidate(stage, id)
             const designation = entry?.user_id === id && lead?.stage !== stage ? "Phase coordinator" : "Phase SPM"
             const tags = matchingInquiryTags(assigned_disciplines, eligibleTagsFor(stage, id))
             return <tr key={`${stage}:${id}`} data-lead={isLead}>
-              <td>{stage}</td><td>{people.get(id)?.name || "Site PM"}</td>
-              <td>{years.format(experience.get(id) ?? 0)}</td>
+              <td>{stage}</td><td>{person?.name || "Site PM"}</td>
+              <td>{person?.experienceYears == null ? "—" : years.format(Number(person.experienceYears))}</td>
               <td>{tags.length ? <><span className="inquiry-pill ready">Matched</span> {tags.join(", ")}</> : <span className="inquiry-pill pending">Matching tag needed</span>}</td>
               <td>{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
             </tr>
@@ -274,7 +284,7 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
         })}</tbody>
       </table>
     </div>
-    <p className="inquiry-muted">Qualified assignments are ranked by relevant project-type experience. Ties use phase order, then account ID. The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
+    <p className="inquiry-muted">The Lead is the eligible engineer assigned to the first included phase with the most relevant project-type experience. Ties use account ID. The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
   </section>
 }
 
@@ -305,6 +315,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
     return owner ? [[area, owner.name] as const] : []
   }))
   const missing = required.filter(area => !owners.has(area))
+  const withoutEligibleMatch = new Set(missing.filter(area => !choices.some(candidate => candidate.qualifiedTags.includes(area))))
   const quota = phaseCoverageQuota(required)
   const coverage = required.length - missing.length
   const update = (next: Engineer[]) => onChange({
@@ -340,7 +351,11 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
     <div className="inquiry-staff-heading"><h3>{stage}</h3>
       {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} scopes covered · minimum {quota}</span>}
     </div>
-    {missing.length > 0 && <p className="inquiry-coverage-warning"><strong>{missing.length} coverage {missing.length === 1 ? "gap" : "gaps"} in {stage}.</strong> Still needed: {missing.join(", ")}</p>}
+    {missing.length > 0 && <p className="inquiry-coverage-warning"><strong>{missing.length} uncovered {missing.length === 1 ? "scope" : "scopes"} in {stage}.</strong>
+      {withoutEligibleMatch.size > 0 && <> No eligible Site PM found for {Array.from(withoutEligibleMatch).join(", ")}.</>}
+      {multi && coverage >= quota && <> The phase meets its minimum coverage of {quota}.</>}
+      {withoutEligibleMatch.size > 0 && <><br /><button type="button" className="button" onClick={onRecheck}>Recheck eligibility</button></>}
+    </p>}
     <div className={`inquiry-staff-layout${required.length ? " with-coverage" : ""}`}>
     {(required.length > 0 || newScopes.length > 0) && <aside className="inquiry-summary-card inquiry-phase-coverage">
       <h4>Phase scope coverage</h4>
@@ -348,7 +363,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
         const owner = owners.get(area)
         return <li key={area} className={owner ? "covered" : "gap"}>
           <Icon name={owner ? "check" : "alert"} size={16} />
-          <span>{area}</span><strong>{owner || "Unassigned"}</strong>
+          <span>{area}</span><strong>{owner || (withoutEligibleMatch.has(area) ? "No eligible Site PM found" : "Unassigned")}</strong>
         </li>
       })}</ul>
       {newScopes.length > 0 && <div className="inquiry-form-stack">
@@ -367,12 +382,15 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
         onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
     </div>
     {!engineers.length && <p>Unfilled</p>}
+    {atLimit && missing.some(area => !withoutEligibleMatch.has(area)) && <p className="inquiry-muted">
+      This phase has reached its assignment limit. Update the current engineers’ responsibilities or replace an engineer to cover another scope.
+    </p>}
     {!atLimit && !addOptions.length && <div id="inquiry-add-engineer-help" className="inquiry-candidate-help">
       <p>{choices.length
         ? "No additional Site PM is eligible for an uncovered responsibility in this phase."
         : blocker ? noEligibleMessage[blocker] : "No eligible Site PM is available for this phase."}</p>
       {missing.length > 0 && <p>Uncovered: <strong>{missing.join(", ")}</strong></p>}
-      {!choices.length && <button className="button" type="button" onClick={onRecheck}>Recheck eligibility</button>}
+      {!choices.length && !withoutEligibleMatch.size && <button className="button" type="button" onClick={onRecheck}>Recheck eligibility</button>}
     </div>}
     <div className="inquiry-engineers">
       {engineers.map((person, index) => {
@@ -395,7 +413,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
                   onChange={() => update(engineers.map(other => other === person ? {
                     ...person, assigned_disciplines: checked ? person.assigned_disciplines.filter(tag => tag !== area) : [...person.assigned_disciplines, area],
                   } : other))} />
-                <span>{area}{!qualified && <small>No eligible qualification for this area</small>}{qualified && alreadyAssigned && <small>Assigned to another engineer</small>}</span>
+                <span>{area}{!qualified && <small>This engineer has no verified match for this scope</small>}{qualified && alreadyAssigned && <small>Assigned to another engineer</small>}</span>
               </label>
             })}
           </fieldset>}
@@ -462,6 +480,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
   const [contract, setContract] = useState<File>()
+  const [pendingContract, setPendingContract] = useState<File>()
   const contractInput = useRef<HTMLInputElement>(null)
   const [contractPreviewOpen, setContractPreviewOpen] = useState(false)
   const [contractFileId, setContractFileId] = useState<string>()
@@ -556,6 +575,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setTeam([])
     setPhases([])
     setContract(undefined)
+    setPendingContract(undefined)
     setContractFileId(undefined)
     setError("")
     setStep(2)
@@ -565,6 +585,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   function closeDialog() {
     if (busy) return
     setContractPreviewOpen(false)
+    setPendingContract(undefined)
     setDialog(undefined)
     setError("")
   }
@@ -853,7 +874,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               </div>
             </fieldset>
             <div className="admin-inquiry-form-grid admin-inquiry-measurements">
-              {input("land_area", "Land area (m²)", "number", false)}
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
@@ -1182,17 +1202,20 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <input ref={contractInput} type="file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
                 const file = event.target.files?.[0]
                 if (!file) return
-                setContract(file)
-                setContractFileId(undefined)
-                setPlanning({ ...planning, candidates: undefined })
-                setTeam([])
+                event.target.value = ""
+                if (!file.size || !/\.(pdf|png|jpe?g)$/i.test(file.name)) {
+                  setError("Choose a nonempty PDF, PNG, or JPEG signed contract.")
+                  return
+                }
+                setError("")
+                setPendingContract(file)
               }} />
               <button type="button" className="button primary" onClick={() => contractInput.current?.click()}>
                 <Icon name="upload" size={17} />{contract || contractFileId ? "Replace signed contract" : "Upload signed contract"}
               </button>
               {(contract || contractFileId) && <div className="inquiry-sent-notice inquiry-contract-preview">
                 <span className="inquiry-list-icon"><Icon name="doc" /></span>
-                <div><strong>{contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract attached</small></div>
+                <div><strong>{contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract confirmed</small></div>
                 <button type="button" className="button" onClick={() => setContractPreviewOpen(true)}>View contract</button>
               </div>}
             </FormSection>
@@ -1228,6 +1251,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         {feedback}
       </div>
     </Modal>}
+    {dialog === "intake" && pendingContract && <ContractPreview file={pendingContract} onClose={() => setPendingContract(undefined)}
+      onConfirm={() => {
+        setContract(pendingContract)
+        setPendingContract(undefined)
+        setContractFileId(undefined)
+        setPlanning(current => current && { ...current, candidates: undefined })
+        setTeam([])
+      }} />}
     {dialog === "intake" && contractPreviewOpen && <ContractPreview file={contract} fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
     {admin && adminPage === "new" && renderAdminInquiryForm()}
     {!dialog && !officePage && adminPage !== "new" && feedback}

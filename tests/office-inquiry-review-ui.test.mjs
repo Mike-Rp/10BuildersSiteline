@@ -15,12 +15,18 @@ test("proposal approval opens mandatory review with live size and inline validat
   }
   let submitted
   let staffingRequest
+  const uploadedContracts = []
   const supplemental = "Power Systems Engineering"
   const globals = new Map()
   for (const [key, value] of Object.entries({
     window, document: window.document, HTMLElement: window.HTMLElement, Node: window.Node, IS_REACT_ACT_ENVIRONMENT: true,
     fetch: async (url, init) => {
       const path = String(url)
+      if (path.endsWith("/files/upload-url")) return Response.json({ data: { mode: "database" } })
+      if (path.endsWith("/files")) {
+        uploadedContracts.push(init.body.get("file").name)
+        return Response.json({ data: {} })
+      }
       if (path.endsWith("/decision")) {
         assert.equal(JSON.parse(init.body).action, "approve")
         inquiry = { ...inquiry, status: "approved" }
@@ -48,13 +54,19 @@ test("proposal approval opens mandatory review with live size and inline validat
       if (path.endsWith("/planning")) {
         const input = JSON.parse(init.body)
         staffingRequest = input
-        const scopes = ["Structural Engineering", ...(input.additional_scopes?.Design ?? [])]
+        const scopes = ["Structural Engineering", "Mechanical", "Acoustic", ...(input.additional_scopes?.Design ?? [])]
         return Response.json({ data: {
           phases: ["Design"], estimate: { size: "Medium", end: submitted.end },
           staffing: { assessment_id: "assessment", phases: ["Design"], contract_file_id: "contract", additional_scopes: input.additional_scopes },
           ...(input.phases && { additional_scope_options: { Design: [supplemental] },
-            team: [{ stage: "Design", user_id: "ana", required_specializations: scopes, engineers: [{ user_id: "ana", assigned_disciplines: ["Structural Engineering"] }] }],
-            candidates: { Design: [{ id: "ana", name: "Ana Reyes", qualifiedTags: ["Structural Engineering"] }] },
+            team: [{ stage: "Design", user_id: "ana", required_specializations: scopes, engineers: [
+              { user_id: "ana", assigned_disciplines: ["Structural Engineering"] },
+              { user_id: "kurt", assigned_disciplines: ["Mechanical"] },
+            ] }],
+            candidates: { Design: [
+              { id: "ana", name: "Ana Reyes", qualifiedTags: ["Structural Engineering"], experienceYears: 0 },
+              { id: "kurt", name: "Kurt Gonzales", qualifiedTags: ["Mechanical"], experienceYears: 2 },
+            ] },
           }),
         } })
       }
@@ -93,10 +105,13 @@ test("proposal approval opens mandatory review with live size and inline validat
   })
   await act(() => root.render(React.createElement(ProjectInquiries, { role: "opm", onReload() {} })))
   await click(document.querySelector('button[aria-label$="for Maple Residence"]'))
+  assert.equal(document.querySelectorAll(".record-cards > .office-workflow-card").length, 2)
+  assert.doesNotMatch(document.querySelector(".record-cards").textContent, /Land area/i)
   await click(button("Open proposal"))
   await click(button("Mark proposal approved"))
   assert.match(document.querySelector(".office-review-toast").textContent, /Proposal approved/)
   const measurements = document.querySelector('section[aria-labelledby="inquiry-review-measurements"]')
+  assert.equal(document.querySelector("#inquiry-review-land_area"), null)
   assert.ok(measurements.closest(".office-review-form"))
   assert.ok(measurements.querySelector(".office-floor-estimate"))
   assert.equal(document.querySelector(".office-review-size strong").textContent, "Small")
@@ -156,6 +171,8 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.deepEqual(submitted.floorMeasurements, { mode: "individual", areas: [100, 80] })
   assert.equal(submitted.amount, "5000000")
   assert.match(document.querySelector(".office-workflow h1").textContent, /Assess project size/)
+  assert.match(document.querySelector(".office-assessment-basis").textContent, /View score breakdown/)
+  assert.ok([...document.querySelectorAll(".office-assessment-basis")].some(node => node.textContent.includes("View duration calculation")))
 
   await click(button("Project information & budget"))
   await click(button("Edit project information"))
@@ -166,7 +183,27 @@ test("proposal approval opens mandatory review with live size and inline validat
   await click(button("Continue to assessment"))
   await click(button("Complete assessment"))
   await click(button("Continue to construction phases"))
+  const chooseContract = name => act(async () => {
+    const input = document.querySelector('input[type="file"]')
+    Object.defineProperty(input, "files", { value: [new File(["contract"], name, { type: "application/pdf" })], configurable: true })
+    input.dispatchEvent(new window.Event("change", { bubbles: true }))
+  })
+  await chooseContract("discarded.pdf")
+  const confirmation = () => document.querySelector('[aria-label="Confirm signed contract"]')
+  assert.match(confirmation().textContent, /discarded.pdf/)
+  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
+  assert.deepEqual(uploadedContracts, [])
+  await chooseContract("signed.pdf")
+  assert.match(confirmation().textContent, /signed.pdf/)
+  await click(button("Confirm this file"))
+  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
+  await chooseContract("replacement.pdf")
+  await click(confirmation().querySelector('[aria-label="Close dialog"]'))
+  assert.match(document.querySelector(".inquiry-contract-preview").textContent, /signed.pdf.*Contract confirmed/)
   await click(button("Continue to staffing"))
+  assert.deepEqual(uploadedContracts, ["signed.pdf"])
+  assert.match(document.querySelector(".inquiry-lineup-table tbody tr:first-child").textContent, /Kurt Gonzales.*2 years.*Lead SPM/)
+  assert.match(document.querySelector(".inquiry-coverage-warning").textContent, /No eligible Site PM found for Acoustic.*meets its minimum coverage of 2/)
   assert.match(document.body.textContent, /Technical requirements · Extensive specialized systems/)
   assert.match(document.body.textContent, /Phase arrangement · Partially overlapping phases/)
   await select("Additional engineering scope", supplemental)

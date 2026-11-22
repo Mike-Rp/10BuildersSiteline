@@ -4,7 +4,7 @@ import { addDays } from "./model"
 import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -47,10 +47,9 @@ function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
   }
 }
 
-const additionalFields = [["land_area", "Land area (m²)"], ...clientFields] as const
-const correctionFields = [...projectFields, ...additionalFields]
+const correctionFields = [...projectFields, ...clientFields]
 const fieldId = (key: string) => `inquiry-review-${key}`
-const numericField = (key: string) => /^(land_area|lot_area|floor_area_sqm|floor_count)$/.test(key)
+const numericField = (key: string) => /^(lot_area|floor_area_sqm|floor_count)$/.test(key)
 const fieldValue = (key: string, value: Details[string] | null | undefined) => {
   const text = String(value ?? "").trim()
   return numericField(key) && text ? Number(text) : text
@@ -63,6 +62,7 @@ const today = () => new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZ
 const latestInquiryStart = addDays("9999-12-31", -MIN_INQUIRY_DURATION_DAYS)
 const formatDay = (value: string) => date.format(new Date(value))
 const amount = (value: string | number | undefined) => value ?? "Not provided"
+const assessmentNumber = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 4 })
 const durationLabel = (days: number) => {
   const months = Math.ceil(days / 30)
   const years = Math.floor(months / 12)
@@ -150,12 +150,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   if (row.details.primary_contact) clientFacts.push(["Primary contact", row.details.primary_contact])
   const projectFacts: [string, string | number][] = [
     ...projectFields.filter(([key]) => key !== "name").map(([key, label]): [string, string | number] => [label, amount(row.details[key])]),
-    ["Land area (m²)", amount(row.details.land_area)],
     ["Estimated start", review ? formatDay(review.start) : row.details.anticipated_start ? formatDay(String(row.details.anticipated_start)) : "Not provided"],
     ["Estimated completion", review ? formatDay(review.end) : "Not provided"],
     ["Classification", row.details.classification || "Normal"],
   ]
   const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
+  const currentEstimate = page === "assessment" && review && preview &&
+    (assessment ? assessInquiry(row.details, review.start, review.end, preview.technical, preview.arrangement) : preview)
+  const assessmentBasis = currentEstimate && preview && currentEstimate.size === preview.size && currentEstimate.score === preview.score &&
+    currentEstimate.complexity === preview.complexity && currentEstimate.planningDays === preview.planningDays &&
+    currentEstimate.durationMultiplier === preview.durationMultiplier
+    ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement) : undefined
   const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
   const reviewing = editing || !review
@@ -229,9 +234,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       : <input {...describedField(id, helper)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
           max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
-          required={key !== "land_area"} value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
+          required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)} />}
       {helper && <div className="office-review-field-helper" id={helper}>
-        {changed && <span>Admin: {amount(original[key] ?? undefined)}{original[key] != null && ["land_area", "lot_area", "floor_area_sqm"].includes(key) ? " m²" : ""}</span>}
+        {changed && <span>Admin: {amount(original[key] ?? undefined)}{original[key] != null && ["lot_area", "floor_area_sqm"].includes(key) ? " m²" : ""}</span>}
       </div>}
       {inlineError(id)}
     </div>
@@ -282,7 +287,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       floorMeasurements: calculatedArea.measurements,
       ...(hasCorrections ? { correction: measuredDraft } : {}), ...(needsReason ? { reason } : {}) })
   }
-  const recordCards = <div className="office-workflow-grid">
+  const recordCards = <div className="office-workflow-grid record-cards">
     <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>
     <Card title="Project information" icon="building"><Facts values={projectFacts} />
       {row.details.overview && <p>{row.details.overview}</p>}
@@ -475,8 +480,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             </div>
           </section>
           <details className="office-review-additional">
-            <summary>Client information and land area</summary>
-            <div className="office-workflow-fields">{additionalFields.map(([key, label]) => editField(key, label))}</div>
+            <summary>Client information</summary>
+            <div className="office-workflow-fields">{clientFields.map(([key, label]) => editField(key, label))}</div>
           </details>
           {needsReason && <div>
             <label htmlFor={fieldId("reason")}>Reason for changes</label>
@@ -570,9 +575,12 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </Notice>}
     <div className="office-workflow-grid assessment">
       <Card title="Project size classification" icon="building">
-        <Facts values={[["Lot area (m²)", row.details.lot_area], ["Floor area (m²)", row.details.floor_area_sqm], ["Floors", row.details.floor_count]]} />
+        <Facts values={[["Project type", row.details.project_type], ["Lot area (m²)", row.details.lot_area], ["Total floor area (m²)", row.details.floor_area_sqm], ["Floors", row.details.floor_count]]} />
         <div className="office-workflow-result"><strong>{preview.size}</strong>
-          <p>{preview.planningDays != null ? "Uses the higher size category from lot area and total floor area." : "Size recorded when this assessment was completed."}</p></div>
+          <p>{assessmentBasis ? "Uses the higher size category from the reviewed lot area and total floor area."
+            : "Size recorded when this assessment was completed."}</p>
+          {assessmentBasis?.size === "Large" && <p>Large if the lot exceeds {assessmentNumber.format(assessmentBasis.medium[0])} m² or the total floor area exceeds {assessmentNumber.format(assessmentBasis.medium[1])} m² for this project type.</p>}
+        </div>
       </Card>
       <Card title="Complexity classification" icon="doc">
         <fieldset className="office-workflow-form" disabled={busy || !!assessment}>
@@ -580,16 +588,27 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>{arrangementOptions.map(option => <option key={option}>{option}</option>)}</select></label>
         </fieldset>
         <div className="office-workflow-result"><span>Complexity score · {preview.score}/15</span><strong>{preview.complexity}</strong>
-          <p>Planning score based on project type, size, floors, technical systems, and phase overlap.</p></div>
+          {assessmentBasis ? <details className="office-assessment-basis"><summary>View score breakdown</summary>
+            <Facts values={[
+              ["Project type", assessmentBasis.typePoints], ["Project size", assessmentBasis.sizePoints],
+              ["Number of floors", assessmentBasis.floorPoints], ["Technical requirements", assessmentBasis.technicalPoints],
+              ["Phase arrangement", assessmentBasis.overlapPoints],
+            ]} />
+            <p>Low is up to 7 points, Moderate is 8–11, and High is 12–15.</p>
+          </details> : <p>Planning score recorded when this assessment was completed.</p>}</div>
       </Card>
       <Card title="Estimated project duration" icon="calendar">
         <div className="office-workflow-result duration">
-          {preview.planningDays != null && <><strong>{durationLabel(preview.planningDays)}</strong>
+          {preview.planningDays != null && <><strong>About {durationLabel(preview.planningDays)}</strong>
             <span>{preview.planningDays.toLocaleString("en-PH")} estimated calendar days</span></>}
           {preview.durationMultiplier != null && <p>Schedule multiplier ×{Number(preview.durationMultiplier.toFixed(3))}</p>}
           {preview.suggestedEnd && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
           <p>Reviewed schedule: {formatDay(review.start)} – {formatDay(review.end)} ({preview.durationDays.toLocaleString("en-PH")} calendar days)</p>
         </div>
+        {assessmentBasis && <details className="office-assessment-basis"><summary>View duration calculation</summary>
+          <p>({assessmentNumber.format(Number(row.details.floor_area_sqm))} m² × {assessmentBasis.rate} days/m² + {assessmentNumber.format(assessmentBasis.extraFloorDays)} days for floors above the first) × {assessmentBasis.complexityFactor} × {assessmentBasis.overlapFactor}, rounded up.</p>
+          <p>The ×{assessmentBasis.complexityFactor} factor reflects {assessmentBasis.baselineComplexity.toLowerCase()} complexity before adding overlap points. The ×{assessmentBasis.overlapFactor} factor reflects the selected phase arrangement.</p>
+        </details>}
         {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>Choose construction phases to continue to Site PM staffing.</p></Notice>}
       </Card>
     </div></>}

@@ -3524,7 +3524,6 @@ export default function RoleWorkspace({
                 <h3>Project information</h3>
                 <dl className="site-offer-facts">
                   <div><dt>Project type</dt><dd>{project.type || "Not provided"}</dd></div>
-                  <div><dt>Land area</dt><dd>{areaLabel(inquiry?.land_area)}</dd></div>
                   <div><dt>Lot area</dt><dd>{areaLabel(inquiry?.lot_area)}</dd></div>
                   <div><dt>Total floor area</dt><dd>{project.area ? `${project.area} m²` : "Not provided"}</dd></div>
                   <div><dt>Number of floors</dt><dd>{project.floors || "Not provided"}</dd></div>

@@ -37,8 +37,9 @@
 .office-workflow-heading p, .office-workflow-card p { color: var(--color-muted); }
 .office-workflow-heading .inquiry-muted { font-size: .85rem; }
 .office-workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.office-workflow-grid.record-cards { align-items: stretch; }
 .office-workflow-grid.assessment { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
-.office-workflow-grid.assessment > .office-workflow-card { align-content: start; }
+.office-workflow-grid:is(.assessment, .record-cards) > .office-workflow-card { align-content: start; }
 .office-workflow-card { display: grid; gap: 14px; padding: clamp(14px, 2vw, 24px); border-color: var(--color-line); box-shadow: 0 2px 6px #172b4d09; }
 .office-workflow-card .inquiry-section-heading { padding-bottom: 10px; border-bottom: 1px solid var(--color-line); }
 .office-workflow-card h2 { font-size: 1.14rem; }
@@ -67,6 +68,8 @@
 .office-workflow-result span { color: #236b68; font-size: .85rem; font-weight: 650; }
 .office-workflow-result p { font-size: .88rem; }
 .office-workflow-result.duration { text-align: center; padding-block: 22px; }
+.office-assessment-basis summary { cursor: pointer; font-weight: 600; }
+.office-assessment-basis > :not(summary) { margin-block-start: 8px; }
 .office-workflow-history { border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; background: var(--surface-subtle); }
 .office-workflow-history summary { cursor: pointer; font-weight: 600; }
 .office-workflow-history :is(ul, ol) { padding-inline-start: 20px; overflow-wrap: anywhere; }
@@ -148,7 +151,7 @@
 .admin-inquiry-page .inquiries-page-heading h1 { font-size: clamp(1.85rem, 3.5vw, 2.65rem); }
 .admin-inquiry-submission { --inquiry-panel-padding: 16px; display: grid; gap: 14px; }
 .admin-inquiry-project-identity { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.admin-inquiry-submission .admin-inquiry-measurements { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-inquiry-submission .admin-inquiry-measurements { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .admin-inquiry-project-types { min-width: 0; }
 .admin-inquiry-project-types legend { margin-bottom: 10px; }
 #root .admin-inquiry-project-types .project-type-card { cursor: pointer; gap: 8px; padding: 12px 15px; border-radius: 12px; }
