@@ -12,6 +12,9 @@ export function inquiryAssessmentBasis(details: Record<string, string | number>,
   medium: [number, number]; extraFloorDays: number;
 };
 export function earliestInquiryCompletion(start: string, estimate: { suggestedEnd: string | null }): string | null;
+export function inquiryAssessmentReady(details: Record<string, string | number>, workflow?: {
+  assessment?: unknown; budget?: number; review?: { start: string; end: string; technical?: string; arrangement?: string };
+}): boolean;
 export function assessInquiry(
   details: Record<string, string | number>,
   start: string, end: string, technical: string, arrangement: string,

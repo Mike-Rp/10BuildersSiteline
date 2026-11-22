@@ -13,6 +13,7 @@ import type { IntakeView } from "./intake-guidance"
 import { phaseCoverageQuota } from "./phase-coverage-policy"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
+import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
@@ -497,6 +498,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [opmPreview, setOpmPreview] = useState<{ type: string; candidates?: InquiryOpmCandidate[]; error?: string }>()
   const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
+  const intakeLocked = row?.status === "approved" && inquiryAssessmentReady(row.details, row.workflow)
+  const displayedOfficePage = officePage && intakeLocked ? "assessment" : officePage
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
@@ -629,13 +632,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       setPhases([])
       setTeam([])
     }
-    if (action === "review" && updated.workflow?.review && updated.workflow.budget) navigateOffice("assessment")
+    if ((action === "review" || action === "budget") && inquiryAssessmentReady(updated.details, updated.workflow)) navigateOffice("assessment")
   }
   function openOfficeInquiry(item: Inquiry) {
     open(item)
     if (item.status === "offered") navigateOffice("pending")
     else if (item.status === "consulting") navigateOffice("proposal")
-    else if (item.status === "approved") navigateOffice(item.workflow?.assessment ? "assessment" : "review")
+    else if (item.status === "approved") navigateOffice(inquiryAssessmentReady(item.details, item.workflow) ? "assessment" : "review")
     else setDialog("details")
   }
   async function startStaffing() {
@@ -648,7 +651,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setDialog("intake")
   }
   async function allocate(recheck = false) {
-    if (!contractFileId) throw new Error("Attach the signed client contract agreement in Project information.")
+    if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const additional = planning?.staffing?.additional_scopes
     const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: contractFileId,
       ...(additional ? { additional_scopes: Object.fromEntries(Object.entries(additional).filter(([stage]) => phases.includes(stage))) } : {}),
@@ -687,7 +690,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setTeam([])
   }
   async function submit() {
-    if (!contractFileId) throw new Error("Attach the signed client contract agreement in Project information.")
+    if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: contractFileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
@@ -995,8 +998,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
     {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
-    {officePage && row && !admin
-      ? <OfficeInquiryWorkflow key={`${row.id}:${officePage}`} row={row} page={officePage} reference={inquiryReference(row)}
+    {displayedOfficePage && row && !admin
+      ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
@@ -1013,9 +1016,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               setError("")
               setPendingContract({ file })
             }} />
-            <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
+            {(!intakeLocked || !contractFileId) && <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
               <Icon name="upload" size={17} />{contractFileId ? "Replace signed contract" : "Upload signed contract"}
-            </button>
+            </button>}
             {contractFileId && <div className="inquiry-sent-notice inquiry-contract-preview">
               <span className="inquiry-list-icon"><Icon name="doc" /></span>
               <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract confirmed</small></div>

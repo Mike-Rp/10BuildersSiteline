@@ -4,7 +4,7 @@ import { addDays, initials } from "./model"
 import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -140,7 +140,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
 
   const name = String(row.details.name || "Project inquiry")
   const accepted = row.status === "approved"
-  const assessmentAvailable = accepted && Boolean(workflow?.budget && review)
+  const assessmentAvailable = accepted && inquiryAssessmentReady(row.details, workflow)
   const title = {
     pending: "Pending inquiry", received: pendingCount ? "Inquiry accepted" : "No pending inquiries", accepted: name,
     proposal: "Client proposal", review: "Edit project information", assessment: "Project assessment",
@@ -308,11 +308,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["assessment", "Project assessment", assessmentAvailable, Boolean(assessment)],
   ] as const
   const workflowNav = <nav className="office-workflow-nav office-intake-record-nav" aria-label="Inquiry workflow">
-    {steps.map(([key, label, enabled, complete], index) => <button type="button" className="button" key={key}
-      disabled={busy || !enabled} aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>
-      <span className="office-intake-step-marker" data-complete={complete} aria-hidden="true">{complete ? <Icon name="check" size={14} /> : index + 1}</span>
-      <span><strong>{label}</strong><small>{page === key ? "Viewing now" : complete ? "Complete" : enabled ? "Available" : "Unavailable"}</small></span>
-    </button>)}
+    {steps.map(([key, label, enabled, complete], index) => {
+      const locked = assessmentAvailable && key !== "assessment"
+      return <button type="button" className="button" key={key} disabled={busy || !enabled || locked}
+        aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>
+        <span className="office-intake-step-marker" data-complete={complete} aria-hidden="true">{complete ? <Icon name="check" size={14} /> : index + 1}</span>
+        <span><strong>{label}</strong><small>{locked ? "Complete · Locked" : page === key ? "Viewing now" : complete ? "Complete" : enabled ? "Available" : "Unavailable"}</small></span>
+      </button>
+    })}
   </nav>
 
   return <div className={`office-workflow${compactReview ? " office-review-compact" : ""}`}>
@@ -623,7 +626,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           </details>
           <div className="office-workflow-actions office-workflow-action-bar">
             {budgetSaved
-              ? <button type="button" className="button primary" onClick={() => navigate("assessment")}>Continue to assessment</button>
+              ? <p className="inquiry-muted">Update the reviewed schedule to continue to assessment.</p>
               : <button type="submit" className="button primary">Save allocated budget</button>}
           </div>
           </Card>
@@ -644,16 +647,19 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     <header className="office-intake-section-heading">
       <div><h2>{title}</h2><p className="inquiry-muted">{descriptions.assessment}</p></div>
       {assessment
-        ? <button type="button" className="button primary" disabled={busy} onClick={hasSignedContract ? startStaffing : () => navigate("review")}>
-            {hasSignedContract ? "Continue to construction phases" : "Attach signed contract"}</button>
+        ? hasSignedContract && <button type="button" className="button primary" disabled={busy} onClick={startStaffing}>
+            Continue to construction phases</button>
         : <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
             onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
     </header>
     {assessmentNeedsDates && <Notice tone="warning">
       <p>{minimumReviewedEnd
         ? `This assessment requires a completion date of ${formatDay(minimumReviewedEnd)} or later.`
-        : "The estimated completion is outside the supported date range."} Review the requirements and estimated dates in Project information.</p>
-      <button type="button" className="button" onClick={() => navigate("review")}>Review project information</button>
+        : "The estimated completion is outside the supported date range."} Choose assessment settings that fit the saved schedule.</p>
+      <button type="button" className="button" onClick={() => {
+        setTechnical(review.technical ?? technicalOptions[0])
+        setArrangement(review.arrangement ?? arrangementOptions[0])
+      }}>Restore reviewed settings</button>
     </Notice>}
     <div className="office-workflow-grid assessment">
       <Card title="Project size classification" icon="building" assessmentMetric="size">
@@ -715,8 +721,12 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <p>({assessmentNumber.format(Number(row.details.floor_area_sqm))} m² × {assessmentBasis.rate} days/m² + {assessmentNumber.format(assessmentBasis.extraFloorDays)} days for floors above the first) × {assessmentBasis.complexityFactor} × {assessmentBasis.overlapFactor}, rounded up.</p>
           <p>The ×{assessmentBasis.complexityFactor} factor reflects {assessmentBasis.baselineComplexity.toLowerCase()} complexity before adding overlap points. The ×{assessmentBasis.overlapFactor} factor reflects the selected phase arrangement.</p>
         </details>}
-        {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>Choose construction phases to continue to Site PM staffing.</p></Notice>}
+        {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>{hasSignedContract
+          ? "Choose construction phases to continue to Site PM staffing."
+          : "Attach the signed client contract below to continue to Site PM staffing."}</p></Notice>}
       </Card>
-    </div></>}
+    </div>
+    {signedContract}
+    </>}
   </div>
 }

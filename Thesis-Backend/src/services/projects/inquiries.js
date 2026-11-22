@@ -7,7 +7,7 @@ import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
-import { assessInquiry, earliestInquiryCompletion, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -287,10 +287,15 @@ export function mountInquiries(router) {
     const workflow = { ...details.opm_workflow };
     if ((workflow.review?.version ?? 0) !== input.version)
       throw new HttpError(409, "The project record changed. Reopen the inquiry to load the latest version.");
+    const intakeLocked = inquiryAssessmentReady(details, workflow);
+    if (intakeLocked && (input.action === "review" || input.action === "budget"))
+      throw new HttpError(409, "Project information and budget are locked once project assessment is available.");
     const audit = { by: actor.id, at: new Date().toISOString() };
     switch (input.action) {
       case "contract": {
         const previousId = workflow.signed_contract?.id ?? workflow.staffing?.contract_file_id ?? null;
+        if (intakeLocked && previousId)
+          throw new HttpError(409, "The confirmed client contract is locked once project assessment is available.");
         if ((input.expected_contract_file_id ?? null) !== previousId)
           throw new HttpError(409, "The signed contract changed. Refresh the inquiry before replacing it.");
         const file = await assertInquiryUpload(db, actor.id, input.contract_file_id, true);
@@ -349,7 +354,8 @@ export function mountInquiries(router) {
         break;
       }
       case "assessment": {
-        if (!workflow.review || !workflow.budget) throw new HttpError(409, "Confirm project information and save the approved budget first.");
+        if (!workflow.review || !workflow.budget || !intakeLocked)
+          throw new HttpError(409, "Confirm the project schedule and save the approved budget first.");
         if (!technicalOptions.includes(input.technical) || !arrangementOptions.includes(input.arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const { start, end } = workflow.review;

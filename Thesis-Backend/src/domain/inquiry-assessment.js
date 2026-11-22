@@ -86,3 +86,13 @@ export function earliestInquiryCompletion(start, estimate) {
   const minimumDate = minimum.toISOString().slice(0, 10);
   return estimate.suggestedEnd > minimumDate ? estimate.suggestedEnd : minimumDate;
 }
+
+export function inquiryAssessmentReady(details, workflow) {
+  if (workflow?.assessment) return true;
+  const review = workflow?.review;
+  if (!review || !workflow.budget) return false;
+  const estimate = assessInquiry(details, review.start, review.end,
+    review.technical ?? technicalOptions[0], review.arrangement ?? arrangementOptions[0]);
+  const minimum = earliestInquiryCompletion(review.start, estimate);
+  return !!minimum && review.end >= minimum;
+}
