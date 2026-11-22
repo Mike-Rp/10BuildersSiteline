@@ -58,3 +58,7 @@
 #root .monitor-client { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 12px; color: var(--color-muted); font-size: 14px; line-height: 1.5; }
 #root .monitor-client svg { flex-shrink: 0; margin-top: 2px; }
 #root .monitor-client > span { min-width: 0; overflow-wrap: anywhere; }
+
+.site-offer-phase-choice { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.site-offer-phase-choice input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: #193b55; }
+.site-offer-response { margin-top: 16px; }

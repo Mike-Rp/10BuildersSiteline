@@ -92,6 +92,19 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
     const project = state.projects.find(p => p.id === id);
     if (!project)
         throw new Error("Project not found.");
+    if (command.phases && ["accept_assignment", "decline_assignment"].includes(command.type)) {
+        if (!command.phases.length) throw new Error("Select at least one phase.");
+        let completed = 0;
+        try {
+            for (const phase of new Set(command.phases)) {
+                await sendApiWorkflow(state, actor, { ...command, phases: undefined, phase });
+                completed++;
+            }
+        } catch (error) {
+            throw new Error(completed + " selected phase responses saved. " + (error as Error).message);
+        }
+        return;
+    }
     const base = "/projects/" + id;
     const retryKey = () => command.submissionRequestId ||= crypto.randomUUID();
     switch (command.type) {

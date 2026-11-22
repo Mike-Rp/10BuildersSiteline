@@ -114,6 +114,7 @@ export type WorkflowCommand = {
   allocationRevision?: number
   photoId?: string
   projectId?: string
+  phases?: string[]
   phase?: string
   doc?: Doc
   docs?: Doc[]
@@ -939,6 +940,11 @@ export function applyWorkflow(
   command: WorkflowCommand,
   now = Date.now(),
 ): State {
+  if (command.phases && ["accept_assignment", "decline_assignment"].includes(command.type)) {
+    assert(command.phases.length > 0, "Select at least one phase.")
+    return [...new Set(command.phases)].reduce((current, phase) =>
+      applyWorkflow(current, actorId, { ...command, phases: undefined, phase }, now), state)
+  }
   const actor = state.accounts.find((a) => a.id === actorId)
   assert(
     actor && actor.status === "active",
@@ -1146,7 +1152,7 @@ export function applyWorkflow(
       assert(actor.role === "spm", "Site PM role required.")
       assert(!assignmentBlock(p, actor.id), assignmentBlock(p, actor.id))
       const rows = p.team.filter(
-        (t) => t.accountId === actor.id && t.status === "pending",
+        (t) => t.accountId === actor.id && t.status === "pending" && (!command.phase || t.phase === command.phase),
       )
       assert(rows.length, "There are no pending assignments for this account.")
       rows.forEach((t) => {

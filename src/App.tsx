@@ -851,6 +851,7 @@ function AppInner() {
       const message = undefined
       return {ok:true, message}
     }catch(error){
+      if (command.phases) await reloadWorkspace().catch(() => {})
       return {ok:false,error:(error as Error).message}
     }
   }

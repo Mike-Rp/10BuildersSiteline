@@ -284,6 +284,8 @@ export default function RoleWorkspace({
   )
   const [phaseWorkspaceOpen, setPhaseWorkspaceOpen] = useState(false)
   const [dialog, setDialog] = useState<RoleDialog>()
+  const [selectedOfferPhases, setSelectedOfferPhases] = useState<string[]>([])
+  const [offerDeclineNote, setOfferDeclineNote] = useState("")
   const [offerView, setOfferView] = useState<"summary" | "Overview" | "Construction phases" | "Assigned team" | "Documents">("summary")
   const [confirmationView, setConfirmationView] = useState<{ projectId: string; view: "team" | "subcontractors" }>()
   const [sitePmContact, setSitePmContact] = useState<{ projectId: string; accountId: string }>()
@@ -296,6 +298,8 @@ export default function RoleWorkspace({
   const [repoQuery, setRepoQuery] = useState("")
   useEffect(() => {
     setOfferView("summary")
+    setSelectedOfferPhases([])
+    setOfferDeclineNote("")
     if (dialog?.kind === "project") return
     setRepositoryOpen(false)
     setRepoPath({})
@@ -3465,6 +3469,7 @@ export default function RoleWorkspace({
       phase.engineers?.some(engineer => engineer.accountId === actor.id))
     const blocker = assignmentBlock(project, actor.id)
     const lead = leadId(project)
+    const selected = pending.filter(row => selectedOfferPhases.includes(row.phase)).map(row => row.phase)
     const summary = offerView === "summary"
     const status = blocker ? "Waiting on prerequisites" : "Awaiting your response"
     const missingDocuments = assignmentDocumentsMissing(project)
@@ -3489,15 +3494,15 @@ export default function RoleWorkspace({
       <div className="site-offer-footer-actions">
         <Button onClick={close}>Close</Button>
         {summary && <>
-        {!blocker && <Button disabled={saving} onClick={() => {
-          setDeclineReason("")
-          setDialog({ kind: "decline", projectId: project.id, phase: pending[0].phase })
-        }}>Decline {pending[0].phase} phase</Button>}
-        <Button variant="primary" icon="check" disabled={saving || !!blocker}
+        {!blocker && <Button disabled={saving || !selected.length || !offerDeclineNote.trim()} onClick={async () => {
+          const phases = [...selected].sort((a, b) => Number(a === leadPhaseAssignment(project)?.phase) - Number(b === leadPhaseAssignment(project)?.phase))
+          if (await act({ type: "decline_assignment", projectId: project.id, phases, note: offerDeclineNote }, "Selected phase assignments declined.")) close()
+        }}>Decline selected phases</Button>}
+        <Button variant="primary" icon="check" disabled={saving || !!blocker || !selected.length}
           aria-describedby={blocker ? "site-offer-acceptance-blocker" : undefined}
           onClick={async () => {
-            if (await act({ type: "accept_assignment", projectId: project.id }, "Your pending Site PM assignments are confirmed.")) close()
-          }}>{actor.id === lead ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}</Button>
+            if (await act({ type: "accept_assignment", projectId: project.id, phases: selected }, "Selected Site PM assignments are confirmed.")) close()
+          }}>Accept selected phases</Button>
         </>}
       </div>
     </div>}>
@@ -3515,7 +3520,12 @@ export default function RoleWorkspace({
               <ul>{assignedPhases.map(phase => {
                 const member = phase.engineers?.find(engineer => engineer.accountId === actor.id)
                 const tags = member?.assignedDisciplines ?? phase.assignedDisciplines ?? []
-                return <li key={phase.phase}><strong>{phase.phase}</strong>
+                return <li key={phase.phase}>
+                  {pending.some(row => row.phase === phase.phase) ? <label className="site-offer-phase-choice">
+                    <input type="checkbox" checked={selectedOfferPhases.includes(phase.phase)} disabled={saving || !!blocker}
+                      onChange={event => setSelectedOfferPhases(current => event.target.checked ? [...current, phase.phase] : current.filter(name => name !== phase.phase))} />
+                    <strong>{phase.phase}</strong>
+                  </label> : <strong>{phase.phase}</strong>}
                   {tags.length > 0 && <div className="tag-list">{tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
                 </li>
               })}</ul>
@@ -3523,7 +3533,14 @@ export default function RoleWorkspace({
             <section className="site-offer-card"><h3>Project at a glance</h3>{projectFacts}</section>
           </div>
           {blocker ? <div className="site-offer-blocker"><Icon name="shield" /><p id="site-offer-acceptance-blocker">{blocker}</p></div>
-            : <p>Accepting confirms {pending.length === 1 ? "your pending phase assignment" : `all ${pending.length} pending phase assignments`} for this project.</p>}
+            : <div className="site-offer-response">
+              <label className="site-offer-phase-choice"><input type="checkbox" disabled={saving || !pending.length}
+                checked={pending.length > 0 && selected.length === pending.length}
+                onChange={event => setSelectedOfferPhases(event.target.checked ? pending.map(row => row.phase) : [])} />Select all pending phases</label>
+              <p>{selected.length} selected. Accept or decline the selected phases together.</p>
+              <Field label="Reason for declining (required to decline)"><textarea rows={2} value={offerDeclineNote} disabled={saving}
+                onChange={event => setOfferDeclineNote(event.target.value)} /></Field>
+            </div>}
           {project.inquiryOrigin && missingDocuments.length > 0 && <p>Office PM uploads pending: {missingDocuments.join(", ")}.</p>}
         </> : <>
           <div className="site-offer-tabs" role="group" aria-label="Project details sections">
