@@ -260,7 +260,7 @@ export async function saveApiAccount(account: Account, existing: boolean, passwo
               credential_review_note: account.credentialReviewNote,
               credential_evidence_reviewed: account.credentialEvidenceReviewed,
             } : {}) } : {}),
-          ...(!existing && account.lastName && !account.email ? { email: undefined, auto_work_email: true, last_name: account.lastName } : {}),
+          ...(!existing && account.role !== "client" && account.lastName && !account.email ? { email: undefined, auto_work_email: true, last_name: account.lastName } : {}),
           ...(!existing && password ? { password } : {}) },
     });
     const id = saved.id || account.id;

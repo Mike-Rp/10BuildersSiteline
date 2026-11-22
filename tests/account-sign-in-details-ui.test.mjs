@@ -31,7 +31,10 @@ test("new account details use the role login, copy individual or combined values
       await click('Copy Password'); assert.equal(writes.at(-1),details.password)
       await click('Copy All Sign-In Details')
       assert.ok(writes.at(-1).includes(values[0]) && writes.at(-1).includes(details.email) && writes.at(-1).includes(details.password))
-      if(role==='client')assert.match(document.body.textContent,/Sign-in remains blocked until project activation/)
+      if(role==='client') {
+        assert.match(document.body.textContent,/Sign-in remains blocked until project activation/)
+        assert.match(document.body.textContent,/Hand these sign-in details to the client during onboarding/)
+      }
     }
     fail=true
     await click('Copy Password')

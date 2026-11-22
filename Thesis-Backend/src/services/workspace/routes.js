@@ -269,7 +269,7 @@ router.get("/workspace", endpoint(null, async (db, user) => {
  or exists(select 1 from user_client_project_links l where l.project_id=p.id and l.user_id=$2))`, [user.role, user.id])).rows.map(r => r.id);
     const projectMeta = user.role === "client" ? [] : (await db.query("select project_id as id,metadata from workspace_project_metadata where project_id=any($1::uuid[])", [allowed])).rows;
     const accountMeta = (await db.query("select user_id as id,metadata from workspace_account_metadata where $1='admin' or user_id=$2", [user.role, user.id])).rows;
-    const companyMeta = user.role === "client" ? [] : (await db.query("select subcontractor_id as id,metadata from workspace_company_metadata")).rows;
+    const companyMeta = user.role === "client" ? [] : (await db.query("select subcontractor_id as id,case when $1='admin' then metadata else metadata-'employmentContract' end as metadata from workspace_company_metadata", [user.role])).rows;
     const selections = user.role === "client" ? [] : (await db.query("select * from project_subcontractor_selections where project_id=any($1::uuid[])", [allowed])).rows;
     const map = rows => Object.fromEntries(rows.map(r => [r.id, r.metadata]));
     const { backendPhases, referenceDisciplines } = await workspaceReferences.get(db);

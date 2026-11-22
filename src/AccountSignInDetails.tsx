@@ -56,6 +56,7 @@ export default function AccountSignInDetails({ details, onClose }: { details: Cr
           <Button onClick={() => void copy(row.value, row.label)}>{row.button}</Button></div>
       </div>)}
       <p className="created-account-note">Temporary password is shown once. The user must change it on first sign-in.</p>
+      {details.role === "client" && <p className="created-account-note">Hand these sign-in details to the client during onboarding. They must choose a separate SiteLine password for this account.</p>}
       <div className="notice neutral"><Icon name="shield" size={18} /><p>{details.role === "client" ? "This link opens Client login. Sign-in remains blocked until project activation." : `This link opens ${details.role === "admin" ? "Administrator" : "Staff"} login. The account role determines the workspace.`}</p></div>
       <p role="status" className="created-account-copy-status">{message}</p>
       {manualCopy && <textarea ref={manual} readOnly value={manualCopy} aria-label="Sign-in details for manual copying" rows={7} />}

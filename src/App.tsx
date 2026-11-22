@@ -2948,6 +2948,10 @@ function AppInner() {
           </div>
         </div>
         <CompanyForemen company={c} />
+        {actor.role === "admin" && <section className="detail-section" aria-label="Subcontractor employment contract">
+          <h3>10 Builders employment contract</h3>
+          {c.employmentContract ? <DocumentList docs={[c.employmentContract]} onPreview={previewDoc} /> : <p>No employment contract on file.</p>}
+        </section>}
         {state.phaseAllocationAvailable && <CompanyProjectPhases companyId={c.id} />}
         {c.note?.trim() && <p className="section-description">{c.note}</p>}
         <CompanyCapabilities key={c.id + (c.capabilityReview?.reviewedAt || "")} company={c} role={actor.role} onPreview={previewDoc}
@@ -3423,7 +3427,7 @@ function AppInner() {
           <EngineerCredentials key={selectedAccount.id} userId={selectedAccount.id} admin onChanged={()=>{void reloadWorkspace()}} />
         </Modal>
       )}
-      {dialog?.kind === "add-company" && <Modal title="Add subcontractor company" subtitle="Company details, trades and Admin verification in one form." wide onClose={() => setDialog(undefined)}>
+      {dialog?.kind === "add-company" && <Modal title="Add subcontractor company" subtitle="Company details, trades, employment contract and Admin verification." wide onClose={() => setDialog(undefined)}>
         <CompanyForm role="admin" owner={actor.name} actorId={actor.id} status="pending" onClose={() => setDialog(undefined)} onSave={async company => {
           const saved = await createCompany(company)
           const verified = saved.status === "approved"

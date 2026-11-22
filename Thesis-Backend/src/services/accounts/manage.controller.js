@@ -191,7 +191,9 @@ async function saveJobTitle(client, userId, role, title) {
 async function insertAccountRecord(client, actor, body) {
   const fullName = body.full_name ?? body.fullName ?? body.contact_person;
   const userId = uuidv4();
+  const role = body.role;
   const automaticEmail = body.auto_work_email === true;
+  if (role === "client" && automaticEmail) throw new HttpError(400, "Use the client's existing email address. Work email generation is for staff accounts.");
   // Insert once so the database assigns its own id_number. This private address
   // is replaced in the same transaction and is never returned or committed.
   const email = body.auto_work_email === true
@@ -199,7 +201,6 @@ async function insertAccountRecord(client, actor, body) {
     : typeof body.email === "string" ? body.email.trim().toLowerCase() : body.email;
   if (automaticEmail) workEmailFromAssignedId(body.last_name, "10B00001"); // Validate the surname before inserting.
   const phone = body.phone ?? body.contact_number ?? null;
-  const role = body.role;
   if (role === "client" && clientEmailError(email)) throw new HttpError(400, clientEmailError(email));
   if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");

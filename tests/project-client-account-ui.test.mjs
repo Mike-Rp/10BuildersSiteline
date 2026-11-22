@@ -14,9 +14,9 @@ test("project client setup creates or links an account and shows temporary crede
   t.mock.method(globalThis, "fetch", async (url, options) => {
     if (options.method === "POST") {
       writes.push(JSON.parse(options.body))
-      return Response.json({ data: { id: "client", full_name: "Client Contact", email: "client@10builders.com", status: "invited", reused, ...(!reused ? { temp_password: "TemporaryPassword123" } : {}) } })
+      return Response.json({ data: { id: "client", full_name: "Client Contact", email: "client@gmail.com", status: "invited", reused, ...(!reused ? { temp_password: "TemporaryPassword123" } : {}) } })
     }
-    return Response.json({ data: { clients: [], editable: true, defaults: { company_name: "Example Client", contact_person: "Client Contact", email: "client@10builders.com", phone: "09171234567" } } })
+    return Response.json({ data: { clients: [], editable: true, defaults: { company_name: "Example Client", contact_person: "Client Contact", email: "client@gmail.com", phone: "09171234567" } } })
   })
   const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
   const { default: React, act } = await import("react"), { createRoot } = await import("react-dom/client"), root = createRoot(document.getElementById("root"))
@@ -25,10 +25,14 @@ test("project client setup creates or links an account and shows temporary crede
   let saved = 0
   const render = key => act(async () => { root.render(React.createElement(Setup, { key, projectId: "project", onSaved: async () => { saved++ } })); await new Promise(resolve => setTimeout(resolve, 20)) })
   await render("new")
-  assert.equal(document.querySelector('input[type="email"]').value,"client@10builders.com")
+  assert.equal(document.querySelector('input[type="email"]').value,"client@gmail.com")
+  assert.equal(document.querySelector('input[type="email"]').checkValidity(),true)
+  assert.match(document.body.textContent,/manual handover/)
   assert.ok(document.querySelector('label[for]'))
   await act(async () => { document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 20)) })
   assert.equal(writes.length,1);assert.equal(writes[0].project_id,"project");assert.equal(saved,1)
+  assert.equal(writes[0].email,"client@gmail.com")
+  assert.equal(writes[0].auto_work_email,undefined)
   assert.match(document.body.textContent,/Awaiting first sign-in/)
   assert.ok([...document.querySelectorAll('input')].some(input => input.value === "TemporaryPassword123"))
   assert.equal(document.querySelector('.project-client-account form'), null)

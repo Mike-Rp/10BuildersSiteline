@@ -56,11 +56,12 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
       {!["active", "invited"].includes(client.status) && <p>Admin needs to review this account in Team & accounts before project activation.</p>}
     </div>)}
     {data && !data.clients?.length && (data.editable ? <form onSubmit={save}>
-      <p>Create the client's account or enter an existing client's login email to link it. New accounts use an @10builders.com login address. Complete this step before project activation.</p>
+      <p>Use the client's existing personal or business email, such as Gmail. An existing client account can be linked using its registered email. Complete this step before project activation.</p>
+      <p>New account sign-in details are displayed for manual handover to the client during onboarding.</p>
       <div className="project-client-account-fields">
         <Field label="Client / company name"><input required maxLength={150} value={draft.company_name} disabled={busy} onChange={event => setDraft({ ...draft, company_name: event.target.value })} /></Field>
         <Field label="Contact person"><input required maxLength={150} value={draft.contact_person} disabled={busy} onChange={event => setDraft({ ...draft, contact_person: event.target.value })} /></Field>
-        <Field label="Client login email"><input type="email" required maxLength={254} placeholder="client@10builders.com" value={draft.email} disabled={busy} onChange={event => setDraft({ ...draft, email: event.target.value })} /></Field>
+        <Field label="Client login email"><input type="email" required maxLength={254} placeholder="client@gmail.com" value={draft.email} disabled={busy} onChange={event => setDraft({ ...draft, email: event.target.value })} /></Field>
         <Field label="Contact number (optional)"><input type="tel" value={draft.phone} disabled={busy} onChange={event => setDraft({ ...draft, phone: event.target.value })} /></Field>
       </div>
       <Button type="submit" variant="primary" disabled={busy}>{busy ? "Saving client account…" : "Create or link client account"}</Button>

@@ -831,9 +831,10 @@ test(
       const loaded=await api('/projects/'+projectId+'/client-account')
       assert.deepEqual(loaded.clients,[])
       assert.equal(loaded.editable,true)
-      const body={project_id:projectId,company_name:'Client setup example',contact_person:'Client Contact',email:'client.setup@10builders.com',phone:'09171234567'}
+      const body={project_id:projectId,company_name:'Client setup example',contact_person:'Client Contact',email:'client.setup@outlook.com',phone:'09171234567'}
       const created=await api('/projects/intake/client-account',{method:'POST',json:body})
       assert.equal(created.status,'invited');assert.equal(created.reused,false);assert.ok(created.temp_password)
+      assert.equal(created.email,body.email)
       const repeated=await api('/projects/intake/client-account',{method:'POST',json:body})
       assert.equal(repeated.id,created.id);assert.equal(repeated.reused,true);assert.equal(repeated.temp_password,undefined)
       const linked=await api('/projects/'+projectId+'/client-account')

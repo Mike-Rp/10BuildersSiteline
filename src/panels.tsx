@@ -137,6 +137,7 @@ export function Upload({
   spreadsheet = false,
   clientVisible = false,
   storageKind = "document",
+  multiple = true,
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
@@ -151,6 +152,7 @@ export function Upload({
   clientVisible?: boolean
   // Picks the private storage bucket: site photos, phase evidence, documents or credentials.
   storageKind?: UploadKind
+  multiple?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
@@ -206,15 +208,15 @@ export function Upload({
         aria-label={ariaLabel || label}
         disabled={disabled || saving}
         accept={spreadsheet ? ".xlsx,.xls" : ".pdf,.jpg,.jpeg,.png"}
-        multiple={!spreadsheet}
+        multiple={multiple && !spreadsheet}
         onChange={(e) => {
-          const selectedFiles = Array.from(e.target.files || [])
+          const selectedFiles = Array.from(e.target.files || []).slice(0, multiple && !spreadsheet ? undefined : 1)
           if (!selectedFiles.length) return
           if (disabled || savingRef.current) { e.target.value = ""; return }
           const validFiles = selectedFiles.filter((selected) => !validateFile(selected, spreadsheet))
           const firstError = selectedFiles.map((selected) => validateFile(selected, spreadsheet)).find(Boolean) || ""
           setError(firstError)
-          if (validFiles.length) setFiles((current) => [...current, ...validFiles])
+          if (validFiles.length) setFiles((current) => multiple && !spreadsheet ? [...current, ...validFiles] : validFiles)
           e.target.value = ""
         }}
       />
@@ -568,6 +570,7 @@ export function AccountForm({
   )
   const [nameParts, setNameParts] = useState({ first: "", middle: "", last: "" })
   const generatedIdentity = !account
+  const autoWorkEmail = generatedIdentity && draft.role !== "client"
   function updateName(part: "first" | "middle" | "last", value: string) {
     const next = { ...nameParts, [part]: value }
     setNameParts(next)
@@ -627,7 +630,7 @@ export function AccountForm({
     if (Object.keys(nameIssues).length) { setFieldErrors(nameIssues); setError("Enter the required name details."); return }
     if (draft.phone && !isPhilippineMobile(draft.phone)) { setFieldErrors({ phone: PH_MOBILE_ERROR }); setError(PH_MOBILE_ERROR); return }
 
-    const err = accountError(submittedDraft, state, generatedIdentity)
+    const err = accountError({ ...submittedDraft, email: submittedDraft.email.trim() }, state, autoWorkEmail)
     if (err) {
       const issues: Record<string, string> = {}
       if (/email/i.test(err)) {
@@ -651,7 +654,7 @@ export function AccountForm({
           ...submittedDraft,
           ...(registeringEngineer ? creationCredentials : {}),
           name: draft.name.trim(),
-          email: draft.email.trim(),
+          email: draft.email.trim().toLowerCase(),
           phone: draft.phone.trim(),
         },
         account ? undefined : pass,
@@ -702,6 +705,7 @@ export function AccountForm({
               onChange={(e) =>
                 patch({
                   role: e.target.value as Account["role"],
+                  email: "",
                   scope: [],
                   projectTypes: [],
                   experienceByType: undefined,
@@ -709,7 +713,7 @@ export function AccountForm({
                 })
               }
             >
-              {Object.entries(ROLE_NAMES).filter(([key]) => key !== "client" && key !== "admin").map(([key, name]) => (
+              {Object.entries(ROLE_NAMES).filter(([key]) => key !== "admin").map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>
@@ -728,7 +732,7 @@ export function AccountForm({
             placeholder="Full name"
           />
         </Field>}
-        {!generatedIdentity && <Field label="Email address *" error={emailError || fieldErrors.email}>
+        {!autoWorkEmail && <Field label="Email address *" error={emailError || fieldErrors.email} hint={draft.role === "client" ? "Use the client's existing personal or business email, such as Gmail." : undefined}>
           <input
             required
             type="email"
@@ -738,7 +742,7 @@ export function AccountForm({
               patch({ email: e.target.value })
               clearValidation()
             }}
-            placeholder="name@company.com"
+            placeholder={draft.role === "client" ? "client@gmail.com" : "name@company.com"}
           />
         </Field>}
         <Field label="Contact number" error={fieldErrors.phone}>
@@ -799,6 +803,9 @@ export function AccountForm({
               {p.name}
             </label>
           ))}
+          {fieldErrors.linkedProjects && <p className="field-error" role="alert">{fieldErrors.linkedProjects}</p>}
+          {!state.projects.length && <p>Create the project through the inquiry process first, then return here to link the client account.</p>}
+          <p>Client sign-in becomes available after a linked project is activated.</p>
         </section>
       )}
       {registeringEngineer && <RegistrationVerification value={credentialDraft} noteError={verificationNoteError} onChange={value => { setCredentialDraft(value); clearValidation() }} />}
@@ -810,8 +817,7 @@ export function AccountForm({
             <Button onClick={() => setPass(password())}>Regenerate</Button>
           </div>
           <p>
-            Shown once after creation. Share securely; delivery and first-login
-            authentication require a backend.
+            {draft.role === "client" ? "Hand the sign-in details to the client during onboarding. They must change the temporary password on first sign-in." : "Provide the sign-in details to the user after account creation. They must change the temporary password on first sign-in."}
           </p>
         </section>
       )}
@@ -1793,7 +1799,8 @@ export function CompanyForm({
   const [fieldErrors, setFieldErrors] = useState<CompanyRegistrationErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
-  const busy = saving || submitting
+  const [uploading, setUploading] = useState(false)
+  const busy = saving || submitting || uploading
   const patch = (values: Partial<Company>) => {
     setDraft((company) => ({ ...company, ...values }))
     const errors = companyRegistrationErrors({ ...draft, ...values })
@@ -1814,7 +1821,7 @@ export function CompanyForm({
       noValidate
       onSubmit={async (event) => {
         event.preventDefault()
-        if (submittingRef.current || saving) return
+        if (submittingRef.current || busy) return
         const errors = companyRegistrationErrors(draft)
         setFieldErrors(errors)
         if (Object.keys(errors).length) return
@@ -1868,11 +1875,20 @@ export function CompanyForm({
         </select></Field>
         <h4>Supporting company documents</h4>
         <DocumentList docs={draft.documents} onPreview={downloadDoc} />
-        <Upload label="Company supporting document" owner={owner} disabled={busy} onSave={doc => patch({ documents: [...draft.documents, doc] })} />
+        <Upload label="Company supporting document" owner={owner} disabled={busy} onBusyChange={setUploading} onSave={doc => patch({ documents: [...draft.documents, doc] })} />
         <div className="company-registration-verification" role="group" aria-label="Company verification process"><span>Verification process</span><Badge tone="green">Verify on registration</Badge></div>
           <label className="check-row"><input type="checkbox" disabled={busy} checked={!!draft.evidenceReviewed} onChange={e => patch({ evidenceReviewed: e.target.checked })} />I reviewed the company records and selected trade capabilities</label>
           <Field label="Verification note *"><textarea maxLength={2000} disabled={busy} value={draft.verificationNote || ""} onChange={e => patch({ verificationNote: e.target.value })} /></Field>
         <p className="notice">The company and selected trade capabilities are verified when registration is saved. Supporting records, your evidence review and a verification note are required. Project allocation still requires matching trades, availability, capacity and existing acceptance steps.</p>
+      </section>}
+      {role === "admin" && <section className="form-section" aria-label="Subcontractor employment contract">
+        <h3>10 Builders employment contract</h3>
+        <p>Upload the signed employment contract between this subcontractor company and 10 Builders (optional). PDF, JPG or PNG. Confirm the upload before registering the company.</p>
+        {draft.employmentContract ? <>
+          <DocumentList docs={[draft.employmentContract]} onPreview={downloadDoc} />
+          <Button disabled={busy} onClick={() => patch({ employmentContract: undefined })}>Remove contract</Button>
+        </> : <Upload label="10 Builders employment contract" owner={owner} multiple={false} disabled={busy} onBusyChange={setUploading}
+          onSave={employmentContract => patch({ employmentContract })} />}
       </section>}
       {project && <p className="role-muted subsection">Suggested for {project.name}. The company remains unassigned until project acceptance is completed separately.</p>}
       {error && (

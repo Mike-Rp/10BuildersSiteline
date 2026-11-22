@@ -152,15 +152,18 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   })
 
   let intakeClient
-  await t.test("new clients require company addresses and cannot log in before project activation", async () => {
+  await t.test("new clients use existing email addresses with temporary passwords and cannot log in before project activation", async () => {
     await asUser("patricia.domingo@10builders.com")
-    for (const email of ["client@gmail.com", "client@yahoo.com", "client@10builders.com.evil", "client@not10builders.com", "bad@@10builders.com", ""]) {
-      await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", email, role: "client", password: "Password@123" } }), /@10builders\.com/)
+    for (const email of ["clientgmail.com", "client@", "@gmail.com", "client @gmail.com", "bad@@gmail.com", ""]) {
+      await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", email, role: "client", password: "Password@123" } }), /valid client email/)
     }
     assert.equal((await db.query("select 1 from users where full_name='Invalid new client'")).rowCount, 0)
-    const created = await api("/accounts", { method: "POST", json: { full_name: "Intake Client Test", email: "  Intake.Client@10BUILDERS.COM  ", role: "client", phone: "09171234567", password: "Password@123" } })
+    await assert.rejects(api("/accounts", { method: "POST", json: { full_name: "Invalid new client", role: "client", auto_work_email: true, last_name: "Client" } }), /existing email address/)
+    const created = await api("/accounts", { method: "POST", json: { full_name: "Intake Client Test", email: "  Intake.Client+project@GMAIL.COM  ", role: "client", phone: "09171234567", password: "Password@123" } })
     intakeClient = created
-    assert.equal(created.email, "intake.client@10builders.com")
+    assert.equal(created.email, "intake.client+project@gmail.com")
+    assert.equal(created.temp_password,"Password@123")
+    assert.equal((await db.query("select temp_password_issued from users where id=$1",[created.id])).rows[0].temp_password_issued,true)
     assert.equal(created.status, "invited")
     assert.equal((await api(`/accounts/${created.id}`)).email, created.email)
     await assert.rejects(login(created.email, "Password@123", true), error => error.status === 403 && /awaiting project approvals/.test(error.message))
@@ -305,6 +308,39 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     await asUser("karlo.espiritu@10builders.com")
     await assert.rejects(createCompany({...company,id:randomUUID()}),error=>error.status===403)
     await assert.rejects(api("/subcontractors/"+result.id+"/capabilities",{method:"PUT",json:{}}),error=>error.status===403)
+  })
+
+  await t.test("Admin registration stores an employment contract separately and restricts access", async () => {
+    let {user,state}=await asUser("patricia.domingo@10builders.com")
+    const contractId=randomUUID(),bytes="%PDF-1.4\nSigned subcontractor employment contract"
+    await uploadFile(contractId,new File([bytes],"10-builders-employment.pdf",{type:"application/pdf"}))
+    const source=state.companies[0]
+    const company={...source,id:randomUUID(),name:"Employment Contract Company",email:"contract.company@gmail.com",phone:"09171234567",foremen:undefined,
+      primaryTrade:"Electrical",verificationDecision:"pending",documents:[],manpowerDocuments:[],
+      employmentContract:{id:contractId,uploaded:true,label:"Untrusted label",name:"Untrusted name",clientVisible:true}}
+    await assert.rejects(createCompany({...company,employmentContract:{id:randomUUID(),uploaded:false}}),/Upload and confirm/)
+    await assert.rejects(createCompany({...company,documents:[company.employmentContract]}),/separately/)
+    const result=await createCompany(company)
+    const saved=(await loadState(user)).companies.find(c=>c.id===result.id)
+    assert.equal(saved.employmentContract.id,contractId)
+    assert.equal(saved.employmentContract.name,"10-builders-employment.pdf")
+    assert.equal(saved.employmentContract.label,"10 Builders employment contract")
+    assert.equal(saved.employmentContract.clientVisible,false)
+    assert.deepEqual(saved.documents,[])
+    assert.equal(await (await downloadApiFile(contractId)).text(),bytes)
+    assert.equal((await db.query("select purpose from stored_files where id=$1",[contractId])).rows[0].purpose,"company_contract")
+    await assert.rejects(createCompany({...company,id:randomUUID()}),/already linked/)
+    await api(`/subcontractors/${result.id}/workspace`,{method:"PUT",json:{...saved,note:"Updated company notes"}})
+    assert.equal((await loadState(user)).companies.find(c=>c.id===result.id).employmentContract.id,contractId,'Other company edits preserve the contract')
+    for(const email of ["lea.fernandez@10builders.com","karlo.espiritu@10builders.com"]) {
+      await asUser(email)
+      const workspace=await api("/workspace")
+      assert.equal(workspace.companies[result.id].employmentContract,undefined)
+      assert.equal(await downloadApiFile(contractId),undefined)
+      await assert.rejects(api(`/files/${contractId}/content`),error=>error.status===404)
+      await assert.rejects(createCompany({...company,id:randomUUID()}),error=>error.status===403)
+    }
+    await asUser("patricia.domingo@10builders.com")
   })
 
   await t.test("monthly report permissions, read-only generation and snapshot exports hold for every role", async () => {

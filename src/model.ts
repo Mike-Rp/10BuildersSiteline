@@ -346,6 +346,7 @@ export type PhaseProgress = {
   locked?: boolean
 }
 export type Company = {
+  employmentContract?: Doc
   verificationDecision?: "pending" | "verified"
   evidenceReviewed?: boolean
   verificationNote?: string

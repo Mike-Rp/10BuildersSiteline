@@ -50,12 +50,25 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
             if (!isUuid(doc.id)) throw new HttpError(400, "Upload a valid file before submitting.");
             const stored = await loadFile(db, user, doc.id, purpose);
             const locked = (await db.query("select purpose from stored_files where id=$1 for update", [stored.id])).rows[0];
-            if (locked?.purpose === "company") throw new HttpError(409, "This file already belongs to a company. Upload the list for the new company.");
+            if (["company", "company_contract"].includes(locked?.purpose)) throw new HttpError(409, "This file already belongs to a company. Upload a new file for the new company.");
             if (purpose === "manpower") workers = readManpowerFile(stored);
             target.push({ id: stored.id, label: purpose === "manpower" ? "Company Manpower List" : "Company supporting document", name: stored.original_name,
                 uploaded: true, clientVisible: false, owner: user.full_name, date: new Date().toISOString().slice(0, 10), size: stored.byte_size, mime: stored.content_type,
                 ...(purpose === "manpower" ? { manpowerCount: workers.length } : {}) });
         }
+    }
+    let employmentContract;
+    if (company.employmentContract !== undefined) {
+        const doc = company.employmentContract;
+        if (!doc?.uploaded || !isUuid(doc.id)) throw new HttpError(400, "Upload and confirm the 10 Builders employment contract before submitting.");
+        if ([...documents, ...manpowerDocuments].some(saved => saved.id === doc.id))
+            throw new HttpError(400, "Upload the employment contract separately from supporting company records.");
+        const stored = await loadFile(db, user, doc.id, "document");
+        const locked = (await db.query("select purpose,project_id,uploaded_by from stored_files where id=$1 for update", [stored.id])).rows[0];
+        if (locked?.uploaded_by !== user.id) throw new HttpError(403, "Upload the employment contract from your Admin account.");
+        if (locked.purpose !== "upload" || locked.project_id) throw new HttpError(409, "This file is already linked to another record. Upload a new employment contract.");
+        employmentContract = { id: stored.id, label: "10 Builders employment contract", name: stored.original_name,
+            uploaded: true, clientVisible: false, owner: user.full_name, date: new Date().toISOString().slice(0, 10), size: stored.byte_size, mime: stored.content_type };
     }
     if (company.id !== undefined && !isUuid(company.id)) throw new HttpError(400, "Invalid company ID. Reopen the company form and try again.");
     const companyId = company.id || crypto.randomUUID();
@@ -77,10 +90,12 @@ export async function registerCompany(db, user, company, loadFile, projectId = "
         ...(foremen === undefined ? {} : { foremen }),
         ...(company.operatingLocation === undefined ? {} : { operatingLocation: normalizeLocation(company.operatingLocation) }),
         documents, manpowerDocuments, manpowerRoster: roster, note: typeof company.note === "string" ? company.note.trim() : "",
+        ...(employmentContract ? { employmentContract } : {}),
         projectId, submittedById: user.id, submittedBy: user.full_name, availability: "available", activeProjectIds: [], manpowerCount: workers.length,
         ...(proposedDisciplines === undefined ? {} : { proposedDisciplines }),
     })]);
     for (const doc of [...documents, ...manpowerDocuments]) await db.query("update stored_files set purpose='company' where id=$1", [doc.id]);
+    if (employmentContract) await db.query("update stored_files set purpose='company_contract' where id=$1", [employmentContract.id]);
     if (company.verificationDecision === "verified") await saveCapabilityReview(db, user, companyId, {
         disciplines: proposedDisciplines || [], documentIds: documents.map(d => d.id), note: company.verificationNote,
         unavailable: false,
