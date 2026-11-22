@@ -27,9 +27,11 @@ Missing, pending, and rejected evidence contributes zero. Optional items do not 
 progress. An unconfigured phase returns zero and `checklist.configured: false`;
 submitting an update or advancing into it returns 422.
 
-An SPM must hold the confirmed assignment for the active current stage. Only the assigned
-OPM or an admin can approve/reject evidence or advance the phase. Approvals lock the project
-and evidence, update the cached project percentage, and append client-visible history.
+An SPM must hold a confirmed assignment and meet the checklist's upload requirements.
+Only the assigned Office PM can preview a review decision, approve evidence, or return it
+for correction. Administrators can view evidence history and attachments for oversight.
+Approvals lock the project and evidence, update the cached project percentage, and append
+client-visible history.
 Rejected evidence needs a review note and can be resubmitted as a new version.
 Approved/pending evidence cannot be overwritten.
 
@@ -42,6 +44,8 @@ Responses use the existing `{code, message, count, data}` envelope.
 |---|---|---|
 | GET | /projects/:id/phase-overview | Data for the expanded UI |
 | POST | /projects/:id/checklist-items/:itemId/evidence | Multipart `file`; upload for review |
+| GET | /projects/:id/evidence-history | Read submission versions, statuses, and review decisions |
+| GET | /projects/:id/evidence/:evidenceId/review-preview | Assigned Office PM previews decision impact and obtains a review token |
 | POST | /projects/:id/evidence/:evidenceId/approve | Approve a pending version |
 | POST | /projects/:id/evidence/:evidenceId/reject | Reject; `review_note` required |
 | POST | /projects/:id/phase-files | Multipart `file`; optional general evidence |

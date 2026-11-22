@@ -128,11 +128,12 @@ export async function readOverlapMonitoring(db,project,user) {
     WHERE r.project_id=$1 AND r.status<>'released' ORDER BY r.id`,[p.id])).rows;
   const active=await readResponsibilityChecklist(db,p,p.current_stage_id,{initialize:false});
   const readiness=await assessPhaseHandoff(db,p);
-  const canReview=user.role==='admin'||user.role==='opm'&&p.suggested_opm_id===user.id;
+  const canReview=user.role==='opm'&&p.suggested_opm_id===user.id;
+  const canViewAll=user.role==='admin'||canReview;
   const phases=[];
   for(const [position,stage]of stages.entries()) {
     const rows=await checklistRows(db,p,stage.id), people=[];
-    for(const r of responsibilities.filter(r=>Number(r.project_stage_id)===Number(stage.id)&&(canReview||r.user_id===user.id))) {
+    for(const r of responsibilities.filter(r=>Number(r.project_stage_id)===Number(stage.id)&&(canViewAll||r.user_id===user.id))) {
       const access=await phaseAccess(db,p,r), items=[];
       for(const item of rows.filter(row=>String(row.responsibility_id)===String(r.id))) {
         const blocker=access.blocker||await dependencyBlocker(db,p,item.id);
@@ -145,10 +146,10 @@ export async function readOverlapMonitoring(db,project,user) {
       }
       people.push({id:String(r.id),user_id:r.user_id,name:r.name,scopes:r.assigned_disciplines,assignment_status:r.status,
         upload_access:access.access,...(access.blocker?{blocker:access.blocker}:{}),
-        can_approve_parallel_uploads:user.role==='opm'&&p.suggested_opm_id===user.id&&access.canApprove,items});
+        can_approve_parallel_uploads:canReview&&access.canApprove,items});
     }
     phases.push({name:stage.code,status:p.lifecycle_status==='archived'||position<current?'completed':position===current?'active':'upcoming',responsibilities:people});
   }
   return {version:1,arrangement:p.inquiry_intake?.assessment?.arrangement||'Sequential phases',active_checklist:{approved:active.approved_count,required:active.required_count},
-    turnover:{can_confirm:canReview&&p.lifecycle_status==='active'&&readiness.state==='ready',stage_id:String(p.current_stage_id),...(readiness.state!=='ready'?{blocker:readiness.reason||'Project activation is required.'}:{})},phases};
+    turnover:{can_confirm:canViewAll&&p.lifecycle_status==='active'&&readiness.state==='ready',stage_id:String(p.current_stage_id),...(readiness.state!=='ready'?{blocker:readiness.reason||'Project activation is required.'}:{})},phases};
 }

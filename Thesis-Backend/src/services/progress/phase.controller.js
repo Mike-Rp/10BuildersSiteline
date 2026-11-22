@@ -201,7 +201,7 @@ export const reportProjectIssue = async (req, res) => {
 
 async function reviewableEvidence(client,user,projectId,evidenceId) {
   const p=await phaseProject(client,user,projectId,{active:true});
-  if (!(await isProjectOpmOrAdmin(user,p.id,client))) throw new HttpError(403,"Office PM approval is required.");
+  if (p.suggested_opm_id !== user.id) throw new HttpError(403,"Only the assigned Office PM can review this project evidence.");
   const found=await client.query(`SELECT e.*, i.required, i.weight, i.title AS activity_title, s.code AS phase_name, submitter.full_name AS submitted_by_name
     FROM project_phase_evidence e
     JOIN project_phase_checklist_items i ON i.id=e.checklist_item_id AND i.project_id=e.project_id AND i.project_stage_id=e.project_stage_id
@@ -216,7 +216,6 @@ async function reviewableEvidence(client,user,projectId,evidenceId) {
     throw new HttpError(409,"Evidence is already reviewed or superseded.");
   }
   if(!await monitoringProject(client,p)) await assertPhaseUnlocked(client, p, evidence.project_stage_id);
-  else if(user.role!=='admin'&&p.suggested_opm_id!==user.id)throw new HttpError(403,'Only the assigned Office PM can review this project evidence.');
   return {p,evidence};
 }
 
@@ -243,7 +242,7 @@ async function evidenceReviewPreview(client,p,evidence) {
 
 export const getEvidenceReviewPreview=async(req,res)=>{
   try {
-    const user=await requireUser(req,res,["admin","opm"]);if(!user)return;
+    const user=await requireUser(req,res,["opm"]);if(!user)return;
     if(!isBigintId(req.params.evidenceId))return sendError(res,"Invalid evidence id.",400);
     const data=await withTransaction(async client=>{
       const {p,evidence}=await reviewableEvidence(client,user,req.params.id,req.params.evidenceId);
@@ -256,7 +255,7 @@ export const getEvidenceReviewPreview=async(req,res)=>{
 
 const reviewEvidence = decision => async (req, res) => {
   try {
-    const user = await requireUser(req, res, ["admin", "opm"]);
+    const user = await requireUser(req, res, ["opm"]);
     if (!user) return;
     rejectProgressInput(req.body);
     if (!isBigintId(req.params.evidenceId)) return sendError(res, "Invalid evidence id.", 400);

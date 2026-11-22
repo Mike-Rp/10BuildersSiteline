@@ -41,12 +41,13 @@ function response() {
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
     send(body) { this.body = body; return this; },
+    set() { return this; },
   };
 }
 function setup(options = {}) {
   const state = {
     p: { id: projectId, current_stage_id: 4, current_stage: "Structure", current_pct: 0,
-      lifecycle_status: "active", project_type_id: 1 },
+      lifecycle_status: "active", project_type_id: 1, suggested_opm_id: opm.id },
     phaseOwner: spm.id,
     evidence: { id: "7", project_id: projectId, project_stage_id: 4,
       checklist_item_id: "1", status: "pending", file_id: fileId, submitted_by: spm.id, phase_update_id: null,
@@ -92,6 +93,7 @@ function setup(options = {}) {
         return result([state.update]);
       }
       if (sql.startsWith("SELECT 1 FROM project_phase_evidence")) return result(state.evidence.status === "rejected" && state.evidence.phase_update_id === params[0] ? [{}] : []);
+      if (sql.startsWith("SELECT i.*,s.code AS stage_code,e.id AS evidence_id")) return result([state.evidence]);
       if (sql.startsWith("UPDATE project_phase_updates")) { state.update.status = sql.includes("status = 'approved'") ? "approved" : "rejected"; return result([state.update]); }
       if (sql.startsWith("INSERT INTO pending_rework_requests")) {
         const issue = { id: "88", reason: params[2], issue_categories: params[3], phase_update_id: params[4], status: "pending" };
@@ -236,6 +238,26 @@ test("an unrelated OPM cannot review the project", async () => {
   await controller.approveEvidence(request({ ...opm, allowed: false }), res);
   assert.equal(res.statusCode, 404);
   assert.equal(state.evidence.status, "pending");
+});
+
+test("Admin can read evidence history but only the assigned OPM can open a decision or record one", async () => {
+  const state = setup();
+  const admin = { ...spm, role: "admin" };
+  const history = response();
+  await controller.getEvidenceHistory(request(admin), history);
+  assert.equal(history.statusCode, 200, history.body?.message);
+  assert.equal(history.body.data[0].status, "pending");
+
+  const otherOpmWithProjectAccess = { ...opm, id: fileId };
+  for (const actor of [admin, spm, otherOpmWithProjectAccess]) {
+    for (const action of [controller.getEvidenceReviewPreview, controller.approveEvidence, controller.rejectEvidence]) {
+      const res = response();
+      await action(request(actor, { review_note: "Missing test results." }), res);
+      assert.equal(res.statusCode, 403, res.body?.message);
+    }
+  }
+  assert.equal(state.evidence.status, "pending");
+  assert.equal(state.history.length, 0);
 });
 
 test("rejected evidence requires a reason and contributes no progress", async () => {

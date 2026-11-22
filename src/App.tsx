@@ -6,6 +6,7 @@ import { resolveAdminSearchDestination, type AdminSearchDestination } from "./ad
 import type { WorkspaceResult } from "./admin-workspace-search"
 import "./admin-search-destination.css"
 import AdminWorkspaceSearch from "./AdminWorkspaceSearch"
+import AdminEvidenceHistory from "./AdminEvidenceHistory"
 import { requiresRenewalOnlyAccess } from "./renewal-only";
 import AdminProjectDocuments from "./AdminProjectDocuments"
 import "./company-created-notice.css"
@@ -2534,6 +2535,7 @@ function AppInner() {
             )}
             {projectAssignments(p)}
             <EngineerHistory projectId={p.id} />
+            {actor.role === "admin" && <AdminEvidenceHistory key={p.id} projectId={p.id} onPreview={previewDoc} />}
             <section className="detail-section">
               <h3>Site photo gallery</h3>
               <SitePhotoGallery photos={p.workflow?.photos || []}
