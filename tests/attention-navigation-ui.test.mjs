@@ -57,7 +57,7 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
       assert.equal(document.querySelector('[aria-label="Active sites"] .nav-count').textContent,"3")
       assert.doesNotMatch(document.querySelector("main").textContent,/Office PM acceptance required/)
       await act(()=>priority("Waiting for Site PM").click())
-      assert.match(document.querySelector('[role="dialog"]').textContent,/Accept (Lead Site PM assignment|my phase assignments)/)
+      assert.match(document.querySelector('[role="dialog"]').textContent,/Accept (Lead Site PM assignment|my phase assignments|selected phases)/)
     }
 
     state.projects = [project("Concurrent intake", {
@@ -95,8 +95,10 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
       match: { project_type: "Residential", experience_years: 7 } }
     const fetch = globalThis.fetch
     previous.set("fetch", Object.getOwnPropertyDescriptor(globalThis, "fetch"))
+    const setupInquiry = { ...inquiry, id: "setup", project_id: "Concurrent intake", project_status: "spm_review",
+      status: "converted", details: { ...inquiry.details, name: "Concurrent intake" } }
     globalThis.fetch = (url, options) => String(url).endsWith("/projects/inquiries")
-      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }] }))
+      ? Promise.resolve(Response.json({ data: [inquiry, { ...inquiry, id: "completed", status: "approved" }, setupInquiry] }))
       : fetch(url, options)
     await render(office,"/opm/project-intake")
     const newInquiryBanner = document.querySelector(".opm-new-inquiries")
@@ -108,6 +110,24 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     assert.match(pendingInquiry.textContent,/Pending inquiry/)
     assert.match(pendingInquiry.textContent,/Inquiry reference 10BL-2026-A9BD9CC9C4AD/)
     assert.doesNotMatch(pendingInquiry.textContent,/Why this match|Relevant experience|Matched project type/)
+
+    await render(office,"/opm/project-inquiries")
+    const cards = [...document.querySelectorAll(".opm-inquiry-card")]
+    assert.equal(cards.length, 3)
+    const currentStep = card => card.querySelector('[aria-current="step"]').textContent
+    assert.equal(currentStep(cards[0]), "Office PM review")
+    assert.equal(currentStep(cards[1]), "Project assessment")
+    assert.equal(currentStep(cards[2]), "Project intake")
+    assert.equal(cards[2].dataset.attention, "true")
+    assert.equal(cards[2].querySelector("progress").value, 0)
+    assert.match(cards[2].textContent, /Awaiting Site PM acceptance.*0 of 6 uploaded/)
+    const setupAction = label => [...cards[2].querySelectorAll("button")].find(button => button.textContent.includes(label))
+    await act(() => setupAction("View assignment status").click())
+    const setupStatus = document.querySelector('[aria-label="Site PM assignment status"]')
+    assert.match(setupStatus.textContent, /Concurrent intake/)
+    await act(() => [...setupStatus.querySelectorAll("button")].find(button => button.textContent === "Close").click())
+    await act(() => setupAction("Upload required documents").click())
+    assert.equal(w.location.pathname, "/opm/documents")
   } finally {
     await act(()=>root.unmount()); await server.close(); dom.window.close()
     for (const [key,descriptor] of previous) descriptor ? Object.defineProperty(globalThis,key,descriptor) : delete globalThis[key]
