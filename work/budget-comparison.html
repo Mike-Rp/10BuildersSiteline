@@ -1,0 +1,68 @@
+<section id="budget-comparison" aria-labelledby="budget-title">
+  <style>
+    #budget-comparison { display: grid; gap: var(--font-size-base); }
+    #budget-comparison header { display: grid; gap: calc(var(--font-size-base) * .25); }
+    #budget-comparison .budget-values { display: grid; gap: calc(var(--font-size-base) * .5); margin: 0; }
+    #budget-comparison dd { margin: 0; overflow-wrap: anywhere; }
+    #budget-comparison input { min-width: 0; width: 100%; }
+  </style>
+  <header>
+    <h2 id="budget-title">Residential project budget</h2>
+    <p class="text-muted">180 m² floor area</p>
+  </header>
+  <div class="viz-grid">
+    <section class="card budget-values" aria-labelledby="starting-budget">
+      <h3 id="starting-budget">Starting example</h3>
+      <dl class="budget-values">
+        <div><dt>Client-requested budget</dt><dd class="tabular-nums">₱5,000,000</dd></div>
+        <div><dt>Requested budget per m²</dt><dd class="tabular-nums">₱27,778</dd></div>
+        <div><dt>Authorized budget</dt><dd><span class="viz-badge">Pending approval</span></dd></div>
+      </dl>
+    </section>
+    <section class="card budget-values" aria-labelledby="edited-budget">
+      <h3 id="edited-budget">Try a different amount</h3>
+      <label class="form-label">
+        Client-requested budget (₱)
+        <input class="form-control tabular-nums" id="budget-input" type="number" min="0" step="any" value="5000000">
+      </label>
+      <dl class="budget-values">
+        <div><dt>Requested budget per m²</dt><dd id="budget-rate" class="tabular-nums" aria-live="polite">₱27,778</dd></div>
+        <div><dt>Authorized budget</dt><dd><span class="viz-badge">Pending approval</span></dd></div>
+      </dl>
+    </section>
+  </div>
+</section>
+<script>
+(() => {
+  const root = document.getElementById('budget-comparison');
+  const input = root.querySelector('#budget-input');
+  const rate = root.querySelector('#budget-rate');
+  const pesos = new Intl.NumberFormat('en-PH', {
+    style: 'currency', currency: 'PHP', maximumFractionDigits: 0
+  });
+  function render() {
+    const amount = input.valueAsNumber;
+    rate.textContent = Number.isFinite(amount) && amount >= 0
+      ? pesos.format(amount / 180)
+      : '—';
+  }
+  function restore(state) {
+    const amount = state?.modelContent?.requestedBudget;
+    if (Number.isFinite(amount) && amount >= 0) {
+      input.value = amount;
+      render();
+    }
+  }
+  restore(window.openai?.widgetState);
+  window.addEventListener('openai:set_globals', (event) => {
+    restore(event.detail?.globals?.widgetState);
+  });
+  input.addEventListener('input', () => {
+    render();
+    const amount = input.valueAsNumber;
+    if (Number.isFinite(amount) && amount >= 0) {
+      window.openai?.setWidgetState?.({ modelContent: { requestedBudget: amount } })?.catch(() => {});
+    }
+  });
+})();
+</script>

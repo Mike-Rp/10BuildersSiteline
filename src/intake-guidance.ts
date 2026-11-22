@@ -55,7 +55,8 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (actor.role === "spm" && ownPending.length && !assignmentBlock(p, actor.id))
     return step(actor.id === lead ? "Lead Site PM acceptance" : "Site PM confirmations", person(actor.id, "Site PM"),
       `Review your assigned phases: ${ownPending.map(row => row.phase).join(", ")}. Accept or decline through your existing assignment controls.`, true, "assignment", "Review assignment")
-  const incompleteTeam = p.team.filter(row => !row.accountId || row.status === "declined")
+  const incompleteTeam = p.team.filter(row => !row.accountId || (row.engineers?.length
+    ? row.engineers.some(engineer => engineer.status === "declined") : row.status === "declined"))
   if (incompleteTeam.length) return step("Phase reassignment", person(p.opmId, "Office PM"),
     `Office PM must review unassigned or declined phases: ${incompleteTeam.map(row => row.phase).join(", ")}.`,
     actor.role === "opm", "reassign", "Review phase assignments")
@@ -65,10 +66,11 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
     "The project Lead must accept before the remaining Site PMs can respond.",
     actor.role === "spm" && actor.id === lead && !assignmentBlock(p, actor.id) && p.team.some(row => row.accountId === actor.id && row.status === "pending"), "assignment", "Review assignment")
   if (!teamConfirmed(p)) {
-    const pending = p.team.filter(row => row.status !== "confirmed")
-    return step("Site PM confirmations", [...new Set(pending.map(row => person(row.accountId, "Site PM")))].join(", "),
-      `Awaiting phase responses: ${pending.map(row => row.phase).join(", ")}.`,
-      actor.role === "spm" && pending.some(row => row.accountId === actor.id && row.status === "pending") && !assignmentBlock(p, actor.id), "assignment", "Review assignment")
+    const pending = p.team.flatMap(row => (row.engineers?.length ? row.engineers : [row])
+      .filter(engineer => engineer.status === "pending").map(engineer => ({ phase: row.phase, accountId: engineer.accountId })))
+    return step("Site PM confirmations", [...new Set(pending.map(row => person(row.accountId, "Site PM")))].join(", ") || "Site PM team",
+      pending.length ? `Awaiting phase responses: ${[...new Set(pending.map(row => row.phase))].join(", ")}.` : "Review the outstanding Site PM confirmations.",
+      actor.role === "spm" && pending.some(row => row.accountId === actor.id) && !assignmentBlock(p, actor.id), "assignment", "Review assignment")
   }
   if (!registeredComplete(p)) return step("Required documents", person(p.opmId, "Office PM"),
     "Upload the remaining required documents before project activation.", actor.role === "opm", "documents", "Open required documents")
@@ -76,9 +78,17 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   const clientReady = checks.find(check => check.id === "client")?.passed === true
   // Client readiness is also a gate on signed-agreement upload, not just activation.
   const mine = actor.role === "spm" && actor.id === lead
+  const automatic = p.projectCompanyAllocation
+  if (automatic && automatic.status !== "accepted") {
+    const available = automatic.can_record_decision || automatic.can_reallocate
+    return step("Subcontractor allocation", person(lead, "Lead Site PM"),
+      automatic.status === "no_eligible_company" ? "No eligible subcontractor is available." : automatic.status === "declined"
+        ? "The Lead Site PM can request the next eligible company." : "The Lead Site PM records the allocated company’s decision.",
+      mine && available, "coordinate", "Review allocation")
+  }
   const phaseBased = !!state.phaseAllocationAvailable && !p.clientSubcon
   const tradeBased = phaseBased || tradeAllocationEnabled(state, p)
-  if (!checks.find(check => check.id === "subcontractors")?.passed)
+  if (!automatic && !checks.find(check => check.id === "subcontractors")?.passed)
     return step(tradeBased ? "Company team coordination" : p.clientSubcon ? "Client subcontractor review" : "Subcontractor coordination", person(lead, "Lead Site PM"),
       phaseBased ? "Lead Site PM selects eligible companies, assigns one foreman per phase, records company agreement, and confirms the allocation." : tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
   if (!clientReady) return step("Client account prerequisite", "Administrator",
@@ -86,7 +96,7 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!tradeBased && p.clientSubcon && checks.every(check => check.passed)) return step("Ready for Lead activation", person(lead, "Lead Site PM"),
     "All existing activation checks pass. The project Lead can open the existing activation controls.", mine, "coordinate", "Review activation")
   if (!checks.find(check => check.id === "agreement")?.passed) return step("Signed agreement", person(lead, "Lead Site PM"),
-    "Lead Site PM must upload the signed Site PM–Subcontractor Agreement through the existing activation workflow.", mine, "coordinate", "Open agreement requirements")
+    "Lead Site PM must upload the signed Site PM–Subcontractor Agreement through the existing activation workflow.", mine && (!automatic || automatic.can_upload_agreement), "coordinate", "Open agreement requirements")
   return step("Activation verification", person(lead, "Lead Site PM"), "Review the existing activation record; no prerequisite is bypassed.", false, "view", "View details")
 }
 

@@ -28,7 +28,7 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     assert.equal(people.length, 3)
     const tags = ["Civil", "Electrical", "Mechanical"]
     const project = { ...state.projects[0], id: "popup-project", name: "Popup Test Project", status: "pending", opmId: actor.id, opmAccepted: true, clientSubcon: undefined, subcontractorAllocation: undefined, subcontractorAllocationVersion: undefined,
-      team: [{ phase: "Design", accountId: people[0].id, status: "confirmed", requiredDisciplines: tags, engineers: people.map((person, index) => ({ accountId: person.id, assignedDisciplines: [tags[index]], status: index === 2 ? "pending" : "confirmed" })) }], docs: [] }
+      team: [{ phase: "Design", isLead: true, accountId: people[1].id, status: "confirmed", requiredDisciplines: tags, engineers: people.map((person, index) => ({ accountId: person.id, assignedDisciplines: [tags[index]], status: index === 2 ? "pending" : "confirmed" })) }], docs: [] }
     state.projects = [project]
     state.phaseAllocationAvailable = false
     state.tradeAllocationAvailable = false
@@ -45,6 +45,8 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     let dialog = document.querySelector('[role="dialog"]')
     assert.equal(dialog.getAttribute("aria-label"), "Site PM Team by Phase")
     assert.equal(dialog.querySelectorAll(".confirmation-engineer").length, 3)
+    assert.equal(dialog.querySelector(".confirmation-phase-card h3").textContent, "Design")
+    assert.equal(dialog.querySelector(".confirmation-engineer strong").textContent, people[1].name)
     for (const person of people) assert.ok(dialog.textContent.includes(person.name))
     assert.doesNotMatch(dialog.textContent, /Coverage complete|Coverage needs review/)
     assert.match(dialog.textContent, /Confirmed/)
@@ -64,7 +66,8 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
 
     await click(button(card, "Track Site PM responses"))
     assert.equal(document.querySelectorAll('.site-pm-roster-contact').length, 3, "Every engineer in the phase has a contact button")
-    assert.equal([...document.querySelectorAll('.site-pm-roster-contact button')].filter(item=>item.textContent==='Review Reassignment').length,1,'A pending supporting engineer stays actionable even after the coordinator confirms')
+    assert.equal(document.querySelectorAll('.site-pm-roster-contact button[aria-label^="Review reassignment"]').length, 0,
+      'Pending responses with no overdue deadline remain visible without offering reassignment')
     const contactButton = document.querySelector(`button[aria-label="View contact details for ${people[2].name} in Design"]`)
     await click(contactButton)
     dialog = document.querySelector('[role="dialog"]')

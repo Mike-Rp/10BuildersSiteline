@@ -1,5 +1,6 @@
 import { useState } from "react"
 import PhaseAllocationPanel from "./PhaseAllocationPanel"
+import ProjectCompanyAllocation from "./ProjectCompanyAllocation"
 import TradeAllocationPanel, { TradeAllocationOverview } from "./TradeAllocationPanel"
 import { tradeAllocationEnabled } from "./subcontractor-allocation"
 import { Badge, Button, Empty, Field, Icon, Modal } from "./ui"
@@ -76,6 +77,7 @@ export function SubcontractorAllocationReadOnly({
     : undefined
   const log = current?.contactLog || (current?.contactAt ? [current.contactAt] : [])
   const declined = work.selections.filter((s) => s.status === "declined")
+  if (project.projectCompanyAllocation) return <ProjectCompanyAllocation project={project} readOnly />
   if (state.phaseAllocationAvailable && !project.clientSubcon) return <PhaseAllocationPanel projectId={project.id} project={project} readOnly />
   if (tradeAllocationEnabled(state, project)) return <TradeAllocationOverview state={state} project={project} />
   const nameOf = (id: string) =>
@@ -155,6 +157,13 @@ export function SubcontractorAllocationReadOnly({
   )
 }
 export default function LeadSubcontractorPanel(props: Parameters<typeof LegacyLeadSubcontractorPanel>[0]) {
+  if (props.project.projectCompanyAllocation) return <ProjectCompanyAllocation project={props.project}
+    readOnly={props.actor.role !== "spm" || props.actor.id !== leadId(props.project) || !allocationReady(props.project)}
+    disabled={props.saving} onReload={props.onReload} onAgreement={async doc => {
+      const saved = await props.onAction({ type: "upload_agreement", projectId: props.project.id, doc })
+      if (saved) props.onActivated()
+      return saved
+    }} />
   if (props.state.phaseAllocationAvailable && !props.project.clientSubcon) return <PhaseAllocationPanel projectId={props.project.id} project={props.project} onAction={props.onAction} onReload={props.onReload} onActivated={props.onActivated} />
   return tradeAllocationEnabled(props.state, props.project)
     ? <TradeAllocationPanel key={props.project.id + ":" + (props.project.subcontractorAllocation?.revision || 0)} {...props} />

@@ -1,5 +1,5 @@
 import { DOC_LABELS, projectPhaseDisciplines, type Project, type State } from "./model"
-import { requiredPhaseNames } from "./workflows"
+import { leadPhaseAssignment, requiredPhaseNames } from "./workflows"
 import { SubcontractorAllocationReadOnly } from "./LeadSubcontractorPanel"
 import { Badge, Button, Modal } from "./ui"
 import "./confirmation-queue-details.css"
@@ -11,14 +11,19 @@ export default function ConfirmationQueueDetails({ state, project, view, onClose
   onClose: () => void
 }) {
   const agreement = project.docs.find(doc => doc.label === DOC_LABELS[6] && doc.uploaded)
+  const lead = leadPhaseAssignment(project)
+  const leadPhase = lead?.accountId ? [lead.phase] : []
   return <Modal title={view === "team" ? "Site PM Team by Phase" : "Subcontractor Allocation"} subtitle={`${project.name} · Read-only`} onClose={onClose} wide>
     <div className="confirmation-queue-details">
       {view === "team" ? <>
         <p className="confirmation-details-intro">Assigned responsibilities and each engineer’s acceptance status for every phase.</p>
-        {[...new Set([...requiredPhaseNames(project), ...project.team.map(row => row.phase)])].map(phase => {
+        {[...new Set([...leadPhase, ...requiredPhaseNames(project), ...project.team.map(row => row.phase)])].map(phase => {
           const rows = project.team.filter(row => row.phase === phase)
           const required = rows.find(row => row.requiredDisciplines?.length)?.requiredDisciplines || projectPhaseDisciplines(project, phase)
-          const engineers = rows.flatMap(row => row.engineers?.length ? row.engineers : row.accountId ? [{ accountId: row.accountId, assignedDisciplines: row.assignedDisciplines || [], status: row.status }] : [])
+          const engineers = rows.flatMap(row => {
+            const people = row.engineers?.length ? row.engineers : row.accountId ? [{ accountId: row.accountId, assignedDisciplines: row.assignedDisciplines || [], status: row.status }] : []
+            return people.map(person => ({ ...person, isLead: row === lead && person.accountId === lead.accountId }))
+          }).sort((a, b) => Number(b.isLead) - Number(a.isLead))
           return <section className="confirmation-phase-card" key={phase}>
             <header><h3>{phase}</h3></header>
             <p className="confirmation-phase-required">Required: {required.join(", ") || "No specialization requirements recorded"}</p>
@@ -29,7 +34,7 @@ export default function ConfirmationQueueDetails({ state, project, view, onClose
           </section>
         })}
       </> : <>
-        <div className="confirmation-agreement-status"><Badge tone={agreement ? "green" : "amber"}>{agreement ? "Signed agreement on file" : "Signed agreement required"}</Badge><p>{agreement ? agreement.name : project.clientSubcon ? "The Administrator must provide the signed client subcontractor agreement before activation." : "The Lead Site PM must provide the signed subcontractor agreement before activation."}</p></div>
+        {!project.projectCompanyAllocation && <div className="confirmation-agreement-status"><Badge tone={agreement ? "green" : "amber"}>{agreement ? "Signed agreement on file" : "Signed agreement required"}</Badge><p>{agreement ? agreement.name : project.clientSubcon ? "The Administrator must provide the signed client subcontractor agreement before activation." : "The Lead Site PM must provide the signed subcontractor agreement before activation."}</p></div>}
         <SubcontractorAllocationReadOnly state={state} project={project} />
       </>}
     </div>

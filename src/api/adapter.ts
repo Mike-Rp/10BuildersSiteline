@@ -339,6 +339,18 @@ export function mapProject(parts: ProjectParts): Project {
   // Public project contact contract; never infer a name from an unrelated account.
   const officePmName = typeof detail.office_pm_contact?.full_name === "string"
     ? detail.office_pm_contact.full_name.trim() : typeof list.office_pm_name === "string" ? list.office_pm_name.trim() : ""
+  const overlapMonitoring = parts.overview?.overlap_monitoring as Project["overlapMonitoring"]
+  if (overlapMonitoring?.version === 1) {
+    for (const phase of overlapMonitoring.phases) {
+      for (const responsibility of phase.responsibilities) {
+        for (const item of responsibility.items) {
+          for (const attachment of item.attachments ?? []) {
+            register(attachment.id, `/api/v1/projects/${id}/phase-files/${encodeURIComponent(attachment.id)}`)
+          }
+        }
+      }
+    }
+  }
   const project: Project = {
     ...(officePmName ? { officePmContact: { name: officePmName } } : {}),
     ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
@@ -351,6 +363,8 @@ export function mapProject(parts: ProjectParts): Project {
     type: list.project_type,
     inquiryOrigin: list.inquiry_origin === true,
     inquiryOverview: detail.inquiry_overview,
+    ...(detail.project_company_allocation?.version === 1 ? { projectCompanyAllocation: detail.project_company_allocation } : {}),
+    ...(overlapMonitoring?.version === 1 ? { overlapMonitoring } : {}),
     ...(list.phase_scope ? {phaseScope: list.phase_scope} : {}),
     area: formatArea(list.floor_area_sqm),
     floors:

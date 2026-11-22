@@ -3,6 +3,7 @@ import ProjectInquiries from "./ProjectInquiries"
 import WorkspaceGuide from "./WorkspaceGuide"
 import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
+import PhaseOverlapPanel from "./PhaseOverlapPanel"
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
@@ -411,6 +412,7 @@ export default function RoleWorkspace({
     (p) =>
       isOpm ||
       phaseOwner(p) === actor.id ||
+      p.overlapMonitoring?.phases.some(phase => phase.responsibilities.some(row => row.user_id === actor.id && row.assignment_status === "confirmed")) ||
       p.team.some(t=>t.engineers?.some(e=>e.accountId===actor.id&&e.status==='confirmed')) ||
       p.team.some(
         (t) =>
@@ -1901,7 +1903,7 @@ export default function RoleWorkspace({
                 </p>
               </div>
             )}
-            <section className="role-checklist">
+            {!p.overlapMonitoring && <section className="role-checklist">
               <div className="section-title">
                 <h3>Activity checklist — {p.phase}</h3>
                 <Badge tone="green">
@@ -1980,7 +1982,7 @@ export default function RoleWorkspace({
                   <span>Historical record</span>
                 </div>)}
               </details>}
-            </section>
+            </section>}
             <section className="role-progress-submit">
               <h3>Field update & issue reporting</h3>
               <div className="field-evidence">
@@ -2983,7 +2985,11 @@ export default function RoleWorkspace({
 
   function inquiryAssignments(project: Project) {
     const lead = leadPhaseAssignment(project)
-    return project.team.flatMap(phase => {
+    const leadPhase = lead?.accountId ? lead.phase : undefined
+    const phases = [...project.team].sort((a, b) =>
+      Number(b.phase === leadPhase) - Number(a.phase === leadPhase) ||
+      Number(!!leadPhase && b === lead) - Number(!!leadPhase && a === lead))
+    return phases.flatMap(phase => {
       const people = phase.engineers?.length ? phase.engineers : phase.accountId
         ? [{ accountId: phase.accountId, assignedDisciplines: phase.assignedDisciplines ?? [], status: phase.status }]
         : []
@@ -2991,7 +2997,7 @@ export default function RoleWorkspace({
         ...person,
         phase: phase.phase,
         lead: phase === lead && person.accountId === phase.accountId,
-      }))
+      })).sort((a, b) => Number(b.lead) - Number(a.lead))
     })
   }
   function inquiryAssignmentStatus(project: Project) {
@@ -3596,6 +3602,8 @@ export default function RoleWorkspace({
       <>
         <ExtensionWorkflow actor={actor} projectId={p.id} />
         <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} showClient />
+        {p.overlapMonitoring && <PhaseOverlapPanel key={p.id} project={p} actor={actor} onCommand={act} onReload={onReload}
+          disabled={saving || licenseAccessPolicy(actor.expiry).mode !== "normal"} />}
         {isOpm ? <ProjectClientAccount projectId={p.id} onSaved={onReload} /> : <ProjectClientDetails project={p} accounts={state.accounts} />}
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
@@ -3724,7 +3732,7 @@ export default function RoleWorkspace({
               Request Site PM update
             </Button>
           )}
-          {!isOpm && p.status === "active" && canWorkPhase(p,actor.id) && (
+          {!isOpm && p.status === "active" && (p.overlapMonitoring || canWorkPhase(p,actor.id)) && (
             <Button
               variant="primary"
               onClick={() => {
@@ -4223,7 +4231,9 @@ export default function RoleWorkspace({
           wide
         >
           <DelayedProjectNotice project={phaseWorkspaceProject} today={scheduleToday} />
-          {progressForm(phaseWorkspaceProject)}
+          {phaseWorkspaceProject.overlapMonitoring && <PhaseOverlapPanel key={phaseWorkspaceProject.id} project={phaseWorkspaceProject} actor={actor}
+            onCommand={act} onReload={onReload} disabled={saving || licenseAccessPolicy(actor.expiry).mode !== "normal"} />}
+          {(!phaseWorkspaceProject.overlapMonitoring || canWorkPhase(phaseWorkspaceProject,actor.id)) && progressForm(phaseWorkspaceProject)}
         </Modal>
       )}
       {dialog?.kind === "changes" && detail && (

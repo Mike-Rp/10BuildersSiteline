@@ -79,8 +79,8 @@ export async function uploadFile(id: string, file: File, purpose: "document" | "
 }
 // The evidence file is already uploaded, so only its id is sent. Re-sending the file
 // itself used to hit the serverless 4.5 MB request cap.
-async function phaseFile(projectId: string, doc: Doc) {
-    const saved = await api<Dto>("/projects/" + projectId + "/phase-files", { method: "POST", json: { file_id: doc.id, request_id: doc.id } });
+async function phaseFile(projectId: string, doc: Doc, assignment?: { responsibility_id: string; checklist_item_id: string }) {
+    const saved = await api<Dto>("/projects/" + projectId + "/phase-files", { method: "POST", json: { file_id: doc.id, request_id: doc.id, ...assignment } });
     return saved.file?.id || saved.id;
 }
 export async function sendApiWorkflow(state: State, actor: Account, command: WorkflowCommand) {
@@ -169,8 +169,11 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             if (!docs.length)
                 throw new Error("Choose checklist evidence.");
             const file_ids=[];
-            for(const doc of docs)file_ids.push(await phaseFile(id,doc));
-            await post(base + "/checklist-items/" + command.itemId?.split(":")[0] + "/submit", { request_id:retryKey(), file_ids, submission_note: command.note });
+            const itemId = command.itemId?.split(":")[0];
+            if (!itemId) throw new Error("Select a checklist item.");
+            const assignment = command.responsibilityId ? { responsibility_id: command.responsibilityId, checklist_item_id: itemId } : undefined;
+            for(const doc of docs)file_ids.push(await phaseFile(id,doc,assignment));
+            await post(base + "/checklist-items/" + itemId + "/submit", { request_id:retryKey(), file_ids, submission_note: command.note, ...(assignment ? { responsibility_id: assignment.responsibility_id } : {}) });
             return;
         }
         case "approve_checklist":

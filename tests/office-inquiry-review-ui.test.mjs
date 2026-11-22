@@ -14,6 +14,8 @@ test("proposal approval opens mandatory review with live size and inline validat
     },
   }
   let submitted
+  let staffingRequest
+  const supplemental = "Power Systems Engineering"
   const globals = new Map()
   for (const [key, value] of Object.entries({
     window, document: window.document, HTMLElement: window.HTMLElement, Node: window.Node, IS_REACT_ACT_ENVIRONMENT: true,
@@ -25,7 +27,15 @@ test("proposal approval opens mandatory review with live size and inline validat
         return Response.json({ data: inquiry })
       }
       if (path.endsWith("/workflow")) {
-        submitted = JSON.parse(init.body)
+        const input = JSON.parse(init.body)
+        if (input.action === "assessment") {
+          inquiry = { ...inquiry, workflow: { ...inquiry.workflow, assessment: {
+            id: "assessment", technical: input.technical, arrangement: input.arrangement, size: "Medium", complexity: "Moderate",
+            score: 8, planningDays: 104, durationDays: 104, suggestedEnd: submitted.end,
+          } } }
+          return Response.json({ data: inquiry })
+        }
+        submitted = input
         inquiry = {
           ...inquiry, details: { ...inquiry.details, ...submitted.correction },
           workflow: {
@@ -34,6 +44,19 @@ test("proposal approval opens mandatory review with live size and inline validat
           },
         }
         return Response.json({ data: inquiry })
+      }
+      if (path.endsWith("/planning")) {
+        const input = JSON.parse(init.body)
+        staffingRequest = input
+        const scopes = ["Structural Engineering", ...(input.additional_scopes?.Design ?? [])]
+        return Response.json({ data: {
+          phases: ["Design"], estimate: { size: "Medium", end: submitted.end },
+          staffing: { assessment_id: "assessment", phases: ["Design"], contract_file_id: "contract", additional_scopes: input.additional_scopes },
+          ...(input.phases && { additional_scope_options: { Design: [supplemental] },
+            team: [{ stage: "Design", user_id: "ana", required_specializations: scopes, engineers: [{ user_id: "ana", assigned_disciplines: ["Structural Engineering"] }] }],
+            candidates: { Design: [{ id: "ana", name: "Ana Reyes", qualifiedTags: ["Structural Engineering"] }] },
+          }),
+        } })
       }
       return Response.json({ data: [inquiry] })
     },
@@ -139,4 +162,16 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.equal(document.querySelector("#inquiry-review-floor-level-2").value, "80")
   assert.match(document.querySelector("#inquiry-review-floor_area_sqm-helper").textContent, /Admin: 120 m²/)
   assert.match(document.querySelector(".office-review-size").textContent, /Small → Medium/)
+  await click(button("Cancel"))
+  await click(button("Continue to assessment"))
+  await click(button("Complete assessment"))
+  await click(button("Continue to construction phases"))
+  await click(button("Continue to staffing"))
+  assert.match(document.body.textContent, /Technical requirements · Extensive specialized systems/)
+  assert.match(document.body.textContent, /Phase arrangement · Partially overlapping phases/)
+  await select("Additional engineering scope", supplemental)
+  await click(button("Add scope"))
+  assert.deepEqual(staffingRequest.additional_scopes, { Design: [supplemental] })
+  assert.match(document.body.textContent, /Power Systems Engineering/)
+  assert.equal(button("Send assignment offers").disabled, true)
 })

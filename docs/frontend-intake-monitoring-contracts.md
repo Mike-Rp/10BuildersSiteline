@@ -1,0 +1,26 @@
+# Frontend contracts for staffing, company allocation, and overlap
+
+The current server supports the existing inquiry review, staffing, acceptance, and official phase checklists. The additions below require server support. The frontend uses the new views and actions only when the corresponding response fields are supplied.
+
+## Additional staffing scopes
+
+Extend `POST /projects/inquiries/:id/planning`. Return `additional_scope_options` as a map from confirmed phase names to arrays of canonical specialization names. Only advertise phases whose scope options can be saved. With the existing `assessment_id`, `phases`, and `contract_file_id`, accept `additional_scopes` as the complete map of confirmed extra scopes for the included phases.
+
+Return the persisted map as `staffing.additional_scopes`, including on the first planning request when reopening a draft. Return the updated `team[].required_specializations`, `candidates[].qualifiedTags` (grouped by phase in `candidates`), and existing eligibility blockers. Committing the staffing plan to `POST /projects/intake` sends that same extra-scope map with `phase_team`. Validate both the scope list and its verified coverage, and snapshot it onto the project. Return a conflict if the assessment or phase selection is stale.
+
+## Project-level company allocation
+
+Expose `project_company_allocation` on the project `detail` object in the workspace project data payload and project detail endpoint. Follow `ProjectCompanyAllocation` in `src/api/intake-monitoring.ts`. Publish the field only for projects enrolled in the project-level automatic allocation flow. Use `version: 1`, a monotonic `revision`, a status, optional `{id, name}` for the selected company, stable history entries, and role-specific action flags.
+
+After all required Site PM offers and six intake documents are confirmed, the server should allocate one eligible approved company and persist it as `awaiting_decision`. Return `no_eligible_company` if no candidate qualifies. Expose `POST /projects/:id/project-company-allocation` with `action: "accept" | "decline" | "reallocate"`, `expected_revision`, and `company_id` when present. Accept and decline record the decision for the selected company. Reallocation skips companies that declined. Enforce Lead Site PM authorization, current allocation status, and revision atomically. Return the updated allocation and include it in subsequent workspace reads. Reject stale actions with HTTP 409.
+
+Keep `upload_agreement` in the existing `POST /projects/:id/workspace-command` flow. Honor the accepted project-level company when validating the signed agreement and activation. Surface the uploaded signed agreement in the project documents.
+
+## Overlap, evidence, and turnover
+
+Expose `overlap_monitoring` on the project `overview` in the workspace project data and in `GET /projects/:id/phase-overview`. Follow `OverlapMonitoring`, `OverlapResponsibility`, and `OverlapItem` in `src/api/intake-monitoring.ts`. Use the stored phase arrangement labels `Sequential phases`, `Partially overlapping phases`, or `Highly concurrent phases`. The active checklist counts count required checklist items, including responsibility rollup. The frontend displays an advisory at `approved × 3 >= required × 2` when some required items remain. The user’s phase, responsibility, item status, and permissions come from the response.
+
+- `POST /projects/:id/parallel-upload-approvals` accepts `{responsibility_id, expected_active_stage_id}` and persists one Office PM approval. Check phase arrangement, the assignment, active-stage version, and project ownership. Return the updated access on the next overview read. For partial overlap, allow multiple responsibilities in the same succeeding phase. Reject authorization of a second succeeding phase in that mode.
+- `POST /projects/:id/phase-files` accepts the existing `{file_id, request_id}` plus `{responsibility_id, checklist_item_id}` for responsibility evidence. Authorize that specific item before linking the file and return the existing phase-file ID. `POST /projects/:id/checklist-items/:itemId/submit` accepts the existing `{request_id, file_ids, submission_note}` plus `responsibility_id`. Enforce assignment, item access, and dependencies again at submission. Store independent evidence for each responsibility.
+- Each submitted item supplies `evidence_id` and authorized attachments in the frontend `Doc` shape, with attachment IDs usable by the existing phase-file download route. Use the existing evidence preview, history, approval, and rejection routes keyed by evidence ID. An approval or rejection updates only that responsibility. Provide `responsibility_totals` when the item requires multiple responsibilities. Return exact blocker messages for locked items, including configured phase dependencies.
+- For projects exposing this contract, evidence approval should make turnover eligible without moving the official phase. `POST /projects/:id/advance-phase` should validate `expected_stage_id` atomically alongside existing handoff checks, advance the official phase, and retain submitted evidence for later phases. Before the handoff is ready, return `turnover.can_confirm: false` with the blocker in the overview.

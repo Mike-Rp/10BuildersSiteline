@@ -1,0 +1,133 @@
+<div class="viz-dotted-background" id="project-budget-preview">
+  <style>
+    #project-budget-preview { padding: clamp(8px, 3vw, 24px); }
+    #project-budget-preview article {
+      color-scheme: light dark;
+      --panel: light-dark(#f5f8fc, #172433);
+      --tile: light-dark(#e8eff7, #22354a);
+      --ink: light-dark(#182a3d, #eff6ff);
+      --subtle: light-dark(#455b73, #b6cbe2);
+      --edge: light-dark(#c2d1e0, #3c5269);
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      padding: clamp(16px, 4vw, 30px);
+      display: grid;
+      gap: 16px;
+      font: 16px/1.45 system-ui, sans-serif;
+    }
+    #project-budget-preview h2 { font-size: 1.65em; margin: 0 0 3px; }
+    #project-budget-preview p { margin: 0; }
+    #project-budget-preview .context { color: var(--subtle); }
+    #project-budget-preview .budget-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
+      gap: 12px;
+    }
+    #project-budget-preview .tile { background: var(--tile); border-radius: 10px; padding: 14px; min-width: 0; }
+    #project-budget-preview label { display: block; font-weight: 600; }
+    #project-budget-preview input {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--edge);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+    }
+    #project-budget-preview .estimate { font-size: 1.5em; font-weight: 650; margin-top: 3px; }
+    #project-budget-preview .gap {
+      padding: 10px 14px;
+      border-inline-start: 3px solid currentColor;
+      border-radius: 4px;
+      background: var(--tile);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    #project-budget-preview .gap[data-state="over"] {
+      color: light-dark(#784500, #ffdb9b);
+      background: light-dark(#fff0d5, #3a2b19);
+    }
+    #project-budget-preview .gap[data-state="under"] {
+      color: light-dark(#176043, #a5ebc8);
+      background: light-dark(#e0f4ea, #18352d);
+    }
+  </style>
+  <article aria-labelledby="project-budget-title">
+    <header>
+      <h2 id="project-budget-title">Project budget</h2>
+      <p class="context">Maple Residence · Residential · 180 m² · Standard finish</p>
+    </header>
+    <div class="budget-grid">
+      <div class="tile">
+        <label for="requested-budget-preview">Client-requested budget (₱)</label>
+        <input id="requested-budget-preview" type="text" inputmode="decimal" value="5,000,000" autocomplete="off">
+      </div>
+      <div class="tile">
+        <strong>Preliminary estimate</strong>
+        <p class="estimate">₱5,760,000</p>
+        <p class="context">180 m² × ₱32,000/m²</p>
+      </div>
+    </div>
+    <p class="gap" data-state="over" role="status">Estimate is ₱760,000 above the client’s budget.</p>
+    <div class="tile">
+      <strong>Authorized budget</strong>
+      <p class="context">Awaiting approval</p>
+    </div>
+  </article>
+  <script>
+  (() => {
+    const preview = document.getElementById('project-budget-preview');
+    const input = preview.querySelector('input');
+    const gap = preview.querySelector('.gap');
+    const estimate = 576000000n;
+    const pesos = new Intl.NumberFormat('en-PH');
+
+    function render() {
+      const amount = input.value.trim();
+      const valid = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{0,2})?$/.test(amount);
+      input.setAttribute('aria-invalid', String(amount !== '' && !valid));
+      if (!valid) {
+        gap.dataset.state = 'neutral';
+        gap.textContent = amount === ''
+          ? 'Enter a budget to see the difference.'
+          : 'Enter a peso amount with up to two decimal places.';
+        return;
+      }
+
+      const [whole, fraction = ''] = amount.replaceAll(',', '').split('.');
+      const difference = estimate - (BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0')));
+      if (difference === 0n) {
+        gap.dataset.state = 'neutral';
+        gap.textContent = 'Estimate matches the client’s budget.';
+        return;
+      }
+      const isOver = difference > 0n;
+      const absolute = isOver ? difference : -difference;
+      const cents = absolute % 100n;
+      const formatted = '₱' + pesos.format(absolute / 100n)
+        + (cents ? '.' + String(cents).padStart(2, '0') : '');
+      gap.dataset.state = isOver ? 'over' : 'under';
+      gap.textContent = 'Estimate is ' + formatted + (isOver ? ' above' : ' below') + ' the client’s budget.';
+    }
+
+    function restore(state) {
+      const saved = state?.privateContent?.budgetInput;
+      if (typeof saved === 'string') {
+        input.value = saved;
+        render();
+      }
+    }
+    restore(window.openai?.widgetState);
+    window.addEventListener('openai:set_globals', (event) => restore(event.detail?.globals?.widgetState));
+    input.addEventListener('input', render);
+    input.addEventListener('change', () => {
+      window.openai?.setWidgetState?.({ privateContent: { budgetInput: input.value } })?.catch(() => {});
+    });
+  })();
+  </script>
+</div>

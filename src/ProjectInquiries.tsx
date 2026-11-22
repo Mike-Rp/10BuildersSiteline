@@ -38,8 +38,10 @@ type BlockedCandidate = Candidate & { reason: "availability" | "schedule" | "com
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability"
+type AdditionalScopes = Record<string, string[]>
 type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>; blockedCandidates?: Record<string, BlockedCandidate[]>;
-  staffing?: {assessment_id:string; phases:string[]; contract_file_id:string} }
+  additional_scope_options?: AdditionalScopes;
+  staffing?: {assessment_id:string; phases:string[]; contract_file_id:string; additional_scopes?: AdditionalScopes} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
 const classifications = ["Normal", "Priority", "Urgent"]
 const statuses: Record<string,string> = {
@@ -276,7 +278,7 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
   </section>
 }
 
-function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, adding, setAdding, onChange, onRecheck }: {
+function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, adding, setAdding, onChange, onRecheck, scopeOptions, onAddScope }: {
   stage: string
   entry?: Phase
   suggested?: Phase
@@ -287,12 +289,16 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
   setAdding: (value: boolean) => void
   onChange: (entry: Phase) => void
   onRecheck: () => void
+  scopeOptions?: string[]
+  onAddScope: (scope: string) => Promise<unknown>
 }) {
+  const [scope, setScope] = useState("")
   const multi = !!suggested?.engineers
   const engineers = entry?.engineers ?? (entry?.user_id ? [
     { user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines || [] },
   ] : [])
   const required = requiredAreas(suggested)
+  const newScopes = scopeOptions?.filter(value => !required.includes(value)) ?? []
   const owners = new Map(required.flatMap(area => {
     const owner = choices.find(candidate => candidate.qualifiedTags.includes(area) && engineers.some(person =>
       person.user_id === candidate.id && person.assigned_disciplines.includes(area)))
@@ -336,7 +342,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
     </div>
     {missing.length > 0 && <p className="inquiry-coverage-warning"><strong>{missing.length} coverage {missing.length === 1 ? "gap" : "gaps"} in {stage}.</strong> Still needed: {missing.join(", ")}</p>}
     <div className={`inquiry-staff-layout${required.length ? " with-coverage" : ""}`}>
-    {!!required.length && <aside className="inquiry-summary-card inquiry-phase-coverage">
+    {(required.length > 0 || newScopes.length > 0) && <aside className="inquiry-summary-card inquiry-phase-coverage">
       <h4>Phase scope coverage</h4>
       <ul>{required.map(area => {
         const owner = owners.get(area)
@@ -345,6 +351,13 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
           <span>{area}</span><strong>{owner || "Unassigned"}</strong>
         </li>
       })}</ul>
+      {newScopes.length > 0 && <div className="inquiry-form-stack">
+        <label>Additional engineering scope<select value={newScopes.includes(scope) ? scope : ""} onChange={event => setScope(event.target.value)}>
+          <option value="">Select a scope</option>
+          {newScopes.map(value => <option key={value}>{value}</option>)}
+        </select></label>
+        <button type="button" className="button" disabled={!newScopes.includes(scope)} onClick={() => void onAddScope(scope)}>Add scope</button>
+      </div>}
     </aside>}
     <div className="inquiry-form-stack">
     <div className="inquiry-staff-heading">
@@ -460,6 +473,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
   const budget = row?.workflow?.budget
+  const technical = row?.workflow?.assessment?.technical ?? row?.workflow?.review?.technical
+  const arrangement = row?.workflow?.assessment?.arrangement ?? row?.workflow?.review?.arrangement
   const staffingInput = {
     ...row?.details, target_start_date: start, target_end_date: end,
     estimated_budget: budget, assessment_id: row?.workflow?.assessment?.id,
@@ -525,6 +540,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     }
   }, [role])
   async function run(action: () => Promise<unknown>) {
+    if (activeAction.current) return
     activeAction.current = true
     actionVersion.current++
     setBusy(true)
@@ -605,12 +621,27 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   async function allocate(recheck = false) {
     const fileId = await uploadIntakeContract()
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId })
+    const additional = planning?.staffing?.additional_scopes
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId,
+      ...(additional ? { additional_scopes: Object.fromEntries(Object.entries(additional).filter(([stage]) => phases.includes(stage))) } : {}),
+    })
     setPlanning(result)
     if (!recheck) setTeam(result.team || [])
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
     setAddingEngineer(false)
     setStep(3)
+  }
+  async function addStaffingScope(scope: string) {
+    if (!planning?.additional_scope_options?.[staffingPhase]?.includes(scope)) return
+    const previous = planning.staffing?.additional_scopes ?? {}
+    const additional_scopes = { ...previous, [staffingPhase]: [...new Set([...(previous[staffingPhase] ?? []), scope])] }
+    const fileId = await uploadIntakeContract()
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: fileId, additional_scopes })
+    if (!result.staffing?.additional_scopes?.[staffingPhase]?.includes(scope) || !result.candidates?.[staffingPhase] ||
+      !requiredAreas(result.team?.find(phase => phase.stage === staffingPhase)).includes(scope)) {
+      throw new Error("The server did not confirm the additional phase scope.")
+    }
+    setPlanning(result)
   }
   async function uploadIntakeContract() {
     if (contractFileId) return contractFileId
@@ -625,6 +656,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: fileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
+      ...(planning?.staffing?.additional_scopes ? { additional_scopes: planning.staffing.additional_scopes } : {}),
     })
     setFinalizedClient({ projectId: result.project.id, name: result.project.name })
     setDialog(undefined)
@@ -634,10 +666,17 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   const canAllocate = !!(contract || contractFileId) && !!row?.workflow?.assessment && phases.length > 0
   const staffingIssues = step === 3 ? phases.flatMap(stage => {
-    const reason = staffingIssue(team.find(item => item.stage === stage),
+    const entry = team.find(item => item.stage === stage)
+    const choices = planning?.candidates?.[stage] ?? []
+    const assigned = entry?.engineers ?? (entry?.user_id ? [entry] : [])
+    const missingExtra = planning?.staffing?.additional_scopes?.[stage]?.filter(scope =>
+      !assigned.some(person => person.assigned_disciplines?.includes(scope) && choices.some(candidate =>
+        candidate.id === person.user_id && candidate.qualifiedTags.includes(scope)))) ?? []
+    const reason = staffingIssue(entry,
       requiredAreas(planning?.team?.find(item => item.stage === stage)),
-      planning?.candidates?.[stage] ?? [], planning?.candidateBlockers?.[stage])
-    return reason ? [{ stage, reason }] : []
+      choices, planning?.candidateBlockers?.[stage])
+    if (reason) return [{ stage, reason }]
+    return missingExtra.length ? [{ stage, reason: `Assign verified coverage for ${missingExtra.join(", ")}.` }] : []
   }) : []
   const firstStaffingIssue = staffingIssues[0]
   const canSend = canAllocate && !staffingIssues.length
@@ -1161,7 +1200,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
-          <div><h3>Assign engineers by phase</h3><p className="inquiry-muted">{row.details.name} · {row.details.project_type}</p></div>
+          <div><h3>Assign engineers by phase</h3><p className="inquiry-muted">{row.details.name} · {row.details.project_type}</p>
+            {technical && <p>Technical requirements · {technical}</p>}
+            {arrangement && <p>Phase arrangement · {arrangement}</p>}
+          </div>
           <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
           <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage} onClick={() => {
@@ -1169,10 +1211,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               setAddingEngineer(false)
             }}>{stage}</button>)}
           </div>
-          <StaffingCards stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
+          <StaffingCards key={staffingPhase} stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
             suggested={planning.team?.find(entry => entry.stage === staffingPhase)}
             choices={planning.candidates[staffingPhase] || []} blocked={planning.blockedCandidates?.[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
+            scopeOptions={planning.additional_scope_options?.[staffingPhase]} onAddScope={scope => run(() => addStaffingScope(scope))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
           {staffingIssues.length > 1 && <details className="inquiry-summary-card inquiry-blocked-engineers">
             <summary>Phases that need staffing review ({staffingIssues.length})</summary>
