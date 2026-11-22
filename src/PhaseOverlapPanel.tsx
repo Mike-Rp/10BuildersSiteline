@@ -21,7 +21,7 @@ export default function PhaseOverlapPanel({ project, actor, disabled = false, on
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [refreshFailed, setRefreshFailed] = useState(false)
-  const [review, setReview] = useState<{ phase: string; item: OverlapItem }>()
+  const [review, setReview] = useState<{ phase: string; responsibilityId: string; item: OverlapItem }>()
   const pending = useRef(false)
   const data = project.overlapMonitoring
   const office = actor.role === "opm" && actor.id === project.opmId
@@ -75,9 +75,9 @@ export default function PhaseOverlapPanel({ project, actor, disabled = false, on
           </div>
           {!office && row.assignment_status === "confirmed" && row.upload_access !== "locked" && item.can_submit &&
             (phase.status === "active" || (phase.status === "upcoming" && data.arrangement !== "Sequential phases" && row.upload_access === "parallel")) && <Upload
-            label={item.title} owner={actor.name} storageKind="evidence" buttonLabel="Submit evidence" ariaLabel={`Submit evidence for ${item.title}`} disabled={paused}
+            label={item.title} owner={actor.name} storageKind="evidence" confirmButtonLabel="Submit evidence" ariaLabel={`Submit evidence for ${item.title}`} disabled={paused}
             onSave={() => false} onSaveMany={docs => onCommand({ type: "submit_checklist", projectId: project.id, phase: phase.name, itemId: item.id, responsibilityId: row.id, docs }, "Checklist evidence submitted.")} />}
-          {office && item.can_review && item.status === "submitted" && item.evidence_id && <Button disabled={paused} onClick={() => setReview({ phase: phase.name, item })}>Review evidence</Button>}
+          {office && item.can_review && item.status === "submitted" && item.evidence_id && <Button disabled={paused} onClick={() => setReview({ phase: phase.name, responsibilityId: row.id, item })}>Review evidence</Button>}
         </div>)}
       </article>)}
     </>}
@@ -88,7 +88,7 @@ export default function PhaseOverlapPanel({ project, actor, disabled = false, on
     {busy && <p role="status">Saving phase change…</p>}
     {error && <p role="alert">{error}</p>}
     {refreshFailed && <p role="alert">The change was saved. Reopen the project to load its current phase status.</p>}
-    {office && review?.item.evidence_id && <EvidenceReview projectId={project.id} evidenceId={review.item.evidence_id} docs={review.item.attachments} manualTurnover
+    {office && review?.item.evidence_id && <EvidenceReview projectId={project.id} evidenceId={review.item.evidence_id} docs={review.item.attachments} manualTurnover responsibilityId={review.responsibilityId}
       onClose={() => setReview(undefined)} onConfirm={async (expectedReviewToken, note, reject) => {
         const saved = await onCommand({ type: reject ? "reject_checklist" : "approve_checklist", projectId: project.id, phase: review.phase,
           itemId: review.item.id, evidenceId: review.item.evidence_id, expectedReviewToken, note })

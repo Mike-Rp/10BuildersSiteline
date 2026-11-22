@@ -29,6 +29,7 @@ test("frontend follows server decisions for company allocation and independent p
   }
   const project = { id: "project", phase: "Envelope / Curtain Wall", status: "active", opmId: office.id, docs: [], projectCompanyAllocation: allocation, overlapMonitoring: monitoring }
   const requests = []
+  let rejectFirstCompanyDecision = true
   const respond = data => Response.json({ data })
   const totals = { phase: { earned: 20, total: 30, percentage: 67 }, project: { earned: 20, total: 100, percentage: 20 } }
   const fetch = async (url, init) => {
@@ -36,6 +37,10 @@ test("frontend follows server decisions for company allocation and independent p
     const json = typeof init?.body === "string" ? JSON.parse(init.body) : undefined
     requests.push({ path, json })
     if (path.endsWith("/project-company-allocation")) {
+      if (rejectFirstCompanyDecision) {
+        rejectFirstCompanyDecision = false
+        return Response.json({ error: { message: "The allocation changed. Please try again." } }, { status: 409 })
+      }
       assert.equal(json.expected_revision, allocation.revision++)
       assert.equal(json.company_id, allocation.company.id)
       if (json.action === "reallocate") {
@@ -110,11 +115,19 @@ test("frontend follows server decisions for company allocation and independent p
   assert.equal(button("Record accepted"), undefined)
   await act(() => showCompany())
   await click(button("Record declined"))
+  assert.match(body(), /The allocation changed/)
+  assert.match(body(), /Awaiting company decision/)
+  assert.equal(button("Reallocate to next company"), undefined)
+  await click(button("Record declined"))
   await click(button("Reallocate to next company"))
   assert.match(body(), /Northgate Construction.*Awaiting company decision/)
   await click(button("Record accepted"))
   assert.match(body(), /Accepted and locked/)
   assert.ok(document.querySelector('[aria-label="Upload signed subcontractor agreement"]'))
+  Object.assign(allocation, { status: "no_eligible_company", company: undefined, can_upload_agreement: false })
+  await act(() => showCompany())
+  assert.match(body(), /No eligible subcontractor available/)
+  assert.equal(button("Record accepted"), undefined)
 
   let actor = office
   const showPhase = () => root.render(React.createElement(Phase, { project, actor, onReload: showPhase, onCommand: async command => {
@@ -142,7 +155,7 @@ test("frontend follows server decisions for company allocation and independent p
     assert.equal(document.querySelector('input[aria-label="Submit evidence for Final checklist item"]'), null)
     Object.defineProperty(file, "files", { value: [new File(["sample"], "evidence.pdf", { type: "application/pdf" })] })
     await act(() => file.dispatchEvent(new window.Event("change", { bubbles: true })))
-    await click(button("Confirm upload"))
+    await click(button("Submit evidence"))
     assert.equal(row.items[0].status, "submitted", body())
   }
   assert.deepEqual(requests.filter(request => request.path.endsWith("/phase-files")).map(request => request.json.responsibility_id), ["ana", "ben", "joel"])

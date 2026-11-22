@@ -133,6 +133,7 @@ export function Upload({
   owner = "Administrator",
   disabled = false,
   buttonLabel = "Upload document",
+  confirmButtonLabel = "Confirm upload",
   ariaLabel,
   spreadsheet = false,
   clientVisible = false,
@@ -146,6 +147,7 @@ export function Upload({
   owner?: string
   disabled?: boolean
   buttonLabel?: string
+  confirmButtonLabel?: string
   ariaLabel?: string
   spreadsheet?: boolean
   // Internal by default, including site photos that still require an authorized release.
@@ -228,7 +230,7 @@ export function Upload({
             Add attachments
           </Button>
           {files.length > 0 && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
-            {saving ? "Uploading…" : "Confirm upload"}
+            {saving ? "Uploading…" : confirmButtonLabel}
           </Button>}
         </div>
         {error && <p className="error" role="alert">{error}</p>}

@@ -17,6 +17,7 @@ type Preview = {
 }
 type EvidenceVersion = {
   id: string | number
+  responsibility_id?: string
   evidence_id: string | number
   status: string
   submitted_by_name?: string
@@ -28,12 +29,13 @@ const measure = (value: ProgressTotals) => value.earned === null || value.total 
   ? "Unavailable"
   : `${Number(value.earned.toFixed(1))} / ${value.total} points`
 
-export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs,manualTurnover=false,onClose,onConfirm}: {
+export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs,manualTurnover=false,responsibilityId,onClose,onConfirm}: {
   projectId: string
   evidenceId: string
   doc?: Doc
   docs?: Doc[]
   manualTurnover?: boolean
+  responsibilityId?: string
   onClose: () => void
   onConfirm: (token: string, note: string, reject: boolean) => Promise<boolean>
 }) {
@@ -109,7 +111,7 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
       {preview.submitted_by_name && <p>Submitted by {preview.submitted_by_name}{preview.submitted_at ? ` · ${new Date(preview.submitted_at).toLocaleString()}` : ""}</p>}
       {preview.submission_note && <p>{preview.submission_note}</p>}
       <Button onClick={()=>void api<EvidenceVersion[]>(`/projects/${projectId}/evidence-history`)
-        .then(rows=>{setHistory(rows.filter(row=>String(row.id)===String(preview.item_id)));setHistoryError("")})
+        .then(rows=>{setHistory(rows.filter(row=>String(row.id)===String(preview.item_id) && (!responsibilityId || row.responsibility_id===responsibilityId)));setHistoryError("")})
         .catch(error=>setHistoryError((error as Error).message))}>View submission history</Button>
       {historyError && <p role="status">History unavailable: {historyError}</p>}
       {history && <div>{history.map(version=><div key={version.evidence_id}>
