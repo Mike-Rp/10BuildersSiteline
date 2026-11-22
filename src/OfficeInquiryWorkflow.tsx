@@ -47,15 +47,6 @@ function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
   }
 }
 
-function suggestedAreaPerFloor(lot: Details[string], submittedLot: Details[string], submittedAverage: number | null) {
-  const lotArea = Number(lot)
-  const originalLotArea = Number(submittedLot)
-  if (!Number.isFinite(lotArea) || lotArea <= 0 || submittedAverage === null) return ""
-  if (lotArea === originalLotArea || !Number.isFinite(originalLotArea) || originalLotArea <= 0) return String(submittedAverage)
-
-  const scaledArea = lotArea * Math.min(submittedAverage / originalLotArea, 1)
-  return String(Math.min(lotArea, Number(scaledArea.toFixed(2)) || scaledArea))
-}
 const additionalFields = [["land_area", "Land area (m²)"], ...clientFields] as const
 const correctionFields = [...projectFields, ...additionalFields]
 const fieldId = (key: string) => `inquiry-review-${key}`
@@ -171,7 +162,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const compactReview = page === "review" && reviewing
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
-  const perFloor = floorArea.perFloor ?? suggestedAreaPerFloor(draft.lot_area, row.details.lot_area, floorArea.submittedAverage)
+  const lotArea = Number(draft.lot_area)
+  const submittedAverage = floorArea.submittedAverage
+  const averageExceedsCorrectedLot = submittedAverage !== null && lotArea > 0 &&
+    lotArea !== Number(row.details.lot_area) && submittedAverage > lotArea
+  const perFloor = floorArea.perFloor ?? (averageExceedsCorrectedLot ? "" : String(submittedAverage ?? ""))
   const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
@@ -441,7 +436,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 <input {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required type="number" min="0" step="any" value={perFloor}
                   onChange={event => updateFloorArea({ ...floorArea, perFloor: event.target.value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
-                  Suggested from the submitted measurements and adjusted when lot area changes. Enter the actual area if known.
+                  {averageExceedsCorrectedLot
+                    ? "The submitted average is larger than the corrected lot. Enter the actual area per floor."
+                    : perFloor ? "Prefilled with the submitted average. Update it if the floor area has changed."
+                    : "Enter the actual area per floor."}
                 </div>}
                 {inlineError(fieldId("area-per-floor"))}
               </div> : floorInputs.slice(floorPage * floorPageSize, (floorPage + 1) * floorPageSize).map((value, offset) => {
