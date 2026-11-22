@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react"
+import { useScrollOnChange } from "./navigation-scroll"
 import { dateLabel } from "./model"
 import { Badge, Button, Empty, Icon } from "./ui"
 import type { Doc } from "./model"
@@ -132,6 +133,7 @@ export default function DocumentRepository({
   const [ownPath, setOwnPath] = useState<RepositoryPath>({})
   const [ownQuery, setOwnQuery] = useState("")
   const path = controlledPath ?? ownPath
+  const scrollRef = useScrollOnChange(JSON.stringify([lockedProjectId ?? path.projectId, path.categoryId, path.folderId]))
   const setPath = onPathChange ?? setOwnPath
   const query = controlledQuery ?? ownQuery
   const setQuery = onQueryChange ?? setOwnQuery
@@ -283,7 +285,7 @@ export default function DocumentRepository({
   // role-scoped) list is never shown: say so instead of rendering an empty browser.
   if (lockedProjectId && !project)
     return (
-      <section className={`panel document-browser ${className}`}>
+      <section ref={scrollRef} className={`panel document-browser ${className}`}>
         <Empty title="You don't have access to these documents.">
           This project is not assigned to your account.
         </Empty>
@@ -291,7 +293,7 @@ export default function DocumentRepository({
     )
 
   return (
-    <section className={`panel document-browser ${className}`}>
+    <section ref={scrollRef} className={`panel document-browser ${className}`}>
       <header className="panel-header">
         <div>
           <h2>{title}</h2>

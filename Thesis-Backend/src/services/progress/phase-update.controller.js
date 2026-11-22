@@ -10,7 +10,7 @@ import { phaseProject, assertProjectSpm, readChecklist, recordPhaseHistory, asse
 import { insertFile } from "./phase-upload.utility.js";
 import { assertAssignmentWritable } from "./assignment.utility.js";
 import { submitChecklist } from "./phase-submission.utility.js";
-import { updateBody, optionalNote, resolveStage, validateFiles, insertIssue, issueReason, rejectProgressInput } from "./phase-update.utility.js";
+import { updateBody, optionalNote, resolveStage, validateFiles, insertIssue, issueReason, rejectProgressInput, assertUpdateHasContent } from "./phase-update.utility.js";
 
 export const submitPhaseUpdate = async (req, res) => {
   try {
@@ -31,6 +31,7 @@ export const submitPhaseUpdate = async (req, res) => {
         "SELECT id FROM project_phase_updates WHERE project_id = $1 AND selected_stage_id=$2 AND submitted_by=$3 AND status = 'pending'", [p.id,stage.id,user.id]);
       if (existing.rowCount) throw new HttpError(409, "Your workspace already has an update awaiting OPM confirmation.");
       await validateFiles(client, selected, user.id, body.file_ids);
+      assertUpdateHasContent(body, Boolean(req.file));
       const update = await client.query(
         `INSERT INTO project_phase_updates
            (project_id, selected_stage_id, prior_stage_id, prior_pct, note, issue_categories, issue_reason, submitted_by)

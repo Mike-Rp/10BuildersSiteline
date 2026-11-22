@@ -9,7 +9,7 @@ test("client company registration validates primary and optional backup contacts
   assert.deepEqual(saved.foremen,[{name:"Juan Cruz",phone:"09171234567"}])
   assert.equal(saved.availability,"available")
   assert.throws(()=>normalizeClientCompany({...profile(),foremen:undefined}),/primary foreman/)
-  assert.throws(()=>normalizeClientCompany({...profile(),foremen:[{name:"Juan",phone:"123"}]}),/11-digit/)
+  assert.throws(()=>normalizeClientCompany({...profile(),foremen:[{name:"Juan",phone:"123"}]}),/Philippine mobile number/)
   assert.throws(()=>normalizeClientCompany({...profile(),foremen:[profile().foremen[0],{name:"Backup",phone:""}]}),/backup foreman/)
   assert.throws(()=>normalizeClientCompany({...profile(),email:"crew@example.com"}),/@gmail.com/)
 })

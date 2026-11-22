@@ -1,0 +1,38 @@
+.allocation-change-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  background: #eaf4ff;
+  border: 1px solid #a8c9e9;
+  border-inline-start: 4px solid #296396;
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+.allocation-change-banner.replacement {
+  background: #fff4df;
+  border-color: #e5be82;
+  border-inline-start-color: #a86512;
+}
+.allocation-change-banner h2 { font-size: 1.05rem; margin: 0 0 4px; }
+.allocation-change-banner time { display: block; margin-top: 5px; color: var(--color-muted); font-size: .875rem; }
+.allocation-change-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.allocation-history { display: grid; gap: 12px; }
+.allocation-history-filters { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+.allocation-history-record {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+.allocation-history-record header { display: flex; justify-content: space-between; align-items: start; gap: 8px; flex-wrap: wrap; }
+.allocation-history-record ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.allocation-history-record li { padding-top: 8px; border-top: 1px solid var(--color-line); }
+.allocation-history-record li p { color: var(--color-muted); }
+@media (max-width: 640px) {
+  .allocation-change-banner { grid-template-columns: auto minmax(0, 1fr); }
+  .allocation-change-banner .allocation-change-actions { grid-column: 2; }
+}

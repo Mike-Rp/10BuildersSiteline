@@ -150,6 +150,15 @@ test("other roles learn about people from the project: team, Office PM and clien
   assert.equal(peopleFromProjects(asClient, [base], new Map()).clientIds.get("p1"), "c", "a client's own projects link to their account")
 })
 
+test("client-safe Office PM contact maps independently of stripped internal assignment fields", () => {
+  const {suggested_opm_id,...clientList}=base
+  const project=mapProject(parts({list:clientList,detail:{office_pm_contact:{id:"assigned-opm",full_name:"  Lea Santos  ",email:"not-projected@example.test"}}}))
+  assert.equal(project.opmId,"assigned-opm")
+  assert.deepEqual(project.officePmContact,{name:"Lea Santos"})
+  assert.equal(mapProject(parts({list:clientList})).officePmContact,undefined)
+  assert.equal(mapProject(parts({list:clientList,detail:{opm_assignment:{target_user_id:"opm-assignment",name:"Lea"}}})).opmId,"opm-assignment")
+})
+
 test("companies and notifications map their key fields", () => {
   const c = mapCompany({ id: "c1", company_name: "Cordova", directory_status: "declined", contact_person: { name: "Alexis" }, contact_email: "a@b.c", crew_count: 3, availability: "committed", assigned_projects: ["Rosaria Business Park"], committed_until: "2026-12-01" }, new Map([["rosaria business park", "p1"]]))
   assert.equal(c.status, "rejected")
@@ -270,4 +279,20 @@ test("a report without attachments, or with a malformed list, shows none", () =>
     assert.equal(update.attachments, undefined, JSON.stringify(files))
     assert.equal(update.evidence, undefined)
   }
+})
+
+test("a pending site issue carries its photo to the Office PM review card", () => {
+  const overview = {
+    stages: [], checklist: { items: [] }, review_queue: [], pending_update: null,
+    issues: [{
+      id: "i1", status: "pending", reason: "error", issue_categories: ["failed_inspection"],
+      submitted_by: "s1", submitted_at: "2026-11-12T07:55:24Z",
+      files: [{ id: "f1", name: "crack.png", content_type: "image/png", byte_size: 1200 }],
+    }],
+  }
+  const project = mapProject(parts({ overview }))
+  const issue = project.workflow.pendingRework
+  assert.equal(issue.attachments.length, 1)
+  assert.equal(issue.attachments[0].name, "crack.png")
+  assert.equal(issue.evidence.id, "f1")
 })

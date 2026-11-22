@@ -5,6 +5,7 @@ import {
   COMMITMENTS_SQL,
 } from "./subcontractor-allocation.utility.js"
 import {
+  allocationCompanyChanges,
   validatePhaseAssignments,
   changedCompanies,
 } from "../../domain/phase-foreman-allocation.js"
@@ -171,16 +172,57 @@ export function registerPhaseAllocationRoutes(
   { endpoint, project, event },
 ) {
   router.get(
-    "/allocation-requests",
-    endpoint(
-      ["admin"],
-      async (db) =>
-        (
-          await db.query(`select r.*,p.name as project_name,u.full_name as requested_by_name
-    from project_allocation_requests r join projects p on p.id=r.project_id join users u on u.id=r.requested_by
-    where not coalesce(p.is_deleted,false) order by (r.status='pending_admin') desc,r.requested_at desc limit 100`)
-        ).rows,
-    ),
+    "/allocation-history",
+    endpoint(["admin", "opm"], async (db, user, req) => {
+      const { projectId, notificationId, search, action, from, to, page } = req.query
+      if (projectId !== undefined && !isUuid(projectId)) throw new HttpError(400, "Choose a valid project.")
+      if (notificationId !== undefined && !/^[0-9]{1,19}$/.test(String(notificationId)))
+        throw new HttpError(400, "Choose a valid allocation notification.")
+      const isDate = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+        Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value && !value.startsWith("0000")
+      if ([from, to].some(value => value !== undefined && !isDate(value)) || (from && to && from > to))
+        throw new HttpError(400, "Choose a valid date range.")
+      const currentPage = Number(page ?? 1)
+      if (!Number.isSafeInteger(currentPage) || currentPage < 1) throw new HttpError(400, "Choose a valid history page.")
+      const { rows } = await db.query(`
+        select e.id,e.project_id,e.created_at,e.detail,p.name as project_name,u.full_name as actor_name,
+          r.reason,r.existing_company_ids
+        from project_allocation_events e
+        join projects p on p.id=e.project_id
+        join users u on u.id=e.actor_id
+        left join project_allocation_requests r on r.id=e.request_id
+        where e.action='confirm' and not coalesce(p.is_deleted,false)
+          and ($1='admin' or p.suggested_opm_id=$2)
+          and ($3::uuid is null or p.id=$3)
+          and ($4::text is null or e.detail->>'notificationId'=$4)
+          and ($5='' or strpos(lower(coalesce(e.detail->>'projectName',p.name)),lower($5))>0)
+          and ($6::date is null or e.created_at >= ($6::date::timestamp at time zone 'Asia/Manila'))
+          and ($7::date is null or e.created_at < (($7::date + 1)::timestamp at time zone 'Asia/Manila'))
+        order by e.id desc`, [user.role, user.id, projectId ?? null, notificationId ?? null, String(search ?? "").trim().slice(0, 150), from ?? null, to ?? null])
+      const records = rows.flatMap(({ id, project_id, created_at, detail, project_name, actor_name, reason, existing_company_ids }) => {
+        const changes = (detail.changes ?? allocationCompanyChanges(detail.previous ?? [], detail.proposal ?? [], existing_company_ids))
+          .filter(change => !action || change.action === action)
+        return changes.length ? [{
+          id, projectId: project_id, projectName: detail.projectName ?? project_name,
+          leadName: detail.leadName ?? actor_name, date: created_at, reason: reason || detail.note,
+          status: "Applied", changes,
+        }] : []
+      })
+      const limit = 20
+      const visible = records.slice((currentPage - 1) * limit, currentPage * limit)
+      const legacyIds = [...new Set(visible.flatMap(record => record.changes.flatMap(change =>
+        change.company === undefined ? [change.companyId, change.previousCompanyId].filter(Boolean) : [])))]
+      if (legacyIds.length) {
+        const { rows: companies } = await db.query("select id,company_name from subcontractors where id=any($1::uuid[])", [legacyIds])
+        const names = new Map(companies.map(company => [company.id, company.company_name]))
+        for (const record of visible) for (const change of record.changes) {
+          change.company ??= names.get(change.companyId) || "Company record unavailable"
+          if (change.previousCompanyId)
+            change.previousCompany ??= names.get(change.previousCompanyId) || "Company record unavailable"
+        }
+      }
+      return { records: visible, hasMore: records.length > currentPage * limit }
+    }),
   )
   router.get(
     "/subcontractors/:id/phase-assignments",
@@ -245,7 +287,9 @@ export function registerPhaseAllocationRoutes(
                 ],
               }))
             : [],
-        requests: ctx.requests,
+        requests: ctx.requests.map(request => request.status === "pending_admin"
+          ? { ...request, status: "approved" }
+          : request),
         revision: ctx.revision,
         history,
         canEdit:
@@ -286,7 +330,7 @@ export function registerPhaseAllocationRoutes(
   )
   router.post(
     "/projects/:id/phase-allocation",
-    endpoint(["admin", "spm"], async (db, user, req) => {
+    endpoint(["spm"], async (db, user, req) => {
       const p = await project(db, user, req.params.id, true),
         b = req.body
       if (!["spm_review", "active"].includes(p.lifecycle_status))
@@ -308,19 +352,9 @@ export function registerPhaseAllocationRoutes(
           [p.id],
         )
       ).rows[0]?.spm_user_id
-      const admin = user.role === "admin"
-      if (!["approve", "reject"].includes(b.action)) {
-        if (user.role !== "spm" || user.id !== lead)
-          throw new HttpError(
-            403,
-            "Only the assigned Lead Site PM can manage phase allocations.",
-          )
-        await assertLicenseActive(user, db)
-      } else if (!admin)
-        throw new HttpError(
-          403,
-          "Only Admin can approve or reject allocation requests.",
-        )
+      if (user.id !== lead)
+        throw new HttpError(403, "Only the assigned Lead Site PM can manage phase allocations.")
+      await assertLicenseActive(user, db)
       if (typeof b.note !== "string" || !b.note.trim() || b.note.length > 2000)
         throw new HttpError(
           400,
@@ -406,21 +440,7 @@ export function registerPhaseAllocationRoutes(
               .map((s) => s.companyId),
           ]),
         ]
-        const scopeChanged=oldIds.length>0&&proposal.some(row=>{
-          const previous=ctx.assignments.find(r=>r.phase===row.phase)
-          if(previous)return previous.companyId!==row.companyId
-          const covered=meta.subcontractorAllocation?.coverage.filter(r=>r.phase===row.phase)||[]
-          return covered.length?covered.some(r=>r.companyId!==row.companyId):oldIds.length>1
-        })
-        const needsApproval = scopeChanged || (
-          ids.some((id) => !oldIds.includes(id)) &&
-          (oldIds.length > 0 || ids.length > 1))
-        const status =
-          b.action === "draft"
-            ? "draft"
-            : needsApproval
-              ? "pending_admin"
-              : "approved"
+        const status = b.action === "draft" ? "draft" : "approved"
         const r = draft
           ? (
               await db.query(
@@ -450,14 +470,6 @@ export function registerPhaseAllocationRoutes(
           { proposal, reason: b.note.trim() },
           r.id,
         )
-        if (status === "pending_admin")
-          await event(
-            db,
-            user,
-            p,
-            "Subcontractor allocation approval requested",
-            b.note.trim(),
-          )
         return r
       }
       if (!Number.isSafeInteger(b.requestId) || b.requestId < 1)
@@ -469,6 +481,7 @@ export function registerPhaseAllocationRoutes(
         )
       ).rows[0]
       if (!r) throw new HttpError(404, "Allocation request not found.")
+      let applied
       if (b.action === "cancel") {
         if (!["draft", "pending_admin", "approved"].includes(r.status))
           fail("This request is already closed.")
@@ -477,36 +490,11 @@ export function registerPhaseAllocationRoutes(
           "update project_allocation_requests set status='cancelled' where id=$1",
           [r.id],
         )
-      } else if (["approve", "reject"].includes(b.action)) {
-        if (r.status !== "pending_admin")
-          fail("Only pending requests can be reviewed.")
-        if (r.base_revision !== ctx.revision)
-          fail("The allocation changed. Ask the SPM to submit a new request.")
-        await db.query(
-          "update project_allocation_requests set status=$2,reviewed_by=$3,reviewed_at=now(),review_note=$4 where id=$1",
-          [
-            r.id,
-            b.action === "approve" ? "approved" : "rejected",
-            user.id,
-            b.note.trim(),
-          ],
-        )
-        await event(
-          db,
-          user,
-          p,
-          "Subcontractor allocation " +
-            (b.action === "approve" ? "approved" : "rejected"),
-          b.note.trim(),
-          [r.requested_by],
-        )
       } else if (
         ["contact", "accept", "decline", "confirm"].includes(b.action)
       ) {
-        if (r.status !== "approved" || r.base_revision !== ctx.revision)
-          fail(
-            "Admin approval is required or the allocation has changed. Cancel and resubmit.",
-          )
+        if (!["approved", "pending_admin"].includes(r.status) || r.base_revision !== ctx.revision)
+          fail("This proposal is closed or the allocation has changed. Reload before continuing.")
         let proposal = r.proposal
         try {
           if (b.action === "accept" || b.action === "confirm")
@@ -614,6 +602,18 @@ export function registerPhaseAllocationRoutes(
             fail(e.message)
           }
           const oldPlan = meta.subcontractorAllocation
+          const previousOwners = ctx.remaining.flatMap(({ name: phase }) => {
+            const current = previous.find(row => row.phase === phase)
+            if (current) return [current]
+            const legacy = [...new Set((oldPlan?.coverage ?? []).filter(row => row.phase === phase).map(row => row.companyId))]
+            return legacy.length === 1 ? [{ phase, companyId: legacy[0] }] : []
+          })
+          const companyName = id => ctx.companies.find(company => company.id === id)?.name || "Company record unavailable"
+          const changes = allocationCompanyChanges(previousOwners, proposal, oldPlan?.companyIds ?? []).map(change => ({
+            ...change,
+            company: companyName(change.companyId),
+            previousCompany: change.previousCompanyId ? companyName(change.previousCompanyId) : null,
+          }))
           const completedCoverage = (oldPlan?.coverage || []).filter((row) =>
             ctx.completed.includes(row.phase),
           )
@@ -711,6 +711,14 @@ export function registerPhaseAllocationRoutes(
             "update project_allocation_requests set status='applied' where id=$1",
             [r.id],
           )
+          const replacement = changes.some(change => change.action === "Replaced")
+          const summary = changes.map(change => change.action === "Replaced"
+            ? `replaced ${change.previousCompany} with ${change.company}`
+            : `added ${change.company}`).join("; ")
+          const notificationId = changes.length ? await event(db, user, p,
+            replacement ? "Subcontractor Allocation Updated" : "New Subcontractor Assigned",
+            `Lead Site PM ${user.full_name} ${summary} for ${p.name}.`) : null
+          applied = { changes, notificationId, projectName: p.name, leadName: user.full_name }
         }
       } else throw new HttpError(400, "Unknown allocation action.")
       await log(
@@ -725,6 +733,7 @@ export function registerPhaseAllocationRoutes(
           note: b.note.trim(),
           previous: ctx.assignments,
           proposal: r.proposal,
+          ...applied,
         },
         r.id,
       )

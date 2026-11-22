@@ -10,7 +10,7 @@ import { normalizeMixedUseScope } from "../../domain/mixed-use-scope.js";
 import { locationError, normalizeLocation, sameLocationRecord } from "../../domain/operating-location.js";
 import { companyRegistrationErrors, normalizeCompanyForemen } from "../../domain/company-registration.js";
 import { normalizeClientCompany } from "../../domain/client-company.js";
-import { COMMITMENTS_SQL, allocationCommand, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
+import { COMMITMENTS_SQL, allocationCommand, intakeReady, saveCapabilityReview, usesTradeAllocation, validateAllocationActivation } from "./subcontractor-allocation.utility.js";
 import { registerPhaseAllocationRoutes } from "./phase-foreman-allocation.js";
 import {recoverySummary,generateRecoveryCodes,verifyRecoveryCode,resetWithRecoveryCode,changeAdminPassword} from '../auth/admin-security.controller.js';
 import {registerResponsibilityRoutes} from './phase-responsibilities.js';
@@ -127,6 +127,7 @@ async function event(db, user, p, title, detail = "", extraRecipientIds = []) {
  on conflict do nothing`, [result.rows[0].id, user.id, p?.suggested_opm_id || null, extraRecipientIds]);
         await mirrorLegacyNotifications(db, [result.rows[0].id]);
     }
+    return result.rows[0]?.id;
 }
 const normalizeResetName = value => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 async function findResetAccounts(db, body) {
@@ -207,7 +208,12 @@ router.post("/auth/logout", logout);
 router.get("/auth/session", sessionStatus);
 router.post("/auth/activity", sessionStatus);
 router.post("/auth/reset-password", requireLogin, reset);
-router.get("/auth/me", endpoint(null, async (db, user) => (await db.query("select u.id,u.full_name,u.email,r.code as role,u.status,u.temp_password_issued from users u join roles r on r.id=u.role_id where u.id=$1", [user.id])).rows[0]));
+router.get("/auth/me", endpoint(null, async (db, user) => (await db.query("select u.id,u.full_name,u.email,r.code as role,u.status,u.temp_password_issued,coalesce((select m.metadata->>'workspaceGuideSeen'='true' from workspace_account_metadata m where m.user_id=u.id),false) as workspace_guide_seen from users u join roles r on r.id=u.role_id where u.id=$1", [user.id])).rows[0]));
+// The first-login welcome guide is shown once per account, on any browser or device.
+router.post("/auth/me/workspace-guide-seen", endpoint(null, async (db, user) => {
+    await db.query("insert into workspace_account_metadata(user_id,metadata) values($1,jsonb_build_object('workspaceGuideSeen',true)) on conflict(user_id) do update set metadata=workspace_account_metadata.metadata||jsonb_build_object('workspaceGuideSeen',true)", [user.id]);
+    return { workspace_guide_seen: true };
+}));
 router.get("/subcontractors", getSubcontractors);
 router.post("/subcontractors", createSubcontractor);
 router.use(phases);
@@ -668,6 +674,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             leader();
             if (meta.clientSubcon) throw new HttpError(409, "This project has a locked client-provided subcontractor.");
             if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
+            if (p.inquiry_intake) await intakeReady(db, p);
             const current = (await db.query("select * from project_subcontractor_selections where project_id=$1 and status in ('contacted','accepted')", [p.id])).rows[0];
             if (current)
                 throw new HttpError(409, "This project already has a subcontractor in progress.");
@@ -685,6 +692,7 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
             leader();
             if (meta.clientSubcon) throw new HttpError(409, "This project has a locked client-provided subcontractor.");
             if (usesTradeAllocation(p, meta)) { await allocationCommand(db, p, meta, user, c); break; }
+            if (p.inquiry_intake) await intakeReady(db, p);
             if (typeof c.accepted !== "boolean")
                 throw new HttpError(400, "An explicit company response is required.");
             if (c.accepted) {

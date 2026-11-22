@@ -19,6 +19,7 @@ import {
   type Role,
   type State,
 } from "../model.ts"
+import { clientActivationStatus } from "../client-activation.ts"
 
 export type Dto = Record<string, any>
 
@@ -94,8 +95,10 @@ export function mapAccount(
     scope: detail?.specializations ?? scope,
     qualifiedRequirements: detail?.qualifiedRequirements,
     projectTypes: types,
+    jobTitle: detail?.job_title ?? a.job_title ?? undefined,
     experienceByType: detail?.experience_by_type ?? a.experience_by_type,
     status: accountStatus(a.status),
+    activationStatus: role === "client" ? clientActivationStatus(detail?.activation_status ?? a.activation_status) : undefined,
     added: day(a.date_added),
     license: license?.license_number ?? "",
     expiry: day(license?.license_expiry),
@@ -210,6 +213,7 @@ export function mapProject(parts: ProjectParts): Project {
     phase: t.stage,
     accountId: t.spm_user_id || "",
     status: teamStatus(t.status),
+    isLead: t.is_lead === true,
     requiredDisciplines: t.required_disciplines,
     assignedDisciplines: t.assigned_disciplines,
     sequence: t.sort_order,
@@ -320,10 +324,23 @@ export function mapProject(parts: ProjectParts): Project {
   workflow.pendingUpdate=workflow.pendingUpdates[0]
 
   const rework=parts.overview?.issues?.find((i:Dto)=>i.status==="pending")
+  const reworkAttachments: Doc[] = (Array.isArray(rework?.files) ? rework.files : []).map((f: Dto): Doc => {
+    register(f.id, "/api/v1/projects/" + id + "/phase-files/" + f.id)
+    return {
+      id: String(f.id), label: "Site issue attachment", name: f.name || "Attachment", uploaded: true, clientVisible: false,
+      owner: "Site PM", date: day(rework.submitted_at),
+      size: f.byte_size == null ? undefined : Number(f.byte_size), mime: f.content_type || undefined,
+    }
+  })
   if(rework)workflow.pendingRework={id:rework.id,version:1,authorId:rework.submitted_by||"",submittedAt:iso(rework.submitted_at),
     note:rework.reason,issues:rework.issue_categories||[],priorPhase:list.current_stage,priorProgress:Number(list.current_pct||0),
-    requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0)}
+    requestedPhase:list.current_stage,requestedProgress:Number(list.current_pct||0),
+    ...(reworkAttachments.length ? { attachments: reworkAttachments, evidence: reworkAttachments[0] } : {})}
+  // Public project contact contract; never infer a name from an unrelated account.
+  const officePmName = typeof detail.office_pm_contact?.full_name === "string"
+    ? detail.office_pm_contact.full_name.trim() : typeof list.office_pm_name === "string" ? list.office_pm_name.trim() : ""
   const project: Project = {
+    ...(officePmName ? { officePmContact: { name: officePmName } } : {}),
     ...(parts.checklistProgress ? { checklistProgress: parts.checklistProgress } : {}),
     ...(parts.verifiedProgress ? { verifiedProgress: parts.verifiedProgress } : {}),
     ...(parts.overallProgress !== undefined ? { overallProgress: parts.overallProgress } : {}),
@@ -332,6 +349,8 @@ export function mapProject(parts: ProjectParts): Project {
     name: list.name,
     subcontractorAllocationVersion: Number(list.subcontractor_allocation_version || 0),
     type: list.project_type,
+    inquiryOrigin: list.inquiry_origin === true,
+    inquiryOverview: detail.inquiry_overview,
     ...(list.phase_scope ? {phaseScope: list.phase_scope} : {}),
     area: formatArea(list.floor_area_sqm),
     floors:
@@ -345,8 +364,8 @@ export function mapProject(parts: ProjectParts): Project {
       id: client.id, name: client.full_name, email: client.email || "", phone: client.phone || "", contactPerson: client.contact_person || "",
     }))} : {}),
     status,
-    opmId: list.suggested_opm_id || "",
-    officePmName: list.office_pm_name || undefined,
+    opmId: detail.office_pm_contact?.id || detail.opm_assignment?.target_user_id || list.suggested_opm_id || "",
+    ...(list.progress_weighting ? { progressWeighting: list.progress_weighting } : {}),
     team,
     phase: list.current_stage || team[0]?.phase || "Mobilization",
     // The backend derives % from approved checklist items; an archived project is finished.
@@ -488,6 +507,10 @@ export function peopleFromProjects(
   add(me)
   for (const p of list) {
     const detail = details.get(p.id) || {}
+    for (const contact of (detail.site_pm_contacts || []) as Dto[]) {
+      const account = byId.get(contact.id) ?? stubAccount(contact.id, contact.full_name, "spm")
+      byId.set(contact.id, { ...account, name: contact.full_name, email: contact.email ?? "", phone: contact.phone ?? "" })
+    }
     for (const t of (detail.phase_team || []).filter((t: Dto) => t.spm_user_id))
       add(stubAccount(t.spm_user_id, t.spm_name, "spm"))
     if (detail.opm_assignment?.target_user_id)
@@ -499,7 +522,7 @@ export function peopleFromProjects(
         ),
       )
     else if (p.suggested_opm_id && !byId.has(p.suggested_opm_id))
-      add(stubAccount(p.suggested_opm_id, "Office PM", "opm"))
+      add(stubAccount(p.suggested_opm_id, p.suggested_opm_name || "Office PM", "opm"))
     const clientName: string = p.client_name || ""
     if (Array.isArray(detail.client_accounts)) {
       const linked = detail.client_accounts as Dto[]

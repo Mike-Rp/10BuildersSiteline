@@ -6,9 +6,11 @@ import { clientProjectViews } from "../src/client-access.ts"
 test("staff notification rows open full previews, mark reads, dismiss by keyboard, and open the related profile or project; clients open project history", async () => {
   const [{ JSDOM }, { createServer }, React] = await Promise.all([import("jsdom"), import("vite"), import("react")])
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   const previous = new Map()
   const w = dom.window
-  for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, navigator: w.navigator,
+  for (const [key, value] of Object.entries({ window: w, localStorage: w.localStorage, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, navigator: w.navigator,
     IS_REACT_ACT_ENVIRONMENT: true, requestAnimationFrame: w.requestAnimationFrame.bind(w), cancelAnimationFrame: w.cancelAnimationFrame.bind(w),
     ResizeObserver: class { observe() {} unobserve() {} disconnect() {} } })) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key))

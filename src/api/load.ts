@@ -109,7 +109,7 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
       const detail = workspace.accountDetails?.[a.id] || await optional(api<Dto>(`/accounts/${a.id}`), undefined as unknown as Dto)
       const mapped=mapAccount(a,detail,projectIdsByName)
       const metadata=workspace.accounts?.[a.id]||{}
-      return {...mapped,...metadata,...(mapped.hasCredentialSpecializations?{scope:mapped.scope,hasCredentialSpecializations:true,credentialCount:mapped.credentialCount,credentialStatus:mapped.credentialStatus}:{}),status:metadata.status==="deactivated"&&mapped.status==="suspended"?"deactivated":mapped.status} as Account
+      return {...mapped,...metadata,...(mapped.hasCredentialSpecializations?{scope:mapped.scope,hasCredentialSpecializations:true,credentialCount:mapped.credentialCount,credentialStatus:mapped.credentialStatus}:{}),activationStatus:mapped.activationStatus,status:metadata.status==="deactivated"&&mapped.status==="suspended"?"deactivated":mapped.status} as Account
     })
   }
   const selfDetail = accounts.some(a=>a.id===me.id)?undefined:await optional(api<Dto>(`/accounts/${me.id}`), undefined as unknown as Dto)
@@ -143,9 +143,18 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
     if(handoff?.reason)project.handoffBlocker=handoff.reason
   }
   // Client accounts see only their own projects.
-  const finalAccounts = people.accounts.map((a) =>
-    a.id === me.id && a.role === "client" ? { ...a, scope: projects.map((p) => p.id), status: "active" as const } : a,
-  )
+  const clientProjects = new Map<string, string[]>()
+  const hasClientLinks = me.role === "admin" && parts.every(part => Array.isArray(part.detail.client_accounts))
+  if (hasClientLinks) for (const part of parts) for (const client of part.detail.client_accounts as Dto[]) {
+    const ids = clientProjects.get(client.id) ?? []
+    ids.push(part.list.id)
+    clientProjects.set(client.id, ids)
+  }
+  const finalAccounts = people.accounts.map(a => {
+    if (a.role !== "client") return a
+    if (a.id === me.id) return { ...a, scope: projects.map(p => p.id), status: "active" as const }
+    return hasClientLinks ? { ...a, scope: clientProjects.get(a.id) ?? [] } : a
+  })
   if (!finalAccounts.some((a) => a.id === me.id)) finalAccounts.push(stubAccount(me.id, me.full_name ?? "", me.role))
 
   const loaded = buildState({

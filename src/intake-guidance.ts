@@ -1,5 +1,5 @@
 import { licenseState, type Account, type Project, type State } from "./model.ts"
-import { activationChecks, assignmentBlock, isAssigned, leadConfirmed, leadId, registeredComplete, teamConfirmed } from "./workflows.ts"
+import { activationChecks, assignmentBlock, assignmentDocumentsMissing, isAssigned, leadConfirmed, leadId, registeredComplete, teamConfirmed } from "./workflows.ts"
 import { requiredCompanies, tradeAllocationEnabled } from "./subcontractor-allocation.ts"
 
 export type IntakeView = "all" | "action" | "waiting"
@@ -46,9 +46,12 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!p.opmId) return step("Office PM unassigned", "Unassigned", "Review the intake record; an Office PM assignment is missing.", false, "view", "View details")
   if (!p.opmAccepted) return step("Office PM acceptance", person(p.opmId, "Office PM"),
     "Office PM must review and accept the assignment or request changes.", actor.role === "opm", "confirm", "Review assignment")
-  if (!registeredComplete(p)) return step("Required documents", person(p.opmId, "Office PM"),
-    "Office PM must complete the six required documents before Site PM acceptance.", actor.role === "opm", "documents", "Open required documents")
-  const ownPending = p.team.filter(row => row.accountId === actor.id && row.status === "pending")
+  if (assignmentDocumentsMissing(p).length && (actor.role !== "spm" || !p.inquiryOrigin)) return step("Required documents", person(p.opmId, "Office PM"),
+    p.inquiryOrigin ? "Upload the remaining intake documents. Site PMs can respond while uploads are in progress." : "Office PM must complete the six required documents before Site PM acceptance.",
+    actor.role === "opm", "documents", "Open required documents")
+  const ownPending = p.team.filter(row => row.engineers?.length
+    ? row.engineers.some(engineer => engineer.accountId === actor.id && engineer.status === "pending")
+    : row.accountId === actor.id && row.status === "pending")
   if (actor.role === "spm" && ownPending.length && !assignmentBlock(p, actor.id))
     return step(actor.id === lead ? "Lead Site PM acceptance" : "Site PM confirmations", person(actor.id, "Site PM"),
       `Review your assigned phases: ${ownPending.map(row => row.phase).join(", ")}. Accept or decline through your existing assignment controls.`, true, "assignment", "Review assignment")
@@ -59,7 +62,7 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   if (!p.team.length || !lead) return step("Phase assignments incomplete", "Unassigned",
     "The stored phase team is incomplete. Review the intake details before continuing.", false, "view", "View details")
   if (!leadConfirmed(p)) return step("Lead Site PM acceptance", person(lead, "Lead Site PM"),
-    "The project Lead must accept Mobilization before the remaining Site PMs can respond.",
+    "The project Lead must accept before the remaining Site PMs can respond.",
     actor.role === "spm" && actor.id === lead && !assignmentBlock(p, actor.id) && p.team.some(row => row.accountId === actor.id && row.status === "pending"), "assignment", "Review assignment")
   if (!teamConfirmed(p)) {
     const pending = p.team.filter(row => row.status !== "confirmed")
@@ -67,6 +70,8 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
       `Awaiting phase responses: ${pending.map(row => row.phase).join(", ")}.`,
       actor.role === "spm" && pending.some(row => row.accountId === actor.id && row.status === "pending") && !assignmentBlock(p, actor.id), "assignment", "Review assignment")
   }
+  if (!registeredComplete(p)) return step("Required documents", person(p.opmId, "Office PM"),
+    "Upload the remaining required documents before project activation.", actor.role === "opm", "documents", "Open required documents")
   const checks = activationChecks(state, p)
   const clientReady = checks.find(check => check.id === "client")?.passed === true
   // Client readiness is also a gate on signed-agreement upload, not just activation.
@@ -75,7 +80,7 @@ export function intakeGuidance(state: State, p: Project, actor: Account): Intake
   const tradeBased = phaseBased || tradeAllocationEnabled(state, p)
   if (!checks.find(check => check.id === "subcontractors")?.passed)
     return step(tradeBased ? "Company team coordination" : p.clientSubcon ? "Client subcontractor review" : "Subcontractor coordination", person(lead, "Lead Site PM"),
-      phaseBased ? "Lead Site PM selects an eligible company, assigns one foreman per phase, and records agreement. Additional or replacement companies require Admin approval." : tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
+      phaseBased ? "Lead Site PM selects eligible companies, assigns one foreman per phase, records company agreement, and confirms the allocation." : tradeBased ? `Lead Site PM must confirm complete discipline coverage and record acceptance from all ${requiredCompanies(p.type)} required companies.` : p.clientSubcon ? "Lead Site PM must review the client-provided subcontractor and resolve any open agreement issues." : "Lead Site PM must coordinate an approved subcontractor and record its response.", mine, "coordinate", "Review coordination")
   if (!clientReady) return step("Client account prerequisite", "Administrator",
     "The linked client record is missing or unavailable. Review the existing account and intake details; activation remains blocked.", false, "view", "View details")
   if (!tradeBased && p.clientSubcon && checks.every(check => check.passed)) return step("Ready for Lead activation", person(lead, "Lead Site PM"),

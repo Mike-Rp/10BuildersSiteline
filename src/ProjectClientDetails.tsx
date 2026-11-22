@@ -1,8 +1,8 @@
 import type { Account, Project } from "./model"
+import { projectClients } from "./project-clients"
 
 export default function ProjectClientDetails({ project, accounts }: { project: Project; accounts: Account[] }) {
-  const saved = accounts.find(account => account.id === project.clientId && account.role === "client" && !account.id.startsWith("client:"))
-  const clients = project.clientAccounts ?? (saved ? [saved] : [])
+  const clients = projectClients(project, accounts)
   return <section className="project-client-details" aria-label="Project client account">
     <h3>{clients.length > 1 ? "Client accounts" : "Client account"}</h3>
     {clients.length ? clients.map(client => <dl className="project-client-contact" key={client.id}>

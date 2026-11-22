@@ -3,12 +3,12 @@ import { intakeGuidance, isIntakeHistory, intakeHistoryLabel, type IntakeGuidanc
 import { clientSubconAgreement, openClientSubconIssue, registeredCount } from "./workflows"
 import InfoPopover from "./InfoPopover"
 
-export function IntakeTabs({ value, counts, onChange, allLabel = "All intake" }: {
-  value: IntakeView; counts: Record<IntakeView, number>; onChange: (value: IntakeView) => void; allLabel?: string
+export function IntakeTabs({ value, counts, onChange, allLabel = "All intake", waitingLabel = "Waiting for others", help }: {
+  value: IntakeView; counts: Record<IntakeView, number>; onChange: (value: IntakeView) => void; allLabel?: string; waitingLabel?: string; help?: string
 }) {
   return <div className="intake-tabs" role="group" aria-label="Intake responsibility">
-    {([["all", allLabel], ["action", "Needs your action"], ["waiting", "Waiting for others"]] as const).map(([key, label]) => <button type="button" key={key} aria-pressed={value === key} onClick={() => onChange(key)}>{label} <span>({counts[key]})</span></button>)}
-    <InfoPopover title="Who needs to act?">Needs your action shows steps available to your account. Waiting for others means a prerequisite or another role’s response is needed; viewing details does not approve on their behalf.</InfoPopover>
+    {([["all", allLabel], ["action", "Needs your action"], ["waiting", waitingLabel]] as const).map(([key, label]) => <button type="button" key={key} aria-pressed={value === key} onClick={() => onChange(key)}>{label} <span>({counts[key]})</span></button>)}
+    <InfoPopover title="Who needs to act?">{help ?? "Needs your action shows steps available to your account. Waiting for others means a prerequisite or another role’s response is needed; viewing details does not approve on their behalf."}</InfoPopover>
   </div>
 }
 

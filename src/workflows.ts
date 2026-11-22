@@ -158,8 +158,11 @@ export function workflowFor(p: Project): ProjectWorkflow {
     }
   )
 }
+export function leadPhaseAssignment(p: Project) {
+  return p.team.find((t) => t.isLead) ?? (p.inquiryOrigin ? undefined : p.team.find((t) => t.phase === "Mobilization"))
+}
 export function leadId(p: Project) {
-  return p.team.find((t) => t.phase === "Mobilization")?.accountId || ""
+  return leadPhaseAssignment(p)?.accountId || ""
 }
 export function phaseOwner(p: Project, phase = p.phase) {
   return p.team.find((t) => t.phase === phase)?.accountId || ""
@@ -186,7 +189,7 @@ export function registeredCount(p: Project) {
 export function leadConfirmed(p: Project) {
   return (
     !!leadId(p) &&
-    p.team.find((t) => t.phase === "Mobilization")?.status === "confirmed"
+    leadPhaseAssignment(p)?.status === "confirmed"
   )
 }
 // Coverage is measured against the project's workflow, never the saved team rows alone.
@@ -226,10 +229,26 @@ export function teamCoverageGaps(p: CoverageProject, backendPhases?: BackendPhas
     .filter(([, list]) => list.length)
     .map(([label, list]) => `${label}: ${list.join(", ")}`)
 }
+// A phase may have several engineers. The phase is ready only when every one of them has confirmed.
+export function phaseEngineerSummary(row: Project["team"][number]) {
+  const people = row.engineers && row.engineers.length > 1 ? row.engineers : undefined
+  if (!people) return { multiple: false, total: 1, confirmed: row.status === "confirmed" ? 1 : 0, waiting: row.status === "confirmed" ? 0 : 1, status: row.status }
+  const confirmed = people.filter((e) => e.status === "confirmed").length
+  const status = confirmed === people.length ? "confirmed" : people.some((e) => e.status === "declined") ? "declined" : "pending"
+  return { multiple: true, total: people.length, confirmed, waiting: people.length - confirmed, status } as const
+}
+export function waitingLabel(waiting: number) {
+  return waiting === 1 ? "1 more awaiting confirmation" : `${waiting} more awaiting confirmation`
+}
 export function teamConfirmed(p: Project) {
   return (
     p.team.length > 0 &&
-    p.team.every((row) => !!row.accountId && row.status === "confirmed")
+    p.team.every(
+      (row) =>
+        !!row.accountId &&
+        row.status === "confirmed" &&
+        (row.engineers || []).every((e) => e.status === "confirmed"),
+    )
   )
 }
 export function allocationReady(p: Project) {
@@ -455,13 +474,17 @@ export function activationChecks(state: State, p: Project) {
     },
   ]
 }
+export function assignmentDocumentsMissing(p: Project) {
+  const labels = p.inquiryOrigin ? [DOC_LABELS[2],DOC_LABELS[3]] : DOC_LABELS.slice(0,6);
+  return labels.filter(label => !p.docs.some(doc => doc.label === label && doc.uploaded));
+}
 export function assignmentBlock(p: Project, actorId: string) {
   if (!isAssigned(p, actorId)) return "This project is not assigned to you."
   if (!p.opmAccepted) return "Waiting for the assigned Office PM to accept."
-  if (!registeredComplete(p))
+  if (!p.inquiryOrigin && !registeredComplete(p))
     return `Waiting for Office PM documents: ${registeredCount(p)} of 6 uploaded.`
   if (actorId !== leadId(p) && !leadConfirmed(p))
-    return "The Lead Site PM must accept Mobilization first."
+    return "The Lead Site PM must accept first."
   if (
     ["changes_requested", "declined", "completed", "expired"].includes(p.status)
   )
@@ -700,7 +723,7 @@ function startDeadline(p: Project, actorId: string, days: number, now: number) {
   }
 }
 function pendingNextPerson(p: Project) {
-  const lead = p.team.find((t) => t.phase === "Mobilization")
+  const lead = leadPhaseAssignment(p)
   if (lead && lead.status !== "confirmed") return lead.accountId
   return (
     p.team.find((t) => t.status === "pending" && t.accountId)?.accountId || ""
@@ -865,7 +888,7 @@ export function documentAccess(
   } else {
     const ownEvidence = Object.entries(work.checklist).some(
       ([phase, items]) =>
-        p.team.some((t) => t.phase === phase && t.accountId === actor.id) &&
+        p.team.some((t) => t.phase === phase && (t.accountId === actor.id || t.engineers?.some((e) => e.accountId === actor.id))) &&
         items.some((item) => item.doc?.id === doc.id),
     )
     const canView =
@@ -1170,7 +1193,7 @@ export function applyWorkflow(
           t.status === "pending",
       )
       assert(row, "Only your pending phase assignment can be declined.")
-      const isLead = row.phase === "Mobilization"
+      const isLead = row === leadPhaseAssignment(p)
       assert(
         !isLead || command.note?.trim(),
         "A reason is required when declining the Lead Site PM assignment.",
@@ -1649,6 +1672,10 @@ export function applyWorkflow(
         !work.pendingRework,
         "A rework flag is already awaiting Office PM review.",
       )
+      assert(
+        command.note?.trim(),
+        "Enter field notes before submitting an update.",
+      )
       if (command.evidence) requireDoc(command.evidence)
       assert(
         issues.length || !work.pendingUpdate,
@@ -2057,7 +2084,7 @@ export function processWorkflowTimers(state: State, now = Date.now()): State {
         t.status = "declined"
         t.accountId = ""
       })
-      if (rows.some((t) => t.phase === "Mobilization")) resetIntake(p)
+      if (rows.some((t) => t === leadPhaseAssignment(p))) resetIntake(p)
       work.deadline = undefined
       p.note = `${person?.name || "Site PM"} did not respond. Reassignment required.`
       event(

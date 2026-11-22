@@ -6,7 +6,7 @@ import {progressLabel,type ProgressTotals} from "./project-progress"
 type Impact={request_id:string;reason:string;activities:{id:string;label:string;status:string}[];selected:string[];
   before:{phase:ProgressTotals;project:ProgressTotals};after:{phase:ProgressTotals;project:ProgressTotals};
   loss:{phase:number|null;project:number|null};review_token:string}
-const value=(p:ProgressTotals)=>p.percentage===null ? "Unavailable" : `${p.earned} / ${p.total} · ${progressLabel(p.percentage)}%`
+const value=(p:ProgressTotals)=>p.percentage===null ? "Unavailable" : `${Number(p.earned!.toFixed(1))} / ${p.total} · ${progressLabel(p.percentage)}%`
 
 export default function ReworkReview({requestId,confirm,onClose,onConfirm}:{requestId:string;confirm:boolean;onClose:()=>void;
   onConfirm:(token:string,ids:string[],reason:string)=>Promise<boolean>}){

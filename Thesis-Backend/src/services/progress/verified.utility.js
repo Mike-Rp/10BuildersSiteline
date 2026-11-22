@@ -1,4 +1,4 @@
-import { phaseProgress, projectProgress } from "../../domain/verified-progress.js";
+import { phaseProgress, projectProgress, projectPointsPerActivityPoint } from "../../domain/verified-progress.js";
 import { ensureChecklist } from "./phase.utility.js";
 import { constructionPhaseProgress } from "../../domain/construction-phase-progress.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
@@ -35,6 +35,7 @@ export async function readVerifiedProgress(db, projectIds) {
     (EXISTS(SELECT 1 FROM project_phase_files f WHERE f.project_id=ph.project_id AND f.project_stage_id=ph.project_stage_id)
       OR EXISTS(SELECT 1 FROM project_phase_updates u WHERE u.project_id=ph.project_id AND u.selected_stage_id=ph.project_stage_id)
       OR EXISTS(SELECT 1 FROM project_progress_history h WHERE h.project_id=ph.project_id AND h.project_stage_id=ph.project_stage_id AND h.pct>0)) AS started,
+    to_jsonb(p)->>'progress_weighting' AS progress_weighting,
     COALESCE(e.status,'missing') AS status,
     (e.status='approved' AND e.reviewed_by IS NOT NULL AND e.reviewed_at IS NOT NULL) AS approval_valid
     FROM phases ph JOIN projects p ON p.id=ph.project_id JOIN project_stages s ON s.id=ph.project_stage_id
@@ -53,7 +54,7 @@ export async function readVerifiedProgress(db, projectIds) {
   for (const row of rows) {
     const phases = grouped.get(row.project_id);
     if (!phases.has(row.phase_id)) phases.set(row.phase_id, {
-      id: row.phase_id, name: row.name, expected: row.expected, configured: row.configured, activities: [],
+      id: row.phase_id, name: row.name, expected: row.expected, configured: row.configured, activities: [], weighting: row.progress_weighting,
       position: row.position, count: row.phase_count, onHold: row.on_hold, started: row.started,
       currentPosition: row.current_position,
     });
@@ -69,8 +70,12 @@ export async function readVerifiedProgress(db, projectIds) {
       ...constructionPhaseProgress(phase.position, phase.count, phase.activities, phase),
       locked: phase.position > (phase.currentPosition ?? 0),
     }));
+    const weighting = phases[0]?.weighting || null, expectedIds = phases.filter(phase => phase.expected).map(phase => phase.id);
     return [id, {
-      project: { ...projectProgress(phases, phases.filter(phase => phase.expected).map(phase => phase.id)),
+      weighting,
+      // Project points per activity point, for previews that add or withdraw one phase's credit.
+      scales: Object.fromEntries(expectedIds.map(phaseId => [phaseId, projectPointsPerActivityPoint(phases, expectedIds, weighting, phaseId)])),
+      project: { ...projectProgress(phases, expectedIds, { weighting }),
         complete: construction.length > 0 && construction.every(phase => phase.complete) },
       phases: phases.map(phase => ({ id: phase.id, name: phase.name, ...phaseProgress(phase),
         complete: construction.find(row => row.id === phase.id)?.complete ?? false })),

@@ -1,4 +1,5 @@
 import DatePicker from "./DatePicker"
+import { useScrollOnChange } from "./navigation-scroll"
 import {
   useEffect,
   useRef,
@@ -37,6 +38,7 @@ const DEFAULT = defaultListQuery()
 // Three-column card collections use complete 3 × 3 pages. Table lists keep
 // their existing row counts; two-column project explorers already use 6/12/24.
 const cardPageSize = (key: string) =>
+  key === "admin:inquiry-log" ? 5 :
   ["admin:engineers", "admin:engineer-docs", "admin:companies"].includes(key) ||
   /^(opm|spm):directory$/.test(key) ? 9 :
   /^(opm|spm):assignments-/.test(key) ? 6 : undefined
@@ -299,11 +301,13 @@ export function ListPager<T>({
 }) {
   const { view } = list
   const sizes = list.pageSizes ?? PAGE_SIZES
+  const scrollRef = useScrollOnChange(`${list.key}:${view.page}:${view.pageSize}`, true)
   if (list.count <= sizes[0]) return null
   const go = (page: number) => update(list, (q) => withPage(q, page))
   const multiple = view.pageCount > 1
   return (
     <nav
+      ref={scrollRef}
       className={`pagination ${touch ? "touch" : ""}`}
       aria-label="Pagination"
     >
@@ -396,10 +400,11 @@ export function ListPager<T>({
 /** Dashboard widgets: Previous / "Page X of Y" / Next, no page-size choice. */
 export function CompactPager<T>({ list }: { list: ListView<T> }) {
   const { view } = list
+  const scrollRef = useScrollOnChange(`${list.key}:${view.page}:${view.pageSize}`, true)
   if (view.pageCount <= 1) return null
   const go = (page: number) => update(list, (q) => withPage(q, page))
   return (
-    <nav className="pagination compact" aria-label="Pagination">
+    <nav ref={scrollRef} className="pagination compact" aria-label="Pagination">
       <Button
         disabled={view.page <= 1}
         aria-label="Previous page"

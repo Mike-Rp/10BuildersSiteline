@@ -54,6 +54,18 @@ export function checkLockout(
   return lockedMessage(Math.ceil((entry.lockedUntil - now) / 60_000))
 }
 
+/** When the lockout for this email ends (ms since epoch), or 0 when it is not locked. */
+export function lockoutDeadline(store: AttemptStore, email: string, now = Date.now()) {
+  const until = store.read()[key(email)]?.lockedUntil
+  return until && until > now ? until : 0
+}
+
+/** Minutes:seconds, for example 04:32. */
+export function formatCountdown(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
+}
+
 /** Counts a credential mismatch. The 5th failure starts the lockout. */
 export function recordFailedAttempt(
   store: AttemptStore,

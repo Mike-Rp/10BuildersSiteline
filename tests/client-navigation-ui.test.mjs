@@ -8,6 +8,8 @@ import { clientProjectViews } from "../src/client-access.ts"
 
 test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, resize and page navigation", { timeout: 30000 }, async t => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/", pretendToBeVisual: true })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, Node: w.Node, sessionStorage: w.sessionStorage, localStorage: w.localStorage, IS_REACT_ACT_ENVIRONMENT: true })) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
@@ -16,7 +18,8 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
   const listeners = new Set()
   const media = { matches: false, media: "(max-width: 1000px)", addEventListener(type, listener) { if (type === "change") listeners.add(listener) }, removeEventListener(type, listener) { listeners.delete(listener) } }
   w.matchMedia = () => media
-  w.scrollTo = () => {}
+  const scrollCalls = []
+  w.scrollTo = options => { scrollCalls.push(options); Object.defineProperty(w, "scrollY", { value: options.top, configurable: true }) }
   w.HTMLElement.prototype.scrollIntoView = () => {}
   const network = []
   t.mock.method(globalThis, "fetch", async url => { network.push(String(url)); throw Error("Navigation must not access the backend") })
@@ -33,11 +36,25 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     const sidebar = () => document.getElementById("client-navigation")
     const click = async element => { assert.ok(!!element, "Navigation control must exist"); assert.equal(element.hidden,false,"Hidden controls must not be used"); await act(() => element.click()) }
     const resize = async width => act(() => { Object.defineProperty(w, "innerWidth", { value: width, configurable: true }); media.matches = width <= 1000; for (const listener of listeners) listener({ matches: media.matches }) })
+    await click(sidebar().querySelector('[aria-label="Project Overview"]'))
+    Object.defineProperty(w, "scrollY", { value: 1400, configurable: true })
+    const callsBeforeHistory = scrollCalls.length
+    await click([...document.querySelectorAll('main button')].find(button => button.textContent.includes("View progress history")))
+    assert.match(document.querySelector("main h1").textContent, /Progress History/)
+    assert.equal(w.scrollY, 0, "Overview shortcut opens progress history at the top")
+    assert.equal(scrollCalls.length, callsBeforeHistory + 1)
+    assert.deepEqual(scrollCalls.at(-1), { top: 0, left: 0, behavior: "instant" })
     assert.equal(toggle().getAttribute("aria-controls"), "client-navigation")
     assert.equal(toggle().getAttribute("aria-expanded"), "true")
     assert.ok(!toggle().classList.contains("mobile-menu"), "toggle must remain visible on desktop")
     for (const width of [1920, 1366, 1024]) {
       await resize(width)
+      const bell = document.querySelector('.notification-container > button')
+      for (const open of [true, false, true, false]) {
+        await click(bell)
+        assert.equal(bell.getAttribute('aria-expanded'), String(open))
+        assert.equal(!!document.getElementById('client-notifications'), open)
+      }
       assert.equal(toggle().getAttribute("aria-label"), "Collapse Client navigation")
       assert.equal(toggle().hidden,true,"Open sidebar shows only its internal close control")
       const close = sidebar().querySelector('.brand .client-nav-close')
@@ -61,6 +78,12 @@ test("Client sidebar toggle works on desktop, laptop and mobile with keyboard, r
     }
     for (const width of [1000, 900, 768, 390, 320]) {
       await resize(width)
+      const bell = document.querySelector('.notification-container > button')
+      for (const open of [true, false, true, false]) {
+        await click(bell)
+        assert.equal(bell.getAttribute('aria-expanded'), String(open))
+        assert.equal(!!document.getElementById('client-notifications'), open)
+      }
       assert.equal(toggle().getAttribute("aria-label"), "Open Client navigation")
       await click(toggle())
       assert.equal(toggle().getAttribute("aria-expanded"), "true")

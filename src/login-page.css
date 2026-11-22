@@ -245,6 +245,10 @@
 #root .client-login .login-portal-nav .login-portal-links { flex: none; width: auto; }
 #root .client-login .login-panel { justify-content: center; }
 #root .client-login .login-content { margin-top: 0; }
+#root .client-login.client-activation .login-card { display: block; width: min(100%, 520px); min-height: 0; padding: 0; }
+#root .client-login.client-activation .login-panel { min-width: 0; padding: clamp(16px, 5vw, 36px); overflow-wrap: anywhere; }
+#root .client-login.client-activation { padding: 24px clamp(12px, 4vw, 28px); }
+#root .client-login.client-activation .login-heading { margin: 14px 0; }
 @media(max-width:760px) {
   #root .client-login { padding-top: 104px; }
   #root .client-login .login-portal-nav { inset: 16px 16px auto; gap: 12px; }

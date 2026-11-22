@@ -139,7 +139,10 @@ export function createReportingHooks(config, { mode, worker, countDbFiles = coun
         claimed = await worker.claim(mode !== "poll");
       } catch (error) {
         claimProblem = error.message;
-        return true; // the backup matters more than the report
+        // The nightly run still backs up when the website cannot be reached: the backup matters more than the report.
+        // The request check must NOT: it exists only to answer an Admin's request, and it runs every few minutes, so
+        // backing up on every failed check would start a full backup every five minutes while the website is down.
+        return mode !== "poll";
       }
       if (!claimed) return false;
       await writeFile(claimedPath, JSON.stringify({ id: claimed.id, claimedAt: new Date().toISOString() }));

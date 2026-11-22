@@ -15,7 +15,7 @@ export default function useSidebarNavigation(enabled = true) {
     // Move focus after React has hidden or revealed the menu button.
     if (enabled && previousExpanded.current !== expanded && !document.querySelector('[aria-modal="true"]')) {
       if (expanded) sidebarRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href],[tabindex="0"]')?.focus()
-      else toggleRef.current?.focus()
+      else toggleRef.current?.focus({ preventScroll: true })
     }
     previousExpanded.current = expanded
   }, [enabled, expanded])
@@ -58,7 +58,7 @@ export default function useSidebarNavigation(enabled = true) {
     return () => {
       document.body.style.overflow = overflow
       document.removeEventListener("keydown", keyboard)
-      if (!document.querySelector('[aria-modal="true"]')) toggleRef.current?.focus()
+      if (!document.querySelector('[aria-modal="true"]')) toggleRef.current?.focus({ preventScroll: true })
     }
   }, [enabled, compact, mobileOpen])
 

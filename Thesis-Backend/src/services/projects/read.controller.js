@@ -1,5 +1,6 @@
 import execute from "../../common/utilities/query.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
+import { projectEngineerScopesSql } from "./phase-engineer-scopes.utility.js";
 import { participantsSql, phaseAssignments } from "../progress/assignment.utility.js";
 import {
   handleError, sendOk, sendError, requireUser, hasProjectAccess, isUuid, paging,
@@ -16,6 +17,7 @@ const SORTS = {
 export const LIST_SELECT = `
   p.id, p.name, p.client_name, pt.code AS project_type,
   to_jsonb(p)->'phase_scope' AS phase_scope,
+  (to_jsonb(p)->>'inquiry_intake') IS NOT NULL AS inquiry_origin,
   coalesce((to_jsonb(p)->>'subcontractor_allocation_version')::int,0) as subcontractor_allocation_version,
   p.floor_area_sqm, p.floor_count, p.target_start_date, p.target_end_date, p.location,
   p.current_stage_id, ps.code AS current_stage, phase_progress.pct AS current_pct,
@@ -24,7 +26,7 @@ export const LIST_SELECT = `
   (SELECT max(h.recorded_at) FROM project_progress_history h WHERE h.project_id = p.id
     AND h.project_stage_id = p.current_stage_id AND h.entry_type <> 'issue') AS last_progress_updated_at,
   p.crew_required, p.crew_assigned,
-  p.lifecycle_status, p.suggested_opm_id, p.suggested_opm_match_score,
+  p.lifecycle_status, p.suggested_opm_id, (SELECT u.full_name FROM users u WHERE u.id = p.suggested_opm_id) AS suggested_opm_name, to_jsonb(p)->>'progress_weighting' AS progress_weighting, p.suggested_opm_match_score,
   p.headcount_suggested, p.headcount_tier, p.archived_at, p.created_at, p.updated_at`;
  
 export const LIST_FROM = `
@@ -65,7 +67,7 @@ export async function projectListFrom(db) {
 }
  
 export const stripInternal = (row) => {
-  const { suggested_opm_id, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
+  const { suggested_opm_id, suggested_opm_name, suggested_opm_match_score, headcount_suggested, headcount_tier, phase_scope, ...rest } = row;
   return rest;
 };
  
@@ -140,7 +142,14 @@ export const getProjectById = async (req, res) => {
     const from=await projectListFrom({query:execute});
  
     const project = await execute(
-      `SELECT ${LIST_SELECT} ${from}
+      `SELECT ${LIST_SELECT}${user.role === "spm" ? `,
+        jsonb_strip_nulls(jsonb_build_object(
+          'land_area', to_jsonb(p)#>'{inquiry_intake,land_area}',
+          'lot_area', to_jsonb(p)#>'{inquiry_intake,lot_area}',
+          'classification', to_jsonb(p)#>'{inquiry_intake,classification}',
+          'technical', to_jsonb(p)#>'{inquiry_intake,assessment,technical}',
+          'arrangement', to_jsonb(p)#>'{inquiry_intake,assessment,arrangement}'
+        )) AS inquiry_overview` : ""} ${from}
         WHERE p.id = $1 AND COALESCE(p.is_deleted, false) = false`,
       [id]
     );
@@ -154,8 +163,7 @@ export const getProjectById = async (req, res) => {
           ORDER BY assigned_at`, [id]),
       execute(
         `SELECT t.project_stage_id AS stage_id, s.code AS stage, w.sort_order,
-                ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
-                  WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
+                ${projectEngineerScopesSql("p", "t.project_stage_id", "s.code")} AS required_disciplines,
                 t.spm_user_id, u.full_name AS spm_name, t.status, t.is_lead
            FROM project_phase_team t
            JOIN projects p ON p.id=t.project_id
@@ -180,8 +188,14 @@ export const getProjectById = async (req, res) => {
     ]);
  
     const base = user.role === "client" ? stripInternal(project.rows[0]) : project.rows[0];
+    // Client-safe contact: the project's Office PM by name only. Staff also get the id.
+    const opmName = project.rows[0].suggested_opm_name?.trim();
+    const officePmContact = opmName
+      ? { full_name: opmName, ...(user.role === "client" ? {} : { id: project.rows[0].suggested_opm_id }) }
+      : null;
     return sendOk(res, "Resource retrieved successfully.", 1, {
       ...base,
+      office_pm_contact: officePmContact,
       engineers: engineers.rows,
       phase_team: phaseTeam.rows,
       subcontractors: subcontractors.rows,

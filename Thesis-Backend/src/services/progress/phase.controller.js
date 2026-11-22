@@ -4,7 +4,7 @@ import { maybeCloseProject } from "../archive/policy.js";
 import { createHash } from "node:crypto";
 import { readVerifiedProgress } from "./verified.utility.js";
 import { verifiedComplete } from "./lifecycle.utility.js";
-import { transitionPhase } from "./handoff.utility.js";
+import { transitionPhase, autoApproveCompletions } from "./handoff.utility.js";
 import {
   HttpError, handleError, sendOk, sendError, requireUser,
   isProjectOpmOrAdmin, isUuid, isBigintId, isSmallintId,
@@ -60,9 +60,15 @@ export const getPhaseOverview = async (req, res) => {
           WHERE l.project_type_id = $1 AND l.project_stage_id = $2 ORDER BY d.code`,
         [p.project_type_id, selected.id]);
       const issues = await client.query(
-        `SELECT id, reason, issue_categories, phase_update_id, status, submitted_by, submitted_at, resolved_at, resolution_note
-           FROM pending_rework_requests WHERE project_id = $1 AND project_stage_id = $2
-          ORDER BY submitted_at DESC, id DESC`, [p.id, selected.id]);
+        `SELECT r.id, r.reason, r.issue_categories, r.phase_update_id, r.status, r.submitted_by, r.submitted_at, r.resolved_at, r.resolution_note,
+           (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'name', f.original_name, 'content_type', f.content_type,
+             'byte_size', f.byte_size) ORDER BY f.uploaded_at, f.id), '[]'::jsonb)
+            FROM project_phase_files f
+            WHERE f.project_id = r.project_id AND (
+              f.id IN (SELECT sf.file_id FROM project_phase_submission_files sf WHERE sf.update_id = r.phase_update_id)
+              OR f.id IN (SELECT uf.file_id FROM project_phase_update_files uf WHERE uf.history_id = r.resulting_history_id))) AS files
+           FROM pending_rework_requests r WHERE r.project_id = $1 AND r.project_stage_id = $2
+          ORDER BY r.submitted_at DESC, r.id DESC`, [p.id, selected.id]);
       const files = await client.query(
         `SELECT f.id, f.original_name, f.content_type, f.byte_size, f.uploaded_at, f.uploaded_by
            FROM project_phase_files f
@@ -205,14 +211,17 @@ async function reviewableEvidence(client,user,projectId,evidenceId) {
 
 async function evidenceReviewPreview(client,p,evidence) {
   const checklist=await readChecklist(client,p.id,evidence.project_stage_id);
-  const project=(await readVerifiedProgress(client,[p.id])).get(p.id).project;
+  const overall=(await readVerifiedProgress(client,[p.id])).get(p.id);
+  const project=overall.project;
   const phase=checklist.verified;
   const credited=checklist.items.filter(item=>String(item.evidence_id)===String(evidence.id)&&item.required).length;
   const added=credited*evidence.weight;
-  const advance=before=>before.percentage===null ? before : {
-    earned:before.earned+added,total:before.total,percentage:(before.earned+added)/before.total*100,reason:null,
+  // Project totals use the project's weighting; the phase keeps its own activity points.
+  const projectAdded=added*(overall.scales?.[String(evidence.project_stage_id)]??1);
+  const advance=(before,gain)=>before.percentage===null ? before : {
+    earned:Number((before.earned+gain).toFixed(9)),total:before.total,percentage:Number(((before.earned+gain)/before.total*100).toFixed(9)),reason:null,
   };
-  const before={phase,project},after={phase:advance(phase),project:advance(project)};
+  const before={phase,project},after={phase:advance(phase,added),project:advance(project,projectAdded)};
   const review_token=createHash("sha256").update(JSON.stringify({id:evidence.id,before,weight:evidence.weight,required:evidence.required,credited})).digest("hex");
   return {evidence_id:String(evidence.id),item_id:String(evidence.checklist_item_id),phase_name:evidence.phase_name,
     activity:evidence.activity_title,submitted_by_name:evidence.submitted_by_name,submitted_at:evidence.submitted_at,submission_note:evidence.submission_note,before,after,review_token};
@@ -259,6 +268,7 @@ const reviewEvidence = decision => async (req, res) => {
         {entryType:"checklist_review",updateProject:decision==="approved",isIssue:decision==="rejected"});
       const projectArchived=decision==="approved" && Number(p.current_stage_id)===Number(selected.current_stage_id)
         ? await maybeCloseProject(client,p,user.id) : false;
+      if (decision === "approved" && Number(p.current_stage_id) === Number(evidence.project_stage_id)) await autoApproveCompletions(client, p, user.id);
       const handoff = decision === "approved" && user.role === "opm" && !projectArchived &&
         Number(p.current_stage_id) === Number(evidence.project_stage_id) && verifiedComplete(checklist.verified)
         ? await transitionPhase(client, p, user.id) : undefined;

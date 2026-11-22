@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import { useId, useState } from "react"
 import { Button } from "./ui"
 import "./reports.css"
@@ -25,9 +26,9 @@ export default function ReportProjectSearch({ projects, value, onChange }: {
     </div>
     {!matches.length && <p>No projects match your search. Try another name.</p>}
     {pages > 1 && <nav className="role-actions" aria-label="Project search pages">
-      <Button disabled={current === 1} onClick={() => setPage(current - 1)}>Previous projects</Button>
+      <Button disabled={current === 1} onClick={(event) => { setPage(current - 1); scrollListAfterChange(event.currentTarget) }}>Previous projects</Button>
       <span>Page {current} of {pages}</span>
-      <Button disabled={current === pages} onClick={() => setPage(current + 1)}>Next projects</Button>
+      <Button disabled={current === pages} onClick={(event) => { setPage(current + 1); scrollListAfterChange(event.currentTarget) }}>Next projects</Button>
     </nav>}
   </section>
 }

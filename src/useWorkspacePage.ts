@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
 import type { Role } from "./model"
 import { changeRoute, defaultPage, pagePath, resolveWorkspaceRoute, ROUTE_CHANGE } from "./workspace-routing"
 
@@ -17,6 +17,10 @@ export default function useWorkspacePage(role: Role, enabled = true) {
     }
   }, [role])
   const page = enabled ? route?.page || defaultPage(role) : demoPage
+  useLayoutEffect(() => {
+    // Run after the destination renders, before explicit review-item targets scroll.
+    if (!enabled || route) window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+  }, [enabled, route?.page, route?.projectId, demoPage])
   const navigate = (next: string, projectId?: string) => {
     if (enabled) changeRoute(pagePath(role, next, projectId))
     else setDemoPage(next)

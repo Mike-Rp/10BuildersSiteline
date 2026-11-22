@@ -187,7 +187,7 @@ export default function ProjectExplorer({
         </div>
         <div>
           <dt>Projects Without Files</dt>
-          <dd>{counters.empty}<small>No uploaded documents yet</small></dd>
+          <dd>{counters.empty}</dd>
         </div>
       </dl>
       <section className="explorer-search-section" aria-label="Search & Filter Projects">

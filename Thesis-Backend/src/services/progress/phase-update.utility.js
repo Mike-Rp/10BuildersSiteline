@@ -80,6 +80,11 @@ export function updateBody(body = {}) {
     })),
   };
 }
+/** An update must say or attach something. An empty one would only send the Office PM a request to confirm nothing. */
+export function assertUpdateHasContent(body, hasUploadedFile = false) {
+  if (typeof body.note === "string" && body.note.trim()) return;
+  throw new HttpError(422, "Enter field notes before submitting an update.");
+}
 export async function resolveStage(client, body, fallback, projectTypeId, projectId) {
  const id=body.stage_id ?? (body.stage===undefined ? fallback : null);
  if(id!=null && !isSmallintId(id))throw new HttpError(400,"Invalid stage_id.");

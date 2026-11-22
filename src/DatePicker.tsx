@@ -10,6 +10,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | 
   clearable?: boolean
   value: string
   min?: string
+  highlightMin?: boolean
   max?: string
   start?: string
   onValueChange: (value: string, badInput?: boolean) => void
@@ -28,12 +29,14 @@ const dateParts = (iso: string) => {
 }
 const isoDate = (year: number, month: number, day: number) => `${String(year).padStart(4, "0")}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 
-export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel = "No date selected.", clearable = true, value, min = "0001-01-01", max = "9999-12-31", start = "", onValueChange, disabled, readOnly, ...inputProps }: Props) {
+export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel = "No date selected.", clearable = true, value, min = "0001-01-01", highlightMin = false, max = "9999-12-31", start = "", onValueChange, disabled, readOnly, ...inputProps }: Props) {
   const [view, setView] = useState<{ year: number; month: number }>()
   function openCalendar() {
     if (disabled || readOnly) return
     const candidate = dateParts(value) ? value : dateParts(start) ? start : localToday()
-    const anchor = dateParts(value) || dateParts(start) || dateParts(candidate < min ? min : candidate > max ? max : candidate)!
+    const anchor = highlightMin && (!dateParts(value) || value < min || value > max)
+      ? dateParts(min)!
+      : dateParts(candidate < min ? min : candidate > max ? max : candidate)!
     setView({ year: anchor.getFullYear(), month: anchor.getMonth() })
   }
   const anchorYear = view?.year || Number(localToday().slice(0, 4))
@@ -43,6 +46,12 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
   const offset = view ? calendarDate(view.year, view.month, 1).getDay() : 0
   const days = view ? calendarDate(view.year, view.month + 1, 0).getDate() : 0
   const monthKey = view ? isoDate(view.year, view.month, 1).slice(0, 7) : ""
+  const minMonth = min.slice(0, 7)
+  const maxMonth = max.slice(0, 7)
+  function selectableMonth(year: number, month: number) {
+    const key = isoDate(year, month, 1).slice(0, 7)
+    return key >= minMonth && key <= maxMonth
+  }
   function moveMonth(direction: number) {
     if (!view) return
     const next = calendarDate(view.year, view.month + direction, 1)
@@ -67,10 +76,14 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
         </div>
         <div className="completion-calendar-selectors">
           <label>Month<select value={view.month} onChange={event => setView({ ...view, month: Number(event.target.value) })}>
-            {months.map((month, index) => <option key={month} value={index}>{month}</option>)}
+            {months.map((month, index) => <option key={month} value={index} disabled={!selectableMonth(view.year, index)}>{month}</option>)}
           </select></label>
-          <label>Year<select value={view.year} onChange={event => setView({ ...view, year: Number(event.target.value) })}>
-            {years.map(year => <option key={year} value={year}>{year}</option>)}
+          <label>Year<select value={view.year} onChange={event => {
+            const year = Number(event.target.value)
+            const allowed = months.flatMap((_, index) => selectableMonth(year, index) ? [index] : [])
+            if (allowed.length) setView({ year, month: Math.min(Math.max(view.month, allowed[0]), allowed[allowed.length - 1]) })
+          }}>
+            {years.map(year => <option key={year} value={year} disabled={!months.some((_, index) => selectableMonth(year, index))}>{year}</option>)}
           </select></label>
         </div>
         <div className="completion-calendar-days" role="group" aria-label={`${months[view.month]} ${view.year} dates`}>
@@ -79,7 +92,8 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
           {Array.from({ length: days }, (_, index) => {
             const iso = isoDate(view.year, view.month, index + 1)
             return <Button key={iso} aria-label={dateLabel(iso)} aria-pressed={iso === value} disabled={iso < min || iso > max}
-              className={iso === value ? "completion-selected" : ""} onClick={() => { onValueChange(iso); setView(undefined) }}>{index + 1}</Button>
+              className={iso === value ? "completion-selected" : highlightMin && iso === min ? "completion-earliest" : ""}
+              onClick={() => { onValueChange(iso); setView(undefined) }}>{index + 1}</Button>
           })}
         </div>
         <p className="completion-calendar-note">{value ? `Selected: ${dateLabel(value)}` : emptyLabel}</p>

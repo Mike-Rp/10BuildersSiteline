@@ -2,6 +2,7 @@ import { SUBMISSION_KIND_SQL } from "./submission-kind.utility.js";
 import {
   ENGINEER_SPECIALIZATIONS,
   REQUIREMENT_SPECIALIZATIONS,
+  SPECIALIZATION_PROFESSIONS,
   qualifyingSpecializations,
   licenseNumberError,
   credentialEligible,
@@ -95,12 +96,17 @@ export async function credentialSummary(db, userId) {
   const requirements = Object.keys(REQUIREMENT_SPECIALIZATIONS).filter((r) =>
     REQUIREMENT_SPECIALIZATIONS[r].some((t) => qualified.includes(t)),
   )
+  const detailedTags = qualified.filter(tag => !Object.hasOwn(SPECIALIZATION_PROFESSIONS, tag))
+  const detailedRequirements = detailedTags.length ? (await db.query(
+    `select d.code from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id
+      where q.user_id=$1 and d.code=any($2::text[]) order by d.code`, [userId, detailedTags],
+  )).rows.map(row => row.code) : []
   const valid = credentials.some((c) => credentialEligible(c, localDay()))
   const eligible =
     account.status === "active" &&
     !holds?.assignmentHold &&
     valid &&
-    (account.role !== "spm" || qualified.length > 0)
+    (account.role !== "spm" || requirements.length > 0 || detailedRequirements.length > 0)
   return {
     accountStatus: account.status,
     credentials: credentials.map((c) => ({
@@ -117,7 +123,7 @@ export async function credentialSummary(db, userId) {
     specializations:tags.map(tag=>specializations.find(s=>s.specialization===tag)||{specialization:tag}),
     legacySpecializations:specializations,
     submissions,
-    qualifiedRequirements: requirements,
+    qualifiedRequirements: [...requirements, ...detailedRequirements],
     eligibleForNewAssignment: eligible,
     eligibilityNote: eligible
       ? "Credential requirements satisfied; assignment still requires matching scope, capacity and availability."
@@ -187,15 +193,15 @@ export const putSpecializations = async (req, res) => {
       const body=req.body||{};
       if (body.credential_id || body.submission_id) {
         await requireCredentialTags(db);
-        const tags=validateSpecializations(body.specializations);
         if(body.credential_id&&body.submission_id)throw new HttpError(400,'Select one credential.');
         await db.query('select id from users where id=$1 for update',[id]);
         const credential=body.credential_id;
         if(credential&&!isUuid(credential))throw new HttpError(400,'Invalid credential.');
         if(!credential&&!/^\d+$/.test(String(body.submission_id)))throw new HttpError(400,'Invalid submission.');
         const table=credential?'user_licenses':'license_renewal_requests';
-        const found=await db.query(`select id from ${table} where id=$1 and user_id=$2 and ${credential?'superseded_at is null':"status='under_review'"} for update`,[credential||body.submission_id,id]);
+        const found=await db.query(`select id, profession from ${table} where id=$1 and user_id=$2 and ${credential?'superseded_at is null':"status='under_review'"} for update`,[credential||body.submission_id,id]);
         if(!found.rowCount)throw new HttpError(404,'Editable credential not found for this engineer.');
+        const tags = validateSpecializations(body.specializations, found.rows[0].profession);
         await db.query(`update ${table} set specializations=$2 where id=$1`,[credential||body.submission_id,tags]);
         await db.query('insert into engineer_specialization_history(user_id,specializations,recorded_by) values($1,$2,$3)',[id,JSON.stringify({credential_id:credential||null,submission_id:body.submission_id||null,specializations:tags}),user.id]);
       } else await saveSpecializations(db, id, body.specializations, user.id)

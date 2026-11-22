@@ -163,3 +163,14 @@ test("inactive-account errors do not count towards the lockout", async () => {
     )
   assert.equal(checkLockout(store, email, T0), undefined)
 })
+
+import { formatCountdown, lockoutDeadline } from "../src/signInPolicy.ts"
+test("lockout countdown uses minutes:seconds", () => {
+  assert.equal(formatCountdown(5 * 60 * 1000), "05:00")
+  assert.equal(formatCountdown(272_400), "04:33")
+  assert.equal(formatCountdown(999), "00:01")
+  assert.equal(formatCountdown(0), "00:00")
+  const store = { data: { "a@b.co": { count: 0, lockedUntil: 10_000 } }, read() { return this.data }, write(v) { this.data = v } }
+  assert.equal(lockoutDeadline(store, "A@b.co", 4_000), 10_000)
+  assert.equal(lockoutDeadline(store, "a@b.co", 10_000), 0)
+})

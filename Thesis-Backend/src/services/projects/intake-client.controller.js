@@ -1,6 +1,7 @@
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError, requireUser, sendOk, sendError, handleError, isUuid } from "../../common/utilities/access.utility.js";
 import { createAccountRecord } from "../accounts/manage.controller.js";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 
 const allowed = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 async function intakeProject(db,id) {
@@ -29,10 +30,10 @@ export const createIntakeClient = async (req,res) => {
     const email=typeof b.email==="string" ? b.email.trim().toLowerCase() : b.email;
     if(typeof company!=="string" || !company.trim() || company.trim().length>150 ||
       typeof person!=="string" || !person.trim() || person.trim().length>150 ||
-      typeof email!=="string" || email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      (phone!=null && (typeof phone!=="string" || phone.length>30))) {
-      return sendError(res,"Provide company_name, contact_person, email, and a valid optional contact number.",400);
+      typeof email!=="string" || email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return sendError(res,"Provide company_name, contact_person, and email.",400);
     }
+    if (phone !== null && phone !== "" && !isPhilippineMobile(phone)) return sendError(res, PH_MOBILE_ERROR, 400);
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,b.project_id);
       const existing=await db.query(

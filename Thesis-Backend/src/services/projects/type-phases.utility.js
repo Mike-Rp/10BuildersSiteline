@@ -2,6 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { prepareEngineerAssignments } from "./engineer-commitments.utility.js";
 import {preparePhaseResponsibilities,responsibilitiesInstalled} from './phase-responsibilities.utility.js';
+import { savedEngineerScopes } from "./phase-engineer-scopes.utility.js";
 export async function validatePhaseTeam(db,typeId,team,{projectId,phaseNames}={}) {
  const phases=phaseNames ? phaseNames.map(code=>({code})) : projectId ?
    (await db.query(`SELECT s.code FROM (${projectWorkflowSql}) w JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_id=$1 ORDER BY w.sort_order`,[projectId])).rows :
@@ -14,6 +15,10 @@ export async function validatePhaseTeam(db,typeId,team,{projectId,phaseNames}={}
 export async function validateScopedQualifications(db,typeId,team,options={}) {
  if(await responsibilitiesInstalled(db) && (options.requireCoverage || team.some(row=>row.engineers))) {
   await preparePhaseResponsibilities(db,typeId,team,options);return;
+ }
+ const requiredScopes = options.requiredScopes ?? await savedEngineerScopes(db, options.projectId);
+ if (requiredScopes) {
+  await prepareEngineerAssignments(db,typeId,team,{...options,requiredScopes});return;
  }
  for (const phase of team) {
   const matched=await db.query(`SELECT 1 FROM engineer_qualified_scopes u

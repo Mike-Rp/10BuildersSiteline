@@ -13,6 +13,7 @@ type ProgressView = {
   phase: string
   phases: string[]
   checklistProgress?: PhaseProgress[]
+  progressWeighting?: string
 }
 
 export default function ProjectProgress({ project, reportingDate = localToday() }: {
@@ -32,7 +33,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     const frame = requestAnimationFrame(() => { saved.element.scrollTop = saved.top })
     return () => cancelAnimationFrame(frame)
   }, [open])
-  const actual = overallChecklistProgress(project.phases, project.checklistProgress)
+  const actual = overallChecklistProgress(project.phases, project.checklistProgress, project.progressWeighting)
   const phaseRows = constructionPhaseRows(project.phases, project.checklistProgress)
   const planned = plannedCompletion(project.start, project.end, reportingDate)
   const gap = progressGap(actual.percentage, planned)
@@ -70,7 +71,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     <Button icon="activity" onClick={event => showBreakdown(event.currentTarget)} aria-haspopup="dialog">View phase breakdown</Button>
     {open && createPortal(<Modal wide title="Progress by construction phase" subtitle={project.name} onClose={() => setOpen(false)}>
       <div className="project-progress pp-breakdown">
-        <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase.</p>
+        <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase, per assigned engineer. Multi-engineer phases show the combined totals.</p>
         {phaseRows.length ? <div className="pp-table-scroll"><table className="pp-table">
           <thead><tr><th scope="col">Construction Phase</th><th scope="col">Approved Activities</th><th scope="col">Phase Status</th></tr></thead>
           <tbody>{phaseRows.map(row => <tr key={row.name}>

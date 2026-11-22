@@ -22,8 +22,10 @@ export const RUNNER_MIGRATIONS = Object.freeze([
 ])
 
 export const DEDICATED_MIGRATIONS = Object.freeze({
+  "031-project-inquiries.sql": "Apply after 014-mixed-use-project-scope.sql to enable the inquiry workflow",
   "028-storage-backed-files.sql": "Apply explicitly before using private Storage-backed files",
   "029-backup-monitoring.sql": "Additive metadata tables: apply explicitly before enabling backup monitoring; see docs/BACKUPS.md",
+  "030-foundation-progress-weighting.sql": "Additive column: existing projects stay on the legacy calculation; new projects weight Foundation at 15%",
   "004-verified-activity-progress.sql": "Recovery only: review its prerequisites and apply explicitly",
   "004-verified-activity-values.sql": "Reviewed local dry run: scripts/migrate-verified-progress.js",
   "005-targeted-rework.sql": "Reviewed local dry run: scripts/migrate-targeted-rework.js",
@@ -38,6 +40,7 @@ export const DEDICATED_MIGRATIONS = Object.freeze({
   "025-independent-spm-workspaces.sql": "Apply explicitly before enabling independent SPM workspaces; requires 020",
   "027-workflow-reliability.sql": "Apply explicitly after reviewed 025/026; see docs/WORKFLOW-RELIABILITY.md",
   "026-credential-specializations.sql": "Apply explicitly before per-credential specialization entry; requires 015",
+  "032-inquiry-engineer-specialties.sql": "Apply after 027 and 031 to enable detailed specialties on new inquiry assignments",
 })
 
 const LEGACY_NAME_ALIASES = Object.freeze({

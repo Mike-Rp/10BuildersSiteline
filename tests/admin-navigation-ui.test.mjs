@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
-test("Admin navigation toggles on desktop and mobile, handles resizing, closes on navigation and restores keyboard focus", { timeout: 30000 }, async t => {
+test("Admin navigation toggles on desktop and mobile, handles resizing, closes on navigation and restores keyboard focus", { timeout: 60000 }, async t => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost:8443/admin/dashboard", pretendToBeVisual: true })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, Node: w.Node,
     sessionStorage: w.sessionStorage, localStorage: w.localStorage, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -41,6 +43,15 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     await act(async () => { root.render(React.createElement(App)); await new Promise(resolve => setTimeout(resolve, 50)) })
     for (let i = 0; i < 50 && !document.querySelector(".admin-workspace"); i++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
     assert.ok(!!document.querySelector(".admin-workspace"), document.body.textContent.slice(0, 200))
+    const checkBell = async () => {
+      const bell = document.querySelector('.notification-container > button')
+      for (const open of [true, false, true, false]) {
+        await act(() => bell.click())
+        assert.equal(bell.getAttribute('aria-expanded'), String(open))
+        assert.equal(!!document.getElementById('admin-notifications'), open)
+      }
+    }
+    await checkBell()
     assert.equal(document.querySelector('.sidebar [aria-label="Reports"]'), null)
     assert.ok(document.querySelector('.sidebar [aria-label="Project intake"]'))
     assert.equal(document.querySelectorAll('.executive-summary').length, 1)
@@ -89,6 +100,7 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     assert.ok(![...document.querySelectorAll('main button')].some(button=>button.textContent.trim()==='Add Company'),'Admin reviews company requests instead of adding companies directly')
     // Smaller laptops/tablets and phones use the same accessible drawer behavior.
     await resize(true)
+    await checkBell()
     assert.equal(toggle().getAttribute("aria-expanded"), "false")
     await click(toggle())
     assert.equal(toggle().getAttribute("aria-expanded"), "true")

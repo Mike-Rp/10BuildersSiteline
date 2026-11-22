@@ -2,7 +2,7 @@ export type ReportBalance={earned:number|null;total:number|null;percentage:numbe
 export type MonthlyReport={
   project:{id:string;name:string;type:string;status:string}
   period:{month:string;timezone:string;start:string;end:string;cutoff:string;monthToDate:boolean;generatedAt:string}
-  coverageFrom:string|null;opening:ReportBalance;closing:ReportBalance;netChange:number|null
+  coverageFrom:string|null;partialFrom?:string|null;opening:ReportBalance;closing:ReportBalance;netChange:number|null
   projection:"staff"|"site"|"client";scopeLabel?:string;limitations:string[];createdAfterPeriod:boolean
   completedPhases:{id:string;phase:string;date:string;stillComplete:boolean}[]|null
   approvals?:{events:number;distinctActivities:number;earned:number}|null
@@ -18,9 +18,15 @@ export function currentReportMonth(date=new Date()) {
   return `${parts.year}-${parts.month}`
 }
 export const reportDate=(date:string)=>new Intl.DateTimeFormat("en-PH",{timeZone:REPORT_TIMEZONE,dateStyle:"medium",timeStyle:"short"}).format(new Date(date))
-export const reportFraction=(balance:ReportBalance)=>balance.percentage===null?"Unavailable":`${balance.earned} / ${balance.total} · ${balance.percentage.toFixed(1)}%`
+export const reportFraction=(balance:ReportBalance)=>balance.percentage===null?"Unavailable":`${Number(balance.earned!.toFixed(1))} / ${balance.total} · ${balance.percentage.toFixed(1)}%`
 const escapeHtml=(value:unknown)=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")
 export function monthlyPrintDocument(report:MonthlyReport) {
+  if (report.createdAfterPeriod) return `<!doctype html><html><head><meta charset="utf-8"><title>Monthly Project Progress Summary</title><style>body{font:14px/1.5 Arial,sans-serif;color:#172b4d;margin:24px}p,h2{overflow-wrap:anywhere}</style></head><body>
+    <h1>Monthly Project Progress Summary</h1><h2>${escapeHtml(report.project.name)}</h2>
+    <p>Reporting month: ${escapeHtml(report.period.month)} · ${escapeHtml(report.period.timezone)}</p>
+    <p>Period start: ${escapeHtml(reportDate(report.period.start))}<br>Cutoff (exclusive): ${escapeHtml(reportDate(report.period.cutoff))}<br>Generated: ${escapeHtml(reportDate(report.period.generatedAt))}</p>
+    <h2>Not applicable for this month</h2><p>This project was created after the selected reporting period. Monthly progress and phase completions do not apply to this period.</p>
+    <p>Select a month from project creation onward. Project Overview shows current progress, separate from this historical monthly report.</p></body></html>`
   const table=(head:string[],rows:unknown[][])=>`<table><thead><tr>${head.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`
   const phases=report.completedPhases?.map(p=>[p.phase,reportDate(p.date),p.stillComplete?"Verified complete":"In progress at cutoff"])||[["Unavailable"]]
   const events=report.projection==="client"?(report.updates||[]).map(e=>[reportDate(e.date),e.phase,e.text]):(report.activity||[]).map(e=>[reportDate(e.date),e.phase,e.record,e.change??""])

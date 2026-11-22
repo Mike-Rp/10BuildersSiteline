@@ -17,6 +17,10 @@ test("Vercel redirects preserve portal selection and keep API routing before the
   assert.equal(config.rewrites[0].source, '/api/:path*')
   assert.equal(config.rewrites[0].destination, '/api')
   assert.equal(config.rewrites.at(-1).destination, '/index.html')
+  const fallback = config.rewrites.at(-1)
+  const pattern = new RegExp('^/' + fallback.source.match(/^\/:path\((.*)\)$/)[1] + '$')
+  for (const path of ['/assets', '/assets/report-pdf-old.js', '/assets/pdfmake-old.js', '/assets/index-old.css']) assert.equal(pattern.test(path),false,`${path} must not receive the SPA shell`)
+  for (const path of ['/', '/admin/activity-log', '/opm/active-sites', '/client/projects/123/overview']) assert.equal(pattern.test(path),true,path)
 })
 
 test("host-specific redirects keep disallowed portal paths on the same domain before legacy login redirects", () => {

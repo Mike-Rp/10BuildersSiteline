@@ -21,7 +21,7 @@ test("Admin company registration verifies on save and still requires supporting 
   const enter=(label,value)=>React.act(()=>{const el=field(label);assert.ok(el,label);Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?w.HTMLSelectElement.prototype:el.tagName==='TEXTAREA'?w.HTMLTextAreaElement.prototype:w.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new w.Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})
   const submit=()=>React.act(async()=>document.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})))
   await enter('Company name *','AquaLine');await enter('Company email *','aqualine@gmail.com')
-  await enter('Primary foreman full name','Juan Cruz');await enter('Primary foreman mobile number','09171234567')
+  await enter('Primary foreman full name','Juan Cruz');await enter('Primary foreman mobile number','171234567')
   await enter('Primary company category *','Mechanical / Plumbing')
   const trade=[...document.querySelectorAll('label')].find(b=>b.textContent.trim()==='Plumbing')?.querySelector('input')
   assert.ok(trade);await React.act(()=>trade.click())

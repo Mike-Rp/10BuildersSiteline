@@ -6,14 +6,17 @@ import { initialState } from "./fixtures/demo-state.ts"
 
 test("Office and Site PM navigation alternates controls across every module on desktop and mobile", {timeout:60000}, async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost", pretendToBeVisual:true })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
   const w = dom.window, previous = new Map()
-  for (const [key,value] of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Element:w.Element,Node:w.Node,IS_REACT_ACT_ENVIRONMENT:true})) {
+  for (const [key,value] of Object.entries({window:w,document:w.document,HTMLElement:w.HTMLElement,Element:w.Element,Node:w.Node,localStorage:w.localStorage,IS_REACT_ACT_ENVIRONMENT:true})) {
     previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key))
     Object.defineProperty(globalThis,key,{value,configurable:true,writable:true})
   }
   const listeners = new Set()
   const media = {matches:false,addEventListener(type,listener){if(type === "change")listeners.add(listener)},removeEventListener(type,listener){listeners.delete(listener)}}
   w.matchMedia = () => media
+  w.scrollTo = () => {}
   w.HTMLElement.prototype.scrollIntoView = () => {}
   const server = await createServer({cacheDir:`node_modules/.vite-tests/role-navigation-${process.pid}`,server:{middlewareMode:true,hmr:false,watch:null},appType:"custom",logLevel:"silent",optimizeDeps:{noDiscovery:true,include:[]}})
   const { default:React, act } = await import("react")
@@ -37,6 +40,12 @@ test("Office and Site PM navigation alternates controls across every module on d
       const modules=[...sidebar.querySelectorAll('nav .nav-item')].map(button=>button.getAttribute('aria-label'))
       for (const compact of [false,true]) {
         await resize(compact)
+        const bell = document.querySelector('.notification-container > button')
+        for (const open of [true,false,true,false]) {
+          await click(bell)
+          assert.equal(bell.getAttribute('aria-expanded'),String(open))
+          assert.equal(!!document.getElementById('staff-notifications'),open)
+        }
         for (const label of modules) {
           if(!menu.hidden)await click(menu)
           assert.equal(menu.hidden,true)

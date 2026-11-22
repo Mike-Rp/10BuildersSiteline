@@ -4,11 +4,13 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { errorlog } from "../../common/utilities/logger.utility.js";
 import { requireUser, sendOk, handleError } from "../../common/utilities/access.utility.js";
 import { LIST_SELECT, projectListFrom, stripInternal } from "../projects/read.controller.js";
+import { projectEngineerScopesSql } from "../projects/phase-engineer-scopes.utility.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
 import { verifiedComplete } from "../progress/lifecycle.utility.js";
 import { transitionPhase, assessPhaseHandoff } from "../progress/handoff.utility.js";
 import { ensureChecklist, readChecklistItems } from "../progress/phase.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
+import { responsibilitiesInstalled } from "../projects/phase-responsibilities.utility.js";
 
 // Keep scope identical to the existing project endpoints; never accept a user ID from the browser.
 const scope = `p.id in (
@@ -96,6 +98,26 @@ export async function getProjectData(req,res) {
     left join workspace_account_metadata m on m.user_id=u.id
     where l.project_id=any($1::uuid[]) and not coalesce(u.is_deleted,false)
     order by u.full_name,u.id`,[ids])).rows):new Map();
+   // Office PMs need work contacts for their assigned phase teams, including
+   // pending offers and supporting engineers who are not legacy phase leads.
+   let sitePmContacts = new Map();
+   if (user.role === "opm") {
+    const peerAssignments = await responsibilitiesInstalled(db) ? `
+     union all
+     select project_id, user_id from project_phase_responsibilities
+      where project_id=any($1::uuid[]) and status<>'released'` : "";
+    sitePmContacts = group((await db.query(`
+     select distinct a.project_id,u.id,u.full_name,u.email,u.phone
+     from (
+      select project_id,spm_user_id as user_id from project_phase_team where project_id=any($1::uuid[])
+      ${peerAssignments}
+     ) a join users u on u.id=a.user_id join roles r on r.id=u.role_id and r.code='spm'
+     join projects p on p.id=a.project_id
+     where not coalesce(u.is_deleted,false) and (p.suggested_opm_id=$2 or exists(
+      select 1 from project_engineers e where e.project_id=p.id and e.user_id=$2 and e.unassigned_at is null
+     ))
+     order by u.full_name,u.id`,[ids,user.id])).rows);
+   }
    // Extend the active checklist with missing standard requirements; retain
    // legacy mandatory records and every existing evidence reference.
    if(staff) {
@@ -104,8 +126,7 @@ export async function getProjectData(req,res) {
     for(const project of missing)await ensureChecklist(db,project.id,project.current_stage_id,{reconcile:true});
    }
    const teams=(await db.query(`select t.project_id,t.project_stage_id as stage_id,s.code as stage,w.sort_order,
-     ARRAY(SELECT d.code::text FROM project_stage_discipline_links l JOIN disciplines d ON d.id=l.discipline_id
-       WHERE l.project_type_id=p.project_type_id AND l.project_stage_id=t.project_stage_id ORDER BY d.code) AS required_disciplines,
+     ${projectEngineerScopesSql("p", "t.project_stage_id", "s.code")} AS required_disciplines,
      t.spm_user_id,u.full_name as spm_name,t.status,t.is_lead,to_jsonb(t)->'assigned_disciplines' as assigned_disciplines,t.response_deadline_at,t.responded_at
      from project_phase_team t join projects p on p.id=t.project_id join (${projectWorkflowSql}) w on w.project_id=p.id and w.project_stage_id=t.project_stage_id join project_stages s on s.id=t.project_stage_id
      left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by w.sort_order`,[ids])).rows;
@@ -141,7 +162,12 @@ export async function getProjectData(req,res) {
     left join project_stages prior on prior.id=u.prior_stage_id
     where u.project_id=any($1::uuid[]) and u.status='pending' order by u.id desc`,[ids])).rows:[];
    const issues=staff?(await db.query(`select r.project_id,r.id,r.reason,r.issue_categories,r.phase_update_id,r.status,
-    r.submitted_by,r.submitted_at,r.resolved_at,r.resolution_note from pending_rework_requests r
+    r.submitted_by,r.submitted_at,r.resolved_at,r.resolution_note,
+    (select coalesce(jsonb_agg(jsonb_build_object('id',f.id,'name',f.original_name,'content_type',f.content_type,'byte_size',f.byte_size) order by f.uploaded_at,f.id),'[]'::jsonb)
+      from project_phase_files f where f.project_id=r.project_id and (
+        f.id in (select sf.file_id from project_phase_submission_files sf where sf.update_id=r.phase_update_id)
+        or f.id in (select uf.file_id from project_phase_update_files uf where uf.history_id=r.resulting_history_id))) as files
+    from pending_rework_requests r
     join projects p on p.id=r.project_id and p.current_stage_id=r.project_stage_id
     where r.project_id=any($1::uuid[]) order by r.submitted_at desc,r.id desc`,[ids])).rows:[];
    const assignments=(await db.query(`select a.project_id,a.id,a.subcontractor_id,s.company_name as subcontractor_name,
@@ -164,7 +190,8 @@ export async function getProjectData(req,res) {
    return projects.map(p=>{
     const [phaseTeam,docs,historyRows,photoRows,noteRows,items,pending,issueRows,assigned,contractRows]=grouped.map(rows=>rows.get(p.id)||[]);
     const list=staff?p:stripInternal(p);
-    return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
+    return {list,detail:{...list,phase_team:phaseTeam,...(staff?{client_accounts:(clientAccounts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{}),
+     ...(user.role==="opm"?{site_pm_contacts:(sitePmContacts.get(p.id)||[]).map(({project_id,...contact})=>contact)}:{})},documents:docs,history:historyRows,photos:photoRows,notes:noteRows,
      overview:staff?{checklist:{items},review_queue:reviewGroups.get(p.id)||[],pending_update:pending.find(u=>user.role!=='spm'||u.submitted_by===user.id)||null,pending_updates:pending.filter(u=>user.role!=='spm'||u.submitted_by===user.id),issues:issueRows.filter(i=>user.role!=='spm'||i.submitted_by===user.id)}:undefined,
      assignments:assigned,contracts:contractRows,pending:null,...(user.role === "admin" ? {handoffReadiness:readiness.get(p.id)} : {}),...(staff?{verifiedProgress:verified.get(p.id),checklistProgress:verified.get(p.id)?.construction}:{overallProgress:verified.get(p.id)?.project.percentage ?? null})};
    });

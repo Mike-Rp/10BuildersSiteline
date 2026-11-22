@@ -17,10 +17,10 @@
 #root .urgent-item-copy strong, #root .urgent-item-copy > span, #root .urgent-item-status strong, #root .urgent-item-status time { display: block; font-size: 14px; }
 #root .urgent-item-copy > span, #root .urgent-item-status time { margin-top: 3px; color: var(--color-muted); }
 #root .urgent-item-status { text-align: right; flex: 0 1 230px; }
+#root .urgent-item-status > span { display: block; margin-top: 3px; color: var(--color-muted); font-size: 13px; }
 #root .urgent-item-status.overdue strong, #root .urgent-item-status.blocked strong { color: var(--color-danger); }
 #root .urgent-item-status.soon strong { color: var(--color-warning); }
 #root .urgent-banner-item > svg { flex: none; }
-#root .urgent-banner-more { margin-top: 10px; font-size: 14px; color: var(--color-muted); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 #root .license-banner.red { border-left: 4px solid var(--color-danger); background: #fff3f1; }
 #root .license-banner.amber { border-left: 4px solid var(--color-warning); background: #fff8ed; }
 #root .urgent-action-banner.ao-blocker-banner { display: block; }

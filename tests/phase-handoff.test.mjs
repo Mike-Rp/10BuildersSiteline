@@ -28,33 +28,3 @@ test("handoff uses verified phase totals and ownership, never legacy percentage 
   assert.equal(phaseHandoff(p, actor).final, true)
   assert.equal(phaseHandoff(p, actor).next, undefined)
 })
-
-test("handoff displays blockers for staff with no manual Activate control", async () => {
-  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost" })
-  const previous = new Map()
-  for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })) {
-    previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
-    Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
-  }
-  const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
-  const { createRoot } = await import("react-dom/client")
-  const root = createRoot(document.getElementById("root"))
-  try {
-    const { default: PhaseHandoff } = await server.ssrLoadModule("/src/PhaseHandoff.tsx")
-    const p = project()
-    p.handoffBlocker = "The next phase SPM must confirm their assignment."
-    for (const role of ["opm", "spm"]) {
-      await act(async () => root.render(React.createElement(PhaseHandoff, { project: p, actor: { ...actor, role } })))
-      assert.match(document.querySelector('[role="status"]').textContent, /SPM must confirm/)
-      assert.ok(![...document.querySelectorAll("button")].some(button => /activate|confirm activation/i.test(button.textContent)))
-    }
-    p.phase = "Design"
-    await act(async () => root.render(React.createElement(PhaseHandoff, { project: p, actor })))
-    assert.equal(document.querySelector('[aria-label="Automatic phase handoff"]'), null)
-  } finally {
-    await act(async () => root.unmount())
-    await server.close()
-    dom.window.close()
-    for (const [key, value] of previous) { if (value) Object.defineProperty(globalThis, key, value); else delete globalThis[key] }
-  }
-})

@@ -13,11 +13,12 @@ function book(rows, extension = "xlsx") {
   return { originalname: `laborers.${extension}`, buffer: XLSX.write(workbook, { type: "buffer", bookType: extension }) }
 }
 
-test("company contacts require exactly 11 digits and an exact Gmail domain", () => {
+test("company contacts require a Philippine mobile number and an exact Gmail domain", () => {
   assert.deepEqual(companyRegistrationErrors(valid), {})
   assert.deepEqual(companyRegistrationErrors({ ...valid, email: " USER.Name+crew@GMAIL.COM " }), {})
-  for (const phone of ["", "0917", "091712345678", "+639171234567", "0917abc4567", 9171234567])
-    assert.match(companyRegistrationErrors({ ...valid, phone }).phone, /11-digit/)
+  for (const phone of ["", "0917", "091712345678", "+638171234567", "08171234567", "0917abc4567", "0917-1234567", 9171234567])
+    assert.match(companyRegistrationErrors({ ...valid, phone }).phone, /Philippine mobile number/)
+  assert.deepEqual(companyRegistrationErrors({ ...valid, phone: "+639171234567" }), {})
   for (const email of ["", "company@yahoo.com", "company@notgmail.com", "company@gmail.com.evil", "user name@gmail.com", "user@@gmail.com"])
     assert.match(companyRegistrationErrors({ ...valid, email }).email, /@gmail.com/)
 })
@@ -37,13 +38,14 @@ test("primary foreman is required and an unused optional backup is omitted", () 
   for (const foremen of [null, {}, [], [company.foremen[0], company.foremen[0], company.foremen[0]], [null]])
     assert.ok(Object.keys(companyRegistrationErrors({ ...valid, foremen })).length)
 })
-test("both foremen require a full name and 11-digit mobile number when entered", () => {
+test("both foremen require a full name and Philippine mobile number when entered", () => {
   const primary = { name: "Juan Dela Cruz", phone: "09171234567" }, backup = { name: "Maria Santos", phone: "09181234567" }
   assert.deepEqual(companyRegistrationErrors({ ...valid, foremen: [primary, backup] }), {})
   assert.ok(companyRegistrationErrors({ ...valid, foremen: [{ name: "", phone: primary.phone }] }).foreman1Name)
   assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { name: backup.name, phone: "" }] }).foreman2Phone)
   assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { name: "", phone: backup.phone }] }).foreman2Name)
-  for (const phone of ["123", "+639171234567", "0917abc4567", 9171234567])
+  assert.deepEqual(companyRegistrationErrors({ ...valid, foremen: [primary, { ...backup, phone: "+639181234567" }] }), {})
+  for (const phone of ["123", "+6391712345678", "0917abc4567", 9171234567])
     assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { ...backup, phone }] }).foreman2Phone)
   assert.ok(companyRegistrationErrors({ ...valid, foremen: [primary, { ...backup, name: "a".repeat(151) }] }).foreman2Name)
 })

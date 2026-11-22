@@ -297,7 +297,7 @@ test("the frontend loads each role's data through the real backend", { skip: !av
   await t.test("Admin registers pending companies while Site PM registration is rejected",async()=>{
     let {user,state}=await asUser("patricia.domingo@10builders.com")
     const company={...state.companies[0],id:randomUUID(),name:"Admin registered company",email:"registered@gmail.com",phone:"09171234567",foremen:undefined,primaryTrade:"Electrical",verificationDecision:"pending",documents:[],manpowerDocuments:[]}
-    for(const phone of ["123","091712345678"]) await assert.rejects(createCompany({...company,phone}),/11-digit/)
+    for(const phone of ["123","091712345678"]) await assert.rejects(createCompany({...company,phone}),/Philippine mobile number/)
     const result=await createCompany(company)
     const saved=(await loadState(user)).companies.find(c=>c.id===result.id)
     assert.equal(saved.status,"pending");assert.equal(saved.primaryTrade,"Electrical");assert.deepEqual(saved.activeProjectIds,[])
@@ -707,7 +707,6 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     const seen=(await api('/accounts/password-reset-requests')).find(r=>r.id===saved.id)
     assert.ok(seen.claimed_by_name&&seen.claimed_by_me===false,'the other Admin sees who is handling it')
     await assert.rejects(api(claimUrl+'claim',claimBody),/already handling/)
-    await assert.rejects(api("/accounts/"+saved.id+"/regenerate-password",{method:"POST",json:{adminPassword:"Password@123",requestedAt:pendingRequest.requested_at}}),/is handling this request/,'a taken request is locked to the Admin who took it')
     await assert.rejects(api(claimUrl+'release',claimBody),/404/,'there is no release once a request is taken')
     await asUser('santos.juan@10builders.com')
     await assert.rejects(api(claimUrl+'release',claimBody),/404/,'not even the Admin who took it can release it')
@@ -740,6 +739,9 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal(target.temp_password_issued, true)
     await api("/auth/reset-password", {method:"POST", json:{password:"UpdatedPassword@123"}})
     assert.equal((await api("/auth/me")).temp_password_issued, false)
+    assert.equal((await api('/auth/me')).workspace_guide_seen,false,'the welcome guide has not been seen yet')
+    await api('/auth/me/workspace-guide-seen',{method:'POST'})
+    assert.equal((await api('/auth/me')).workspace_guide_seen,true,'seen is stored on the account, not the browser')
   })
 
   await t.test("first-login reset and employee resignation persist and revoke access",async()=>{

@@ -72,7 +72,7 @@ export function adminDashboardOverview(state: State, now = Date.now()) {
       detail: p.status === "changes_requested" ? "Intake changes requested"
         : p.status === "draft" ? "Draft intake needs setup" : "Awaiting Office PM response",
       label: "Intake follow-up", icon: "clock",
-      urgency: p.status === "changes_requested" ? "attention" as const : undefined,
+      urgency: ["draft", "changes_requested"].includes(p.status) ? "attention" as const : undefined,
     })),
   ]
   return {

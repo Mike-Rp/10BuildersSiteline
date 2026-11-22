@@ -1,4 +1,8 @@
 export declare const PROFESSIONS: string[];
+export declare const SPECIALTIES_BY_PROFESSION: Record<string, string[]>;
+export declare const CREDENTIAL_SPECIALIZATIONS: string[];
+export declare const ENGINEER_JOB_TITLES: string[];
+export declare function credentialChoices(profession: string | null, saved?: string[]): string[];
 export declare const ENGINEER_SPECIALIZATIONS: string[];
 export declare const SPECIALIZATION_PROFESSIONS: Record<string,string[]>;
 export declare const REQUIREMENT_SPECIALIZATIONS: Record<string,string[]>;

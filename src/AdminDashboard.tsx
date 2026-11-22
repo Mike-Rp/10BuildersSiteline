@@ -1,3 +1,4 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import PasswordResetRequestPanel from "./PasswordResetRequestPanel"
 import type { PasswordResetRequest } from "./PasswordResetRequests"
 import { overdueCount } from "./password-reset-wait"
@@ -15,7 +16,7 @@ const categories: ["all" | DashboardCategory, string][] = [
   ["all", "All"], ["requests", "Requests"], ["licenses", "Licenses"], ["updates", "Project updates"], ["intake", "Intake"],
 ]
 
-export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, onCompletedProjects, resetRequests = [], onOpenReset = () => {}, resetRequestFocus = 0, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
+export default function AdminDashboard({ overview, onNavigate, onOpen, onNewIntake, onMonthlyReport, onActivity, activity, allocationBanner, onCompletedProjects, resetRequests = [], onOpenReset = () => {}, resetRequestFocus = 0, readinessAvailable = true, delayedCount = 0, onDelayedProjects }: {
   resetRequests?: PasswordResetRequest[]
   onOpenReset?: (id:string,requestedAt?:string) => void
   resetRequestFocus?: number
@@ -30,6 +31,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
   onMonthlyReport: () => void
   onActivity: () => void
   activity: ReactNode
+  allocationBanner?: ReactNode
 }) {
   const [attentionView,setAttentionView]=useState("priority")
   const pendingResets=resetRequests.filter(r=>r.status!=='completed')
@@ -51,6 +53,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
         <Button className="ao-new-intake" variant="primary" icon="plus" onClick={onNewIntake}>New project intake</Button>
       </div>
     </PageTitlePanel>
+    {allocationBanner}
     <div className="dashboard-attention-switch" role="tablist" aria-label="Dashboard attention views" onKeyDown={event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return
       event.preventDefault()
@@ -63,7 +66,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
     </div>
     <div id="priority-items-panel" role="tabpanel" aria-labelledby="priority-items-tab" hidden={attentionView!=='priority'}>
       <UrgentActionBanner items={priorities.map(adminBannerItem)} label="Priority attention" className={readinessAvailable && blockers.length ? "ao-blocker-banner" : ""}
-      title="Priority items" showReviewButton={false}
+      title="Priority items"
       description={`${readinessAvailable && blockers.length ? `${blockers.length} ${blockers.length === 1 ? "project cannot" : "projects cannot"} advance. ` : ""}Open an item to review its details and take action.`}
       onOpen={item => { const source = priorities.find(priority => priority.key === item.key); if (source) onOpen(source) }} />
     </div>
@@ -96,7 +99,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onNewInta
           {overview.items.length ? "Choose another category to see other follow-up items." : "No pending requests, license alerts, project reviews, or intake follow-up in your current records."}
         </Empty>}
         <footer className="ao-pager"><span role="status">{filtered.length ? `${(current - 1) * 6 + 1}–${Math.min(current * 6, filtered.length)} of ${filtered.length} items` : "0 items"}</span>
-          {pages > 1 && <div><Button disabled={current === 1} onClick={() => setPage(current - 1)}>Previous</Button><span>Page {current} of {pages}</span><Button disabled={current === pages} onClick={() => setPage(current + 1)}>Next</Button></div>}
+          {pages > 1 && <div><Button disabled={current === 1} onClick={(event) => { setPage(current - 1); scrollListAfterChange(event.currentTarget) }}>Previous</Button><span>Page {current} of {pages}</span><Button disabled={current === pages} onClick={(event) => { setPage(current + 1); scrollListAfterChange(event.currentTarget) }}>Next</Button></div>}
         </footer>
       </section>
       <section className="ao-panel ao-activity" aria-labelledby="ao-activity-title">

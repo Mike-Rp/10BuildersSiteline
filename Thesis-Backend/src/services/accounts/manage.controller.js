@@ -2,12 +2,12 @@ import { validateUpload } from "../workspace/upload-policy.utility.js";
 import { saveSpecializations,credentialSummary } from "../licenses/credentials.controller.js";
 import { workEmailFromAssignedId, assertWorkEmailAvailable } from "./work-email.utility.js";
 import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
-import { ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
+import { ENGINEER_JOB_TITLES, ENGINEER_SPECIALIZATIONS } from "../../domain/engineer-credentials.js";
 import { createRenewalRequest } from "../licenses/renewal.controller.js";
 import {validateSpecializations,requireCredentialTags} from '../licenses/credential-specializations.utility.js';
 import { archiveNote,recordArchiveEvent } from "../archive/audit.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
-import { activeClaim } from "./reset-follow-up.utility.js";
+import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import crypto from "crypto";
 import { accountListQuery } from "./account-list.utility.js";
 import { validateEngineerExperience, saveEngineerExperience } from "./experience.utility.js";
@@ -176,6 +176,18 @@ export async function createAccountRecord(client, actor, body) {
   return saved;
 }
 
+async function saveJobTitle(client, userId, role, title) {
+  if (title === undefined) return;
+  if (!["opm", "spm"].includes(role) || (title !== null && !ENGINEER_JOB_TITLES.includes(title))) {
+    throw new HttpError(422, "Select a supported engineer job title.");
+  }
+  await client.query(
+    `INSERT INTO workspace_account_metadata(user_id, metadata) VALUES($1, jsonb_build_object('jobTitle', $2::text))
+     ON CONFLICT(user_id) DO UPDATE SET metadata = workspace_account_metadata.metadata || excluded.metadata`,
+    [userId, title],
+  );
+}
+
 async function insertAccountRecord(client, actor, body) {
   const fullName = body.full_name ?? body.fullName ?? body.contact_person;
   const userId = uuidv4();
@@ -191,12 +203,12 @@ async function insertAccountRecord(client, actor, body) {
   if (role === "client" && clientEmailError(email)) throw new HttpError(400, clientEmailError(email));
   if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length>150) throw new HttpError(400,"full_name is required (max 150 characters).");
   if (typeof email !== "string" || email.length>254 || !EMAIL_RE.test(email)) throw new HttpError(400,"A valid email is required.");
-  if (phone!==null && (typeof phone!=="string" || (phone !== "" && !/^\d{11}$/.test(phone)))) throw new HttpError(400,"Contact number must contain exactly 11 digits.");
+  if (phone !== null && phone !== "" && !isPhilippineMobile(phone)) throw new HttpError(400, PH_MOBILE_ERROR);
   if (!["admin","opm","spm","client"].includes(role)) throw new HttpError(400,"Invalid role.");
   const associated=Array.isArray(body.initial_credentials)&&body.initial_credentials.some(c=>c?.specializations!==undefined);
   if (associated) {
     await requireCredentialTags(client);
-    for(const credential of body.initial_credentials)validateSpecializations(credential?.specializations);
+    for(const credential of body.initial_credentials)validateSpecializations(credential?.specializations, credential?.profession);
   }
   const scope = normalizeScope(role,associated&&role==='spm'?undefined:body.scope);
   const experience = validateEngineerExperience(body.experience_by_type, role);
@@ -220,6 +232,7 @@ async function insertAccountRecord(client, actor, body) {
     inserted.rows[0].email = workEmail;
   }
   if (scope) await writeScope(client,inserted.rows[0].id,scope,actor.id);
+  await saveJobTitle(client, userId, role, body.job_title);
   await saveEngineerExperience(client, inserted.rows[0].id, experience);
   if (body.initial_credentials !== undefined) {
     if (actor.role !== "admin") throw new HttpError(403, "Administrator access required.");
@@ -299,6 +312,7 @@ export const getAccount = async (req, res) => {
     const base = await execute(
       `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.status,
               u.date_added::text AS date_added, u.last_login_at, u.temp_password_issued,
+              (SELECT m.metadata->>'jobTitle' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS job_title,
               (SELECT m.metadata->'experienceByType' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS experience_by_type
          FROM users u JOIN roles r ON r.id = u.role_id
         WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false`, [id]);
@@ -349,7 +363,7 @@ export const updateAccount = async (req, res) => {
     const fullName = pick(b, "full_name", "fullName");
     if (fullName !== undefined && (!String(fullName).trim() || String(fullName).length > 150)) return sendError(res, "full_name must be 1-150 characters.", 400);
     if (b.email !== undefined && !EMAIL_RE.test(b.email)) return sendError(res, "A valid email is required.", 400);
-    if (b.phone !== undefined && b.phone !== null && b.phone !== "" && (typeof b.phone !== "string" || !/^\d{11}$/.test(b.phone))) return sendError(res, "Contact number must contain exactly 11 digits.", 400);
+    if (b.phone !== undefined && b.phone !== null && b.phone !== "" && !isPhilippineMobile(b.phone)) return sendError(res, PH_MOBILE_ERROR, 400);
 
     const data = await withTransaction(async (client) => {
       const found = await client.query(
@@ -368,7 +382,7 @@ export const updateAccount = async (req, res) => {
       if (fullName !== undefined) set("full_name", String(fullName).trim());
       if (b.email !== undefined) set("email", b.email);
       if (b.phone !== undefined) set("phone", b.phone);
-      if (sets.length === 0 && !scope && experience === undefined) throw new HttpError(400, "No editable fields provided.");
+      if (sets.length === 0 && !scope && experience === undefined && b.job_title === undefined) throw new HttpError(400, "No editable fields provided.");
 
       if (sets.length > 0) {
         params.push(actor.id);
@@ -376,6 +390,7 @@ export const updateAccount = async (req, res) => {
           `UPDATE users SET ${sets.join(", ")}, updated_by = $${params.length}, updated_at = now() WHERE id = $1`, params);
       }
       if (scope) await writeScope(client, id, scope, actor.id);
+      await saveJobTitle(client, id, found.rows[0].role, b.job_title);
       await saveEngineerExperience(client, id, experience);
 
       const out = await client.query(`SELECT id, full_name, email, phone FROM users WHERE id = $1`, [id]);
@@ -427,8 +442,9 @@ export const regeneratePassword = async (req, res) => {
     const data = await withTransaction(async (client) => {
       const admin = (await client.query("select password_hash from users where id=$1", [actor.id])).rows[0];
       if (typeof req.body?.adminPassword !== "string" || !(await bcrypt.compare(req.body.adminPassword, admin.password_hash))) throw new HttpError(403, "Administrator password is incorrect.");
-      const target = (await client.query("select u.full_name,m.metadata->>'lastName' as last_name from users u left join workspace_account_metadata m on m.user_id=u.id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
+      const target = (await client.query("select r.code as role from users u join roles r on r.id=u.role_id where u.id=$1 and not coalesce(u.is_deleted,false) for update of u", [id])).rows[0];
       if (!target) throw new HttpError(404, "Account not found.");
+      if (target.role === "client") throw new HttpError(403, "Clients must set their own SiteLine password.");
       const resetMeta = (await client.query("select metadata from workspace_account_metadata where user_id=$1",[id])).rows[0]?.metadata || {};
       if(req.body?.requestedAt !== undefined && resetMeta.passwordResetRequestedAt !== req.body.requestedAt) {
         const done = (resetMeta.passwordResetHistory || []).find(h => h.requestedAt === req.body.requestedAt);
@@ -437,8 +453,6 @@ export const regeneratePassword = async (req, res) => {
           ? `This reset was already completed${doneBy ? ` by ${doneBy}` : ""} on ${new Date(done.completedAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}. Refresh the requests.`
           : "This reset request has changed or was already completed. Refresh the requests.");
       }
-      const held = activeClaim(resetMeta);
-      if (held && held.by !== actor.id) throw new HttpError(409, `${held.byName} is handling this request. It reopens to every administrator when their hold runs out.`);
       const tempPassword = makeTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const updated = await client.query(

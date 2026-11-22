@@ -67,7 +67,6 @@
 #root .admin-workspace .document-browser > .panel-header { padding: 16px 18px 10px; }
 #root .admin-workspace .project-explorer { padding: 12px 18px 18px; gap: 16px; }
 #root .admin-workspace .explorer-counters > div { padding: 12px 14px; background: #fff; }
-#root .admin-workspace .explorer-counters small { display: block; color: var(--color-muted); font-size: 13px; line-height: 1.4; margin-top: 3px; }
 .explorer-search-section { min-width: 0; border-top: 1px solid var(--color-line); padding-top: 16px; }
 .explorer-search-section > h3 { margin: 0 0 8px; font-size: 17px; }
 #root .admin-workspace .explorer-search-section .list-toolbar { padding: 4px 0 12px; }

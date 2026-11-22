@@ -267,6 +267,7 @@ export function Modal({
   onClose,
   wide = false,
   closeOnBackdrop = false,
+  footer,
 }: {
   title: string
   subtitle?: string
@@ -274,6 +275,7 @@ export function Modal({
   onClose: () => void
   wide?: boolean
   closeOnBackdrop?: boolean
+  footer?: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
@@ -294,9 +296,9 @@ export function Modal({
       if (e.key === "Tab") {
         const els = Array.from(
           ref.current?.querySelectorAll<HTMLElement>(
-            'button:not(:disabled),input,select,textarea,a[href],[tabindex="0"]',
+            'button,input,select,textarea,a[href],[tabindex="0"]',
           ) || [],
-        )
+        ).filter(el => !el.matches(":disabled") && !el.closest("[hidden]"))
         const first = els[0]
         const last = els.at(-1)
         if (e.shiftKey && document.activeElement === first) {
@@ -346,6 +348,7 @@ export function Modal({
           />
         </header>
         <div className="modal-body">{children}</div>
+        {footer && <footer className="modal-footer">{footer}</footer>}
       </div>
     </div>
   )

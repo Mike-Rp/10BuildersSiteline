@@ -11,7 +11,7 @@ export default function IntakeRecord({ state, project, actor, onOpenActive }: {
 }) {
   const office = state.accounts.find(account => account.id === project.opmId)
   return <div className="intake-record">
-    <header><h3>{project.name}</h3><p>{project.type} · {project.location || "Location not recorded"}</p>
+    <header><h3>{project.name}</h3><p>{project.type}</p>
       {isIntakeHistory(project) ? <span className="intake-stage completed">{intakeHistoryLabel(project)}</span> : <IntakeGuidance state={state} project={project} actor={actor} details />}
     </header>
     <section><h3>Intake & Confirmation Record</h3>

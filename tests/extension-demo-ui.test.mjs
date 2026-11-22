@@ -11,6 +11,8 @@ test(
       url: "http://localhost:8443/?extensionDemo=1",
       pretendToBeVisual: true,
     })
+  // The first-visit workspace guide is a modal; tests that exercise the app itself treat it as already seen.
+  { const getItem = dom.window.Storage.prototype.getItem; dom.window.Storage.prototype.getItem = function (key) { return String(key).startsWith('10buildline:workspace-guide:') ? 'seen' : getItem.call(this, key) } }
     const previous = new Map()
     const w = dom.window
     for (const key of [

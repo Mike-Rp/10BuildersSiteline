@@ -1,6 +1,7 @@
+import ProjectInquiries from "./ProjectInquiries"
 import WorkspaceGuide from "./WorkspaceGuide"
+import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
-import EngineerResponsibilities from './EngineerResponsibilities'
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
@@ -14,11 +15,11 @@ import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import ExecutiveSummary from "./ExecutiveSummary"
 import PageTitlePanel from "./PageTitlePanel"
 import ProjectClientDetails from "./ProjectClientDetails"
+import { projectClientNames } from "./project-clients"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyForemen from "./CompanyForemen"
-import { CompanyProjectPhases } from "./AllocationDirectory"
+import AllocationDirectory, { AllocationChangeBanner, CompanyProjectPhases } from "./AllocationDirectory"
 import { api } from "./api/client"
-import PhaseHandoff from "./PhaseHandoff"
 import MyProfile from "./MyProfile"
 import EvidenceReview from "./EvidenceReview"
 import UrgentActionBanner, { useUrgencyNow } from "./UrgentActionBanner"
@@ -120,6 +121,7 @@ import {
   allocationReady,
   activeSubcontractors,
   assignmentBlock,
+  assignmentDocumentsMissing,
   checklistFor,
   pendingChecklistFor,
   ISSUES,
@@ -127,6 +129,7 @@ import {
   leadConfirmed,
   officePmStage,
   leadId,
+  leadPhaseAssignment,
   ownedProjects,
   phaseOwner,
   canWorkPhase,
@@ -134,6 +137,8 @@ import {
   registeredCount,
   REVIEW_MS,
   teamConfirmed,
+  phaseEngineerSummary,
+  waitingLabel,
   visibleEvents,
   workflowFor,
   type WorkflowCommand,
@@ -199,7 +204,7 @@ function Status({ value }: { value: string }) {
 }
 const OPM_NAV = [
   ["Dashboard", "grid"],
-  ["Confirmation queue", "check"],
+  ["Project intake", "check"],
   ["Documents", "folder"],
   ["Active sites", "building"],
   ["Archive", "archive"],
@@ -269,7 +274,8 @@ export default function RoleWorkspace({
   const projects = ownedProjects(state, actor)
   const navigationCounts = navigationAttention(state, actor)
   const { page: routePage, navigate: setPage } = useWorkspacePage(actor.role, !extensionDemo)
-  const page = extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
+  const legacyIntakeRoute = isOpm && ["Project inquiries", "Confirmation queue"].includes(routePage)
+  const page = legacyIntakeRoute ? "Project intake" : extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -278,15 +284,18 @@ export default function RoleWorkspace({
   )
   const [phaseWorkspaceOpen, setPhaseWorkspaceOpen] = useState(false)
   const [dialog, setDialog] = useState<RoleDialog>()
+  const [offerView, setOfferView] = useState<"summary" | "Overview" | "Construction phases" | "Assigned team" | "Documents">("summary")
   const [confirmationView, setConfirmationView] = useState<{ projectId: string; view: "team" | "subcontractors" }>()
   const [sitePmContact, setSitePmContact] = useState<{ projectId: string; accountId: string }>()
   const [suggestedReassignment, setSuggestedReassignment] = useState<{ projectId: string; accountId: string; phase: string }>()
+  const [inquiryAssignmentProjectId, setInquiryAssignmentProjectId] = useState<string>()
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [repositoryOpen, setRepositoryOpen] = useState(false)
   const [repoPath, setRepoPath] = useState<RepositoryPath>({})
   const [repoQuery, setRepoQuery] = useState("")
   useEffect(() => {
+    setOfferView("summary")
     if (dialog?.kind === "project") return
     setRepositoryOpen(false)
     setRepoPath({})
@@ -306,7 +315,14 @@ export default function RoleWorkspace({
   const [query, setQuery] = useState("")
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
-  const [confirmTab, setConfirmTab] = useState("mine")
+  const [confirmTab, setConfirmTab] = useState<"inquiries" | "mine" | "responses">(
+    () => routePage === "Project inquiries" ? "inquiries" : "mine",
+  )
+  const [inquiryCount, setInquiryCount] = useState<number>()
+  const [inquiryBannerTarget, setInquiryBannerTarget] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (legacyIntakeRoute) setConfirmTab(routePage === "Project inquiries" ? "inquiries" : "mine")
+  }, [legacyIntakeRoute, routePage])
   const [intakeView, setIntakeView] = useState<IntakeView>("all")
   const [assignmentIntakeView, setAssignmentIntakeView] = useState<IntakeView>("all")
   const navigation = useSidebarNavigation(!paused)
@@ -359,6 +375,20 @@ export default function RoleWorkspace({
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
   const [completedProjectId, setCompletedProjectId] = useState("")
+  const [officeDocumentsPath, setOfficeDocumentsPath] = useState<RepositoryPath>({})
+  const [requiredDocumentJump, setRequiredDocumentJump] = useState<{ projectId: string; index: number }>()
+  useEffect(() => {
+    if (page !== "Documents" || !requiredDocumentJump || officeDocumentsPath.projectId !== requiredDocumentJump.projectId) return
+    const { projectId, index } = requiredDocumentJump
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(`required-document-${projectId}-${index}`)
+        ?? document.getElementById(`required-documents-${projectId}`)
+      target?.scrollIntoView?.({ block: "center" })
+      target?.focus({ preventScroll: true })
+      setRequiredDocumentJump(undefined)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [page, officeDocumentsPath, requiredDocumentJump])
   const previousStatuses = useRef(
     Object.fromEntries(projects.map((p) => [p.id, p.status])),
   )
@@ -390,11 +420,19 @@ export default function RoleWorkspace({
   const intakes = projects.filter((p) =>
     ["pending", "changes_requested", "draft"].includes(p.status),
   )
+  const pendingSitePhases = (project: Project) => project.team.filter(phase =>
+    phase.engineers?.length
+      ? phase.engineers.some(engineer => engineer.accountId === actor.id && engineer.status === "pending")
+      : phase.accountId === actor.id && phase.status === "pending",
+  )
+  const pendingSiteOffers = isOpm ? [] : projects
+    .filter(project => project.status === "pending")
+    .map(project => ({ project, phases: pendingSitePhases(project), blocker: assignmentBlock(project, actor.id) }))
+    .filter(offer => offer.phases.length > 0)
   const tasks = projects.filter((p) =>
     isOpm
       ? p.status === "pending" && !p.opmAccepted
-      : !assignmentBlock(p, actor.id) &&
-        p.team.some((t) => (t.accountId === actor.id && t.status === "pending") || t.engineers?.some(e=>e.accountId===actor.id&&e.status==='pending')),
+      : !assignmentBlock(p, actor.id) && pendingSitePhases(p).length > 0,
   )
   // Projects with a Site PM phase that is still pending or declined.
   const responseProjects = projects.filter(
@@ -552,6 +590,9 @@ export default function RoleWorkspace({
   }
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); return }
+    const openInquiryTab = isOpm && next === "Project inquiries"
+    if (openInquiryTab || (isOpm && next === "Confirmation queue")) next = "Project intake"
+    if (next === "Documents" && page !== "Documents") setOfficeDocumentsPath({})
     let nextActiveSitesView: typeof activeSitesView | undefined
     if (!isOpm && next === "Document repository") {
       setResourcesTab("documents")
@@ -572,21 +613,24 @@ export default function RoleWorkspace({
     setActiveSitesScheduleFilter("")
     if (nextActiveSitesView) setActiveSitesView(nextActiveSitesView)
     setPage(normalizeWorkspacePage(next))
-    setConfirmTab("mine")
+    setConfirmTab(openInquiryTab ? "inquiries" : "mine")
     setQuery("")
     setError("")
     navigation.closeMobile()
     setBell(false)
   }
   const swipe = useSwipeNavigation({identity:actor.id,page,allowedPages:roleNav.map(([label])=>label),enabled:!paused && !extensionDemo,blocked:navigation.compact && navigation.expanded,navigate})
-  // Old SPM responses links open the Site PM responses tab of Confirmation queue.
   function openSiteResponses() {
-    navigate("Confirmation queue")
+    navigate("Project intake")
     setConfirmTab("responses")
   }
   function openDocuments(p: Project) {
     setPickedId(p.id)
     navigate("Documents")
+    setOfficeDocumentsPath({ projectId: p.id })
+    const missing = assignmentDocumentsMissing(p)[0] ?? DOC_LABELS.slice(0, 6).find(label =>
+      !p.docs.some(doc => doc.label === label && doc.uploaded))
+    setRequiredDocumentJump({ projectId: p.id, index: missing ? DOC_LABELS.indexOf(missing) : -1 })
   }
   function openChecklistApprovals(project?: Project) {
     const filters: Record<string, string> = project ? { project: project.id } : {}
@@ -609,7 +653,18 @@ export default function RoleWorkspace({
       navigate("Active sites")
       if (isOpm) setActiveSitesView("updates")
       requestAnimationFrame(() => document.getElementById(`active-site-review-${project.id}`)?.scrollIntoView({ block: "center" }))
-    } else if (priority.target === "assignment") { navigate("Assignments"); setAssignmentId(project.id) }
+    } else if (priority.target === "photos") {
+      navigate("Active sites")
+      setActiveSitesView("uploads")
+      requestAnimationFrame(() => document.getElementById("active-sites-photo-review")?.scrollIntoView({ block: "start" }))
+    } else if (priority.target === "confirm") {
+      navigate("Project intake")
+      setIntakeView("action")
+      updateListQuery(`${actor.role}:confirmations`, q => ({ ...q, search: project.name, filters: {}, page: 1 }))
+    } else if (priority.target === "assignment" || priority.target === "coordinate") {
+      navigate("Assignments")
+      setDialog({ kind: "project", projectId: project.id })
+    }
     else if (priority.target === "responses") { openSiteResponses(); setDialog({ kind: "project", projectId: project.id }) }
     else if (priority.target === "documents") openDocuments(project)
     else { navigate("Active sites"); setDialog({ kind: "project", projectId: project.id }) }
@@ -617,11 +672,10 @@ export default function RoleWorkspace({
   function urgentBanner() {
     const items = staffUrgentItems(state, actor, page, urgencyNow)
     const checklistOnly = items.length > 0 && items.every(item => item.target === "qa")
-    return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : isOpm ? "Priority items need your attention" : "Your response needs attention"}
+    return <UrgentActionBanner items={items} title={checklistOnly ? "Checklist approvals need your attention" : "Priority items need your attention"}
       description={checklistOnly ? `${items.length} ${items.length === 1 ? "project has" : "projects have"} submitted checklist evidence awaiting your approval.` : undefined}
       label="Priority action items"
-      actionLabel={checklistOnly ? "Review approvals" : isOpm ? "Open priority item" : "Review assignment"} onOpen={openUrgentItem}
-      onReview={() => { if (checklistOnly) openChecklistApprovals(); else if (items[0]) openUrgentItem(items[0]) }} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
+      onOpen={openUrgentItem} soonLabel="due within 24 hours" overdueLabel="overdue" note={isOpm && items.some(item => item.target === "qa" || item.target === "progress") ? "Evidence and progress reports: review within 3 days of submission." : undefined} />
   }
   async function showDoc(p: Project, doc: Doc) {
     if (isOpm ? p.opmId !== actor.id : !isAssigned(p, actor.id)) {
@@ -651,7 +705,7 @@ export default function RoleWorkspace({
         {page === "Dashboard" && <div className="staff-priority-summary"><span>Priority Items ({staffUrgentItems(state, actor, page, urgencyNow).length})</span></div>}
         {urgentBanner()}
         <LicenseBanner license={state.license?.self} />
-        {["Dashboard", "Assignments", "Confirmation queue"].includes(page) && (
+        {["Dashboard", "Assignments", "Project intake"].includes(page) && (
           <ReassignRequests
             requests={state.license?.requests || []}
             onError={setError}
@@ -666,29 +720,21 @@ export default function RoleWorkspace({
     )
   }
   function timeline(p: Project) {
-    const step = !p.opmAccepted
-      ? 0
-      : !registeredComplete(p)
-        ? 1
-        : !leadConfirmed(p)
-          ? 2
-          : !teamConfirmed(p)
-            ? 3
-            : 4
+    const labels = p.inquiryOrigin
+      ? ["Office PM accepts", "Lead Site PM", "Remaining Site PMs", "Required documents", "Subcontractor allocation"]
+      : ["Office PM accepts", "Six documents", "Lead Site PM", "Remaining Site PMs", "Subcontractor allocation"]
+    const completed = p.inquiryOrigin
+      ? [p.opmAccepted, leadConfirmed(p), teamConfirmed(p), registeredComplete(p), false]
+      : [p.opmAccepted, !assignmentDocumentsMissing(p).length, leadConfirmed(p), teamConfirmed(p), false]
+    const step = completed.indexOf(false)
     return (
       <ol className="role-intake-timeline">
-        {[
-          "Office PM accepts",
-          "Six documents",
-          "Lead Site PM",
-          "Remaining Site PMs",
-          "Subcontractor allocation",
-        ].map((label, i) => (
+        {labels.map((label, i) => (
           <li
             key={label}
-            className={i < step ? "done" : i === step ? "current" : ""}
+            className={completed[i] ? "done" : i === step ? "current" : ""}
           >
-            <span>{i < step ? <Icon name="check" size={15} /> : i + 1}</span>
+            <span>{completed[i] ? <Icon name="check" size={15} /> : i + 1}</span>
             <strong>{label}</strong>
           </li>
         ))}
@@ -698,12 +744,14 @@ export default function RoleWorkspace({
   function assignmentRoster(p: Project, allowReassign = false, showContacts = false) {
     return (
       <div className="role-roster">
-        {p.team.map((t) => (
+        {p.team.map((t) => {
+          const summary = phaseEngineerSummary(t)
+          return (
           <div key={t.phase}>
             <div>
               <strong>{t.phase}</strong>
               <small>
-                {t.phase === "Mobilization"
+                {t === leadPhaseAssignment(p)
                   ? `Project-specific Lead Site PM · ${projectPhaseDisciplines(p, t.phase).join(", ")}`
                   : projectPhaseDisciplines(p, t.phase).join(", ") ||
                     "Phase responsibility"}
@@ -712,20 +760,26 @@ export default function RoleWorkspace({
             {showContacts ? <div className="site-pm-roster-contacts">
               {(t.engineers?.length ? t.engineers.map(engineer => engineer.accountId) : t.accountId ? [t.accountId] : []).filter((id, index, ids) => ids.indexOf(id) === index).map(id => {
                 const engineer = t.engineers?.find(person => person.accountId === id)
+                const name = state.accounts.find(account => account.id === id)?.name || "Site PM record unavailable"
                 const status = engineer?.status || t.status
                 const deadline = engineer?.responseDeadline
                 const overdue = status === "pending" && !!deadline && Date.parse(deadline) <= urgencyNow
                 return <div className="site-pm-roster-contact" key={id}>
-                  <span>{actorName(id)}{deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</span>
+                  <span>{name}{deadline && status === "pending" && <small>Response due: {new Date(deadline).toLocaleString("en-PH")}</small>}</span>
                   <Status value={overdue ? "response overdue" : status} />
-                  <Button icon="users" aria-label={`View contact details for ${actorName(id)} in ${t.phase}`} onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>View Contact Details</Button>
-                  {status !== "confirmed" && p.status !== "completed" && <Button aria-label={`Review reassignment for ${actorName(id)} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Review Reassignment</Button>}
+                  <Button icon="users" aria-label={`View contact details for ${name} in ${t.phase}`} onClick={() => setSitePmContact({ projectId: p.id, accountId: id })}>View Contact Details</Button>
+                  {status !== "confirmed" && p.status !== "completed" && <Button aria-label={`Review reassignment for ${name} in ${t.phase}`} onClick={() => setSuggestedReassignment({ projectId: p.id, accountId: id, phase: t.phase })}>Review Reassignment</Button>}
                 </div>
               })}
               {!t.accountId && !t.engineers?.length && <span>Unassigned</span>}
-            </div> : <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>}
-            {!showContacts && <Status value={t.accountId ? t.status : "unassigned"} />}
-            {allowReassign && !showContacts &&
+            </div> : summary.multiple
+              ? <span>{t.engineers!.map((e) => actorName(e.accountId)).join(", ")}</span>
+              : <span>{t.accountId ? actorName(t.accountId) : "Unassigned"}</span>}
+            {!showContacts && <span className="phase-status-cell">
+              <Status value={t.accountId ? summary.status : "unassigned"} />
+              {summary.multiple && summary.waiting > 0 && <small>{waitingLabel(summary.waiting)}</small>}
+            </span>}
+            {allowReassign && !showContacts && !summary.multiple &&
               t.status !== "confirmed" &&
               p.status !== "completed" && (
                 <select
@@ -756,13 +810,19 @@ export default function RoleWorkspace({
                 </select>
               )}
           </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
   function confirmationCard(p: Project) {
     const work = workflowFor(p)
     const guidance = intakeGuidance(state, p, actor)
+    const parallelIntake = p.inquiryOrigin && p.opmAccepted
+    const assignments = parallelIntake ? inquiryAssignments(p) : []
+    const accepted = assignments.filter(person => person.status === "confirmed").length
+    const declined = assignments.some(person => person.status === "declined")
+    const documentsComplete = registeredComplete(p)
     return (
       <Panel
         key={p.id}
@@ -795,7 +855,25 @@ export default function RoleWorkspace({
         }
       >
         <div className="role-card-content">
-          {timeline(p)}
+          {parallelIntake ? (
+            <div className="opm-intake-progress" aria-label="Intake progress">
+              <div>
+                <h3><Icon name="folder" size={17} />Required documents</h3>
+                <p>{registeredCount(p)} of 6 uploaded</p>
+                <Badge tone={documentsComplete ? "green" : "amber"}>{documentsComplete ? "Complete" : "Uploads pending"}</Badge>
+              </div>
+              <div>
+                <h3><Icon name="users" size={17} />Site PM acceptance</h3>
+                <p>{assignments.length ? `${accepted} of ${assignments.length} assignments accepted` : "No assignments recorded"}</p>
+                <Badge tone={declined ? "red" : teamConfirmed(p) ? "green" : "amber"}>
+                  {declined ? "Reassignment needed" : teamConfirmed(p) ? "Accepted" : assignments.length ? "Awaiting responses" : "Staffing pending"}
+                </Badge>
+              </div>
+              {!documentsComplete && assignments.some(person => person.status === "pending") && (
+                <small>Site PMs can accept their assignments while documents are being uploaded. The Lead Site PM responds first.</small>
+              )}
+            </div>
+          ) : timeline(p)}
           <div className="opm-confirmation-next-action">
             {guidance && <div className="opm-confirmation-next-copy" aria-label={`${p.name} intake next step`}>
               <span className={`intake-stage ${guidance.kind}`}>{stageLabel(guidance, p)}</span>
@@ -851,15 +929,15 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  icon={registeredComplete(p) ? "folder" : "upload"}
+                  icon={documentsComplete ? "folder" : "upload"}
                   onClick={() => openDocuments(p)}
                 >
-                  {registeredComplete(p)
+                  {documentsComplete
                     ? "View project documents"
-                    : "Open required documents"}
+                    : parallelIntake ? "Upload required documents" : "Open required documents"}
                 </Button>
-                <Button onClick={openSiteResponses}>
-                  {guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
+                <Button onClick={parallelIntake && assignments.length ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses}>
+                  {parallelIntake && assignments.length ? "View assignment status" : guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
                 </Button>
               </div>
             </>
@@ -867,7 +945,7 @@ export default function RoleWorkspace({
           </div>
           <div className="role-project-facts">
             <span><Icon name="users" size={17} />Lead: {actorName(leadId(p))}</span>
-            <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>
+            {!parallelIntake && <span><Icon name="doc" size={17} />{registeredCount(p)}/6 documents</span>}
           </div>
           {work.deadline && (
             <div className="deadline-inline">
@@ -891,17 +969,44 @@ export default function RoleWorkspace({
     const dashActivity = runList(`${actor.role}:dash-activity`, events, { searchText: () => "" }, { pageSize: 5 })
     const reviewCount = isOpm ? pendingUpdates.length + pendingRework.length + qaCount
       : projects.filter(p => workflowFor(p).pendingRework?.authorId === actor.id).length
+    const firstReadyOffer = pendingSiteOffers.find(offer => !offer.blocker)
+    const firstOffer = firstReadyOffer ?? pendingSiteOffers[0]
     return (
       <div className="staff-overview">
         {header(
           "Dashboard",
           <Button icon="doc" onClick={() => setMonthlySummaryOpen(true)}>Monthly report</Button>,
         )}
+        {isOpm && <AllocationChangeBanner events={events} onRead={onRead} onOpen={setSelectedNotification} />}
+        {firstOffer && <section className="urgent-action-banner" aria-label="Site PM assignment offers">
+          <div className="urgent-banner-heading">
+            <span className="urgent-banner-icon" aria-hidden="true"><Icon name="alert" size={24} /></span>
+            <div className="urgent-banner-copy">
+              <span className="urgent-banner-eyebrow">{firstReadyOffer ? "Your response required" : "Pending assignments"}</span>
+              <h2>Site PM assignment offers</h2>
+              <p>{pendingSiteOffers.length === 1 ? "You have 1 pending offer." : `You have ${pendingSiteOffers.length} pending offers.`}</p>
+            </div>
+            <Button variant="primary" icon="arrow" onClick={() => setDialog({ kind: "project", projectId: firstOffer.project.id })}>
+              View assignment offer
+            </Button>
+          </div>
+          <div className="urgent-banner-items">
+            {pendingSiteOffers.map(({ project, phases, blocker }) => <button key={project.id} type="button" className="urgent-banner-item"
+              aria-label={`View assignment offer for ${project.name}`} onClick={() => setDialog({ kind: "project", projectId: project.id })}>
+              <span className="urgent-item-copy"><strong>{project.name}</strong>
+                <span>{actor.id === leadId(project) ? "Lead Site PM" : "Phase Site PM"} · {phases.map(phase => phase.phase).join(", ")}</span>
+                {blocker && <span>{blocker}</span>}
+              </span>
+              <span className="urgent-item-status"><strong>{blocker ? "Waiting on prerequisites" : "Awaiting your response"}</strong></span>
+              <Icon name="arrow" size={18} />
+            </button>)}
+          </div>
+        </section>}
         <ExecutiveSummary
           description={isOpm ? `${active.length} managed active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your confirmation; ${reviewCount} reviews need attention.` : `${active.length} current active sites and ${intakes.length} projects in intake. ${tasks.length} assignments await your response; ${reviewCount} rework flags await Office PM review.`}
           metrics={[
             { label: isOpm ? "Managed active sites" : "Current active sites", value: active.length, hint: "Assigned to you", icon: "building", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("sites") } },
-            { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Confirmation queue" : "Assignments") },
+            { label: "Actionable assignments", value: tasks.length, hint: isOpm ? "Awaiting your confirmation" : "Awaiting your response", icon: "check", onOpen: () => navigate(isOpm ? "Project intake" : "Assignments") },
             { label: isOpm ? "Pending reviews" : "Rework flags submitted", value: reviewCount, hint: isOpm ? "Progress, QA/QC and rework" : "Pending Office PM review", icon: "shield", onOpen: () => { navigate("Active sites"); if (isOpm) setActiveSitesView("updates") } },
             { label: "Open intake projects", value: intakes.length, hint: "In pre-construction setup", icon: "folder", onOpen: () => navigate(isOpm ? "Documents" : "Assignments") },
           ]}
@@ -934,7 +1039,7 @@ export default function RoleWorkspace({
           </Badge>
         }
       >
-        <div className="role-card-content">
+        <div className="role-card-content" id={page === "Documents" ? `required-documents-${p.id}` : undefined} tabIndex={-1}>
           <IntakeGuidance state={state} project={p} actor={actor} />
           <div className="document-completion">
             <progress max={6} value={registeredCount(p)} />
@@ -947,7 +1052,7 @@ export default function RoleWorkspace({
                 Accept your Office PM assignment before uploading any required
                 project document.
               </p>
-              <Button onClick={() => navigate("Confirmation queue")}>
+              <Button onClick={() => navigate("Project intake")}>
                 Review assignment
               </Button>
             </div>
@@ -972,6 +1077,9 @@ export default function RoleWorkspace({
                 const doc = p.docs.find((d) => d.label === label)
                 return (
                   <section
+                    id={page === "Documents" ? `required-document-${p.id}-${i}` : undefined}
+                    tabIndex={-1}
+                    aria-label={label}
                     className={`registered-document ${
                       doc?.uploaded ? "complete" : ""
                     }`}
@@ -1036,9 +1144,9 @@ export default function RoleWorkspace({
             <div className="notice">
               <Icon name="check" />
               <p>
-                All six documents are confirmed. {actorName(leadId(p))} must
-                accept first, then the remaining Site PMs. Uploading documents
-                does not activate the project.
+                All six documents are confirmed. {teamConfirmed(p) ? "All Site PM assignments are accepted." :
+                  leadConfirmed(p) ? "Waiting for the remaining Site PM responses." :
+                    "Waiting for the Lead Site PM to accept before the remaining Site PMs can respond."}
               </p>
             </div>
           )}
@@ -1133,6 +1241,8 @@ export default function RoleWorkspace({
           ),
         })}
         {...(isOpm && {
+          path: officeDocumentsPath,
+          onPathChange: setOfficeDocumentsPath,
           rootLabel: "Documents",
           rootClickable: true,
           fileDetails: true,
@@ -1246,6 +1356,14 @@ export default function RoleWorkspace({
         <div className="role-card-content">
           <IntakeGuidance state={state} project={p} actor={actor} />
           {timeline(p)}
+          {p.inquiryOrigin && <>
+            <ProjectScheduleDetails project={p} today={scheduleToday} />
+            <h3>Assignment documents</h3>
+            <ul>{DOC_LABELS.slice(0,6).map(label => {
+              const doc = p.docs.find(item => item.label === label && item.uploaded)
+              return <li key={label}>{doc ? <Button variant="ghost" onClick={() => showDoc(p,doc)}>{label} · Available</Button> : `${label} · Pending`}</li>
+            })}</ul>
+          </>}
           {pending.length > 0 && (
             <>
               {isIntake(p)
@@ -1427,9 +1545,9 @@ export default function RoleWorkspace({
         <div className="assignment-card-top">
           <div>
             <h3>{p.name}</h3>
-            <p className="assignment-location">
+            <p className="assignment-project-type">
               <Icon name="building" size={16} />
-              {p.location || "Location not set"} · {p.type}
+              {p.type}
             </p>
           </div>
           <Badge
@@ -1736,14 +1854,24 @@ export default function RoleWorkspace({
           projectPhaseNames(p).indexOf(t.phase) <=
             projectPhaseNames(p).indexOf(p.phase),
       )
+      // Phases still ahead of the project: this engineer's work starts when the project reaches them.
+      const order = projectPhaseNames(p), currentIndex = order.indexOf(p.phase)
+      const upcoming = p.team
+        .filter((t) => (t.accountId === actor.id || t.engineers?.some((e) => e.accountId === actor.id)) && order.indexOf(t.phase) > currentIndex)
+        .sort((x, y) => order.indexOf(x.phase) - order.indexOf(y.phase))
+      const owner = phaseOwner(p)
+      const where = `The project is in ${p.phase}${owner && owner !== actor.id ? `, handled by ${actorName(owner)}` : ""}.`
+      const next = upcoming.length ? ` Your next phase is ${upcoming[0].phase}${upcoming.length > 1 ? ` (and ${upcoming.length - 1} more after it)` : ""}; your workspace opens when it becomes active.` : ""
       return (
         <div className="role-card-content">
           <div className="notice">
             <Icon name="shield" />
             <p>
               {past.length
-                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is now read-only. Other assigned SPMs may continue their work.`
-                : `Your workspace remains locked until your assigned phase becomes active.`}
+                ? `Your completed phase responsibility (${past.map((t) => t.phase).join(", ")}) is read-only. ${where}${next}`
+                : upcoming.length
+                  ? `${where}${next}`
+                  : `Your workspace remains locked until your assigned phase becomes active.`}
             </p>
           </div>
           {past.map((t) => (
@@ -1764,15 +1892,6 @@ export default function RoleWorkspace({
     }
     return (
       <div className="role-card-content">
-        {work.handoff && (
-          <div className="notice">
-            <Icon name="check" />
-            <p>
-              Handoff complete: {work.handoff.from} → {work.handoff.to}. Your
-              confirmed phase is now active.
-            </p>
-          </div>
-        )}
         {work.updateRequested && (
           <div className="notice">
             <Icon name="bell" />
@@ -1939,11 +2058,12 @@ export default function RoleWorkspace({
                 label={
                   issueChoices.length>0
                     ? "Explain the issue *"
-                    : "Field notes (optional)"
+                    : "Field notes *"
                 }
               >
                 <textarea
                   rows={3}
+                  required
                   value={note}
                   disabled={saving}
                   onChange={(e) => setNote(e.target.value)}
@@ -1953,8 +2073,9 @@ export default function RoleWorkspace({
               <div className="role-actions">
                 <Button
                   variant="primary"
-                  disabled={saving || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&(!affectedActivities.length||!note.trim()))}
+                  disabled={saving || !note.trim() || (!!work.pendingUpdate && !issueChoices.length)||(issueChoices.length>0&&!affectedActivities.length)}
                   onClick={async () => {
+                    if (!note.trim()) { setError("Enter field notes before submitting an update."); return }
                     if (
                       await act(
                         {
@@ -1982,6 +2103,9 @@ export default function RoleWorkspace({
                     : "Submit progress update"}
                 </Button>
               </div>
+              {!issueChoices.length && !note.trim() && !work.pendingUpdate && (
+                <p className="role-muted" id="progress-update-hint">Field notes are required. Attachments are optional and do not replace field notes.</p>
+              )}
             </section>
           </>
         )}
@@ -2109,6 +2233,7 @@ export default function RoleWorkspace({
             projects={projects.map(p => ({
               ...p,
               lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              clientNames: projectClientNames(p, state.accounts),
               needsReview: false,
               currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
             }))}
@@ -2140,6 +2265,7 @@ export default function RoleWorkspace({
         {((!isOpm && activeSitesView === "sites") || (isOpm && (extensionDemo || activeSitesView === "sites"))) && <ActiveSites key={`${actor.id}:${activeSitesScheduleFilter}`} initialScheduleFilter={activeSitesScheduleFilter} showDelayNotice={!isOpm} today={scheduleToday} phaseDefinitionsByType={state.backendPhases} projects={allActive.map(p => ({
           ...p,
           lead: state.accounts.find(a => a.id === leadId(p))?.name,
+          clientNames: projectClientNames(p, state.accounts),
           needsReview: hasPendingSiteReview(p),
           currentPhaseStatus: currentPhaseStatusForProject(p, state, scheduleToday),
         }))} onOpen={projectId => setDialog({ kind: "project", projectId })}
@@ -2216,7 +2342,7 @@ export default function RoleWorkspace({
                   <div className="active-site-review-heading"><strong>Progress update</strong><Status value={update.escalated ? "escalated — review required" : "pending review"} /></div>
                   <div className="submission-meta"><span>Submitted by {actorName(update.authorId)}</span><span>{new Date(update.submittedAt).toLocaleString()}</span></div>
                   <p className="submission-note">{update.note || "No additional note provided."}</p>
-                  {submissionDocs(update).length > 0 && <div className="report-attachments"><h4>Attachments ({submissionDocs(update).length})</h4><ul>{submissionDocs(update).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  {submissionDocs(update).length > 0 && <div className="report-attachments"><h4>Attachments ({submissionDocs(update).length})</h4><ul>{submissionDocs(update).map(doc => <li key={doc.id}><AttachmentPreview doc={doc} onOpen={() => showDoc(project, doc)} /><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
                   <p className="role-muted">Approving records this progress note. It does not approve checklist evidence or change phase progress.</p>
                   <div className="role-actions"><Button variant="primary" icon="check" disabled={saving} onClick={() => void act({ type: "approve_update", projectId: project.id, expectedVersion: update.version }, "Progress note approved and added to visible history.")}>Approve progress note</Button><Button variant="danger-ghost" disabled={saving} onClick={() => setReportReject({ projectId: project.id, projectName: project.name, expectedVersion: update.version })}>Reject report</Button></div>
                 </div>}
@@ -2225,7 +2351,7 @@ export default function RoleWorkspace({
                   <div className="submission-meta"><span>Submitted by {actorName(rework.authorId)}</span><span>{new Date(rework.submittedAt).toLocaleString()}</span></div>
                   {rework.issues.length > 0 && <div className="tag-list subsection">{rework.issues.map(issue => <span key={issue}>{issue}</span>)}</div>}
                   <p className="submission-note">{rework.note || "No additional note provided."}</p>
-                  {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
+                  {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><AttachmentPreview doc={doc} onOpen={() => showDoc(project, doc)} /><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
                   <p className="role-muted">Review the affected activities and progress impact before confirming targeted rework.</p>
                   <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework impact</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
                 </div>}
@@ -2587,7 +2713,7 @@ export default function RoleWorkspace({
             className="deadline-list-item"
             onClick={() => {
               setPickedId(p.id)
-              navigate("Confirmation queue")
+              navigate("Project intake")
             }}
           >
             <span className="activity-icon request">
@@ -2884,6 +3010,53 @@ export default function RoleWorkspace({
         </div>
       </Panel>
     )
+  }
+
+  function inquiryAssignments(project: Project) {
+    const lead = leadPhaseAssignment(project)
+    return project.team.flatMap(phase => {
+      const people = phase.engineers?.length ? phase.engineers : phase.accountId
+        ? [{ accountId: phase.accountId, assignedDisciplines: phase.assignedDisciplines ?? [], status: phase.status }]
+        : []
+      return people.map(person => ({
+        ...person,
+        phase: phase.phase,
+        lead: phase === lead && person.accountId === phase.accountId,
+      }))
+    })
+  }
+  function inquiryAssignmentStatus(project: Project) {
+    const assignments = inquiryAssignments(project)
+    const responses = [...workflowFor(project).responses].reverse()
+    const accepted = assignments.filter(person => person.status === "confirmed").length
+    const close = () => setInquiryAssignmentProjectId(undefined)
+    return <Modal title="Site PM assignment status"
+      subtitle={`${project.name} · ${accepted} of ${assignments.length} assignments accepted`}
+      wide onClose={close} footer={<Button onClick={close}>Close</Button>}>
+      {assignments.length ? <div className="inquiry-lineup-table">
+        <table aria-label="Assigned Site PMs">
+          <thead><tr><th scope="col">Assigned phase</th><th scope="col">Site PM</th><th scope="col">Assigned tags</th>
+            <th scope="col">Designation</th><th scope="col">Response</th><th scope="col">Next action</th></tr></thead>
+          <tbody>{assignments.map(person => {
+            const declined = person.status === "declined"
+            const reason = declined ? responses.find(response => response.accountId === person.accountId &&
+              response.phase === person.phase && response.status === "declined")?.note : undefined
+            return <tr key={`${person.phase}:${person.accountId}`} data-declined={declined}>
+              <th scope="row">{person.phase}</th>
+              <td>{actorName(person.accountId)}</td>
+              <td>{person.assignedDisciplines.join(", ") || "No tags recorded"}</td>
+              <td>{person.lead ? "Lead Site PM" : "Phase Site PM"}</td>
+              <td><Badge tone={declined ? "red" : person.status === "confirmed" ? "green" : "amber"}>
+                {declined ? "Declined" : person.status === "confirmed" ? "Accepted" : "Pending"}
+              </Badge>{reason && <p>{reason}</p>}</td>
+              <td>{declined && project.status !== "completed" && <Button onClick={() => setSuggestedReassignment({
+                projectId: project.id, accountId: person.accountId, phase: person.phase,
+              })}>Review reassignment</Button>}</td>
+            </tr>
+          })}</tbody>
+        </table>
+      </div> : <p>No Site PM assignments are recorded for this project.</p>}
+    </Modal>
   }
   function responseTracking() {
     const completed = responseProjects.filter((p) =>
@@ -3285,6 +3458,131 @@ export default function RoleWorkspace({
       </>
     )
   }
+  function siteAssignmentOffer(project: Project) {
+    const pending = pendingSitePhases(project)
+    const assignedPhases = project.team.filter(phase => phase.accountId === actor.id ||
+      phase.engineers?.some(engineer => engineer.accountId === actor.id))
+    const blocker = assignmentBlock(project, actor.id)
+    const lead = leadId(project)
+    const summary = offerView === "summary"
+    const status = blocker ? "Waiting on prerequisites" : "Awaiting your response"
+    const missingDocuments = assignmentDocumentsMissing(project)
+    const documents = offerView === "Documents"
+      ? projectDocumentIndexFor(project, actor).flatMap(category =>
+        category.folders.flatMap(folder => folder.files.map(file => file.doc)))
+          .filter(doc => !DOC_LABELS.slice(0, 6).some(label => label === doc.label))
+      : []
+    const close = () => setDialog(undefined)
+    const inquiry = project.inquiryOverview
+    const areaLabel = (area?: number) => area == null ? "Not provided" : `${area.toLocaleString("en-PH")} m²`
+    const projectFacts = <dl className="site-offer-facts">
+      <div><dt>Target start</dt><dd>{project.start ? dateLabel(project.start) : "Not set"}</dd></div>
+      <div><dt>Target completion</dt><dd>{project.end ? dateLabel(project.end) : "Not set"}</dd></div>
+      <div><dt>Office PM</dt><dd>{project.officePmContact?.name || (project.opmId ? actorName(project.opmId) : "Unassigned")}</dd></div>
+      <div><dt>Lead Site PM</dt><dd>{lead ? actorName(lead) : "Unassigned"}</dd></div>
+    </dl>
+    return <Modal title={summary ? "Project assignment" : "Project details"} subtitle={project.name} wide onClose={close} footer={<div className="site-offer-footer">
+      <Button icon={summary ? "doc" : undefined} onClick={() => setOfferView(summary ? "Overview" : "summary")}>
+        {summary ? "View full project details" : "Back to assignment summary"}
+      </Button>
+      <div className="site-offer-footer-actions">
+        <Button onClick={close}>Close</Button>
+        {summary && <>
+        {!blocker && <Button disabled={saving} onClick={() => {
+          setDeclineReason("")
+          setDialog({ kind: "decline", projectId: project.id, phase: pending[0].phase })
+        }}>Decline {pending[0].phase} phase</Button>}
+        <Button variant="primary" icon="check" disabled={saving || !!blocker}
+          aria-describedby={blocker ? "site-offer-acceptance-blocker" : undefined}
+          onClick={async () => {
+            if (await act({ type: "accept_assignment", projectId: project.id }, "Your pending Site PM assignments are confirmed.")) close()
+          }}>{actor.id === lead ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}</Button>
+        </>}
+      </div>
+    </div>}>
+      <div className="site-offer-content">
+        <div className="site-offer-meta">
+          <p>{[project.type, project.area && `${project.area} m² floor area`,
+            project.floors && `${project.floors} ${project.floors === "1" ? "floor" : "floors"}`].filter(Boolean).join(" · ")}</p>
+          <Badge tone={blocker ? "amber" : "green"}>{status}</Badge>
+        </div>
+        {summary ? <>
+          <div className="site-offer-grid">
+            <section className="site-offer-card">
+              <h3>Your assignment</h3>
+              <p>{actor.id === lead ? "Lead Site PM" : "Phase Site PM"}</p>
+              <ul>{assignedPhases.map(phase => {
+                const member = phase.engineers?.find(engineer => engineer.accountId === actor.id)
+                const tags = member?.assignedDisciplines ?? phase.assignedDisciplines ?? []
+                return <li key={phase.phase}><strong>{phase.phase}</strong>
+                  {tags.length > 0 && <div className="tag-list">{tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
+                </li>
+              })}</ul>
+            </section>
+            <section className="site-offer-card"><h3>Project at a glance</h3>{projectFacts}</section>
+          </div>
+          {blocker ? <div className="site-offer-blocker"><Icon name="shield" /><p id="site-offer-acceptance-blocker">{blocker}</p></div>
+            : <p>Accepting confirms {pending.length === 1 ? "your pending phase assignment" : `all ${pending.length} pending phase assignments`} for this project.</p>}
+          {project.inquiryOrigin && missingDocuments.length > 0 && <p>Office PM uploads pending: {missingDocuments.join(", ")}.</p>}
+        </> : <>
+          <div className="site-offer-tabs" role="group" aria-label="Project details sections">
+            {(["Overview", "Construction phases", "Assigned team", "Documents"] as const).map(tab =>
+              <Button key={tab} variant={offerView === tab ? "primary" : ""} aria-pressed={offerView === tab}
+                onClick={() => setOfferView(tab)}>{tab}</Button>)}
+          </div>
+          {offerView === "Overview" && <>
+            <div className="site-offer-grid">
+              <section className="site-offer-card">
+                <h3>Project information</h3>
+                <dl className="site-offer-facts">
+                  <div><dt>Project type</dt><dd>{project.type || "Not provided"}</dd></div>
+                  <div><dt>Land area</dt><dd>{areaLabel(inquiry?.land_area)}</dd></div>
+                  <div><dt>Lot area</dt><dd>{areaLabel(inquiry?.lot_area)}</dd></div>
+                  <div><dt>Total floor area</dt><dd>{project.area ? `${project.area} m²` : "Not provided"}</dd></div>
+                  <div><dt>Number of floors</dt><dd>{project.floors || "Not provided"}</dd></div>
+                  <div><dt>Project location</dt><dd>{project.location || "Not provided"}</dd></div>
+                  <div><dt>Inquiry classification</dt><dd>{inquiry?.classification || "Not provided"}</dd></div>
+                </dl>
+              </section>
+              <section className="site-offer-card">
+                <h3>Schedule and construction plan</h3>
+                {projectFacts}
+                <dl className="site-offer-facts">
+                  <div><dt>Technical requirements</dt><dd>{inquiry?.technical || "Not provided"}</dd></div>
+                  <div><dt>Project phase arrangement</dt><dd>{inquiry?.arrangement || "Not provided"}</dd></div>
+                </dl>
+              </section>
+            </div>
+            {blocker && <div className="site-offer-blocker"><Icon name="shield" /><p>{blocker}</p></div>}
+          </>}
+          {offerView === "Construction phases" && <section aria-label="Construction phase sequence">
+            <p><strong>Target start:</strong> {project.start ? dateLabel(project.start) : "Not set"}
+              {" · "}<strong>Target completion:</strong> {project.end ? dateLabel(project.end) : "Not set"}</p>
+            <ol className="site-offer-phases">
+            {projectPhaseNames(project).map(phase => {
+              const assigned = assignedPhases.some(row => row.phase === phase)
+              return <li key={phase} data-assigned={assigned}><strong>{phase}</strong>
+                <div>{assigned && <Badge>Your assignment</Badge>}<Badge>{phase === project.phase ? "Not started" : "Upcoming"}</Badge></div>
+              </li>
+            })}
+            </ol>
+          </section>}
+          {offerView === "Assigned team" && <section className="site-offer-card">
+            <h3>Personnel by phase</h3>{projectFacts}{assignmentRoster(project)}
+          </section>}
+          {offerView === "Documents" && <section className="site-offer-card">
+            <h3>Project documents</h3>
+            {missingDocuments.length > 0 && <div className="site-offer-blocker"><Icon name="shield" />
+              <p>{project.inquiryOrigin ? "Office PM uploads pending" : "Waiting for Office PM documents"}: {missingDocuments.join(", ")}.</p></div>}
+            {documents.length ? <ul>{documents.map(doc => <li key={doc.id}>
+              <Button variant="text-button" icon="doc" onClick={() => void showDoc(project, doc)}>{doc.label} · {doc.name}</Button>
+            </li>)}</ul> : <p>No files are available to your account yet.</p>}
+          </section>}
+        </>}
+        {error && <p className="error" role="alert">{error}</p>}
+      </div>
+    </Modal>
+  }
   function projectDetail(p: Project) {
     const work = workflowFor(p)
     const historyRows = p.history.slice().reverse().map((h, i) => (
@@ -3315,16 +3613,15 @@ export default function RoleWorkspace({
     return (
       <>
         <ExtensionWorkflow actor={actor} projectId={p.id} />
-        <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} />
+        <ProjectMonitoringOverview project={p} state={state} onPreview={doc=>showDoc(p,doc)} showClient />
         <ProjectClientDetails project={p} accounts={state.accounts} />
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
-        {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={onReload}/>}
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
-        {actor.role === "spm" && isIntake(p) && p.team.some(t => t.accountId === actor.id && t.status === "pending") && (() => {
-          const ownPending = p.team.filter(t => t.accountId === actor.id && t.status === "pending")
+        {actor.role === "spm" && isIntake(p) && pendingSitePhases(p).length > 0 && (() => {
+          const ownPending = pendingSitePhases(p)
           const block = assignmentBlock(p, actor.id)
           return <section className="detail-section" aria-label="Accept this project assignment">
             <h3>{actor.id === leadId(p) ? "Lead Site PM acceptance" : "Your phase assignments"}</h3>
@@ -3353,6 +3650,7 @@ export default function RoleWorkspace({
           <section className="detail-section">
             <h3>Subcontractor allocation</h3>
             <SubcontractorAllocationReadOnly state={state} project={p} />
+            {state.phaseAllocationAvailable && !p.clientSubcon && <AllocationDirectory projectId={p.id} />}
           </section>
         )}
         {!isOpm && (p.subcontractorAllocation || (actor.id === leadId(p) && allocationReady(p) && p.status !== "completed")) && <section className="detail-section">
@@ -3422,7 +3720,6 @@ export default function RoleWorkspace({
         <section className="detail-section">
           <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
         </section>
-        <PhaseHandoff project={p} actor={actor} />
         {isOpm && p.opmAccepted && (
           <section className="detail-section">
             <h3>Registered project documents</h3>
@@ -3605,14 +3902,14 @@ export default function RoleWorkspace({
     switch (page) {
       case "Dashboard":
         return dashboard()
-      case "Confirmation queue":
+      case "Project intake":
         return (
           <>
-            {header(
-              "Confirmation queue",
-            )}
-            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Confirmation queue views">
+            {header("Project intake")}
+            <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
+            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Project intake views">
               {([
+                ["inquiries", "Project inquiries", inquiryCount, "plus"],
                 ["mine", "Intake overview", intakes.length, "check"],
                 ["responses", "Site PM responses", responsesNeedingAction.length, "users"],
               ] as const).map(([value, label, count, icon]) => (
@@ -3620,17 +3917,27 @@ export default function RoleWorkspace({
                   key={value}
                   type="button"
                   role="tab"
+                  id={`project-intake-tab-${value}`}
+                  aria-controls={`project-intake-panel-${value}`}
                   aria-selected={confirmTab === value}
                   className={confirmTab === value ? "active" : ""}
                   onClick={() => { setConfirmTab(value); for (const key of [`${actor.role}:confirmations`, `${actor.role}:responses`, `${actor.role}:responses-done`]) updateListQuery(key, q => withPage(q, 1)) }}
                 >
-                  <Icon name={icon} size={17} /> {label} <span>{count}</span>
+                  <Icon name={icon} size={17} /> {label} {count !== undefined && <span>{count}</span>}
                 </button>
               ))}
             </div>
-            {confirmTab === "responses" ? (
-              responseTracking()
-            ) : (
+            <div role="tabpanel" id="project-intake-panel-inquiries" aria-labelledby="project-intake-tab-inquiries" hidden={confirmTab !== "inquiries"}>
+              <ProjectInquiries key={actor.id} role="opm" embedded onReload={onReload}
+                projects={projects} onOpenDocuments={openDocuments} onInquiryCountChange={setInquiryCount}
+                bannerTarget={inquiryBannerTarget} onShowInquiries={() => setConfirmTab("inquiries")}
+                onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
+            </div>
+            <div role="tabpanel" id="project-intake-panel-responses" aria-labelledby="project-intake-tab-responses" hidden={confirmTab !== "responses"}>
+              {confirmTab === "responses" && responseTracking()}
+            </div>
+            <div role="tabpanel" id="project-intake-panel-mine" aria-labelledby="project-intake-tab-mine" hidden={confirmTab !== "mine"}>
+              {confirmTab === "mine" && (
               <><div className="confirmation-intake-filters"><IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1)) }} /></div><ListSection
                 list={intakesList}
                 placeholder="Search confirmations"
@@ -3641,7 +3948,8 @@ export default function RoleWorkspace({
                 }
                 render={(items) => <>{items.map(confirmationCard)}</>}
               /></>
-            )}
+              )}
+            </div>
           </>
         )
       case "Documents":
@@ -3839,11 +4147,13 @@ export default function RoleWorkspace({
                 icon="bell"
                 variant="icon-button"
                 aria-label={`Notifications, ${unread} unread`}
-                onClick={() => setBell(!bell)}
+                aria-expanded={bell}
+                aria-controls="staff-notifications"
+                onClick={() => setBell(open => !open)}
               />
               {unread > 0 && <i className="notification-dot" />}
               {bell && (
-                <div className="notification-popover">
+                <div id="staff-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>Your notifications</h3>
                     <Button
@@ -3882,6 +4192,10 @@ export default function RoleWorkspace({
           </div>
         </main>
       </div>
+      {isOpm && inquiryAssignmentProjectId && (() => {
+        const project = projects.find(p => p.id === inquiryAssignmentProjectId)
+        return project ? inquiryAssignmentStatus(project) : null
+      })()}
       {isOpm && suggestedReassignment && (() => {
         const project = projects.find(p => p.id === suggestedReassignment.projectId)
         if (!project) return null
@@ -3938,7 +4252,6 @@ export default function RoleWorkspace({
         >
           <DelayedProjectNotice project={phaseWorkspaceProject} today={scheduleToday} />
           {progressForm(phaseWorkspaceProject)}
-          {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={phaseWorkspaceProject} actor={actor} onReload={onReload}/>}
         </Modal>
       )}
       {dialog?.kind === "changes" && detail && (
@@ -4041,7 +4354,9 @@ export default function RoleWorkspace({
       {dialog?.kind === "project" &&
         detail &&
         projects.some((p) => p.id === detail.id) && (
-          <Modal
+          !isOpm && !extensionDemo && detail.status === "pending" && pendingSitePhases(detail).length > 0
+          ? siteAssignmentOffer(detail)
+          : <Modal
             title="Project monitoring"
             subtitle={detail.name}
             wide
@@ -4115,7 +4430,7 @@ export default function RoleWorkspace({
           confirm={reviewAction.type==="approve_rework"} onClose={()=>setReviewAction(undefined)}
           onConfirm={(expectedReviewToken,selectedActivityIds,note)=>act({...reviewAction,expectedReviewToken,selectedActivityIds,note},"Rework decision recorded.")}/>
       )}
-      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave} showAllocationHistory={isOpm}
         action={notificationAction(selectedNotification, actor, projects, state.accounts, [...nav.map(([label]) => label), "Reports", ...(isOpm ? ["SPM responses"] : [])])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)

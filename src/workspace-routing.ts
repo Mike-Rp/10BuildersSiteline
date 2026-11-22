@@ -3,12 +3,13 @@ import type { Role } from "./model"
 // Only real pages belong here. Dialogs, filters and in-page tabs stay local.
 export const WORKSPACE_ROUTES: Record<Role, Record<string, string>> = {
   admin: {
-    Dashboard: "dashboard", "Active sites": "active-sites", "Project intake": "project-intake",
+    Dashboard: "dashboard", "Active sites": "active-sites", "Project intake": "project-intake", "Project inquiries": "project-inquiries",
     Documents: "documents", Directory: "directory", Archive: "archive", Team: "team",
     "Activity log": "activity-log", Settings: "settings",
   },
   opm: {
-    Dashboard: "dashboard", "Confirmation queue": "confirmation-queue", Documents: "documents",
+    Dashboard: "dashboard", "Project intake": "project-intake", Documents: "documents",
+    "Confirmation queue": "confirmation-queue", "Project inquiries": "project-inquiries",
     "Active sites": "active-sites", Archive: "archive", "Activity log": "activity-log", Preferences: "preferences",
   },
   spm: {

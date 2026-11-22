@@ -12,7 +12,7 @@ import {installCredentialFixture} from './helpers/credential-fixture.mjs'
 import {readChecklist} from '../Thesis-Backend/src/services/progress/phase.utility.js'
 import {readVerifiedProgress} from '../Thesis-Backend/src/services/progress/verified.utility.js'
 import {pendingChecklistFor,canWorkPhase} from '../src/workflows.ts'
-import {mapProject} from '../src/api/adapter.ts'
+import {mapProject, peopleFromProjects, stubAccount} from '../src/api/adapter.ts'
 
 const read=p=>fs.readFileSync(new URL(p,import.meta.url),'utf8')
 const freePort=()=>new Promise(resolve=>{const s=net.createServer().listen(0,'127.0.0.1',()=>{const {port}=s.address();s.close(()=>resolve(port))})})
@@ -44,7 +44,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
  const preserved=(await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows
  await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'));await pg.exec(read('../Thesis-Backend/migrations/027-workflow-reliability.sql'))
  assert.deepEqual((await pg.query('select id,project_id,project_stage_id,checklist_item_id,submitted_by,file_id,status,reviewed_by,reviewed_at from project_phase_evidence order by id')).rows,preserved)
- const users=(await pg.query("select u.id,u.email,r.code as role from users u join roles r on r.id=u.role_id where u.status='active' order by u.id")).rows
+ const users=(await pg.query("select u.id,u.full_name,u.email,u.phone,r.code as role from users u join roles r on r.id=u.role_id where u.status='active' order by u.id")).rows
  const [a,b,c]=users.filter(u=>u.role==='spm'), admin=users.find(u=>u.role==='admin')
  const source=(await pg.query("select * from projects where lifecycle_status='active' limit 1")).rows[0]
  const opm=users.find(u=>u.id===source.suggested_opm_id)
@@ -86,6 +86,22 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   assert.ok(user.token)
  }
  const root='/projects/'+projectId
+ await t.test('the assigned Office PM receives work contacts for each phase engineer',async()=>{
+  const part=(await call(opm,'/workspace/project-data')).find(project=>project.list.id===projectId)
+  assert.ok(part.detail.phase_team.every(row=>row.spm_user_id===a.id))
+  const expected=[a,b,c].map(({id,full_name,email,phone})=>({id,full_name,email,phone}))
+  assert.deepEqual(new Map(part.detail.site_pm_contacts.map(contact=>[contact.id,contact])),new Map(expected.map(contact=>[contact.id,contact])))
+  const {accounts}=peopleFromProjects(stubAccount(opm.id,opm.full_name,'opm'),[part.list],new Map([[part.list.id,part.detail]]))
+  for(const person of expected) {
+   const contact=accounts.find(account=>account.id===person.id)
+   assert.equal(contact.name,person.full_name)
+   assert.equal(contact.email,person.email)
+   assert.equal(contact.phone,person.phone??'')
+  }
+  const spmPart=(await call(b,'/workspace/project-data')).find(project=>project.list.id===projectId)
+  assert.ok(spmPart)
+  assert.ok(!Object.hasOwn(spmPart.detail,'site_pm_contacts'))
+ })
  const aPhotoId=randomUUID()
  async function upload(user,stage=stages[0]){const form=new FormData();form.set('file',new Blob(['%PDF-test'],{type:'application/pdf'}),'evidence.pdf');form.set('stage_id',stage.id);return call(user,root+'/phase-files',{method:'POST',body:form,status:201})}
  const [a1,a2,b1]=await Promise.all([upload(a),upload(a),upload(b)])
@@ -146,8 +162,7 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   await call(b,root+'/engineer-responsibilities/'+ar.id,{method:'POST',json:{action:'submit_completion',note:'Not mine',fileId:b1.id},status:403})
   await call(a,root+'/engineer-responsibilities/'+ar.id,{method:'POST',json:{action:'submit_completion',note:'Too early',fileId:a1.id},status:409})
   for(const id of itemIds.slice(1)) {const ev=await call(a,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:[a1.id,a2.id]},status:201});await approve(ev)}
-  await complete(a,ar,'submit_completion',a1.id)
-  await complete(opm,ar,'approve_completion')
+  // Approval of the last item completes this engineer's workspace automatically.
   assert.equal((await call(a,root+'/phase-overview')).can_submit,false)
   assert.equal((await call(b,root+'/phase-overview')).can_submit,true)
   const p=(await pg.query('select current_stage_id from projects where id=$1',[projectId])).rows[0]
@@ -182,9 +197,6 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   const correction=await call(b,root+'/checklist-items/'+itemIds[0]+'/submit',{method:'POST',json:{file_ids:[corrected.id]},status:201})
   await approve(correction)
   for(const id of itemIds.slice(1)){const ev=await call(b,root+'/checklist-items/'+id+'/submit',{method:'POST',json:{file_ids:[b1.id]},status:201});await approve(ev)}
-  const waiting=(await call(opm,'/workspace/reconcile-phase-handoffs',{method:'POST',json:{}})).find(row=>row.project_id===projectId)
-  assert.equal(waiting.reasonCode,'engineer_responsibilities')
-  await complete(b,br,'submit_completion',b1.id);await complete(opm,br,'approve_completion')
   assert.equal((await pg.query('select current_stage_id from projects where id=$1',[projectId])).rows[0].current_stage_id,stages[1].id)
   assert.equal((await db.query("select count(*)::int as n from project_progress_history where project_id=$1 and entry_type='handoff'",[projectId])).rows[0].n,1)
   const totals=(await readVerifiedProgress(db,[projectId])).get(projectId)
@@ -283,8 +295,15 @@ test('independent SPM workspaces through the real API and Supabase PostgreSQL sc
   assert.equal(await count(),before)
   assert.equal((await db.query('select count(*)::int as n from project_request_receipts where request_id=$1',[failedKey])).rows[0].n,0)
   const files={}
-  for(const user of [a,b])files[user.id]=await upload(user,stages[1])
-  const slots=(await db.query('select * from project_phase_responsibilities where project_id=$1 and project_stage_id=$2',[projectId,stages[1].id])).rows
+  const slots=(await db.query("select * from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and status='confirmed'",[projectId,stages[1].id])).rows
+  for(const slot of slots) {
+   const user=[a,b,c].find(person=>person.id===slot.user_id)
+   const file=(await db.query('select id from project_phase_files where project_id=$1 and project_stage_id=$2 and uploaded_by=$3 limit 1',[projectId,stages[1].id,user.id])).rows[0]
+   files[user.id]=file || (await db.query(`insert into project_phase_files
+    select (jsonb_populate_record(null::project_phase_files,to_jsonb(f)||jsonb_build_object('id',$4::text,'project_stage_id',$2::int))).*
+    from project_phase_files f where f.project_id=$1 and f.uploaded_by=$3 limit 1 returning id`,[projectId,stages[1].id,user.id,randomUUID()])).rows[0]
+   assert.ok(files[user.id])
+  }
   const items=(await db.query('select * from project_phase_checklist_items where project_id=$1 and project_stage_id=$2 and required',[projectId,stages[1].id])).rows
   for(const slot of slots)for(const item of items)await db.query("insert into project_phase_evidence(project_id,project_stage_id,checklist_item_id,file_id,submitted_by,status,reviewed_by,reviewed_at,responsibility_id) values($1,$2,$3,$4,$5,'approved',$6,now(),$7)",[projectId,stages[1].id,item.id,files[slot.user_id].id,slot.user_id,opm.id,slot.id])
   await db.query("update project_phase_responsibilities set completion_status='approved',reviewed_by=$3,reviewed_at=now() where project_id=$1 and project_stage_id=$2",[projectId,stages[1].id,opm.id])

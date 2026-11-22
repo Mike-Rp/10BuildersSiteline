@@ -702,11 +702,13 @@ export default function ClientPortal({
                 icon="bell"
                 variant="icon-button"
                 aria-label={`Client notifications, ${unread} unread`}
-                onClick={() => setBell(!bell)}
+                aria-expanded={bell}
+                aria-controls="client-notifications"
+                onClick={() => setBell(open => !open)}
               />
               {unread > 0 && <span className="notification-dot" />}
               {bell && (
-                <div className="notification-popover">
+                <div id="client-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>Project updates</h3>
                     <Button
@@ -794,9 +796,9 @@ export default function ClientPortal({
             </div>
           )}
           {project && scheduleAttention?.tone === "amber" && !["Preferences", "Active sites"].includes(page) && <UrgentActionBanner
-            label="Project schedule attention" title="Your project schedule needs attention" actionLabel="View project contacts"
-            items={[{ key: `client-schedule:${project.id}`, title: project.name, detail: scheduleAttention.detail, status: scheduleAttention.label, urgency: scheduleAttention.label === "Target date passed" ? "overdue" : "soon" }]}
-            onOpen={() => setSiteDetails(true)} onReview={() => setSiteDetails(true)} overdueLabel="target date passed" soonLabel="completion date approaching" />}
+            label="Project schedule attention" title="Your project schedule needs attention"
+            items={[{ key: `client-schedule:${project.id}`, title: project.name, detail: scheduleAttention.detail, status: scheduleAttention.label, actionText: "View project details", urgency: scheduleAttention.label === "Target date passed" ? "overdue" : "soon" }]}
+            onOpen={() => setSiteDetails(true)} overdueLabel="target date passed" soonLabel="completion date approaching" />}
           {pageContent()}
           {siteDetails && project && <Modal wide title={project.name} subtitle="Project details" onClose={() => setSiteDetails(false)}>{projectDetails()}</Modal>}
           <div className="workspace-footer">

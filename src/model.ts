@@ -1,5 +1,5 @@
 import { workEmailFor } from "../Thesis-Backend/src/domain/work-email.js";
-import { ENGINEER_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
+import { CREDENTIAL_SPECIALIZATIONS } from "../Thesis-Backend/src/domain/engineer-credentials.js";
 import type { LicenseData } from "./licenseTypes.ts"
 import { experienceYears, type EngineerExperience } from "../Thesis-Backend/src/domain/engineer-experience.js"
 import { DOCUMENT_UPLOAD_LIMIT_MB, MANPOWER_UPLOAD_LIMIT_MB } from "../Thesis-Backend/src/domain/upload-limits.js"
@@ -200,6 +200,7 @@ export type RegistrationCredential = {
   fileName: string
 }
 export type Account = {
+  activationStatus?: import("./client-activation.ts").ClientActivationStatus
   singleProjectCommitment?: boolean
   engineerCommitments?: {project_id:string; phase:string; tags:string[] | null; status:string}[]
   initialCredentials?: RegistrationCredential[]
@@ -215,6 +216,7 @@ export type Account = {
   certifications?: string[]
   scope: string[]
   projectTypes: string[]
+  jobTitle?: string
   experienceByType?: EngineerExperience
   status: "active" | "invited" | "suspended" | "deactivated" | "pending-setup"
   added: string
@@ -267,6 +269,14 @@ export type ClientSubconReview = {
   issues: ClientSubconIssue[]
 }
 export type Project = {
+  inquiryOrigin?: boolean
+  inquiryOverview?: {
+    land_area?: number
+    lot_area?: number
+    classification?: string
+    technical?: string
+    arrangement?: string
+  }
   phaseScope?: import("../Thesis-Backend/src/domain/mixed-use-scope.js").MixedUseScope
   subcontractorAllocationVersion?: number
   subcontractorAllocation?: import("./subcontractor-allocation").SavedAllocation
@@ -276,6 +286,8 @@ export type Project = {
   checklistProgress?: PhaseProgress[]
   verifiedProgress?: import("./project-progress").VerifiedProgress
   overallProgress?: number | null
+  // 'foundation_15' on projects configured after the Foundation weighting rule; absent or 'legacy' keeps the old calculation.
+  progressWeighting?: string
   id: string
   name: string
   type: string
@@ -287,11 +299,12 @@ export type Project = {
   clientAccounts?: { id: string; name: string; email: string; phone: string; contactPerson?: string }[]
   status: "active" | "pending" | "changes_requested" | "draft" | "completed" | "declined" | "expired"
   opmId: string
-  officePmName?: string
+  officePmContact?: { name: string }
   team: {
     phase: string
     accountId: string
     status: "pending" | "confirmed" | "declined"
+    isLead?: boolean
     requiredDisciplines?: string[]
     assignedDisciplines?: string[]
     engineers?: {accountId:string;assignedDisciplines:string[];status:"pending"|"confirmed"|"declined";completionStatus?:string;responsibilityId?:string;responseDeadline?:string}[]
@@ -892,8 +905,8 @@ export function accountError(
   if (
     a.role === "spm" &&
     (!a.scope.length ||
-      a.scope.length > (a.initialCredentials || a.hasCredentialSpecializations ? ENGINEER_SPECIALIZATIONS.length : 3) ||
-      a.scope.some((t) => !ENGINEER_SPECIALIZATIONS.includes(t)))
+      a.scope.length > (a.initialCredentials || a.hasCredentialSpecializations ? CREDENTIAL_SPECIALIZATIONS.length : 3) ||
+      a.scope.some((t) => !CREDENTIAL_SPECIALIZATIONS.includes(t)))
   )
     return a.initialCredentials||a.hasCredentialSpecializations ? "Choose supported specializations within each professional credential." : "Choose one to three valid discipline tags."
   if (

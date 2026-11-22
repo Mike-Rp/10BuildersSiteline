@@ -1,10 +1,10 @@
+import { scrollListAfterChange } from "./navigation-scroll"
 import WorkspaceGuide from "./WorkspaceGuide"
 import { resolveAdminSearchDestination, type AdminSearchDestination } from "./admin-search-destination"
 import type { WorkspaceResult } from "./admin-workspace-search"
 import "./admin-search-destination.css"
 import AdminWorkspaceSearch from "./AdminWorkspaceSearch"
 import { requiresRenewalOnlyAccess } from "./renewal-only";
-import EngineerResponsibilities from './EngineerResponsibilities'
 import AdminProjectDocuments from "./AdminProjectDocuments"
 import "./company-created-notice.css"
 import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
@@ -20,6 +20,7 @@ import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
 import EngineerCredentials from "./EngineerCredentials";
 import RestrictedRenewalPage from "./RestrictedRenewalPage";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
+import { projectClientNames } from "./project-clients"
 import ActionFeedback, { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import ProjectScopeSummary from "./ProjectScopeSummary"
@@ -67,10 +68,13 @@ import { applyRefreshSetting, isStale, startPolling } from "./refresh-interval"
 import { flushSync } from "react-dom"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
+import ProjectInquiries from "./ProjectInquiries"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
+import ClientActivationPage from "./ClientActivationPage"
+import { CLIENT_ACCOUNT_PENDING, clientActivationLabel } from "./client-activation"
 import { canonicalizeLoginEntry, currentLoginPortal, loginPortalForRole, loginPath, isLandingPath, navigateToWorkspace, type LoginPortal } from "./login-portal"
-import { roleAllowedOnHost } from "./portal-domain"
+import { isClientActivationPath, roleAllowedOnHost } from "./portal-domain"
 import { SIGN_IN_MESSAGES, guardedSignIn, localAttemptStore } from "./signInPolicy"
 import { assertCanSignIn } from "./auth"
 import { stubAccount } from "./api/adapter"
@@ -92,7 +96,7 @@ import ClientPortal from "./ClientPortal"
 import CompanyCapabilities from "./CompanyCapabilities"
 import CompanyRemovalActions from "./CompanyRemovalActions"
 import CompanyForemen from "./CompanyForemen"
-import AllocationDirectory, { CompanyProjectPhases } from "./AllocationDirectory"
+import AllocationDirectory, { AllocationChangeBanner, CompanyProjectPhases } from "./AllocationDirectory"
 import { TradeAllocationOverview } from "./TradeAllocationPanel"
 import PlannedTimeline from "./PlannedTimeline"
 import {
@@ -215,7 +219,7 @@ const STATUS: Record<string, string> = {
   deactivated: "Deactivated",
   archived: "Archived",
 }
-function Status({ status }: { status: string }) {
+function Status({ status, pendingLabel }: { status: string; pendingLabel?: string }) {
   return (
     <Badge
       tone={
@@ -248,7 +252,7 @@ function Status({ status }: { status: string }) {
               : ""
       }
     >
-      {STATUS[status] || status.replace(/_/g, " ")}
+      {(status === "pending" && pendingLabel) || STATUS[status] || status.replace(/_/g, " ")}
     </Badge>
   )
 }
@@ -449,11 +453,13 @@ function AppInner() {
   // hiccup keeps the token and offers a retry instead of the login page.
   const [restoreError, setRestoreError] = useState("")
   useEffect(() => {
-    if (!signedOut || checkingSession || restoreError || isLandingPath(routePath)) return
+    if (!signedOut || checkingSession || restoreError || isLandingPath(routePath) || isClientActivationPath(routePath)) return
     const portal = currentLoginPortal()
     changeRoute(loginPath(portal), true, { loginPortal: portal, returnTo: routePath })
   }, [signedOut, checkingSession, restoreError, routePath])
   const [restoreAttempt, setRestoreAttempt] = useState(0)
+  // After a temporary-password replacement the app restores the session at the module that was requested.
+  const resumePath = useRef("")
   const sessionRestore = useRef(createInFlight<Account>())
   const sessionLoadVersion = useRef(0)
   useEffect(() => {
@@ -498,7 +504,13 @@ function AppInner() {
     sessionRestore.current.run(token, () =>
       api<Parameters<typeof startApiSession>[0]>("/auth/me").then(user => {
         if (getToken() !== token) throw new ApiError("Your session has changed. Sign in again.", 401)
-        return startApiSession(user)
+        const resume = resumePath.current
+        resumePath.current = ""
+        if (resume) window.history.replaceState({ ...(window.history.state || {}), returnTo: resume }, "", window.location.pathname)
+        return startApiSession(user, !!resume).then(account => {
+          if (resume) setRoutePath(navigateToWorkspace(account.role, true))
+          return account
+        })
       }),
     )
       .then((account) => {
@@ -734,7 +746,7 @@ function AppInner() {
       if ((user as {temp_password_issued?:boolean}).temp_password_issued) {
         setPasswordChangeRequired(true)
         const account = stubAccount(user.id, user.full_name || "", user.role)
-        setState({ ...emptyState, accounts: [account] })
+        setState({ ...emptyState(), accounts: [account] })
         return account
       }
       setPasswordChangeRequired(false)
@@ -768,7 +780,8 @@ function AppInner() {
     try {
       user = await apiLogin(email, password, replaceSession, loginPortal)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "ACCOUNT_ALREADY_SIGNED_IN") throw error
+      if (error instanceof ApiError && (error.code === "ACCOUNT_ALREADY_SIGNED_IN" ||
+        (loginPortal === "client" && error.code === CLIENT_ACCOUNT_PENDING))) throw error
       throw new Error(
         error instanceof ApiError &&
           error.status !== 401 &&
@@ -835,9 +848,7 @@ function AppInner() {
     try{
       const response = await sendApiWorkflow(stateRef.current,actor,command)
       await reloadWorkspace()
-      const message = response?.handoff?.advanced ? `Activity approved. ${response.handoff.current_stage} automatically activated for its assigned Site PM.`
-        : response?.handoff?.reason ? `Activity approved. Phase remains open: ${response.handoff.reason}`
-        : undefined
+      const message = undefined
       return {ok:true, message}
     }catch(error){
       return {ok:false,error:(error as Error).message}
@@ -871,12 +882,6 @@ function AppInner() {
       }
       setToast((error as Error).message);throw error
     }
-  }
-  async function saveClient(account:Account) {
-    const saved=await saveApiAccount(account,false)
-    const loaded=await reloadWorkspace()
-    if(saved.password)setCredentials({name:account.name,email:saved.email,password:saved.password,role:"client",viewOnlyLoginLink:true})
-    return loaded.accounts.find(a=>a.id===saved.id)!
   }
   async function addProject(project:Project) {
     try {
@@ -1287,15 +1292,6 @@ function AppInner() {
         })),
         test: (e, value) => e.type === value,
       },
-      {
-        id: "person",
-        label: "Person",
-        allLabel: "Everyone",
-        options: optionsFrom(
-          state.events.map((e) => (e.actorId ? nameFor(e.actorId) : "")),
-        ),
-        test: (e, value) => !!e.actorId && nameFor(e.actorId) === value,
-      },
       ...dateFilters<Event>((e) => e.date, "Date"),
     ],
   })
@@ -1582,6 +1578,7 @@ function AppInner() {
       onActivity={() => navigate("Activity log")}
       onOpen={item => item.key.startsWith("password-reset:") ? openReset(item.id) : item.key.startsWith("license-cover:") ? openLicenseCover(item.id) : item.key.startsWith("license-renewal:") ? setRenewalsOpen(true) : setDialog({ kind: item.kind, id: item.id })}
       activity={<>{activityList(dashActivity.view.items, true)}<CompactPager list={dashActivity} /></>}
+      allocationBanner={<AllocationChangeBanner events={state.events} onRead={notificationSettings.markRead} onOpen={setSelectedNotification} />}
     />}</PasswordResetRequests>
   }
   function openAdminPriority(item: UrgentItem) {
@@ -1597,11 +1594,12 @@ function AppInner() {
       <PageTitlePanel title={title}>
         {action}
       </PageTitlePanel>
-      <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} actionLabel="Open priority item" />
+      <UrgentActionBanner items={adminPriorityItems(adminDashboardOverview(state).items, page, readinessAvailable).map(adminBannerItem)} onOpen={openAdminPriority} />
       </>
     )
   }
   function renderPage() {
+    if (page === "Project inquiries") return <ProjectInquiries key={actor.id} role="admin" onReload={reloadWorkspace} />
     if (page === "Activity log") return <>
       {pageHeading("Activity log")}
       <Panel title="Workspace activity" subtitle="Browse the activity available to your account.">
@@ -1630,6 +1628,7 @@ function AppInner() {
             return {
               ...p,
               lead: state.accounts.find(a => a.id === leadId(p))?.name,
+              clientNames: projectClientNames(p, state.accounts),
               needsReview: hasPendingSiteReview(p),
               currentPhaseStatus: currentPhaseStatus({
                 projectStatus: p.status,
@@ -1802,7 +1801,7 @@ function AppInner() {
                     >
                       <div className="engineer-top">
                         <span className="avatar large">{initials(a.name)}</span>
-                        <div className="engineer-identity"><h3>{a.name}</h3><p>{ROLE_NAMES[a.role]}</p></div>
+                        <div className="engineer-identity"><h3>{a.name}</h3><p>{ROLE_NAMES[a.role]}</p>{a.jobTitle && <p>{a.jobTitle}</p>}</div>
                         <Status status={a.status} />
                       </div>
                       {a.hasProfessionalCredentials === false && ["opm", "spm"].includes(a.role) && (
@@ -1846,7 +1845,7 @@ function AppInner() {
               <Button variant="icon-button" icon="close" aria-label="Dismiss company creation notification" onClick={() => setCompanyCreatedNotice(undefined)} />
             </div>
           </div>}
-          {state.phaseAllocationAvailable && <AllocationDirectory onChanged={reloadWorkspace} />}
+          {state.phaseAllocationAvailable && <AllocationDirectory />}
           <div className="active-sites-view-tabs" role="tablist" aria-label="Subcontractor directory views">
             {[
               ["registered", "Registered companies"],
@@ -2107,7 +2106,8 @@ function AppInner() {
                           )}
                         </td>
                         <td data-label="Status">
-                          {a.status === "invited" && a.role === "client" ? <span className="team-status-help"><Badge tone="amber">Pending Setup</Badge><InfoPopover title="Pending client setup" label={`Why is ${a.name} pending setup?`}>This client account has been created. “Invited” is an account status, not an email invitation. Client sign-in also requires approval of a linked project.</InfoPopover></span> : <Status status={a.status} />}
+                          <Status status={a.status} />
+                          {a.role === "client" && <p><small>Activation · {clientActivationLabel(a.activationStatus)}</small></p>}
                         </td>
                         <td data-label="Added">{dateLabel(a.added)}</td>
                         <td data-label="Actions">
@@ -2409,7 +2409,12 @@ function AppInner() {
               })()}
               <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === p.opmId)?.expiry} projectEnd={p.end} />
               <div className="phase-assignments">
-                {p.team.map((t) => (
+                {p.team.map((t) => {
+                  // A phase can have several engineers; the phase is confirmed only when every one of them is.
+                  const people = t.engineers && t.engineers.length > 1 ? t.engineers : undefined
+                  const confirmedCount = people?.filter((e) => e.status === "confirmed").length ?? 0
+                  const phaseStatus = !people ? t.status : people.every((e) => e.status === "confirmed") ? "confirmed" : people.some((e) => e.status === "declined") ? "declined" : "pending"
+                  return (
                   <div key={t.phase}>
                     <span>
                       <strong>{t.phase}</strong>
@@ -2420,12 +2425,40 @@ function AppInner() {
                             "Any discipline"}
                       </small>
                     </span>
-                    <span>
-                      {t.accountId ? nameFor(t.accountId) : "Unassigned"}
-                      <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
+                    {people ? (
+                      <span className="phase-engineer-list">
+                        <small>{people.length} engineers in this phase</small>
+                        {people.map((e) => (
+                          <span className="phase-engineer-row" key={e.accountId}>
+                            <span>
+                              <strong>{nameFor(e.accountId)}</strong>
+                              <small>{e.assignedDisciplines.join(", ") || "Any discipline"}</small>
+                              <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === e.accountId)?.expiry} projectEnd={p.end} />
+                            </span>
+                            <Status status={e.status} pendingLabel="Awaiting Site PM" />
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span>
+                        {t.accountId ? nameFor(t.accountId) : "Unassigned"}
+                        <LicenseAssignmentWarning expiry={state.accounts.find((a) => a.id === t.accountId)?.expiry} projectEnd={p.end} />
+                      </span>
+                    )}
+                    <span className="phase-status-cell">
+                      <Status status={t.accountId ? phaseStatus : "unassigned"} pendingLabel="Awaiting Site PM" />
+                      {people && confirmedCount < people.length && <small>{people.length - confirmedCount === 1 ? "1 more awaiting confirmation" : `${people.length - confirmedCount} more awaiting confirmation`}</small>}
                     </span>
-                    <Status status={t.accountId ? t.status : "unassigned"} />
-                    {t.status !== "confirmed" && p.status !== "completed" ? (
+                    {people ? (
+                      phaseStatus === "confirmed" || p.status === "completed" ? (
+                        <span className="locked-label">
+                          <Icon name="shield" size={14} />
+                          Locked
+                        </span>
+                      ) : (
+                        <span className="locked-label">Awaiting engineers</span>
+                      )
+                    ) : phaseStatus !== "confirmed" && p.status !== "completed" ? (
                       <select
                         aria-label={`Reassign ${t.phase}`}
                         value=""
@@ -2455,7 +2488,8 @@ function AppInner() {
                       return li && li.daysToExpiry !== null && li.daysToExpiry <= 33 && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
                     })()}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
     )
@@ -2479,17 +2513,16 @@ function AppInner() {
               {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
             </span>
             <h3>{p.name}</h3>
-            <p>{p.location || "Project location not specified"}</p>
+
           </div>
           <Status status={p.status} />
         </div>
         </>}
-        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} />}
+        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} showClient />}
         {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
         {!docsOnly && (
           <>
             <ProjectScheduleDetails project={p} today={scheduleToday} />
-            {state.multiEngineerAllocationAvailable&&<EngineerResponsibilities project={p} actor={actor} onReload={reloadWorkspace}/>}
             {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
             <PlannedTimeline project={p} />
             {p.status !== "active" && p.status !== "completed" && (
@@ -2551,9 +2584,9 @@ function AppInner() {
                 </div>
               )) : <p className="role-muted">No project progress or review history yet.</p>}
               {projectHistory.length > 3 && <div className="history-pagination" aria-label="Project history pagination">
-                <Button disabled={projectHistoryPage <= 1} onClick={() => setProjectHistoryPage(page => Math.max(1, page - 1))}>Previous</Button>
+                <Button disabled={projectHistoryPage <= 1} onClick={(event) => { setProjectHistoryPage(page => Math.max(1, page - 1)); scrollListAfterChange(event.currentTarget) }}>Previous</Button>
                 <span>Page {projectHistoryPage} of {historyPageCount}</span>
-                <Button disabled={projectHistoryPage >= historyPageCount} onClick={() => setProjectHistoryPage(page => Math.min(historyPageCount, page + 1))}>Next</Button>
+                <Button disabled={projectHistoryPage >= historyPageCount} onClick={(event) => { setProjectHistoryPage(page => Math.min(historyPageCount, page + 1)); scrollListAfterChange(event.currentTarget) }}>Next</Button>
               </div>}
             </section>
             {p.status === "active" && (
@@ -2668,6 +2701,7 @@ function AppInner() {
           <div>
             <span className="eyebrow">{ROLE_NAMES[a.role]}</span>
             <h3>{a.name}</h3>
+            {a.jobTitle && <p>{a.jobTitle}</p>}
             <p>{a.email}</p>
           </div>
           <Status status={a.status} />
@@ -2689,23 +2723,21 @@ function AppInner() {
                 <strong>{dateLabel(a.added)}</strong>
               </div>
               <div>
-                <small>DISCIPLINE / SPECIALIZATION</small>
+                <small>{a.role === "client" ? "ASSOCIATED PROJECTS" : "DISCIPLINE / SPECIALIZATION"}</small>
                 <strong>
                   {[
                     ...a.scope.map((s) =>
                       a.role === "client" ? projectFor(s) : s,
                     ),
                     ...a.projectTypes,
-                  ].join(", ") || "Organization-wide"}
+                  ].join(", ") || (a.role === "client" ? "No associated projects" : "Organization-wide")}
                 </strong>
               </div>
-              {a.role === "client" ? <div>
-                <small>ACTIVE SITES</small>
-                <strong>{projects.filter((p) => p.status === "active").length}</strong>
-              </div> : a.role !== "admin" && <div>
-                <small>WORKLOAD</small>
+              {a.role === "client" && <div><small>ACTIVATION STATUS</small><strong>{clientActivationLabel(a.activationStatus)}</strong></div>}
+              {a.role !== "admin" && <div>
+                <small>{a.role === "client" ? "ACTIVE SITES" : "WORKLOAD"}</small>
                 <strong>
-                  {a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
+                  {a.role === "client" ? projects.filter(project => project.status === "active").length : a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
                 </strong>
               </div>}
             </div>
@@ -2740,13 +2772,13 @@ function AppInner() {
             )}
             <div className="profile-actions">
               {a.id===actor.id&&actor.role==='admin'&&<><Button icon="shield" onClick={()=>{setDialog(undefined);setSecurityTab('password');setSecurityOpen(true)}}>Change password</Button><Button onClick={()=>{setDialog(undefined);setSecurityTab('codes');setSecurityOpen(true)}}>Recovery codes</Button></>}
-              <Button
+              {a.role !== "client" && <Button
                 disabled={a.status === "deactivated"}
                 icon="edit"
                 onClick={() => { setPage("Team"); setDialog({ kind: "edit-account", id: a.id }) }}
               >
                 {page === "Team" ? "Edit account" : "Edit in Team & accounts"}
-              </Button>
+              </Button>}
               {a.id !== admin.id &&
                 a.status !== "deactivated" &&
                 (a.role === "client" ? (
@@ -2992,8 +3024,10 @@ function AppInner() {
       </main>
     )
   if (signedOut || !actor.id)
-    return <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
-  if(mustResetPassword)return <PasswordReset onComplete={()=>{setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
+    return isClientActivationPath(routePath) && roleAllowedOnHost("client", window.location.hostname)
+      ? <ClientActivationPage />
+      : <LoginPage key={loginPortal} portal={loginPortal} onSignIn={signIn} workspaceRole={loadingWorkspaceRole} sessionMessage={sessionMessage} />
+  if(mustResetPassword)return <PasswordReset onComplete={()=>{resumePath.current=window.location.pathname;setPasswordChangeRequired(false);setMustResetPassword(false);setSignedOut(true);setRestoreAttempt(attempt=>attempt+1)}} onCancel={endSession} />
   if (actor.role === "client") {
     const views = clientProjectViews(state, actor.id)
     return (
@@ -3185,11 +3219,13 @@ function AppInner() {
                 icon="bell"
                 variant="icon-button notification-button"
                 aria-label={`Notifications, ${unread} unread`}
-                onClick={() => setNotifications(!notifications)}
+                aria-expanded={notifications}
+                aria-controls="admin-notifications"
+                onClick={() => setNotifications(open => !open)}
               />
               {unread > 0 && <span className="notification-dot" />}
               {notifications && (
-                <div className="notification-popover">
+                <div id="admin-notifications" className="notification-popover">
                   <div className="popover-heading">
                     <h3>
                       Notifications <span>{unread}</span>
@@ -3255,7 +3291,6 @@ function AppInner() {
             project={selectedProject}
             onClose={() => setDialog(undefined)}
             onSubmit={addProject}
-            onClient={saveClient}
           />
         </Modal>
       )}
@@ -3292,7 +3327,6 @@ function AppInner() {
         <IntakeRecord state={state} project={selectedProject} actor={actor} onOpenActive={() => { navigate("Active sites"); setDialog({ kind: "project", id: selectedProject.id }) }} />
         {!isIntakeHistory(selectedProject) && <>
           {projectAssignments(selectedProject)}
-          {state.multiEngineerAllocationAvailable && <EngineerResponsibilities project={selectedProject} actor={actor} onReload={reloadWorkspace} />}
         </>}
       </Modal>}
       {(dialog?.kind === "project" || dialog?.kind === "project-docs") &&
@@ -3456,7 +3490,7 @@ function AppInner() {
           <Button onClick={stayActive}>Stay signed in</Button>
         </div>
       )}
-      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings}
+      {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSettings} showAllocationHistory
         action={notificationAction(selectedNotification, actor, state.projects, state.accounts, [...NAV.map(item => item.label), "Reports", "Approvals", "Project documents", "Engineer documents", "Engineer directory", "Subcon directory"])}
         onClose={() => setSelectedNotification(undefined)} onOpen={action => {
           setSelectedNotification(undefined)

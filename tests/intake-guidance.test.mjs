@@ -80,6 +80,16 @@ test("Site PM guidance preserves independent responses and project-specific Lead
   assert.equal(intakeGuidance(state,p,actor("spm","unassigned")),null)
 })
 
+test("inquiry Site PMs can accept while Office PM documents are pending", () => {
+  const p = project({ inquiryOrigin: true, opmAccepted: true }), state = workspace(p)
+  p.team[0].isLead = true
+  assert.equal(intakeGuidance(state, p, actor("opm")).action, "documents")
+  assert.equal(intakeGuidance(state, p, actor("spm", "lead")).action, "assignment")
+  assert.equal(intakeGuidance(state, p, actor("spm")).stage, "Lead Site PM acceptance")
+  p.team[0].status = "confirmed"
+  assert.equal(intakeGuidance(state, p, actor("spm")).action, "assignment")
+})
+
 test("Activation guidance uses existing agreement, client and subcontractor checks and never grants Admin Lead actions", () => {
   const p=project({opmAccepted:true,docs:docs(),team:[{phase:"Mobilization",accountId:"lead",status:"confirmed"}]}),state=workspace(p),lead=actor("spm","lead")
   assert.equal(intakeGuidance(state,p,lead).stage,"Subcontractor coordination")
