@@ -695,7 +695,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           </div>
           <div><span>Complexity score</span><strong>{preview.complexity}</strong></div>
         </div>
-        {assessmentBasis ? <details className="office-assessment-basis"><summary>View score breakdown</summary>
+        {assessmentBasis ? <details className="office-assessment-basis office-score-breakdown">
+          <summary>View score breakdown <Icon name="chevron" size={18} /></summary>
           <dl className="office-assessment-score-list">
             {([
               ["Project type", assessmentBasis.typePoints], ["Project size", assessmentBasis.sizePoints],

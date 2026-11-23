@@ -236,6 +236,23 @@
 .office-assessment-basis { padding: 8px 10px; border: 1px solid var(--color-line); border-radius: 8px; }
 .office-assessment-basis summary { cursor: pointer; font-weight: 600; }
 .office-assessment-basis > :not(summary) { margin-block-start: 8px; }
+.office-score-breakdown { padding: 0; border: 0; }
+#root .office-score-breakdown > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #b6cde2;
+  border-radius: 8px;
+  background: #edf5fc;
+  color: var(--color-primary);
+  list-style: none;
+}
+.office-score-breakdown > summary::-webkit-details-marker { display: none; }
+#root .office-score-breakdown > summary:hover { background: #dfedf9; }
+.office-score-breakdown > summary svg { flex: none; }
+.office-score-breakdown[open] > summary svg { transform: rotate(90deg); }
 .office-workflow-history { border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; background: var(--surface-subtle); }
 .office-workflow-history summary { cursor: pointer; font-weight: 600; }
 .office-workflow-history :is(ul, ol) { padding-inline-start: 20px; overflow-wrap: anywhere; }

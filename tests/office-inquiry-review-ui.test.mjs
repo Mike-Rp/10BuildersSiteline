@@ -230,9 +230,16 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.equal(document.querySelector(".office-assessment-size-scale [aria-current]").textContent, "Medium")
   assert.match(document.querySelector(".office-assessment-ring").textContent, /9\s*\/ 15/)
   const scoreBreakdown = document.querySelector(".office-assessment-basis")
-  assert.match(scoreBreakdown.textContent, /View score breakdown/)
+  const scoreToggle = scoreBreakdown.querySelector("summary")
+  assert.match(scoreToggle.textContent, /View score breakdown/)
+  assert.ok(scoreToggle.querySelector("svg"))
+  assert.equal(scoreBreakdown.open, false)
+  await click(scoreToggle)
+  assert.equal(scoreBreakdown.open, true)
   assert.deepEqual([...scoreBreakdown.querySelectorAll("dd span")].map(value => value.textContent), ["1/3", "2/3", "1/3", "3/3", "2/3"])
   assert.ok([...scoreBreakdown.querySelectorAll("meter")].every(meter => meter.max === 3))
+  await click(scoreToggle)
+  assert.equal(scoreBreakdown.open, false)
   assert.ok([...document.querySelectorAll(".office-assessment-basis")].some(node => node.textContent.includes("View duration calculation")))
 
   const expectLockedSteps = async () => {
