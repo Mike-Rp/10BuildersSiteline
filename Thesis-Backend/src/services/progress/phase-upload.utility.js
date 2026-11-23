@@ -42,6 +42,7 @@ export async function insertFileFromStored(client, project, fileId, userId) {
   if (!row) throw new HttpError(404, "Uploaded file not found. Upload the file again.");
   if (row.project_id && row.project_id !== project.id)
     throw new HttpError(409, "This file already belongs to another project. Upload a separate copy.");
+  if (row.purpose !== "upload") throw new HttpError(409, "This upload is already linked. Retry using the original request ID.");
   const contentType = row.storage_path ? row.content_type : fileType({ buffer: Buffer.from(row.content ?? []), originalname: row.original_name });
   await assertProjectUploadBudget(client, project.id, Number(row.byte_size));
   const id = uuidv4();
@@ -57,6 +58,7 @@ export async function insertFileFromStored(client, project, fileId, userId) {
          (id, project_id, project_stage_id, original_name, content_type, byte_size, content, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [id, project.id, project.current_stage_id, row.original_name, contentType, row.byte_size, row.content, userId]);
+  await client.query("UPDATE stored_files SET project_id=$2,purpose='phase_evidence' WHERE id=$1",[fileId,project.id]);
   return { id, original_name: row.original_name, content_type: contentType, byte_size: Number(row.byte_size) };
 }
 

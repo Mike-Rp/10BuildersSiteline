@@ -186,7 +186,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
     ? { mode: "same", areaPerFloor: perFloor }
     : { mode: "individual", areas: floorInputs }, floorCount) : null
-  const measuredDraft = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
+  const measuredDraft: Details = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
   const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
     ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement)
     : undefined
@@ -195,7 +195,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const budgetSaved = !!workflow?.budget && Number(budget) === workflow.budget
   const original = Object.fromEntries(correctionFields.map(([key]) => {
     const firstChange = workflow?.review_history?.find(event => event.changes[key])
-    return [key, firstChange ? firstChange.changes[key].before : row.details[key]]
+    return [key, (firstChange ? firstChange.changes[key].before : row.details[key]) ?? ""]
   }))
   const changedFromAdmin = (key: string) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, original[key])
   const originalAverageArea = Number(original.floor_area_sqm) / Number(original.floor_count)

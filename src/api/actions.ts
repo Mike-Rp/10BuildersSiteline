@@ -18,6 +18,7 @@ const MIME_BY_EXTENSION: Record<string, string> = { pdf: "application/pdf", png:
 // switched off, so the caller uses the older database-backed upload.
 async function uploadToStorage(id: string, file: File, kind: UploadKind): Promise<Dto | null> {
     const target = await api<Dto>("/files/upload-url", { method: "POST", json: { id, name: file.name, size: file.size, kind } });
+    if (target.mode === "complete") return target;
     if (target.mode !== "storage" || typeof target.upload_url !== "string") return null;
     const type = file.type || MIME_BY_EXTENSION[file.name.split(".").pop()?.toLowerCase() || ""] || "application/octet-stream";
     const body = new FormData();
@@ -26,22 +27,18 @@ async function uploadToStorage(id: string, file: File, kind: UploadKind): Promis
     const response = await fetch(target.upload_url, { method: "PUT", headers: { "x-upsert": "false" }, body, signal: AbortSignal.timeout(120_000) });
     if (!response.ok) {
         const detail = await response.json().catch(() => undefined) as { message?: string } | undefined;
+        if (response.status === 409 || detail?.message?.toLowerCase().includes("already exists"))
+            return await api<Dto>(`/files/${id}/complete-storage`, { method: "POST", json: { name: file.name, kind } });
         throw new ApiError(response.status === 413 ? "File too large. Choose a smaller file and try again." : detail?.message || "The file could not be uploaded. Try again.", response.status);
     }
     return await api<Dto>(`/files/${id}/complete-storage`, { method: "POST", json: { name: file.name, kind } });
 }
 export async function uploadFile(id: string, file: File, purpose: "document" | "manpower" = "document", kind: UploadKind = "document") {
     if (purpose === "document") {
-        try {
-            const stored = await uploadToStorage(id, file, kind);
-            if (stored) {
-                registerFileUrl(id, stored.download_url);
-                return stored;
-            }
-        } catch (error) {
-            // A rejected file or a refused request is a real answer. Only a network or
-            // browser failure (for example a blocked cross-origin request) falls back.
-            if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error;
+        const stored = await uploadToStorage(id, file, kind);
+        if (stored) {
+            registerFileUrl(id, stored.download_url);
+            return stored;
         }
     }
     const uploadInChunks = async () => {

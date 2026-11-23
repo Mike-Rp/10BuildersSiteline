@@ -173,6 +173,7 @@ export const ROLE_NAMES = {
 }
 export type Role = keyof typeof ROLE_NAMES
 export type Doc = {
+  documentCode?: string
   id: string
   label: string
   name: string

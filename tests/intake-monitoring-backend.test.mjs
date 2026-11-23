@@ -124,6 +124,52 @@ test('intake monitoring v1 through the real API: company decisions, independent 
   await call(opm,'/projects/intake',{method:'POST',json:{...body,additional_scopes:{Structure:[]}},status:409});
   assert.equal((await call(opm,'/projects/intake',{method:'POST',json:body})).project.id,finalized.project.id);
  });
+ await t.test('chunk retries assemble the original document once and validate the assembled content',async()=>{
+  const id=randomUUID(), path='/files/'+id+'/complete';
+  async function chunk(id,index,blob,status=200) {
+    const form=new FormData();
+    for(const [key,value] of Object.entries({upload_id:id,index,total:2,purpose:'document'})) form.set(key,String(value));
+    form.set('chunk',new Blob([blob]),'part.pdf');
+    return call(a,'/files/chunks',{method:'POST',body:form,status});
+  }
+  await chunk(id,0,'%PDF-');await chunk(id,0,'%PDF-');await chunk(id,0,'changed',409);
+  await chunk(id,1,'chunked evidence');
+  const saved=await call(a,path,{method:'POST'});
+  assert.deepEqual(await call(a,path,{method:'POST'}),saved);
+  await call(b,path,{method:'POST',status:404});
+  const limit=10*1024*1024, bytes=new Uint8Array(limit+1);bytes.set(new TextEncoder().encode('%PDF-'));
+  const oversized=new FormData();oversized.set('id',randomUUID());oversized.set('file',new Blob([bytes]),'large.pdf');
+  await call(a,'/files',{method:'POST',body:oversized,status:400});
+  const tooLarge=randomUUID(), chunkSize=3*1024*1024;
+  for(let index=0;index<4;index++){
+    const part=new FormData();part.set('upload_id',tooLarge);part.set('index',String(index));part.set('total','4');
+    part.set('chunk',new Blob([bytes.subarray(index*chunkSize,(index+1)*chunkSize)]),'large.pdf');
+    await call(a,'/files/chunks',{method:'POST',body:part});
+  }
+  await call(a,'/files/'+tooLarge+'/complete',{method:'POST',status:400});
+  const invalid=randomUUID();await chunk(invalid,0,'abc');await chunk(invalid,1,'def');
+  await call(a,'/files/'+invalid+'/complete',{method:'POST',status:400});
+ });
+ await t.test('Admin recovers an unlinked intake with verified email and Office PM receives an actionable status',async()=>{
+  const id=await project('Sequential phases','spm_review',['Structure']),path='/projects/'+id+'/client-account';
+  await db.query("UPDATE projects SET inquiry_intake=NULL WHERE id=$1",[id]);
+  assert.equal((await call(opm,path)).next_action,'request_email_correction');
+  const input={email:'recover.client@gmail.com',ownership_verified:true};
+  await call(opm,path+'/recover',{method:'POST',json:input,status:403});
+  await call(admin,path+'/recover',{method:'POST',json:{...input,ownership_verified:false},status:422});
+  await call(admin,path+'/recover',{method:'POST',json:{...input,email:'invalid'},status:422});
+  const result=await call(admin,path+'/recover',{method:'POST',json:input});
+  assert.equal(result.status,'pending_activation');
+  assert.equal((await call(opm,path)).next_action,'issue_activation_code');
+  const activation=await call(opm,path+'/activation-code',{method:'POST'});
+  assert.equal(activation.email,input.email);
+  await call(admin,path+'/recover',{method:'POST',json:input,status:409});
+  const client=users.find(person=>person.role==='client');
+  const other=await project('Sequential phases','spm_review',['Structure']),otherPath='/projects/'+other+'/client-account';
+  assert.equal((await call(admin,otherPath+'/recover',{method:'POST',json:{email:client.email,ownership_verified:true}})).status,'active');
+  assert.equal((await call(opm,otherPath)).clients[0].id,client.id);
+  await db.query("update projects set lifecycle_status='archived' where id=any($1::uuid[])",[[id,other]]);
+ });
  await t.test('Commercial: independent MEP/Fire uploads, targeted revision, final dependencies, rollup and explicit turnover',async()=>{
   const id=await project(),root=`/projects/${id}`,ra=await responsibility(id,a,mep),rb=await responsibility(id,b,mep),rc=await responsibility(id,c,fire),re=await responsibility(id,a,envelope);
   const envelopeItems=(await db.query('select id from project_phase_checklist_items where project_id=$1 and project_stage_id=$2 order by sort_order',[id,envelope.id])).rows;
@@ -138,12 +184,29 @@ test('intake monitoring v1 through the real API: company decisions, independent 
   for(const r of [ra,rb,rc])await call(opm,root+'/parallel-upload-approvals',{method:'POST',json:{responsibility_id:String(r),expected_active_stage_id:String(envelope.id)}});
   await upload(id,a,ra,final,{status:409});
   await upload(id,a,rb,early,{status:403});
-  const first=await submit(id,a,ra,early,await upload(id,a,ra,early)),second=await submit(id,b,rb,early,await upload(id,b,rb,early));
+  const fileId=randomUUID(), requestId=randomUUID();
+  const sendFile=async()=>{
+    const form=new FormData();form.set('id',fileId);form.set('file',new File(['%PDF-1.4 evidence'],'retry.pdf'));
+    return call(a,'/files',{method:'POST',body:form});
+  };
+  const link=()=>call(a,root+'/phase-files',{method:'POST',status:201,json:{file_id:fileId,request_id:fileId,responsibility_id:String(ra),checklist_item_id:String(early)}});
+  await sendFile();await link(); // Discard the successful responses, as after a network loss.
+  await sendFile();const linked=await link();
+  const payload={request_id:requestId,responsibility_id:String(ra),file_ids:[linked.id],submission_note:'Individual evidence'};
+  const send=()=>call(a,root+'/checklist-items/'+early+'/submit',{method:'POST',status:201,json:payload});
+  const otherFile=await upload(id,b,rb,early);
+  const [first,second]=await Promise.all([send(),submit(id,b,rb,early,otherFile)]);
+  await sendFile();assert.deepEqual(await link(),linked);assert.deepEqual(await send(),first);
+  assert.notEqual(first.id,second.id);
+  assert.equal((await db.query("select count(*)::int as n from project_phase_files where project_id=$1 and original_name='retry.pdf'",[id])).rows[0].n,1);
+  assert.equal((await db.query("select count(*)::int as n from project_phase_evidence where project_id=$1 and checklist_item_id=$2",[id,early])).rows[0].n,2);
+  await call(admin,root+'/evidence/'+first.id+'/approve',{method:'POST',json:{},status:403});
   await review(id,first,'reject');await review(id,second);
   view=await overview(id);let rows=view.phases.find(p=>p.name===mep.code).responsibilities;
   assert.equal(rows.find(r=>r.id===String(ra)).items.find(i=>i.id===String(early)).status,'rework_required');
   assert.equal(rows.find(r=>r.id===String(rb)).items.find(i=>i.id===String(early)).status,'approved');
   assert.deepEqual(rows[0].items.find(i=>i.id===String(early)).responsibility_totals,{approved:1,required:2});
+  await submit(id,a,ra,early,linked,409);
   const revised=await submit(id,a,ra,early,await upload(id,a,ra,early));await review(id,revised);
   const pendingItem=await item(id,mep,'work_inspection');
   await submit(id,b,rb,pendingItem,await upload(id,b,rb,pendingItem));
@@ -159,6 +222,8 @@ test('intake monitoring v1 through the real API: company decisions, independent 
   await call(opm,root+'/advance-phase',{method:'POST',json:{expected_stage_id:String(envelope.id)},status:409});
   assert.equal((await db.query('select current_stage_id from projects where id=$1',[id])).rows[0].current_stage_id,mep.id);
   assert.deepEqual((await overview(id)).active_checklist,{approved:1,required:3},'A shared item is credited only after every applicable responsibility is approved');
+  assert.deepEqual(await send(),first,'a late retry returns the original receipt even after review and turnover');
+  assert.deepEqual(await link(),linked);
   assert.deepEqual((await db.query('select id,status,responsibility_id from project_phase_evidence where project_id=$1 order by id',[id])).rows,before);
   const ownHistory=await call(b,root+'/evidence-history');assert.ok(ownHistory.every(row=>row.submitted_by===b.id));
   const part=(await call(opm,'/workspace/project-data')).find(p=>p.list.id===id);assert.equal(part.overview.overlap_monitoring.version,1);
@@ -223,7 +288,9 @@ test('intake monitoring v1 through the real API: company decisions, independent 
   await db.query('INSERT INTO user_client_project_links(user_id,project_id) VALUES($1,$2)',[client.id,id]);
   const agreementForm=new FormData(),agreementId=randomUUID();agreementForm.set('id',agreementId);agreementForm.set('file',new File(['%PDF-1.4\nAccepted company signed agreement'],'company-agreement.pdf',{type:'application/pdf'}));
   await call(a,'/files',{method:'POST',body:agreementForm});
-  await call(a,root+'/workspace-command',{method:'POST',json:{type:'upload_agreement',company_id:allocation.company.id,doc:{id:agreementId}}});
+  const activation={method:'POST',json:{type:'upload_agreement',company_id:allocation.company.id,doc:{id:agreementId}}};
+  const active=await call(a,root+'/workspace-command',activation);
+  assert.deepEqual(await call(a,root+'/workspace-command',activation),active);
   assert.equal((await db.query('SELECT lifecycle_status FROM projects WHERE id=$1',[id])).rows[0].lifecycle_status,'active');
   const linkedAgreement=(await db.query('SELECT agreement_file_id,agreement_company_id FROM project_company_allocations WHERE project_id=$1',[id])).rows[0];
   assert.equal(linkedAgreement.agreement_file_id,agreementId);assert.equal(linkedAgreement.agreement_company_id,allocation.company.id);

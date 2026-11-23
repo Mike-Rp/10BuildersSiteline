@@ -1,6 +1,6 @@
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError, requireUser, sendOk, sendError, handleError, isUuid } from "../../common/utilities/access.utility.js";
-import { clientLoginEmail, CLIENT_ACTIVATION_PASSWORD_MARKER } from "./client-onboarding.js";
+import { provisionInquiryClient, clientLoginEmail, CLIENT_ACTIVATION_PASSWORD_MARKER } from "./client-onboarding.js";
 
 const allowed = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 async function intakeProject(db,id,editable=true) {
@@ -18,6 +18,17 @@ async function attach(db,p,user,company,actorId) {
     [user.id,p.id,actorId]);
   await db.query("UPDATE projects SET client_name=$2,updated_by=$3,updated_at=now() WHERE id=$1",[p.id,company,actorId]);
 }
+function recoveryState(clients, linkCount, editable, email) {
+  if (linkCount > 1 || linkCount !== clients.length) return ["account_unavailable","admin_verify"];
+  if (clients.length) {
+    if (clients[0].activation_status === "pending_activation") return ["pending_activation","issue_activation_code"];
+    if (clients[0].activation_status === "active") return ["active","none"];
+    return ["account_unavailable","admin_verify"];
+  }
+  if (!editable) return ["setup_locked","admin_verify"];
+  return email ? ["unlinked","admin_verify"] : ["missing_valid_email","request_email_correction"];
+}
+
 export const getProjectClientAccount = async (req,res) => {
   try {
     const actor=await requireUser(req,res,["admin","opm"]);
@@ -33,17 +44,59 @@ export const getProjectClientAccount = async (req,res) => {
       const details=p.inquiry_details||{};
       const managed = !!p.inquiry_details;
       const email = clientLoginEmail(details.email);
-      const existing = managed && email && actor.role === "admin" && !clients.length && allowed.includes(p.lifecycle_status)
+      const {rows:[{count}]}=await db.query("SELECT count(*)::int AS count FROM user_client_project_links WHERE project_id=$1",[p.id]);
+      const editable=allowed.includes(p.lifecycle_status);
+      const [status,next_action]=recoveryState(clients,count,editable,email);
+      const can_recover=actor.role==="admin" && editable && count===0;
+      const existing = can_recover && managed && email
         ? (await db.query(`SELECT u.id,u.full_name,u.email FROM users u JOIN roles r ON r.id=u.role_id
           WHERE lower(u.email::text)=$1 AND r.code='client' AND u.status='active' AND NOT COALESCE(u.is_deleted,false)`, [email])).rows[0]
         : undefined;
-      return {clients,managed,existing,can_issue_activation_code:actor.role === "opm" && clients.some(account => account.activation_status === "pending_activation"),
+      return {clients,managed,existing,status,next_action,can_recover,
+        can_issue_activation_code:actor.role === "opm" && next_action==="issue_activation_code",
         defaults:{email:details.email||""}};
     });
     res.set("Cache-Control","private, no-store");
     return sendOk(res,"Project client account loaded.",1,data);
   } catch(error) {return handleError(res,error);}
 };
+// Recovery is restricted to an unlinked intake. Keep the original inquiry snapshot
+// and record the verified recovery address and actor separately for audit.
+export const recoverProjectClient = async (req,res) => {
+  try {
+    const actor=await requireUser(req,res,["admin"]);
+    if (!actor) return;
+    const email=clientLoginEmail(req.body?.email);
+    if (!email || req.body?.ownership_verified !== true)
+      throw new HttpError(422,"Verify the client's ownership of a valid email before recovery.");
+    const data=await withTransaction(async db=>{
+      const p=await intakeProject(db,req.params.id);
+      if ((await db.query("SELECT 1 FROM user_client_project_links WHERE project_id=$1",[p.id])).rowCount)
+        throw new HttpError(409,"A client link already exists. Review the linked account with Admin.");
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1))",["client-email:"+email]);
+      const found=(await db.query(`SELECT u.id,u.status,u.is_deleted,r.code FROM users u JOIN roles r ON r.id=u.role_id
+        WHERE lower(u.email::text)=$1 FOR UPDATE OF u`,[email])).rows;
+      let status;
+      if (!found.length) {
+        status=await provisionInquiryClient(db,p.id,{...(p.inquiry_details||{}),client_name:p.client_name,email},actor.id);
+        if (status!=="pending_activation") throw new HttpError(409,"Account creation requires Admin verification.");
+      } else {
+        const [account]=found;
+        if (found.length!==1 || account.code!=="client" || account.status!=="active" || account.is_deleted)
+          throw new HttpError(409,"Admin must resolve the existing account before linking this email.");
+        await attach(db,p,account,p.client_name,actor.id);
+        status="active";
+      }
+      await db.query(`INSERT INTO audit_log(table_name,record_id,operation,changed_by,new_values)
+        VALUES('projects',$1,'UPDATE',$2,jsonb_build_object('verified_client_email',$3::text,'client_recovery',$4::text))`,
+        [p.id,actor.id,email,status]);
+      return {project_id:p.id,status,next_action:status==="active"?"none":"issue_activation_code"};
+    });
+    res.set("Cache-Control","private, no-store");
+    return sendOk(res,"Verified client account recovered.",1,data);
+  } catch(error) {return handleError(res,error);}
+};
+
 export const selectIntakeClient = async (req,res) => {
   try {
     const actor=await requireUser(req,res,["admin"]);
@@ -51,6 +104,7 @@ export const selectIntakeClient = async (req,res) => {
     if(!isUuid(req.body?.client_user_id)) return sendError(res,"client_user_id is required.",400);
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,req.params.id);
+      if (!p.inquiry_details && p.lifecycle_status === "spm_review") throw new HttpError(409,"Use verified client account recovery for this intake.");
       const found=await db.query(
         `SELECT u.id,u.full_name,u.email,u.status FROM users u JOIN roles r ON r.id=u.role_id
          WHERE u.id=$1 AND r.code='client' AND u.status IN ('active','invited') AND COALESCE(u.is_deleted,false)=false FOR UPDATE OF u`,

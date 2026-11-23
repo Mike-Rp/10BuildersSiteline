@@ -109,6 +109,7 @@ test("CSV and print share the snapshot, escape content, and never leak omitted f
   assert.equal(csvCell('a,"b"\nc'),'"a,""b""\nc"')
   assert.equal(csvCell("\t=1"),'"\'\t=1"')
   assert.doesNotMatch(csv,/Withdrawals|Credit withdrawn|Pending evidence|Rework/)
+  assert.doesNotMatch(html,/\d+(?:\.\d+)?\s*\/\s*\d+\s*\u00b7|Credit awarded|Credit withdrawn|Credit change/i)
   assert.ok(html.includes('&lt;script&gt;'));assert.equal(html.includes('<script>'),false)
   assert.ok(csv.includes(report.period.generatedAt));assert.ok(html.includes('Monthly Project Progress Summary'))
 })

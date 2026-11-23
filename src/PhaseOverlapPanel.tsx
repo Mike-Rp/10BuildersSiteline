@@ -75,8 +75,9 @@ export default function PhaseOverlapPanel({ project, actor, disabled = false, on
           </div>
           {!office && row.assignment_status === "confirmed" && row.upload_access !== "locked" && item.can_submit &&
             (phase.status === "active" || (phase.status === "upcoming" && data.arrangement !== "Sequential phases" && row.upload_access === "parallel")) && <Upload
+            attemptScope={[actor.id,project.id,row.id,item.id,item.evidence_id ?? "initial"].join(":")}
             label={item.title} owner={actor.name} storageKind="evidence" previewBeforeUpload ariaLabel={`Submit evidence for ${item.title}`} disabled={paused}
-            onSave={() => false} onSaveMany={docs => onCommand({ type: "submit_checklist", projectId: project.id, phase: phase.name, itemId: item.id, responsibilityId: row.id, docs }, "Checklist evidence submitted.")} />}
+            onSave={() => false} onSaveMany={(docs, submissionRequestId) => onCommand({ type: "submit_checklist", submissionRequestId, projectId: project.id, phase: phase.name, itemId: item.id, responsibilityId: row.id, docs }, "Checklist evidence submitted.")} />}
           {office && item.can_review && item.status === "submitted" && item.evidence_id && <Button disabled={paused} onClick={() => setReview({ phase: phase.name, responsibilityId: row.id, item })}>Review evidence</Button>}
         </div>)}
       </article>)}

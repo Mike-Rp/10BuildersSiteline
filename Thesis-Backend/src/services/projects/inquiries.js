@@ -298,6 +298,7 @@ export function mountInquiries(router) {
     switch (input.action) {
       case "contract": {
         const previousId = workflow.signed_contract?.id ?? workflow.staffing?.contract_file_id ?? null;
+        if (previousId && previousId === input.contract_file_id && input.request_id === previousId) return inquiryResponse(row);
         if (intakeLocked && previousId)
           throw new HttpError(409, "The confirmed client contract is locked once project assessment is available.");
         if ((input.expected_contract_file_id ?? null) !== previousId)
@@ -406,7 +407,7 @@ export function mountInquiries(router) {
       req.body.additional_scopes ?? Object.fromEntries(selected.map(phase => [phase, stored[phase] || []])));
     const scopes = configuration.required;
     const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers, {
-      requiredScopes: scopes, blockedCandidates,
+      requiredScopes: scopes, setupAdditionalScopes: configuration.additional, blockedCandidates,
     });
     for (const phase of selected) {
       if (!Object.hasOwn(candidates, phase)) {

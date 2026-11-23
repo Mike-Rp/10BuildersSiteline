@@ -10,7 +10,7 @@ import { ListPager, runList, updateListQuery, useListMemory } from "./ListContro
 import { withPage } from "./listing"
 import { IntakePipelinePanel, IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
-import { phaseCoverageQuota } from "./phase-coverage-policy"
+import { SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
@@ -213,15 +213,8 @@ function staffingIssue(entry: Phase | undefined, required: string[], choices: Ca
   if (assigned.some(person => !matchingInquiryTags(
     person.assigned_disciplines, choices.find(candidate => candidate.id === person.user_id)?.qualifiedTags ?? [],
   ).length)) return "Review the lineup. An assigned engineer is unavailable or has no verified scope selected."
-  if (!entry?.engineers) return ""
-  const covered = new Set(assigned.flatMap(person => person.assigned_disciplines ?? []))
-  const missing = required.filter(area => !covered.has(area))
-  const needed = phaseCoverageQuota(required) - (required.length - missing.length)
-  if (needed <= 0) return ""
-  const noMatch = missing.filter(area => !choices.some(candidate => candidate.qualifiedTags.includes(area)))
-  return `Cover ${needed} more ${needed === 1 ? "scope" : "scopes"}. ${noMatch.length
-    ? `No available verified match for ${noMatch.join(", ")}.`
-    : `Unassigned: ${missing.join(", ")}.`}`
+  if (assigned.length > SETUP_ENGINEER_LIMIT) return "Choose at most two engineers for this phase."
+  return ""
 }
 
 function ContractPreview({ file, fileId, onClose, onConfirm, busy, error }: {
@@ -326,13 +319,14 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   const required = requiredAreas(suggested)
   const newScopes = scopeOptions?.filter(value => !required.includes(value)) ?? []
   const owners = new Map(required.flatMap(area => {
-    const owner = choices.find(candidate => candidate.qualifiedTags.includes(area) && engineers.some(person =>
-      person.user_id === candidate.id && person.assigned_disciplines.includes(area)))
-    return owner ? [[area, owner.name] as const] : []
+    const names = engineers.filter(person => person.assigned_disciplines.includes(area))
+      .map(person => choices.find(candidate => candidate.id === person.user_id && candidate.qualifiedTags.includes(area))?.name)
+      .filter(Boolean)
+    return names.length ? [[area, names.join(", ")] as const] : []
   }))
   const missing = required.filter(area => !owners.has(area))
   const withoutEligibleMatch = new Set(missing.filter(area => !choices.some(candidate => candidate.qualifiedTags.includes(area))))
-  const quota = phaseCoverageQuota(required)
+  const quota = 1
   const coverage = required.length - missing.length
   const update = (next: Engineer[]) => onChange({
     ...entry, stage, user_id: next[0]?.user_id || null,
@@ -343,7 +337,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
     const others = engineers.filter((_, current) => current !== index)
     const used = new Set(others.flatMap(person => person.assigned_disciplines))
     return choices.filter(candidate => !others.some(person => person.user_id === candidate.id))
-      .map(candidate => ({ ...candidate, tags: candidate.qualifiedTags.filter(tag => !used.has(tag)).slice(0, multi ? 3 : 1) }))
+      .map(candidate => ({ ...candidate, tags: [...candidate.qualifiedTags].sort((a,b) => Number(used.has(a)) - Number(used.has(b))).slice(0, multi ? 3 : 1) }))
       .filter(candidate => !multi || candidate.tags.length > 0)
   }
   function assign(index: number, id: string) {
@@ -355,7 +349,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
     setAdding(false)
   }
   const addOptions = options(engineers.length)
-  const atLimit = engineers.length >= (multi ? 3 : 1)
+  const atLimit = engineers.length >= (multi ? SETUP_ENGINEER_LIMIT : 1)
   const noEligibleMessage = {
     phase_disciplines: "This phase has no configured discipline requirements. Ask Admin to review its project-type setup.",
     availability: "The qualified Site PMs already have assignments. Recheck after an assignment ends.",
@@ -395,7 +389,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
       <strong>Assigned engineers · {engineers.length}</strong>
       {!adding && !atLimit && choices.length > 0 && <button className="button inquiry-add-engineer" type="button" disabled={!addOptions.length}
         aria-describedby={addOptions.length ? undefined : "inquiry-add-engineer-help"}
-        onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
+        onClick={() => setAdding(true)}><Icon name="plus" size={16} />{engineers.length ? "Add optional engineer" : "Assign engineer"}</button>}
     </div>
     {!engineers.length && <p>Unfilled</p>}
     {atLimit && missing.some(area => !withoutEligibleMatch.has(area)) && <p className="inquiry-muted">
@@ -403,7 +397,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
     </p>}
     {!atLimit && !addOptions.length && <div id="inquiry-add-engineer-help" className="inquiry-candidate-help">
       <p>{choices.length
-        ? "No additional Site PM is eligible for an uncovered responsibility in this phase."
+        ? "No additional Site PM is available to add in this phase."
         : blocker ? noEligibleMessage[blocker] : "No eligible Site PM is available for this phase."}</p>
       {missing.length > 0 && <p>Uncovered: <strong>{missing.join(", ")}</strong></p>}
       {!choices.length && !withoutEligibleMatch.size && <button className="button" type="button" onClick={onRecheck}>Recheck eligibility</button>}
@@ -413,7 +407,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
         const assigned = choices.find(candidate => candidate.id === person.user_id)
         const replacements = options(index)
         return <article className="inquiry-card" key={person.user_id}>
-          <label>Assigned Site PM<select value={person.user_id} onChange={event => assign(index, event.target.value)}>
+          <label>{index === 0 ? "Assigned Site PM" : "Additional Site PM"}<select value={person.user_id} onChange={event => assign(index, event.target.value)}>
             {!replacements.some(option => option.id === person.user_id) && <option value={person.user_id}>{assigned?.name || "Site PM"}</option>}
             {replacements.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select></label>
@@ -423,13 +417,12 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
             {required.map(area => {
               const checked = person.assigned_disciplines.includes(area)
               const qualified = assigned?.qualifiedTags.includes(area)
-              const alreadyAssigned = engineers.some(other => other !== person && other.assigned_disciplines.includes(area))
               return <label className="inquiry-check" key={area}>
-                <input type="checkbox" checked={checked} disabled={checked ? !qualified : !qualified || alreadyAssigned || person.assigned_disciplines.length >= 3}
+                <input type="checkbox" checked={checked} disabled={checked ? !qualified : !qualified || person.assigned_disciplines.length >= 3}
                   onChange={() => update(engineers.map(other => other === person ? {
                     ...person, assigned_disciplines: checked ? person.assigned_disciplines.filter(tag => tag !== area) : [...person.assigned_disciplines, area],
                   } : other))} />
-                <span>{area}{!qualified && <small>This engineer has no verified match for this scope</small>}{qualified && alreadyAssigned && <small>Assigned to another engineer</small>}</span>
+                <span>{area}{!qualified && <small>This engineer has no verified match for this scope</small>}</span>
               </label>
             })}
           </fieldset>}
@@ -483,7 +476,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
   const [team, setTeam] = useState<Phase[]>([])
-  const [pendingContract, setPendingContract] = useState<{ file: File; uploadedId?: string }>()
+  const [pendingContract, setPendingContract] = useState<{ file: File; id: string; uploaded?: boolean }>()
   const contractInput = useRef<HTMLInputElement>(null)
   const [contractPreviewOpen, setContractPreviewOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -644,14 +637,21 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setStep(2)
     setDialog("intake")
   }
-  async function allocate(recheck = false) {
+  async function allocate() {
     if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const additional = planning?.staffing?.additional_scopes
     const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, contract_file_id: contractFileId,
       ...(additional ? { additional_scopes: Object.fromEntries(Object.entries(additional).filter(([stage]) => phases.includes(stage))) } : {}),
     })
     setPlanning(result)
-    if (!recheck) setTeam(result.team || [])
+    setTeam(current => (result.team || []).map(phase => {
+      const selected = current.find(prior => prior.stage === phase.stage)
+      if (selected) return selected
+      // Older planning APIs can recommend several engineers. Start with the coordinator.
+      if (!phase.engineers || phase.engineers.length < 2) return phase
+      const [coordinator] = phase.engineers
+      return { ...phase, ...coordinator, engineers: [coordinator] }
+    }))
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
     setAddingEngineer(false)
     setStep(3)
@@ -669,14 +669,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   async function confirmContract() {
     if (!pendingContract) return
-    const id = pendingContract.uploadedId ?? crypto.randomUUID()
-    if (!pendingContract.uploadedId) {
+    const id = pendingContract.id
+    if (!pendingContract.uploaded) {
       await uploadFile(id, pendingContract.file)
-      setPendingContract({ ...pendingContract, uploadedId: id })
+      setPendingContract({ ...pendingContract, uploaded: true })
     }
     const updated = await post<Inquiry>(`${root}/${selected}/workflow`, {
       action: "contract", version: row?.workflow?.review?.version ?? 0,
-      contract_file_id: id, expected_contract_file_id: contractFileId ?? null,
+      request_id: id, contract_file_id: id, expected_contract_file_id: contractFileId ?? null,
     })
     updateInquiry(updated)
     setPendingContract(undefined)
@@ -1017,7 +1017,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 return
               }
               setError("")
-              setPendingContract({ file })
+              setPendingContract({ file, id: crypto.randomUUID() })
             }} />}
             {(!intakeLocked || !contractFileId) && <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
               <Icon name="upload" size={17} />{contractFileId ? "Replace signed contract" : "Upload signed contract"}
@@ -1308,7 +1308,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <StaffingCards key={staffingPhase} stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
             suggested={planning.team?.find(entry => entry.stage === staffingPhase)}
             choices={planning.candidates[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
-            blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
+            blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate())}
             scopeOptions={planning.additional_scope_options?.[staffingPhase]} onAddScope={scope => run(() => addStaffingScope(scope))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
           <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />

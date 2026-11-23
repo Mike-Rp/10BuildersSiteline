@@ -83,7 +83,6 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
         <h3>Monthly progress movement</h3>
         <div className="monthly-report-table"><table><thead><tr><th>Record</th><th>Verified value</th></tr></thead><tbody>
           <tr><td>Opening verified progress</td><td>{reportFraction(report.opening)}</td></tr>
-          {report.movement&&<><tr><td>Credit awarded from approvals</td><td>+{report.movement.awarded}</td></tr><tr><td>Credit withdrawn for rework</td><td>−{report.movement.withdrawn}</td></tr>{report.movement.scopeChanges>0&&<tr><td>Scope revision records ({report.movement.scopeChanges})</td><td>{report.movement.scopeDelta} credit change; denominator may differ</td></tr>}</>}
           <tr><td>Closing verified progress</td><td>{reportFraction(report.closing)}</td></tr>
         </tbody></table></div>
         <p className="role-muted">Verified progress uses approved required checklist activities. Uploads awaiting review earn no credit.{report.netChange!==null?` Net change: ${report.netChange.toFixed(1)} percentage points.`:""}</p>

@@ -208,6 +208,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     assert.deepEqual(savedContract.signed_contract,{id:documents.contract_file_id,name:"signed.pdf"})
     assert.equal(savedContract.assessment.id,assessed.assessment.id)
     await save("contract", 2, documents, 409)
+    assert.deepEqual((await save("contract",2,{...documents,request_id:documents.contract_file_id})).workflow.signed_contract,savedContract.signed_contract)
     await call(planning,{token,status:409,json:{...planInput,contract_file_id:await upload("stale.pdf"),phases}})
   }
   const recommended = await call(planning,{token,json:{...planInput,...documents,phases}})
@@ -234,11 +235,22 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     !firstPhaseIds.includes(person.id) && !secondPhase.engineers?.slice(1).some(e=>e.user_id===person.id)
     && tags.every(tag=>person.qualifiedTags.includes(tag)))
   assert.ok(alternate,"A second qualified Site PM is required for the authorization scenario")
+  if (multiEngineer) {
+    assert.ok(recommended.team.every(phase => phase.engineers.length===1))
+    const support = recommended.candidates[phases[1]].find(person=>person.id!==alternate.id && person.qualifiedTags.length)
+    assert.ok(support)
+    secondPhase.engineers.push({user_id:support.id,assigned_disciplines:support.qualifiedTags.slice(0,1)})
+  }
   secondPhase.user_id = alternate.id
   if (secondPhase.engineers) secondPhase.engineers[0].user_id = alternate.id
   await db.query(`INSERT INTO workspace_account_metadata(user_id,metadata) VALUES($1,'{"experienceByType":{"Residential":{"months":240}}}')
     ON CONFLICT(user_id) DO UPDATE SET metadata=workspace_account_metadata.metadata||excluded.metadata`,[alternate.id])
   const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
+  if (multiEngineer) {
+    const crowded=structuredClone(payload)
+    crowded.phase_team[1].engineers.push(crowded.phase_team[1].engineers[0])
+    await call("/projects/intake",{token,status:422,json:crowded})
+  }
   await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:undefined}})
   await call("/projects/intake",{token,status:409,json:{...payload,estimated_budget:updatedBudget-1}})
   await call("/projects/intake",{token,status:422,json:{...payload,contract_file_id:undefined}})
@@ -263,6 +275,28 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(stored.inquiry_intake.estimated_budget,updatedBudget)
   assert.deepEqual(stored.phase_scope.phases,phases)
   const projectId = response.project.id
+  const contract = response.signed_contract
+  assert.equal(contract.code,"owner_contract")
+  assert.equal(contract.file_id,documents.contract_file_id)
+  assert.equal(contract.original_name,"signed.pdf")
+  assert.deepEqual(repeated.signed_contract,contract)
+  const registered=(await call(`/projects/${projectId}/documents`,{token})).filter(doc=>doc.code==="owner_contract")
+  assert.equal(registered.length,1)
+  for (const key of ["file_id","original_name","content_type","byte_size","download_url","uploaded_at","id"]) assert.deepEqual(registered[0][key],contract[key])
+  const downloaded=await fetch(new URL(contract.download_url,base),{headers:{Authorization:"Bearer "+token}})
+  assert.equal(downloaded.status,200)
+  assert.match(await downloaded.text(),/^%PDF-/)
+  assert.equal((await call(`/projects/${projectId}/workspace-command`,{token,json:{type:"upload_registered",docIndex:2,doc:{id:contract.file_id}}})).project_id,projectId)
+  await call(`/projects/${projectId}/workspace-command`,{token,status:409,json:{type:"upload_registered",docIndex:2,doc:{id:await upload("replacement.pdf")}}})
+  await db.query("DELETE FROM project_documents WHERE id=$1",[contract.id])
+  const backfill=read("../Thesis-Backend/migrations/034-recover-inquiry-contracts.sql")
+  await db.exec(backfill)
+  await db.exec(backfill)
+  const restored=(await call(`/projects/${projectId}/documents`,{token})).filter(doc=>doc.code==="owner_contract")
+  assert.equal(restored.length,1)
+  assert.equal(restored[0].file_id,contract.file_id)
+  await db.query("UPDATE project_documents SET file_ref=$2 WHERE id=$1",[restored[0].id,"db:"+contract.file_id])
+  assert.equal((await call(`/projects/${projectId}/documents`,{token})).find(doc=>doc.code==="owner_contract").download_url,contract.download_url)
   const { clients } = await call(`/projects/${projectId}/client-account`, { token })
   assert.equal(clients.length, 1)
   assert.equal(clients[0].email, details.email)

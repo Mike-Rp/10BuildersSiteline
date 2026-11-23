@@ -2,7 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js"
 import { assertEligibleManager } from "../../common/utilities/license-eligibility.utility.js"
 import { prepareEngineerAssignments } from "./engineer-commitments.utility.js"
 import { recordArchiveEvent } from "../archive/audit.utility.js"
-import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
+import { MAX_ENGINEERS_PER_PHASE, SETUP_ENGINEER_LIMIT, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js"
 import { savedEngineerScopes } from "./phase-engineer-scopes.utility.js"
 
 export async function responsibilitiesInstalled(db) {
@@ -38,6 +38,8 @@ export async function preparePhaseResponsibilities(
         [typeId, phase.stage],
       )
     ).rows.map((r) => r.code)
+    if (options.setupStaffing && phase.engineers.length > SETUP_ENGINEER_LIMIT)
+      throw new HttpError(422, `Assign one Site PM and at most one additional engineer to ${phase.stage}.`)
     if (phase.engineers.length > MAX_ENGINEERS_PER_PHASE)
       throw new HttpError(422, `Assign no more than three engineers to ${phase.stage}.`)
     const used = new Set(),
@@ -55,17 +57,19 @@ export async function preparePhaseResponsibilities(
         !tags.length ||
         tags.length > 3 ||
         new Set(tags).size !== tags.length ||
-        tags.some((t) => !required.includes(t) || used.has(t))
+        tags.some((t) => !required.includes(t) || (!options.setupStaffing && used.has(t)))
       )
         throw new HttpError(
           422,
-          "Assign one qualified owner to each required specialization, with at most three tags per engineer.",
+          options.setupStaffing ? "Select one to three verified phase specialties for each engineer." : "Assign one qualified owner to each required specialization, with at most three tags per engineer.",
         )
       for (const tag of tags) used.add(tag)
       flat.push({ ...engineer, stage: phase.stage })
     }
     const covered = required.filter((tag) => used.has(tag)).length
-    const quota = phaseCoverageQuota(required)
+    if (options.setupStaffing && options.additionalScopes?.[phase.stage]?.some(tag => !used.has(tag)))
+      throw new HttpError(409, `Cover every additional engineering scope in ${phase.stage} before sending offers.`)
+    const quota = options.setupStaffing ? 1 : phaseCoverageQuota(required)
     if (covered < quota)
       throw new HttpError(
         422,

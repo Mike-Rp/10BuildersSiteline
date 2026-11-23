@@ -22,6 +22,15 @@ import { provisionInquiryClient } from "./client-onboarding.js";
 // Lifecycle states an intake may be corrected and resubmitted from. Active and archived projects are closed to intake edits.
 const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 
+async function signedContract(db, projectId) {
+  const { rows } = await db.query(`SELECT d.id, t.code, f.id AS file_id, f.original_name, f.content_type,
+    f.byte_size, d.uploaded_at, '/api/v1/files/' || f.id || '/content' AS download_url
+    FROM project_documents d JOIN document_types t ON t.id=d.document_type_id
+    JOIN stored_files f ON d.file_ref IN ('db://' || f.id,'db:' || f.id)
+    WHERE d.project_id=$1 AND t.code='owner_contract' AND d.status='uploaded'`, [projectId]);
+  return rows[0] ?? null;
+}
+
 export const createIntake = async (req, res) => {
   try {
     const inquiryId = req.body?.inquiry_id;
@@ -75,7 +84,7 @@ export const createIntake = async (req, res) => {
           throw new HttpError(409, "The confirmed engineering scopes changed. Reopen staffing before sending offers.");
         if (inquiry.project_id) {
           const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
-          return {project: prior, duplicate: true};
+          return {project: prior, duplicate: true, signed_contract: await signedContract(client, prior.id)};
         }
         tier = assessment.size;
         intake = {...details, target_start_date:review.start, target_end_date:review.end, estimated_budget:budget, size:assessment.size, assessment, additional_scopes: scopeConfiguration.additional};
@@ -149,11 +158,7 @@ export const createIntake = async (req, res) => {
       }
       for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
       const requiredScopes = scopeConfiguration?.required;
-      await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true,requiredScopes});
-      if(scopeConfiguration?.options)for(const phase of phase_team) {
-        const covered=new Set((phase.engineers||[phase]).flatMap(engineer=>engineer.assigned_disciplines||[]));
-        if(requiredScopes[phase.stage].some(scope=>!covered.has(scope)))throw new HttpError(409,`Cover every confirmed engineering scope in ${phase.stage} before sending offers.`);
-      }
+      await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true,requiredScopes,setupStaffing:!!inquiry,additionalScopes:scopeConfiguration?.additional});
       const inquiryLead = inquiry ? await prepareInquiryLead(client, phase_team, phases, projectType.rows[0].id,
         intake.project_type, inquiry.details.opm_workflow.review, null, requiredScopes) : null;
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
@@ -177,7 +182,7 @@ export const createIntake = async (req, res) => {
       const project = inserted.rows[0];
       if (inquiry) {
         await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
-          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,engineerScopes:requiredScopes,additional_scopes:scopeConfiguration.additional,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,staffingPolicy:"primary_with_optional_engineer",engineerScopes:requiredScopes,additional_scopes:scopeConfiguration.additional,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
         if ((await client.query("SELECT to_regclass('public.project_company_allocations') IS NOT NULL AS ready")).rows[0].ready)
           await client.query("UPDATE projects SET intake_monitoring_version=1 WHERE id=$1", [project.id]);
         project.lifecycle_status = "spm_review";
@@ -217,7 +222,7 @@ export const createIntake = async (req, res) => {
         await client.query("UPDATE project_inquiries SET status='converted',project_id=$2,updated_at=now() WHERE id=$1",[inquiry.id,project.id]);
         const recipients = new Set(phase_team.flatMap(row => [row.user_id, ...(row.engineers || []).map(person => person.user_id)]));
         for (const recipient of recipients) await notifyInquiry(client,actor.id,recipient,"Site PM assignment offer",name,project.id);
-        return {project, client_account_status};
+        return {project, client_account_status, signed_contract: await signedContract(client, project.id)};
       }
       // A resubmission supersedes every open Office PM confirmation, in the same transaction as the
       // fresh pending one, so the previous OPM can no longer accept and the replacement can. Declined
@@ -248,7 +253,7 @@ export const createIntake = async (req, res) => {
         [project.id,suggested_opm_id,suggested_opm_match_score ?? suggested_opm_math_score ?? null,actor.id,supersededId]);
       return {project, confirmation:confirmation.rows[0]};
     });
-    if (result.duplicate) return responseOk(res, 'Project was already submitted.', 1, {project: result.project, confirmation: result.confirmation});
+    if (result.duplicate) return responseOk(res, 'Project was already submitted.', 1, {project: result.project, confirmation: result.confirmation, ...(inquiryId ? {signed_contract:result.signed_contract} : {})});
     return responseOk(res, inquiryId ? 'Project created and Site PM offers sent.' : 'Project and pending OPM confirmation created.', 1, result);
   } catch (error) {
     if (error.status) return responseError(res, error.message, error.status);

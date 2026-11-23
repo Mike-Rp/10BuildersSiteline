@@ -155,8 +155,11 @@ export const markChecklistSubmitted = async (req, res) => {
     body.checklist_submissions[0].responsibility_id=req.body?.responsibility_id;
     const data = await withTransaction(async client => {
       await assertLicenseActive(user, client);
-      const p = await itemProject(client, user, req.params.id, req.params.itemId, body);
-      return projectRequest(client,p.id,user.id,req.body?.request_id,'checklist:'+req.params.itemId,body,()=>submitChecklist(client, p, user, body.checklist_submissions[0]));
+      const project = await phaseProject(client, user, req.params.id);
+      return projectRequest(client,project.id,user.id,req.body?.request_id,'checklist:'+req.params.itemId,body,async()=>{
+        const p = await itemProject(client, user, project.id, req.params.itemId, body);
+        return submitChecklist(client, p, user, body.checklist_submissions[0]);
+      });
     });
     return sendOk(res, "Checklist item submitted for Office PM verification.", 1, data, 201);
   } catch (error) { return handleError(res, error); }
@@ -297,13 +300,10 @@ export const rejectEvidence = reviewEvidence("rejected");
 export const uploadPhaseFile = async (req, res) => {
   try {
     const data = await withTransaction(async client => {
-      const p = await phaseProject(client, req.user, req.params.id, { active: true });
-      await assertProjectSpm(client, req.user, p);
-      const monitored=await monitoringProject(client,p);
-      const access=monitored?await assertOverlapSubmission(client,p,req.user,req.body?.responsibility_id,req.body?.checklist_item_id,{checkStatus:false}):null;
-      const stage = await resolveStage(client, req.body, access?.item.project_stage_id??p.current_stage_id, p.project_type_id, p.id);
-      if(access&&Number(stage.id)!==Number(access.item.project_stage_id))throw new HttpError(422,'The selected item belongs to another phase.');
-      if(!access){await assertPhaseUnlocked(client, p, stage.id);await assertAssignmentWritable(client,req.user,p,stage.id);}
+      const p = await phaseProject(client, req.user, req.params.id);
+      const itemId=req.body?.checklist_item_id;
+      const itemStage=isBigintId(itemId) ? (await client.query("select project_stage_id from project_phase_checklist_items where id=$1 and project_id=$2",[itemId,p.id])).rows[0]?.project_stage_id : null;
+      const stage = await resolveStage(client, req.body, itemStage ?? p.current_stage_id, p.project_type_id, p.id);
       // A JSON body with file_id references a file that was already uploaded (directly to
       // storage or in chunks), so a large file never has to be re-sent through this request.
       const storedId = req.file ? undefined : req.body?.file_id;
@@ -311,7 +311,11 @@ export const uploadPhaseFile = async (req, res) => {
         {stage_id:stage.id,responsibility_id:req.body?.responsibility_id,checklist_item_id:req.body?.checklist_item_id,
           ...(storedId?{file_id:storedId}:{name:req.file?.originalname,bytes:req.file?.buffer?.toString('base64')})},
         async()=>{
-          if(access)await assertOverlapSubmission(client,p,req.user,req.body.responsibility_id,req.body.checklist_item_id);
+          if (p.lifecycle_status !== "active") throw new HttpError(422,"An active project is required.");
+          await assertProjectSpm(client,req.user,p);
+          const access=await monitoringProject(client,p) ? await assertOverlapSubmission(client,p,req.user,req.body?.responsibility_id,itemId) : null;
+          if (access && Number(stage.id)!==Number(access.item.project_stage_id)) throw new HttpError(422,"The selected item belongs to another phase.");
+          if (!access) { await assertPhaseUnlocked(client,p,stage.id); await assertAssignmentWritable(client,req.user,p,stage.id); }
           const saved=storedId?await insertFileFromStored(client,{...p,current_stage_id:stage.id},storedId,req.user.id):await insertFile(client,{...p,current_stage_id:stage.id},req.file,req.user.id);
           if(access)await client.query('UPDATE project_phase_files SET responsibility_id=$2,checklist_item_id=$3 WHERE id=$1',[saved.id,access.responsibility.id,access.item.id]);
           return saved;

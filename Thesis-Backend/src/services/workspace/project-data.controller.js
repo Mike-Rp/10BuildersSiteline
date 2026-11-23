@@ -134,7 +134,7 @@ export async function getProjectData(req,res) {
      left join users u on u.id=t.spm_user_id where t.project_id=any($1::uuid[]) order by w.sort_order`,[ids])).rows;
    const documents=(await db.query(`select p.id as project_id,d.id,t.code,t.label,
     t.is_client_visible_default as client_visible,d.status='uploaded' as uploaded,d.uploaded_at,
-    f.original_name,f.content_type,f.byte_size,d.file_ref
+    f.id AS file_id,f.original_name,f.content_type,f.byte_size,d.file_ref
     from projects p cross join document_types t
     left join project_documents d on d.project_id=p.id and d.document_type_id=t.id
     left join stored_files f on d.file_ref='db://'||f.id or d.file_ref='db:'||f.id

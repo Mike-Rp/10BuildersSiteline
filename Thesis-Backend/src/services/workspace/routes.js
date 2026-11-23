@@ -101,6 +101,7 @@ async function file(db, user, id, purpose = "document") {
     const row = (await db.query("select * from stored_files where id=$1", [id])).rows[0];
     if (!row || !(user.role === "admin" || row.uploaded_by === user.id))
         throw new HttpError(404, "Uploaded file not found.");
+    if (row.purpose === "phase_evidence") throw new HttpError(409, "This upload is already linked to phase evidence.");
     // Storage-backed files were already type-checked when the upload completed; their bytes are not in the database.
     if (!row.storage_path)
         await validateUpload(row, purpose);
@@ -114,9 +115,11 @@ async function linkDocument(db, user, p, code, fileId) {
     if (!type)
         throw new HttpError(422, "Document type is not configured.");
     await linkProjectFile(db, p.id, bytes.id);
-    return (await db.query(`insert into project_documents(project_id,document_type_id,status,file_ref,uploaded_by,uploaded_at)
+    const written = await db.query(`insert into project_documents(project_id,document_type_id,status,file_ref,uploaded_by,uploaded_at)
  values($1,$2,'uploaded',$3,$4,now()) on conflict(project_id,document_type_id) do update
- set status='uploaded',file_ref=excluded.file_ref,uploaded_by=excluded.uploaded_by,uploaded_at=now() returning id`, [p.id, type.id, "db://" + bytes.id, user.id])).rows[0];
+ set status='uploaded',file_ref=excluded.file_ref,uploaded_by=excluded.uploaded_by,uploaded_at=now() where project_documents.status <> 'uploaded' returning id`, [p.id, type.id, "db://" + bytes.id, user.id]);
+    if (!written.rowCount) throw new HttpError(409, "The registered document is already uploaded.");
+    return written.rows[0];
 }
 async function event(db, user, p, title, detail = "", extraRecipientIds = []) {
     const result = await db.query(`insert into activity_log(activity_type_id,title,detail,actor_user_id,related_project_id)
@@ -373,6 +376,22 @@ router.post("/notifications/read", endpoint(null, async (db, user, req) => {
     }
     return { ids: read };
 }));
+async function lockUpload(db, id) {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["upload:" + id]);
+}
+async function persistUpload(db, user, id, f, purpose) {
+    const contentType = await validateUpload(f, purpose);
+    const manpowerCount = purpose === "manpower" ? readManpowerFile(f).length : undefined;
+    const prior = (await db.query("select uploaded_by,original_name,content from stored_files where id=$1", [id])).rows[0];
+    if (prior) {
+        if (prior.uploaded_by !== user.id || prior.original_name !== f.originalname || !prior.content?.equals(f.buffer))
+            throw new HttpError(409, "Upload ID already used for another file.");
+    } else {
+        await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
+ values($1,$2,$7,$3,$4,$5,$6,$2)`, [id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
+    }
+    return { id, download_url: "/api/v1/files/" + id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
+}
 router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const f = req.file;
     if (!f || !isUuid(req.body.id))
@@ -380,11 +399,8 @@ router.post("/files", requireLogin, parseUpload, endpoint(["admin", "opm", "spm"
     const purpose = req.body.purpose || "document";
     if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
         throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
-    const contentType = await validateUpload(f, purpose);
-    const manpowerCount = purpose === "manpower" ? readManpowerFile(f).length : undefined;
-    await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
- values($1,$2,$7,$3,$4,$5,$6,$2)`, [req.body.id, user.id, f.originalname, contentType, f.size, f.buffer, purpose === "manpower" ? "manpower" : "upload"]);
-    return { id: req.body.id, download_url: "/api/v1/files/" + req.body.id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
+    await lockUpload(db, req.body.id);
+    return persistUpload(db, user, req.body.id, f, purpose);
 }));
 router.post("/files/chunks", requireLogin, parseChunk, endpoint(["admin", "opm", "spm"], async (db, user, req) => {
     const { upload_id: uploadId, index: rawIndex, total: rawTotal, purpose = "document" } = req.body || {};
@@ -394,16 +410,21 @@ router.post("/files/chunks", requireLogin, parseChunk, endpoint(["admin", "opm",
     if (!["document", "manpower"].includes(purpose)) throw new HttpError(400, "Unknown upload purpose.");
     if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
         throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
-    if ((await db.query("select 1 from stored_files where id=$1", [uploadId])).rowCount)
-        throw new HttpError(409, "This file was already uploaded.");
-    const prior = (await db.query("select chunk_count,original_name,purpose from stored_file_upload_chunks where upload_id=$1 and user_id=$2 limit 1 for update", [uploadId, user.id])).rows[0];
-    if (prior && (prior.chunk_count !== total || prior.original_name !== chunk.originalname || prior.purpose !== purpose))
+    await lockUpload(db, uploadId);
+    const completed = (await db.query("select uploaded_by,original_name from stored_files where id=$1", [uploadId])).rows[0];
+    if (completed && (completed.uploaded_by !== user.id || completed.original_name !== chunk.originalname))
+        throw new HttpError(409, "Upload ID already used for another file.");
+    const prior = (await db.query("select user_id,chunk_count,original_name,purpose from stored_file_upload_chunks where upload_id=$1 limit 1 for update", [uploadId])).rows[0];
+    if (prior && (prior.user_id !== user.id || prior.chunk_count !== total || prior.original_name !== chunk.originalname || prior.purpose !== purpose))
         throw new HttpError(409, "The upload details changed. Start the upload again.");
-    await db.query("delete from stored_file_upload_chunks where created_at < now() - interval '24 hours'");
+    await db.query(`delete from stored_file_upload_chunks where upload_id in (
+        select upload_id from stored_file_upload_chunks where user_id=$1 and upload_id<>$2
+        group by upload_id having max(created_at)<now()-interval '24 hours'
+    )`,[user.id,uploadId]);
     const saved = await db.query(`insert into stored_file_upload_chunks(upload_id,user_id,chunk_index,chunk_count,original_name,purpose,content)
  values($1,$2,$3,$4,$5,$6,$7) on conflict(upload_id,chunk_index) do update set content=excluded.content,created_at=now()
  where stored_file_upload_chunks.user_id=excluded.user_id and stored_file_upload_chunks.chunk_count=excluded.chunk_count
- and stored_file_upload_chunks.original_name=excluded.original_name and stored_file_upload_chunks.purpose=excluded.purpose`,
+ and stored_file_upload_chunks.original_name=excluded.original_name and stored_file_upload_chunks.purpose=excluded.purpose and stored_file_upload_chunks.content=excluded.content`,
     [uploadId, user.id, index, total, chunk.originalname, purpose, chunk.buffer]);
     if (!saved.rowCount) throw new HttpError(409, "The upload details changed. Start the upload again.");
     return { upload_id: uploadId, index, total };
@@ -414,21 +435,24 @@ router.post("/files/:id/complete", endpoint(["admin", "opm", "spm"], async (db, 
     if (!["document", "manpower"].includes(purpose)) throw new HttpError(400, "Unknown upload purpose.");
     if (purpose === "manpower" && !["admin", "spm"].includes(user.role))
         throw new HttpError(403, "Only subcontractor manpower-list uploads accept Excel files.");
+    await lockUpload(db, id);
     const chunks = (await db.query(`select chunk_index,chunk_count,original_name,purpose,content from stored_file_upload_chunks
  where upload_id=$1 and user_id=$2 order by chunk_index for update`, [id, user.id])).rows;
-    if (!chunks.length) throw new HttpError(404, "Upload chunks not found. Start the upload again.");
+    if (!chunks.length) {
+        const prior = (await db.query("select original_name,content from stored_files where id=$1 and uploaded_by=$2", [id,user.id])).rows[0];
+        if (prior?.content && (purpose === "manpower") === /\.(xls|xlsx)$/i.test(prior.original_name))
+            return {id, download_url: "/api/v1/files/" + id + "/content", ...(purpose === "manpower" ? {manpowerCount:readManpowerFile({originalname:prior.original_name,buffer:prior.content}).length} : {})};
+        throw new HttpError(404, "Upload chunks not found. Start the upload again.");
+    }
     const total = chunks[0].chunk_count;
     if (chunks.length !== total || chunks.some((part, index) => part.chunk_index !== index || part.chunk_count !== total || part.original_name !== chunks[0].original_name || part.purpose !== purpose))
         throw new HttpError(400, "The upload is incomplete. Retry the upload.");
     const buffer = Buffer.concat(chunks.map(part => part.content));
     const originalname = chunks[0].original_name;
     const file = { originalname, buffer, size: buffer.length };
-    const contentType = await validateUpload(file, purpose);
-    const manpowerCount = purpose === "manpower" ? readManpowerFile(file).length : undefined;
-    await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,content,uploaded_by)
- values($1,$2,$7,$3,$4,$5,$6,$2)`, [id, user.id, originalname, contentType, buffer.length, buffer, purpose === "manpower" ? "manpower" : "upload"]);
+    const result = await persistUpload(db, user, id, file, purpose);
     await db.query("delete from stored_file_upload_chunks where upload_id=$1 and user_id=$2", [id, user.id]);
-    return { id, download_url: "/api/v1/files/" + id + "/content", ...(manpowerCount !== undefined ? { manpowerCount } : {}) };
+    return result;
 }));
 // Direct-to-storage uploads: the browser sends the file straight to a private bucket,
 // so it never passes through the serverless function and its 4.5 MB request cap.
@@ -475,7 +499,8 @@ router.get("/files/:id/content", async (req, res) => {
                 if (companyRecord) return;
                 if (!row.project_id)
                     throw new HttpError(404, "File not found.");
-                await project(db, user, row.project_id);
+                const scope = await project(db, user, row.project_id);
+                if (row.purpose === "phase_evidence" && (user.role !== "opm" || scope.suggested_opm_id !== user.id)) throw new HttpError(404, "File not found.");
                 if (user.role === "client") {
                     const visible = await db.query(`select 1 from project_documents d join document_types t on t.id=d.document_type_id
        where d.project_id=$1 and (d.file_ref=$2 or d.file_ref=replace($2,'db://','db:')) and t.is_client_visible_default
@@ -500,7 +525,7 @@ router.get("/files/:id/content", async (req, res) => {
 router.get("/projects/:id/documents", endpoint(null, async (db, user, req) => {
     const p = await project(db, user, req.params.id);
     const rows = (await db.query(`select d.id,t.code,t.label,t.is_client_visible_default as client_visible,
- d.status='uploaded' as uploaded,d.uploaded_at,f.original_name,f.content_type,f.byte_size,d.file_ref
+ d.status='uploaded' as uploaded,d.uploaded_at,f.id AS file_id,f.original_name,f.content_type,f.byte_size,d.file_ref
  from document_types t left join project_documents d on d.document_type_id=t.id and d.project_id=$1
  left join stored_files f on (d.file_ref='db://'||f.id or d.file_ref='db:'||f.id)
  where ($2<>'client' or t.is_client_visible_default) order by t.id`, [p.id, user.role])).rows;
@@ -672,7 +697,8 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 throw new HttpError(409, "Accept the project first.");
             if (!Number.isInteger(c.docIndex) || c.docIndex < 0 || c.docIndex > 5)
                 throw new HttpError(400, "Invalid document index.");
-            const existing = await db.query("select 1 from project_documents d join document_types t on t.id=d.document_type_id where d.project_id=$1 and t.code=$2 and d.status='uploaded'", [p.id, codes[c.docIndex]]);
+            const existing = await db.query("select d.file_ref,d.uploaded_by from project_documents d join document_types t on t.id=d.document_type_id where d.project_id=$1 and t.code=$2 and d.status='uploaded'", [p.id, codes[c.docIndex]]);
+            if (existing.rows[0]?.uploaded_by === user.id && existing.rows[0].file_ref?.replace(/^db:(?:\/\/)?/, "") === c.doc?.id) return {project_id:p.id};
             if (existing.rowCount)
                 throw new HttpError(409, "The registered document is already uploaded.");
             await linkDocument(db, user, p, codes[c.docIndex], c.doc?.id);
@@ -755,6 +781,12 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
         case "activate_project":
         case "upload_agreement": {
             leader();
+            if (c.type === "upload_agreement" && p.lifecycle_status === "active" && isUuid(c.doc?.id)) {
+                const saved = await db.query(`select 1 from project_documents d join document_types t on t.id=d.document_type_id
+                    where d.project_id=$1 and t.code='subcontractor_agreement' and d.uploaded_by=$2
+                    and d.file_ref in ('db:'||$3::text,'db://'||$3::text) and d.status='uploaded'`, [p.id,user.id,c.doc.id]);
+                if (saved.rowCount) return {project_id:p.id};
+            }
             if (p.lifecycle_status !== "spm_review")
                 throw new HttpError(409, "Only an intake under Site PM review can be activated.");
             // Required phases come from the project-type workflow, never from the saved team rows.

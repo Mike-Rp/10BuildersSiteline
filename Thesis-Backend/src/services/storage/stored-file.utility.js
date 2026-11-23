@@ -24,8 +24,19 @@ export async function requestUploadTarget(db, user, body) {
   if (!await storageReady(db)) return { mode: "direct" };
   if (!isUuid(body?.id)) throw new HttpError(400, "A file UUID is required.");
   const plan = planUpload({ userId: user.id, id: body.id, name: body.name, size: Number(body.size), kind: body.kind });
-  if ((await db.query("select 1 from stored_files where id=$1", [body.id])).rowCount)
+  const existing = (await db.query("select uploaded_by,storage_bucket,storage_path,original_name,byte_size from stored_files where id=$1", [body.id])).rows[0];
+  if (existing) {
+    if (existing.uploaded_by === user.id && existing.original_name === cleanName(body.name)
+        && Number(existing.byte_size) === Number(body.size) && existing.storage_bucket === plan.bucket && existing.storage_path === plan.path)
+      return { mode: "complete", id: body.id, download_url: "/api/v1/files/" + body.id + "/content" };
     throw new HttpError(409, "This file was already uploaded.");
+  }
+  const received = await statObject(plan.bucket, plan.path);
+  if (received) {
+    if (received.size !== Number(body.size)) throw new HttpError(409, "The uploaded size differs from the selected file.");
+    const saved = await completeStorageUpload(db,user,body);
+    return { mode:"complete", ...saved };
+  }
   const target = await createUploadTarget(plan.bucket, plan.path);
   return { mode: "storage", upload_url: target.url, bucket: plan.bucket, path: plan.path, content_type: plan.contentType };
 }
@@ -37,9 +48,10 @@ export async function completeStorageUpload(db, user, body) {
   if (!isUuid(body?.id)) throw new HttpError(400, "A file UUID is required.");
   const plan = planUpload({ userId: user.id, id: body.id, name: body.name, kind: body.kind });
   const downloadUrl = "/api/v1/files/" + body.id + "/content";
-  const existing = (await db.query("select uploaded_by,storage_path from stored_files where id=$1", [body.id])).rows[0];
+  await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", ["upload:" + body.id]);
+  const existing = (await db.query("select uploaded_by,original_name,storage_bucket,storage_path from stored_files where id=$1", [body.id])).rows[0];
   if (existing) {
-    if (existing.uploaded_by === user.id && existing.storage_path === plan.path) return { id: body.id, download_url: downloadUrl };
+    if (existing.uploaded_by === user.id && existing.storage_path === plan.path && existing.storage_bucket === plan.bucket && existing.original_name === cleanName(body.name)) return { id: body.id, download_url: downloadUrl };
     throw new HttpError(409, "This file was already uploaded.");
   }
   const stat = await statObject(plan.bucket, plan.path);
@@ -49,7 +61,7 @@ export async function completeStorageUpload(db, user, body) {
     assertUploadSize(stat.size);
     contentType = fileType({ buffer: await readHead(plan.bucket, plan.path), originalname: body.name });
   } catch (error) {
-    await removeObject(plan.bucket, plan.path);
+    if (error instanceof HttpError && error.status === 400) await removeObject(plan.bucket, plan.path);
     throw error;
   }
   await db.query(`insert into stored_files(id,user_id,purpose,original_name,content_type,byte_size,uploaded_by,storage_bucket,storage_path)

@@ -41,6 +41,7 @@ export const issueClientActivationCode = async (req, res) => {
         FROM projects p JOIN user_client_project_links l ON l.project_id=p.id
         JOIN users u ON u.id=l.user_id JOIN roles r ON r.id=u.role_id
         WHERE p.id=$1 AND p.suggested_opm_id=$2 AND NOT COALESCE(p.is_deleted,false)
+          AND (SELECT count(*) FROM user_client_project_links WHERE project_id=p.id)=1
           AND r.code='client' AND u.status='invited' AND u.password_hash=$3
           AND NOT COALESCE(u.is_deleted,false) FOR UPDATE OF u`, [req.params.id, actor.id, CLIENT_ACTIVATION_PASSWORD_MARKER]);
       if (!account)

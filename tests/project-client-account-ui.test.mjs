@@ -3,20 +3,22 @@ import test from "node:test"
 import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 
-test("project client setup creates or links an account and shows temporary credentials once", { timeout: 60000 }, async t => {
+test("project client setup shows role-specific recovery and requires ownership confirmation", { timeout: 60000 }, async t => {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost/opm/active-sites", pretendToBeVisual: true })
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
   }
-  let reused = false
+  let admin = false
   const writes = []
+  const client = { id:"client",full_name:"Client Contact",email:"client@gmail.com",activation_status:"pending_activation" }
   t.mock.method(globalThis, "fetch", async (url, options) => {
     if (options.method === "POST") {
-      writes.push(JSON.parse(options.body))
-      return Response.json({ data: { id: "client", full_name: "Client Contact", email: "client@gmail.com", status: "invited", reused, ...(!reused ? { temp_password: "TemporaryPassword123" } : {}) } })
+      writes.push({url:String(url),body:JSON.parse(options.body)})
+      return Response.json({data:{status:"pending_activation",next_action:"issue_activation_code"}})
     }
-    return Response.json({ data: { clients: [], editable: true, defaults: { company_name: "Example Client", contact_person: "Client Contact", email: "client@gmail.com", phone: "09171234567" } } })
+    return Response.json({data:{clients:writes.length?[client]:[],can_recover:admin && !writes.length,
+      can_issue_activation_code:!admin && !!writes.length,next_action:"request_email_correction",defaults:{email:client.email}}})
   })
   const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: "custom", logLevel: "silent", optimizeDeps: { noDiscovery: true, include: [] } })
   const { default: React, act } = await import("react"), { createRoot } = await import("react-dom/client"), root = createRoot(document.getElementById("root"))
@@ -24,22 +26,20 @@ test("project client setup creates or links an account and shows temporary crede
   const { default: Setup } = await server.ssrLoadModule("/src/ProjectClientAccount.tsx")
   let saved = 0
   const render = key => act(async () => { root.render(React.createElement(Setup, { key, projectId: "project", onSaved: async () => { saved++ } })); await new Promise(resolve => setTimeout(resolve, 20)) })
-  await render("new")
-  assert.equal(document.querySelector('input[type="email"]').value,"client@gmail.com")
-  assert.equal(document.querySelector('input[type="email"]').checkValidity(),true)
-  assert.match(document.body.textContent,/manual handover/)
-  assert.ok(document.querySelector('label[for]'))
-  await act(async () => { document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 20)) })
-  assert.equal(writes.length,1);assert.equal(writes[0].project_id,"project");assert.equal(saved,1)
-  assert.equal(writes[0].email,"client@gmail.com")
-  assert.equal(writes[0].auto_work_email,undefined)
-  assert.match(document.body.textContent,/Awaiting first sign-in/)
-  assert.ok([...document.querySelectorAll('input')].some(input => input.value === "TemporaryPassword123"))
-  assert.equal(document.querySelector('.project-client-account form'), null)
-  reused = true
-  await render("existing")
-  await act(async () => { document.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(resolve => setTimeout(resolve, 20)) })
-  assert.equal(saved,2)
-  assert.match(document.body.textContent,/Existing client account linked/)
-  assert.equal(document.querySelector('.account-sign-in-details'),null)
+  await render("opm")
+  assert.match(document.body.textContent,/Request a corrected client email/)
+  assert.equal(document.querySelector("form"),null)
+  admin=true
+  await render("admin")
+  assert.equal(document.querySelector('input[type="email"]').value,client.email)
+  assert.equal(document.querySelector('button[type="submit"]').disabled,true)
+  await act(()=>document.querySelector('input[type="checkbox"]').click())
+  await act(async () => { document.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})); await new Promise(resolve=>setTimeout(resolve,20)) })
+  assert.equal(writes.length,1)
+  assert.ok(writes[0].url.endsWith('/projects/project/client-account/recover'))
+  assert.deepEqual(writes[0].body,{email:client.email,ownership_verified:true})
+  assert.equal(saved,1)
+  admin=false
+  await render("opm-after-recovery")
+  assert.match(document.body.textContent,/Issue activation code/)
 })

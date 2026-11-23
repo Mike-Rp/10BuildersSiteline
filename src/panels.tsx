@@ -6,6 +6,7 @@ import ProjectExperienceFields from "./ProjectExperienceFields"
 import CompanyRegistrationFields from "./CompanyRegistrationFields"
 import MobileNumberInput from "./MobileNumberInput"
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
+import { checklistAttempt, forgetChecklistAttempt } from "./checklist-upload-attempt"
 import { uploadFile, type UploadKind } from "./api/actions"
 import { beginFileUpload, showActionResult } from "./action-feedback"
 import ClientSearch from "./ClientSearch"
@@ -186,6 +187,7 @@ export function Upload({
   label,
   onSave,
   onSaveMany,
+  attemptScope,
   onBusyChange,
   owner = "Administrator",
   disabled = false,
@@ -200,7 +202,8 @@ export function Upload({
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
-  onSaveMany?: (docs: Doc[]) => void | boolean | Promise<void | boolean>
+  attemptScope?: string
+  onSaveMany?: (docs: Doc[], submissionRequestId: string) => void | boolean | Promise<void | boolean>
   onBusyChange?: (busy: boolean) => void
   owner?: string
   disabled?: boolean
@@ -220,8 +223,12 @@ export function Upload({
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const fileIds = useRef(new WeakMap<File, string>())
+  const attempt = useRef<{ files: File[]; scope?: string; id: string } | null>(null)
   const review = previewBeforeUpload && !spreadsheet
   function clear() {
+    if (attemptScope) forgetChecklistAttempt(attemptScope)
+    attempt.current = null
     setFiles([])
     setError("")
     if (input.current) input.current.value = ""
@@ -238,9 +245,15 @@ export function Upload({
     const finishUpload = beginFileUpload()
     try {
       if (onSaveMany && files.length > 20) throw new Error("Choose at most 20 attachments per submission.")
+      if (attempt.current?.files !== files || attempt.current.scope !== attemptScope) {
+        const saved = attemptScope && await checklistAttempt(attemptScope, files)
+        if (saved) files.forEach((file, index) => fileIds.current.set(file, saved.fileIds[index]))
+        attempt.current = { files, scope: attemptScope, id: saved ? saved.requestId : uid() }
+      }
       const docs: Doc[] = []
       for (const file of files) {
-        const id = uid()
+        const id = fileIds.current.get(file) ?? uid()
+        fileIds.current.set(file, id)
         const uploaded = await saveFile(id, file, spreadsheet, storageKind)
         const doc = newUploadedDoc({ id, label, file, owner, clientVisible })
         if (spreadsheet && Number.isInteger(uploaded.manpowerCount) && uploaded.manpowerCount >= 0) doc.manpowerCount = uploaded.manpowerCount
@@ -248,7 +261,7 @@ export function Upload({
         const saved=onSaveMany ? true : await onSave(doc)
         if(saved===false)throw new Error("We couldn’t save your upload. Your files are still selected—please try again.")
       }
-      if (onSaveMany && await onSaveMany(docs) === false) throw new Error("We couldn’t save your submission. Please try again.")
+      if (onSaveMany && await onSaveMany(docs, attempt.current.id) === false) throw new Error("We couldn’t save your submission. Please try again.")
       showActionResult(`${files.length === 1 ? label : `${files.length} ${label} files`} uploaded and saved successfully.`)
       clear()
     } catch (e) {

@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const access = await import("../src/common/utilities/access.utility.js");
 let database;
-mock.module("../src/common/utilities/access.utility.js", { exports: {
+mock.module("../src/common/utilities/access.utility.js", { namedExports: {
   ...access,
   requireUser: (req, res, roles) => {
     if (roles.includes(req.actor?.role)) return req.actor;
@@ -15,7 +15,7 @@ mock.module("../src/common/utilities/access.utility.js", { exports: {
   },
 } });
 mock.module("../src/common/utilities/transaction.utility.js", {
-  exports: { withTransaction: activity => database.transaction(activity) },
+  namedExports: { withTransaction: activity => database.transaction(activity) },
 });
 const { activateClient, issueClientActivationCode, provisionInquiryClient, CLIENT_ACTIVATION_PASSWORD_MARKER }
   = await import("../src/services/projects/client-onboarding.js");

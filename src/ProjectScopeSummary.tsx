@@ -4,7 +4,7 @@ import "./project-scope-review.css"
 export default function ProjectScopeSummary({ scope }: { scope?: MixedUseScope }) {
   if (!scope) return null
   if (!scope.uses || !scope.features) return <section className="scope-saved-summary" aria-label="Confirmed project scope">
-    <h3>Confirmed construction phases</h3><ul>{scope.phases.map(phase => <li key={phase}>{phase}</li>)}</ul>
+    <h3>Confirmed construction phases</h3><ul>{scope.phases?.map(phase => <li key={phase}>{phase}</li>)}</ul>
   </section>
   return <section className="scope-saved-summary" aria-label="Confirmed project scope">
     <h3>Confirmed Mixed-Use scope</h3>

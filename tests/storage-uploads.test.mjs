@@ -123,8 +123,12 @@ test("direct-to-storage upload is checked, recorded once, and bad files are remo
 
     await assert.rejects(completeStorageUpload(db, user, { id: FILE, name: "evidence.jpg", kind: "evidence" }), /not received/);
     put("phase-evidence", `${FILE}.jpg`, JPEG);
+    const resumed = await requestUploadTarget(db,user,{id:FILE,name:"evidence.jpg",size:JPEG.length,kind:"evidence"});
+    assert.equal(resumed.mode,"complete","Resuming after a lost PUT response validates the existing object");
     const done = await completeStorageUpload(db, user, { id: FILE, name: "evidence.jpg", kind: "evidence" });
     assert.equal(done.download_url, `/api/v1/files/${FILE}/content`);
+    const replay = await requestUploadTarget(db,user,{id:FILE,name:"evidence.jpg",size:JPEG.length,kind:"evidence"});
+    assert.deepEqual(replay,{mode:"complete",...done});
     const row = (await db.query("select * from stored_files where id=$1", [FILE])).rows[0];
     assert.equal(row.storage_bucket, "phase-evidence");
     assert.equal(row.storage_path, `${USER}/${FILE}.jpg`);

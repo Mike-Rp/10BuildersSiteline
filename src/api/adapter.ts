@@ -151,6 +151,8 @@ export function mapDocs(
     return {
       id,
       label: DOC_LABELS[i],
+      documentCode: code,
+      size: row?.byte_size == null ? undefined : Number(row.byte_size),
       name: uploaded ? (row?.original_name || `${DOC_LABELS[i]}.pdf`) : "",
       uploaded,
       clientVisible: row ? Boolean(row.client_visible) : CLIENT_VISIBLE.has(i),

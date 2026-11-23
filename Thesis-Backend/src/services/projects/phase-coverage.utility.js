@@ -2,7 +2,7 @@ import { HttpError } from "../../common/utilities/access.utility.js";
 import { projectWorkflowSql } from "./project-workflow.utility.js";
 import { LICENSE_ELIGIBILITY_SQL } from "../../common/utilities/license-eligibility.utility.js";
 import {responsibilitiesInstalled} from './phase-responsibilities.utility.js';
-import { MAX_ENGINEERS_PER_PHASE, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js";
+import { MAX_ENGINEERS_PER_PHASE, SETUP_ENGINEER_LIMIT, phaseCoverageQuota } from "../../domain/engineer-phase-coverage.js";
 import { projectEngineerScopesSql } from "./phase-engineer-scopes.utility.js";
 
 // Pure check: every required phase has exactly one row with a valid engineer that is confirmed.
@@ -42,9 +42,11 @@ export async function loadPhaseCoverage(db, projectId) {
   const resolved = (await db.query(`SELECT w.project_stage_id,s.code,w.sort_order FROM (${projectWorkflowSql}) w
     JOIN project_stages s ON s.id=w.project_stage_id WHERE w.project_id=$1 ORDER BY w.sort_order`, [projectId])).rows;
   // Phase names that do not resolve to a stage, or repeat, would silently shorten the list: fail closed instead.
-  const expected = (await db.query(`SELECT jsonb_array_length(COALESCE(to_jsonb(p)->'phase_scope'->'phases',
-    (SELECT jsonb_agg(w.project_stage_id) FROM project_type_stages w WHERE w.project_type_id=p.project_type_id),'[]'::jsonb)) AS n
-    FROM projects p WHERE p.id=$1`, [projectId])).rows[0]?.n;
+  const snapshot = (await db.query(`SELECT jsonb_array_length(COALESCE(to_jsonb(p)->'phase_scope'->'phases',
+    (SELECT jsonb_agg(w.project_stage_id) FROM project_type_stages w WHERE w.project_type_id=p.project_type_id),'[]'::jsonb)) AS n, to_jsonb(p)->'phase_scope' AS scope
+    FROM projects p WHERE p.id=$1`, [projectId])).rows[0];
+  const expected = snapshot?.n;
+  const setup = snapshot?.scope?.staffingPolicy === "primary_with_optional_engineer";
   const consistent = resolved.length === Number(expected) && new Set(resolved.map(p => String(p.project_stage_id))).size === resolved.length;
   const required = consistent ? resolved : [];
   const rows = (await db.query(`SELECT t.project_stage_id,s.code AS stage_code,t.spm_user_id,t.status,
@@ -61,8 +63,9 @@ export async function loadPhaseCoverage(db, projectId) {
     const requiredTags=(await db.query(`select ${projectEngineerScopesSql("p", "s.id", "s.code")} as scopes
       from projects p cross join project_stages s where p.id=$1 and s.id=$2`,[projectId,phase.project_stage_id])).rows[0]?.scopes ?? [];
     const coveredTags = new Set(assigned.filter(r=>r.status==='confirmed'&&r.engineer_valid).flatMap(r=>r.assigned_disciplines||[]));
-    const quota = phaseCoverageQuota(requiredTags);
-    if(!assigned.length || assigned.length > MAX_ENGINEERS_PER_PHASE || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;
+    const quota = setup ? 1 : phaseCoverageQuota(requiredTags);
+    const missingExtra = setup && snapshot.scope.additional_scopes?.[phase.code]?.some(tag => !coveredTags.has(tag));
+    if(missingExtra || !assigned.length || assigned.length > (setup ? SETUP_ENGINEER_LIMIT : MAX_ENGINEERS_PER_PHASE) || assigned.some(r=>r.status!=='confirmed'||!r.engineer_valid) || requiredTags.filter(tag=>coveredTags.has(tag)).length < quota) {result.ok=false;
      // Name who is still outstanding so the admin can see why a phase with some confirmations is not ready.
      const waiting=assigned.filter(r=>r.status!=='confirmed'||!r.engineer_valid);
      let names='';

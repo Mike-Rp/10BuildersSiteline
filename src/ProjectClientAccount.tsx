@@ -7,6 +7,9 @@ import "./project-client-account.css"
 type Client = { id: string; full_name: string; email: string; status?: string; activation_status?: ClientActivationStatus }
 type AccountData = {
   clients: Client[]
+  status?: string
+  next_action?: string
+  can_recover?: boolean
   managed: boolean
   existing?: Client
   can_issue_activation_code: boolean
@@ -23,6 +26,7 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [ownershipVerified, setOwnershipVerified] = useState(false)
+  const [email, setEmail] = useState("")
   const [activation, setActivation] = useState<ActivationCode>()
   const [reload, setReload] = useState(0)
   const saving = useRef(false)
@@ -34,7 +38,7 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
     setError("")
     setOwnershipVerified(false)
     setActivation(undefined)
-    api<AccountData>(path, { signal: request.signal }).then(setData).catch(reason => {
+    api<AccountData>(path, { signal: request.signal }).then(result => { if (!request.signal.aborted) { setData(result); setEmail(result.defaults.email) } }).catch(reason => {
       if (!request.signal.aborted) setError(reason.message)
     })
     return () => request.abort()
@@ -57,7 +61,7 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
     await api(`/projects/${projectId}/client`, {
       method: "POST", json: { client_user_id: client.id, ownership_verified: true },
     })
-    setData({ ...data, clients: [{ ...client, activation_status: "active" }], existing: undefined })
+    setData({ ...data, clients: [{ ...client, activation_status: "active" }], existing: undefined, can_recover:false, status:"active", next_action:"none" })
     setMessage("Verified client account linked to the project.")
     try { await onSaved?.() }
     catch { setError("The account was linked. Refresh the workspace to see the latest project information.") }
@@ -71,9 +75,22 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
       <span>{client.activation_status ? clientActivationLabel(client.activation_status)
         : client.status === "active" ? "Active" : client.status === "invited" ? "Awaiting first sign-in" : "Account needs attention"}</span>
     </div>)}
-    {data && !data.clients.length && <p>{data.managed
-      ? <><strong>Verification Required.</strong> An Administrator must verify the registered email{data.defaults.email && ` (${data.defaults.email})`} before linking an existing account.</>
-      : "No client account is linked to this project."}</p>}
+    {data && !data.clients.length && <p>{data.next_action === "request_email_correction"
+      ? "Request a corrected client email. An Administrator must verify ownership before restoring access."
+      : "Ask an Administrator to verify the client?s identity and registered email."}</p>}
+    {data?.can_recover && !data.existing && <form onSubmit={event => {
+      event.preventDefault()
+      void run(async () => {
+        await api(path + "/recover", {method:"POST",json:{email,ownership_verified:ownershipVerified}})
+        setReload(value => value+1)
+        await onSaved?.()
+      })
+    }}>
+      <Field label="Verified client email"><input required type="email" value={email} onChange={event => { setEmail(event.target.value); setOwnershipVerified(false) }} /></Field>
+      <label><input type="checkbox" checked={ownershipVerified} onChange={event => setOwnershipVerified(event.target.checked)} /> I verified that this client owns this email.</label>
+      <Button type="submit" disabled={busy || !email || !ownershipVerified}>Recover client account</Button>
+    </form>}
+    {data?.status === "account_unavailable" && <p>Ask an Administrator to review the existing client link before activation.</p>}
     {data?.existing && <form onSubmit={event => { event.preventDefault(); void run(linkVerifiedClient) }}>
       <p>{data.existing.full_name} · {data.existing.email}</p>
       <label><input type="checkbox" checked={ownershipVerified} onChange={event => setOwnershipVerified(event.target.checked)} disabled={busy} /> I verified that this client owns the registered email.</label>

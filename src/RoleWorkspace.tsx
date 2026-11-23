@@ -1029,9 +1029,8 @@ export default function RoleWorkspace({
   }
   // Existing Office PM upload UI and rules, now shown inside a project's view.
   function requiredDocuments(p: Project) {
-    const contract = p.docs.find(
-      (d) => d.label === "Client Contract Agreement" && d.uploaded,
-    )
+    const contract = p.docs.find(d => d.uploaded && d.documentCode === "owner_contract")
+      ?? p.docs.find(d => d.uploaded && (d.label === DOC_LABELS[2] || d.label === "Client Contract Agreement"))
     const panel = (
       <Panel
         title="Required documents"
@@ -1987,15 +1986,17 @@ export default function RoleWorkspace({
                       label={item.label}
                       previewBeforeUpload
                       storageKind="evidence"
+                      attemptScope={[actor.id,p.id,item.id,item.version ?? item.evidenceId ?? "initial"].join(":")}
                       owner={actor.name}
                       buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}
                       ariaLabel={`Upload evidence for ${item.label}`}
                       disabled={saving}
                       onSave={() => {}}
-                      onSaveMany={async (docs) =>
+                      onSaveMany={async (docs, submissionRequestId) =>
                         await act(
                           {
                             type: "submit_checklist",
+                            submissionRequestId,
                             projectId: p.id,
                             phase: p.phase,
                             itemId: item.id,

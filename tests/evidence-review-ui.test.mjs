@@ -32,7 +32,7 @@ test("activity review shows trusted impact before confirmation, requires rejecti
       if(reject)await act(async()=>button("Reject").click())
     }
     await render(false,"approve")
-    assert.match(document.body.textContent,/20 \/ 30 points → 30 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/\d+\s*\/\s*\d+\s*points|Impact if approved/)
     assert.doesNotMatch(document.body.textContent,/Project:|80 \/ 270|90 \/ 270/)
     assert.doesNotMatch(document.body.textContent,/%/)
     assert.equal(confirmations.length,0)
@@ -44,7 +44,7 @@ test("activity review shows trusted impact before confirmation, requires rejecti
     await act(async()=>button("Confirm approval").click())
     assert.ok(popup("Approve evidence?"),"Confirm approval asks first")
     assert.match(popup("Approve evidence?").textContent,/Concrete test report/)
-    assert.match(popup("Approve evidence?").textContent,/20 \/ 30 points → 30 \/ 30 points/)
+    assert.doesNotMatch(popup("Approve evidence?").textContent,/\d+\s*\/\s*\d+\s*points|Impact if approved/)
     assert.equal(confirmations.length,0,"nothing saved yet")
     await act(async()=>answer("Approve evidence?","No").click())
     assert.equal(popup("Approve evidence?"),null,"No closes only the popup")
@@ -61,7 +61,7 @@ test("activity review shows trusted impact before confirmation, requires rejecti
     assert.deepEqual(confirmations,[{token:"trusted-token",note:""}])
     assert.equal(closed,1)
     await render(true,"reject")
-    assert.match(document.body.textContent,/20 \/ 30 points → 20 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/\d+\s*\/\s*\d+\s*points|Impact if approved/)
     assert.doesNotMatch(document.body.textContent,/Project:/)
     assert.doesNotMatch(document.body.textContent,/%/)
     assert.equal(button("Confirm rejection").disabled,true)
@@ -89,13 +89,12 @@ test("activity review shows trusted impact before confirmation, requires rejecti
     preview.before.project={earned:null,total:null,percentage:null,reason:"Complete project phase scope is unavailable."}
     preview.after.project=preview.before.project
     await render(false,"unknown-scope")
-    assert.match(document.body.textContent,/Phase: 20 \/ 30 points → 30 \/ 30 points/)
+    assert.doesNotMatch(document.body.textContent,/\d+\s*\/\s*\d+\s*points|Impact if approved/)
     assert.doesNotMatch(document.body.textContent,/Project:|Complete project phase scope is unavailable/)
     preview.before.phase={earned:null,total:null,percentage:null,reason:"Complete phase activity scope is unavailable."}
     preview.after.phase=preview.before.phase
     await render(false,"unknown-phase-scope")
-    assert.match(document.body.textContent,/Phase: Unavailable → Unavailable/)
-    assert.match(document.body.textContent,/Complete phase activity scope is unavailable/)
+    assert.doesNotMatch(document.body.textContent,/\d+\s*\/\s*\d+\s*points|Impact if approved/)
     fail=true
     await render(false,"stale")
     assert.match(document.querySelector('[role="alert"]').textContent,/superseded/)

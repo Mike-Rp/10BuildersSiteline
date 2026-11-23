@@ -25,10 +25,6 @@ type EvidenceVersion = {
   review_note?: string
   files: {id: string; original_name: string}[]
 }
-const measure = (value: ProgressTotals) => value.earned === null || value.total === null
-  ? "Unavailable"
-  : `${Number(value.earned.toFixed(1))} / ${value.total} points`
-
 export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs,manualTurnover=false,responsibilityId,onClose,onConfirm}: {
   projectId: string
   evidenceId: string
@@ -124,13 +120,6 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
       {!reject && preview.after.phase.percentage === 100 && <p>{manualTurnover
         ? "The phase checklist will be complete. Confirm phase turnover when the handoff is ready."
         : "The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass."}</p>}
-      <div className="notice subsection">
-        <div>
-          <strong>{reject ? "Progress remains unchanged" : "Impact if approved"}</strong>
-          <p>Phase: {measure(preview.before.phase)} → {measure(reject ? preview.before.phase : preview.after.phase)}</p>
-          {preview.before.phase.reason && <p>{preview.before.phase.reason}</p>}
-        </div>
-      </div>
       <div className="evidence-decision-choice">
         <span className="evidence-decision-label" id="evidence-decision-label">Your decision</span>
         <div className="evidence-review-choice" role="radiogroup" aria-labelledby="evidence-decision-label"
@@ -158,7 +147,7 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
             <p>Reject <strong>{preview.activity}</strong>? The submitter will see your reason, and phase progress stays unchanged.</p>
             <blockquote className="evidence-confirm-reason">{note.trim()}</blockquote>
           </>
-        : <p>Approve <strong>{preview.activity}</strong>? This counts toward phase progress: {measure(preview.before.phase)} → {measure(preview.after.phase)}.{preview.after.phase.percentage === 100 ? " The phase checklist will be complete." : ""}</p>}
+        : <p>Approve <strong>{preview.activity}</strong>?{preview.after.phase.percentage === 100 ? " The phase checklist will be complete." : ""}</p>}
       <div className="modal-actions">
         <Button disabled={busy} onClick={()=>setAsking(false)}>No</Button>
         <Button variant={reject ? "danger" : "primary"} disabled={busy} onClick={async()=>{

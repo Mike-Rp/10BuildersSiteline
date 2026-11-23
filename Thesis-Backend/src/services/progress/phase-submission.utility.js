@@ -33,6 +33,14 @@ export async function submitChecklist(client, project, user, submission, updateI
     const matching=await client.query('SELECT id FROM project_phase_files WHERE id=ANY($1::uuid[]) AND responsibility_id=$2 AND checklist_item_id=$3',[fileIds,assignment.responsibility_id,item.id]);
     if(matching.rowCount!==fileIds.length)throw new HttpError(400,'Files must be linked to this checklist item and responsibility.');
   }
+  if (monitored) {
+    const reused = await client.query(`SELECT 1 FROM project_phase_evidence e
+      LEFT JOIN project_phase_evidence_files f ON f.evidence_id=e.id
+      WHERE e.project_id=$1 AND e.checklist_item_id=$2 AND e.responsibility_id=$3
+        AND (f.file_id=ANY($4::uuid[]) OR e.file_id=ANY($4::uuid[])) LIMIT 1`,
+      [project.id,item.id,assignment.responsibility_id,fileIds]);
+    if (reused.rowCount) throw new HttpError(409,"Upload fresh files for corrected evidence.");
+  }
   if (fileIds.length > 1 && !await multiSpmInstalled(client)) throw new HttpError(409,"Apply migration 025 to enable multiple attachments.");
   const result = await client.query(
     `INSERT INTO project_phase_evidence
