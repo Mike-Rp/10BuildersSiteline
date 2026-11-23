@@ -297,6 +297,7 @@ export type Project = {
   start: string
   end?: string
   clientId: string
+  recordedClientName?: string
   clientAccounts?: { id: string; name: string; email: string; phone: string; contactPerson?: string }[]
   status: "active" | "pending" | "changes_requested" | "draft" | "completed" | "declined" | "expired"
   opmId: string

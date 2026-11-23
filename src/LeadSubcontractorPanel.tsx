@@ -1011,6 +1011,8 @@ function LegacyLeadSubcontractorPanel({
             ) : (
               <Upload
                 label={DOC_LABELS[6]}
+                previewBeforeUpload
+                multiple={false}
                 owner={actor.name}
                 disabled={saving || !responsesComplete || coverageGaps.length > 0}
                 buttonLabel="Upload signed subcontractor agreement"

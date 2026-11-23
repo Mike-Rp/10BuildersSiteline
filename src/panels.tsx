@@ -125,6 +125,63 @@ export function AttachmentRow({ name, size, onRemove, disabled = false }: {
   </div>
 }
 
+function UploadPreview({ files, label, multiple, busy, disabled, error, onAdd, onRemove, onCancel, onConfirm }: {
+  files: File[]
+  label: string
+  multiple: boolean
+  busy: boolean
+  disabled: boolean
+  error: string
+  onAdd: () => void
+  onRemove: (index: number) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const [selected, setSelected] = useState(0)
+  const file = files[selected]
+  const [preview, setPreview] = useState<{ file: File; url: string }>()
+  const [failedFile, setFailedFile] = useState<File>()
+  const mime = /\.pdf$/i.test(file.name) ? "application/pdf" : /\.png$/i.test(file.name) ? "image/png" : "image/jpeg"
+  useEffect(() => {
+    let url: string
+    try {
+      url = URL.createObjectURL(file.slice(0, file.size, mime))
+      setPreview({ file, url })
+    } catch {
+      setFailedFile(file)
+      return
+    }
+    return () => URL.revokeObjectURL(url)
+  }, [file, mime])
+  const url = preview?.file === file ? preview.url : undefined
+  return <Modal title={files.length === 1 ? "Confirm file upload" : "Confirm file uploads"} subtitle={label} wide onClose={onCancel}
+    footer={<>
+      <Button disabled={busy} onClick={onCancel}>Cancel</Button>
+      <Button variant="primary" disabled={disabled || busy || !url} onClick={onConfirm}>
+        {busy ? "Uploading…" : files.length === 1 ? "Confirm this file" : "Confirm these files"}
+      </Button>
+    </>}>
+    <div className="upload-review">
+      <p>Review {files.length === 1 ? "the file" : "each file"} before confirming the upload.</p>
+      {files.length === 1 ? <strong className="upload-review-filename">{file.name}</strong> :
+        <Field label="File to preview"><select disabled={busy} value={selected} onChange={event => setSelected(Number(event.target.value))}>
+          {files.map((attachment, index) => <option key={index} value={index}>{index + 1}. {attachment.name}</option>)}
+        </select></Field>}
+      {multiple && <div className="attachment-actions">
+        <Button icon="plus" disabled={disabled || busy} onClick={onAdd}>Add more attachments</Button>
+        {files.length > 1 && <Button disabled={busy} onClick={() => { setSelected(0); onRemove(selected) }}>Remove selected file</Button>}
+      </div>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {url ? mime === "application/pdf"
+        ? <object className="pdf-preview large" data={`${url}#toolbar=0&navpanes=0`} type={mime} aria-label={`Preview ${file.name}`}>
+          <p>This browser cannot display the PDF preview.</p>
+        </object>
+        : <img className="upload-review-image" src={url} alt={`Preview ${file.name}`} />
+        : failedFile === file ? <p role="alert">The file preview could not be loaded. Choose the file again.</p> : <p role="status">Loading file preview…</p>}
+    </div>
+  </Modal>
+}
+
 export function Upload({
   label,
   onSave,
@@ -139,6 +196,7 @@ export function Upload({
   clientVisible = false,
   storageKind = "document",
   multiple = true,
+  previewBeforeUpload = false,
 }: {
   label: string
   onSave: (doc: Doc) => void | boolean | Promise<void | boolean>
@@ -155,12 +213,14 @@ export function Upload({
   // Picks the private storage bucket: site photos, phase evidence, documents or credentials.
   storageKind?: UploadKind
   multiple?: boolean
+  previewBeforeUpload?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const review = previewBeforeUpload && !spreadsheet
   function clear() {
     setFiles([])
     setError("")
@@ -223,18 +283,22 @@ export function Upload({
         }}
       />
       <div className="upload-control attachment-control">
-        {files.map((file, index) => <AttachmentRow key={`${file.name}-${file.lastModified}-${index}`} name={file.name} size={file.size} disabled={disabled || saving} onRemove={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} />)}
+        {!review && files.map((file, index) => <AttachmentRow key={`${file.name}-${file.lastModified}-${index}`} name={file.name} size={file.size} disabled={disabled || saving} onRemove={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} />)}
         <div className="attachment-actions">
           <Button icon="plus" className="attachment-add" disabled={disabled || saving}
             aria-label={ariaLabel || buttonLabel} onClick={() => input.current?.click()}>
             Add attachments
           </Button>
-          {files.length > 0 && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
+          {!review && files.length > 0 && <Button variant="primary" disabled={disabled || saving} onClick={confirm}>
             {saving ? "Uploading…" : confirmButtonLabel}
           </Button>}
         </div>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && (!review || !files.length) && <p className="error" role="alert">{error}</p>}
       </div>
+      {review && files.length > 0 && <UploadPreview files={files} label={label} multiple={multiple} busy={saving} disabled={disabled}
+        error={error} onAdd={() => input.current?.click()}
+        onRemove={index => setFiles(current => current.filter((_, fileIndex) => fileIndex !== index))}
+        onCancel={() => { if (!savingRef.current) clear() }} onConfirm={confirm} />}
     </>
   )
 }
@@ -1619,6 +1683,8 @@ export function IntakeForm({
             ) : (
               <Upload
                 label="Client Contract Agreement"
+                previewBeforeUpload
+                multiple={false}
                 onSave={(doc) => patch({ docs: [...draft.docs, doc] })}
               />
             )}

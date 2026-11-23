@@ -374,6 +374,7 @@ export function mapProject(parts: ProjectParts): Project {
     start: day(list.target_start_date),
     end: day(list.target_end_date) || undefined,
     clientId: parts.clientId,
+    recordedClientName: typeof list.client_name === "string" ? list.client_name.trim() : undefined,
     ...(Array.isArray(detail.client_accounts) ? {clientAccounts: detail.client_accounts.map((client: Dto) => ({
       id: client.id, name: client.full_name, email: client.email || "", phone: client.phone || "", contactPerson: client.contact_person || "",
     }))} : {}),

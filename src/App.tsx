@@ -2460,6 +2460,8 @@ function AppInner() {
                 ) : (
                   <Upload
                     label={`${a.name} — Engagement Agreement`}
+                    previewBeforeUpload
+                    multiple={false}
                     onSave={(d) => addEngagement(p, a, d)}
                   />
                 )}

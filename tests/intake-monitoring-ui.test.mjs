@@ -153,9 +153,26 @@ test("frontend follows server decisions for company allocation and independent p
     const file = document.querySelector('input[aria-label="Submit evidence for Inspection and Testing Records"]')
     assert.ok(file)
     assert.equal(document.querySelector('input[aria-label="Submit evidence for Final checklist item"]'), null)
-    Object.defineProperty(file, "files", { value: [new File(["sample"], "evidence.pdf", { type: "application/pdf" })] })
+    const evidence = new File(["sample"], "evidence.pdf", { type: "application/pdf" })
+    const picked = row === ana ? [evidence, new File(["extra"], "extra.png", { type: "image/png" })] : [evidence]
+    Object.defineProperty(file, "files", { value: picked })
+    const beforeSelection = requests.length
     await act(() => file.dispatchEvent(new window.Event("change", { bubbles: true })))
-    await click(button("Submit evidence"))
+    assert.equal(requests.length, beforeSelection, "File selection and preview do not upload evidence")
+    const preview = document.querySelector(".upload-review")
+    assert.ok(preview.querySelector('object[aria-label="Preview evidence.pdf"]'))
+    if (row === ana) {
+      const select = preview.querySelector("select")
+      await act(() => {
+        select.value = "1"
+        select.dispatchEvent(new window.Event("change", { bubbles: true }))
+      })
+      assert.ok(preview.querySelector('img[alt="Preview extra.png"]'))
+      assert.ok(button("Confirm these files"))
+      await click(button("Remove selected file"))
+      assert.ok(preview.querySelector('object[aria-label="Preview evidence.pdf"]'))
+    }
+    await click(button("Confirm this file"))
     assert.equal(row.items[0].status, "submitted", body())
   }
   assert.deepEqual(requests.filter(request => request.path.endsWith("/phase-files")).map(request => request.json.responsibility_id), ["ana", "ben", "joel"])

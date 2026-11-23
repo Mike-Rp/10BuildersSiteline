@@ -4,6 +4,7 @@
 #root .role-workspace .opm-confirmation-card > .panel-header > div:first-child { flex: 1 1 260px; min-width: 0; }
 #root .role-workspace .opm-confirmation-card > .panel-header h2 { font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
 #root .role-workspace .opm-confirmation-card > .panel-header p { font-size: 14px; margin-top: 5px; }
+.opm-confirmation-client strong { margin-inline-start: 5px; color: var(--color-ink); }
 #root .role-workspace .opm-confirmation-header-status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; }
 #root .role-workspace .opm-confirmation-dates { padding-left: 16px; margin: 0; border-left: 1px solid var(--color-line); font-size: 13px; color: var(--color-muted); }
 #root .role-workspace .opm-confirmation-dates > div { display: flex; flex-wrap: wrap; gap: 4px 6px; }

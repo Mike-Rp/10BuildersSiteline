@@ -193,6 +193,9 @@ test("linked client identity and contact details come from the project link, not
   assert.deepEqual(p.clientAccounts,[{id:contact.id,name:contact.full_name,email:contact.email,phone:contact.phone,contactPerson:contact.contact_person}])
   const unlinked=peopleFromProjects(me,[base],new Map([["p1",{client_accounts:[]}]]),existing)
   assert.equal(unlinked.clientIds.has("p1"),false,"an absent link must not borrow another account with the same name")
+  const unlinkedProject = mapProject(parts({ detail: { client_accounts: [] }, clientId: "" }))
+  assert.equal(unlinkedProject.recordedClientName, base.client_name)
+  assert.deepEqual(unlinkedProject.clientAccounts, [])
 })
 
 test("an empty current review queue does not revive retired manual-percentage requests",()=>{

@@ -30,6 +30,9 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     const project = { ...state.projects[0], id: "popup-project", name: "Popup Test Project", status: "pending", opmId: actor.id, opmAccepted: true, clientSubcon: undefined, subcontractorAllocation: undefined, subcontractorAllocationVersion: undefined,
       team: [{ phase: "Design", isLead: true, accountId: people[1].id, status: "confirmed", requiredDisciplines: tags, engineers: people.map((person, index) => ({ accountId: person.id, assignedDisciplines: [tags[index]], status: index === 2 ? "pending" : "confirmed" })) }], docs: [] }
     state.projects = [project]
+    project.recordedClientName = "Recorded Inquiry Client"
+    project.clientId = ""
+    project.clientAccounts = []
     state.phaseAllocationAvailable = false
     state.tradeAllocationAvailable = false
     let writes = 0
@@ -37,9 +40,24 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     const button = (scope, text) => [...scope.querySelectorAll("button")].find(item => item.textContent.includes(text))
     await act(() => root.render(React.createElement(Workspace, { state, actor, onCommand: async () => { writes++; return { ok: true } }, onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
     await click(document.querySelector('nav [aria-label="Project setup"]'))
-    const card = document.querySelector(".opm-confirmation-card")
+    let card = document.querySelector(".opm-confirmation-card")
     assert.ok(card)
+    assert.equal(card.querySelector(".opm-confirmation-client strong").textContent, "Recorded Inquiry Client")
     assert.equal(card.querySelectorAll("details.opm-confirmation-details").length, 0)
+    await click(button(card, "Open required documents"))
+    const documentInput = document.querySelector('input[type="file"][aria-label="Notice to Proceed"]')
+    assert.ok(documentInput)
+    Object.defineProperty(documentInput, "files", { value: [new File(["sample"], "notice.pdf", { type: "application/pdf" })] })
+    await act(() => documentInput.dispatchEvent(new dom.window.Event("change", { bubbles: true })))
+    const uploadPreview = document.querySelector('[role="dialog"][aria-label="Confirm file upload"]')
+    assert.ok(uploadPreview.querySelector('object[aria-label="Preview notice.pdf"]'))
+    assert.ok(button(uploadPreview, "Confirm this file"))
+    assert.equal(writes, 0)
+    await click(button(uploadPreview, "Cancel"))
+    assert.equal(document.querySelector(".upload-review"), null)
+    assert.equal(writes, 0)
+    await click(document.querySelector('nav [aria-label="Project setup"]'))
+    card = document.querySelector(".opm-confirmation-card")
     const teamButton = button(card, "View Site PM team by phase")
     await click(teamButton)
     let dialog = document.querySelector('[role="dialog"]')

@@ -786,6 +786,8 @@ export default function PhaseAllocationPanel({
             </p>
             <Upload
               label={DOC_LABELS[6]}
+              previewBeforeUpload
+              multiple={false}
               owner="Lead Site PM"
               disabled={busy}
               onSave={async (doc) => {

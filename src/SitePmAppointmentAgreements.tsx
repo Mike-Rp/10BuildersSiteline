@@ -30,7 +30,7 @@ export default function SitePmAppointmentAgreements({ project, accounts, onPrevi
             <Badge tone="green">Agreement on file</Badge>
             <Button icon="eye" aria-label={`View appointment agreement for ${account.name}`} onClick={() => onPreview(agreement)}>View</Button>
             <Button icon="download" aria-label={`Download appointment agreement for ${account.name}`} onClick={() => downloadDoc(agreement)}>Download</Button>
-          </div> : project.status === "completed" ? <Badge>Not on file</Badge> : <Upload label={`${account.name} — Engagement Agreement`} onSave={doc => onUpload(account, doc)} />}
+          </div> : project.status === "completed" ? <Badge>Not on file</Badge> : <Upload label={`${account.name} — Engagement Agreement`} previewBeforeUpload multiple={false} onSave={doc => onUpload(account, doc)} />}
         </section>
       }) : <Empty title="No Site PM appointments">Assigned Site PMs and their appointment agreements will appear here.</Empty>}
     </div>

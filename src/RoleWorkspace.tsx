@@ -800,6 +800,7 @@ export default function RoleWorkspace({
     const leadName = lead ? actorName(lead) : "Unassigned"
     const floorArea = Number(p.area)
     const areaLabel = p.area && Number.isFinite(floorArea) ? floorArea.toLocaleString("en-PH") : p.area
+    const clientName = p.recordedClientName || projectClientNames(p, state.accounts).join(", ") || "Not recorded"
     const openAssignmentStatus = parallelIntake && assignments.length
       ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses
     return (
@@ -814,6 +815,7 @@ export default function RoleWorkspace({
             <div>
               <h2>{p.name}</h2>
               <p>{p.type}{areaLabel && ` · ${areaLabel} m²`}{p.floors && ` · ${p.floors} ${Number(p.floors) === 1 ? "floor" : "floors"}`}</p>
+              <p className="opm-confirmation-client">Client <strong>{clientName}</strong></p>
             </div>
           </div>
           <div className="opm-confirmation-header-status">
@@ -1120,6 +1122,8 @@ export default function RoleWorkspace({
                     ) : (
                       <Upload
                         label={label}
+                        previewBeforeUpload
+                        multiple={false}
                         owner={actor.name}
                         disabled={saving || !p.opmAccepted || p.status !== "pending"}
                         buttonLabel={`Upload ${label}`}
@@ -1981,6 +1985,7 @@ export default function RoleWorkspace({
                   {["missing","rework_required"].includes(item.status) && (
                     <Upload
                       label={item.label}
+                      previewBeforeUpload
                       storageKind="evidence"
                       owner={actor.name}
                       buttonLabel={item.status==="rework_required"?"Upload corrected evidence":"Upload evidence"}

@@ -54,7 +54,7 @@ export default function ProjectCompanyAllocation({ project, readOnly = false, di
     <h4>{DOC_LABELS[6]}</h4>
     <p>{agreement ? `On file · ${agreement.name}` : "Awaiting signed agreement"}</p>
     {!readOnly && !agreement && allocation.status === "accepted" && allocation.can_upload_agreement && onAgreement && <Upload
-      label={DOC_LABELS[6]} owner="Lead Site PM" buttonLabel="Upload signed subcontractor agreement" multiple={false} disabled={busy} onSave={onAgreement} />}
+      label={DOC_LABELS[6]} owner="Lead Site PM" buttonLabel="Upload signed subcontractor agreement" previewBeforeUpload multiple={false} disabled={busy} onSave={onAgreement} />}
     {pending && <p role="status">Saving subcontractor allocation…</p>}
     {error && <p role="alert">{error}</p>}
     {refreshFailed && <p role="alert">The action was saved. Reopen the project to load its current allocation.</p>}

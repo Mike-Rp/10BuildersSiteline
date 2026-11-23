@@ -571,6 +571,8 @@ export default function TradeAllocationPanel({
             ) : (
               <Upload
                 label={DOC_LABELS[6]}
+                previewBeforeUpload
+                multiple={false}
                 owner={actor.name}
                 disabled={disabled || !allocationConsented(state, project)}
                 buttonLabel="Upload signed subcontractor agreements"
