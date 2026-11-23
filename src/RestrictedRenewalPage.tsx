@@ -31,7 +31,11 @@ export default function RestrictedRenewalPage({ actor, status, onReload, onSignO
       <h1>{pending.length ? "Await Admin verification" : submissionAllowed ? "Submit license renewal" : "Visit your Administrator"}</h1>
       <p>{actor.name} · {actor.role === "opm" ? "Office PM" : "Site PM"}</p>
       <div className="notice"><strong>Renewal-only access</strong><p>Your license is within 30 days of expiry. Only renewal submission and status are available. Normal workspace access and new assignments are blocked.</p>
-        <p>License expiry: {dateLabel(status.expiry || "")} · Self-service submission closes: {dateLabel(status.restrictedOn || "")}</p></div>
+        <dl className="renewal-policy-dates">
+          <div><dt>Work access cutoff</dt><dd>{dateLabel(status.noticeOn || "")}</dd></div>
+          <div><dt>Self-service submission closes</dt><dd>{dateLabel(status.restrictedOn || "")}</dd></div>
+          <div><dt>PRC license expiry</dt><dd>{dateLabel(status.expiry || "")}</dd></div>
+        </dl></div>
       {error && <p className="error" role="alert">{error}</p>}
       {!submissions ? <><p role="status">Loading renewal status…</p>{error && <Button onClick={() => void refresh().then(() => setError("")).catch(e => setError(e.message))}>Retry</Button>}</> : pending.length ? <>
         <h2>Renewal submitted</h2><Badge tone="amber">License renewal under review</Badge>

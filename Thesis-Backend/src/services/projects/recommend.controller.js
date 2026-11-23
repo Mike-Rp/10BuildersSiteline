@@ -4,6 +4,7 @@ import {allocatePhaseCoverage, recommendPhaseEngineer} from '../../domain/engine
 import { validatePhaseTeam, validateScopedQualifications } from "./type-phases.utility.js";
 import { experienceForProjectSql } from "../accounts/experience.utility.js";
 import { prepareInquiryLead, scheduleConflicts } from "./inquiry-staffing.js";
+import { loadStaffingCredentials, staffingLicenseByScope, validateStaffingLicenses } from "./staffing-license.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -139,6 +140,12 @@ export const updatePhaseTeam = async (req, res) => {
       await validateScopedQualifications(client,project.project_type_id,phase_team,{projectId:project_id,requireCoverage:project.inquiry_origin,setupStaffing:project.phase_scope?.staffingPolicy==="primary_with_optional_engineer",additionalScopes:project.phase_scope?.additional_scopes});
       const lead = project.inquiry_origin ? await prepareInquiryLead(client, phase_team, project.phase_scope.phases,
         project.project_type_id, project.project_type, {start:project.start,end:project.end}, project_id) : null;
+      if (project.inquiry_origin && project.phase_scope.phase_dates) {
+        await validateStaffingLicenses(client, phase_team, lead, project, project.phase_scope.phase_dates, {}, project.project_type_id);
+        const coordinatorScopes = Object.fromEntries(phase_team.map(phase => [phase.stage, phase.assigned_disciplines]));
+        await client.query("UPDATE projects SET phase_scope=jsonb_set(phase_scope,'{coordinator_scopes}',$2::jsonb) WHERE id=$1",
+          [project_id, JSON.stringify(coordinatorScopes)]);
+      }
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       await client.query('DELETE FROM project_phase_team WHERE project_id = $1', [project_id]);
       const clock=await client.query("SELECT now() AS now");
@@ -221,7 +228,7 @@ export const getOpm = async (projectType, excludedId, db) =>
   (await getOpmCandidates(projectType, excludedId, db))[0] ?? null;
 
 export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers, {
-  requiredScopes, setupAdditionalScopes, staffingTarget, blockedCandidates, db = { query: execute },
+  requiredScopes, setupAdditionalScopes, staffingTarget, blockedCandidates, phaseDates, licenseUnavailable, db = { query: execute },
 } = {}) => {
   const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
@@ -333,6 +340,21 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
       details=available;
       if (!details.length) blocker = "commitments";
     }
+    if (phaseDates) {
+      const credentials = await loadStaffingCredentials(db, details.map(person => person.id));
+      const beforeStart = phaseDates[row.code]?.start;
+      licenseUnavailable[row.code] = [];
+      details = details.flatMap(person => {
+        const licenseByScope = staffingLicenseByScope(credentials.get(person.id), person.matching_scopes);
+        const matching = person.matching_scopes.filter(tag => licenseByScope[tag] && (!beforeStart || licenseByScope[tag].cutoff > beforeStart));
+        if (!matching.length) {
+          licenseUnavailable[row.code].push({ id: person.id, name: person.full_name, licenseByScope });
+          return [];
+        }
+        return [{ ...person, matching_scopes: matching, assigned_disciplines: person.assigned_disciplines?.filter(tag => matching.includes(tag)), licenseByScope }];
+      });
+      if (!details.length && licenseUnavailable[row.code].length) blocker = "license";
+    }
     if (candidateBlockers && blocker) candidateBlockers[row.code] = blocker;
     if (blockedCandidates) blockedCandidates[row.code] = blocked.map(({person,reason}) => ({
       id:person.id, name:person.full_name, qualifiedTags:person.matching_scopes, reason,
@@ -343,13 +365,13 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
     if(multi) {
       const required=requiredScopes?.[row.code] ?? (await db.query('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
       const candidates = details.map(person => ({id:person.id,qualifiedTags:person.matching_scopes}));
-      if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years}));
+      if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years,licenseByScope:details[i].licenseByScope}));
       const result=setupAdditionalScopes ? recommendPhaseEngineer(required,candidates,setupAdditionalScopes[row.code],staffingTarget ?? 1) : allocatePhaseCoverage(required,candidates);
       suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),required_specializations:required,coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }
 
-    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines ?? person.matching_scopes,experienceYears:person.experience_years}));
+    if (candidateMap) candidateMap[row.code] = details.map(person => ({id:person.id,name:person.full_name,qualifiedTags:person.assigned_disciplines?.length ? person.assigned_disciplines : person.matching_scopes,experienceYears:person.experience_years,licenseByScope:person.licenseByScope}));
     if (details.length > 0) {
       suggestedSpms.push({
         id: row.project_stage_id,
@@ -358,7 +380,7 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
         user_id: details[randomIndex].id,
         name: details[randomIndex].full_name,
         percentage: details[randomIndex].percentage,
-        assigned_disciplines: details[randomIndex].assigned_disciplines ?? details[randomIndex].matching_scopes.slice(0, 1)
+        assigned_disciplines: details[randomIndex].assigned_disciplines?.length ? details[randomIndex].assigned_disciplines : details[randomIndex].matching_scopes.slice(0, 1)
       });
     }
   }

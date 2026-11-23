@@ -1,6 +1,7 @@
 import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
 import { intakeSize } from "../../domain/inquiry-assessment.js";
 import { prepareInquiryLead } from "./inquiry-staffing.js";
+import { normalizePhaseDates, validateStaffingLicenses } from "./staffing-license.utility.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { businessDeadline } from "../archive/audit.utility.js";
 import { linkProjectFile } from "../workspace/project-upload-budget.utility.js";
@@ -64,7 +65,7 @@ export const createIntake = async (req, res) => {
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
-      let inquiry, intake, phases, deadline, scopeConfiguration;
+      let inquiry, intake, phases, deadline, scopeConfiguration, phaseDates, planningBackups;
       if (inquiryId) {
         inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
         if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
@@ -86,6 +87,14 @@ export const createIntake = async (req, res) => {
           const prior = (await client.query("SELECT id,name,lifecycle_status FROM projects WHERE id=$1",[inquiry.project_id])).rows[0];
           return {project: prior, duplicate: true, signed_contract: await signedContract(client, prior.id)};
         }
+        phaseDates = normalizePhaseDates(confirmed.phase_dates ?? {}, phases, review);
+        if (req.body.phase_dates !== undefined &&
+            JSON.stringify(normalizePhaseDates(req.body.phase_dates, phases, review)) !== JSON.stringify(phaseDates))
+          throw new HttpError(409, "The confirmed phase dates changed. Reopen staffing before sending offers.");
+        planningBackups = req.body.planning_backups ?? {};
+        if (typeof planningBackups !== "object" || Array.isArray(planningBackups) ||
+            Object.entries(planningBackups).some(([stage, id]) => !phases.includes(stage) || !isUuid(id)))
+          throw new HttpError(422, "Select a qualified planning backup for an included phase.");
         tier = assessment.size;
         intake = {...details, target_start_date:review.start, target_end_date:review.end, estimated_budget:budget, size:assessment.size, assessment, additional_scopes: scopeConfiguration.additional};
         deadline = businessDeadline((await client.query("SELECT now() AS now")).rows[0].now);
@@ -156,11 +165,12 @@ export const createIntake = async (req, res) => {
       for (const phase of phase_team) {
         if (!phase || !phase.stage || !phase.user_id) throw Object.assign(new Error('Each phase needs stage and user_id.'), {status:422});
       }
-      for(const userId of [...new Set(phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]))].sort())await assertEligibleManager(client,userId,'spm');
+      for(const userId of [...new Set([...phase_team.flatMap(phase=>phase.engineers?.map(e=>e.user_id)||[phase.user_id]), ...Object.values(planningBackups ?? {})])].sort())await assertEligibleManager(client,userId,'spm');
       const requiredScopes = scopeConfiguration?.required;
       await validateScopedQualifications(client,projectType.rows[0].id,phase_team,{projectId:draft?.id || null,requireCoverage:true,requiredScopes,setupStaffing:!!inquiry,additionalScopes:scopeConfiguration?.additional});
       const inquiryLead = inquiry ? await prepareInquiryLead(client, phase_team, phases, projectType.rows[0].id,
         intake.project_type, inquiry.details.opm_workflow.review, null, requiredScopes) : null;
+      if (inquiry) await validateStaffingLicenses(client, phase_team, inquiryLead, inquiry.details.opm_workflow.review, phaseDates, planningBackups, projectType.rows[0].id, requiredScopes);
       await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
       const inserted = draft ? await client.query(
         `UPDATE projects SET name=$1,project_type_id=(SELECT id FROM project_types WHERE code=$2),client_name=$3,
@@ -182,7 +192,12 @@ export const createIntake = async (req, res) => {
       const project = inserted.rows[0];
       if (inquiry) {
         await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
-          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({phases,staffingPolicy:"primary_with_optional_engineer",engineerScopes:requiredScopes,additional_scopes:scopeConfiguration.additional,confirmedBy:actor.id,confirmedAt:new Date().toISOString()})]);
+          [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({
+            phases, staffingPolicy:"primary_with_optional_engineer", engineerScopes:requiredScopes,
+            additional_scopes:scopeConfiguration.additional, phase_dates:phaseDates, planning_backups:planningBackups,
+            coordinator_scopes:Object.fromEntries(phase_team.map(phase => [phase.stage, phase.assigned_disciplines])),
+            confirmedBy:actor.id, confirmedAt:new Date().toISOString(),
+          })]);
         if ((await client.query("SELECT to_regclass('public.project_company_allocations') IS NOT NULL AS ready")).rows[0].ready)
           await client.query("UPDATE projects SET intake_monitoring_version=1 WHERE id=$1", [project.id]);
         project.lifecycle_status = "spm_review";

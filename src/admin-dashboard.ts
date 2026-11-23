@@ -45,7 +45,7 @@ export function adminDashboardOverview(state: State, now = Date.now()) {
     ...cover.map(i => ({
       key: `license-cover:${i.id}`, id: i.id, kind: "account" as const, category: "licenses" as const,
       title: i.daysToExpiry !== null && i.daysToExpiry < 0 ? "Engineer replacement overdue" : "Prepare engineer replacement",
-      detail: `${i.name} · license expires ${i.expiry ? dateLabel(i.expiry) : ""} · Replace on: ${i.assignments.map(a => a.projectName).filter((name, index, all) => all.indexOf(name) === index).join(", ")}`,
+      detail: `${i.name} · ${i.assignments.filter(a => a.needsCover ?? !a.pendingOverrideId).map(a => `${a.projectName}${a.stage ? ` / ${a.stage}` : ""}${a.workAccessCutoff ? ` · cutoff ${dateLabel(a.workAccessCutoff)}` : ""}`).join(", ")}`,
       label: "Prepare replacement", icon: "alert", urgency: i.daysToExpiry !== null && i.daysToExpiry < 0 ? "blocked" as const : "soon" as const,
     })),
     ...renewals.map(r => ({

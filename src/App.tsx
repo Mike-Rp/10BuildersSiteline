@@ -696,7 +696,7 @@ function AppInner() {
   // Needs attention → "Engineer license expired": open the override for the first assignment that still needs cover.
   function openLicenseCover(userId: string) {
     const item = state.license?.overview?.find((i) => i.id === userId)
-    const open = item?.assignments.find((a) => !a.pendingOverrideId)
+    const open = item?.assignments.find(a => a.needsCover ?? !a.pendingOverrideId)
     if (open) setOverrideTarget({ projectId: open.projectId, stageId: open.stageId })
     else setDialog({ kind: "account", id: userId })
   }
@@ -2281,7 +2281,7 @@ function AppInner() {
                     {(() => {
                       const li = state.license?.overview?.find((i) => i.id === t.accountId)
                       const asg = li?.assignments.find((x) => x.projectId === p.id && x.role === "spm" && x.stage?.toLowerCase() === t.phase.toLowerCase())
-                      return li && li.daysToExpiry !== null && li.daysToExpiry <= 33 && asg ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
+                      return li && asg && (asg.needsCover || (li.daysToExpiry !== null && li.daysToExpiry <= 33)) ? <PhaseLicenseFlag item={li} assignment={asg} onOverride={setOverrideTarget} /> : null
                     })()}
                   </div>
                   )

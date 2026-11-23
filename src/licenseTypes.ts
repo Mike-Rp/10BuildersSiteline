@@ -34,6 +34,9 @@ export type OverviewAssignment = {
   role: "spm" | "opm"
   isLead: boolean
   pendingOverrideId: number | null
+  needsCover?: boolean
+  expiry?: string | null
+  workAccessCutoff?: string | null
 }
 export type OverviewItem = {
   id: string
@@ -85,10 +88,14 @@ export type OverrideCandidate = {
   matchPercent: number
   licenseExpiry: string | null
   expiresBeforeProjectEnd: boolean
+  coverageStart?: string | null
+  coverageEnd?: string | null
+  planningBackup?: boolean
   best: boolean
 }
 export type OverrideOptions = {
-  project: { id: string; name: string; targetEndDate: string | null }
+  project: { id: string; name: string; targetEndDate: string | null; coverageEnd?: string | null }
+  requiresAvailabilityConfirmation?: boolean
   role: "spm" | "opm"
   stageId: number | null
   stage: string | null
@@ -98,6 +105,7 @@ export type OverrideOptions = {
     name: string
     status: string
     expiry: string | null
+    workAccessCutoff?: string | null
     graceEndsOn: string | null
     graceEnded: boolean
     restricted: boolean

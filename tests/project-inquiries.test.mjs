@@ -251,6 +251,25 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await db.query(`INSERT INTO workspace_account_metadata(user_id,metadata) VALUES($1,'{"experienceByType":{"Residential":{"months":240}}}')
     ON CONFLICT(user_id) DO UPDATE SET metadata=workspace_account_metadata.metadata||excluded.metadata`,[alternate.id])
   const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
+  const phaseDates = {[phases[1]]: {start:"2027-01-20",end:"2027-02-20"}}
+  const datedPlan = {...planInput,...documents,phases,phase_dates:phaseDates}
+  await call(planning,{token,status:422,json:{...datedPlan,phase_dates:{[phases[1]]:{start:"2027-01-01",end:"2027-02-20"}}}})
+  await db.query("UPDATE user_licenses SET license_expiry='2027-02-19' WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
+  const dated = await call(planning,{token,json:datedPlan})
+  assert.deepEqual(dated.staffing.phase_dates,phaseDates)
+  assert.ok(dated.licenseUnavailable[phases[1]].some(person=>person.id===alternate.id))
+  assert.ok(!dated.candidates[phases[1]].some(person=>person.id===alternate.id))
+  await call("/projects/intake",{token,status:422,json:{...payload,phase_dates:phaseDates}})
+  await db.query("UPDATE user_licenses SET license_expiry='2027-03-15' WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
+  const atRisk = await call(planning,{token,json:datedPlan})
+  assert.equal(atRisk.candidates[phases[1]].find(person=>person.id===alternate.id).licenseByScope[tags[0]].cutoff,"2027-02-13")
+  await call("/projects/intake",{token,status:409,json:{...payload,phase_dates:{}}})
+  await call("/projects/intake",{token,status:422,json:{...payload,phase_dates:phaseDates,planning_backups:{[phases[1]]:alternate.id}}})
+  payload.phase_dates=phaseDates
+  const backup = atRisk.candidates[phases[1]].find(person=>person.id!==alternate.id &&
+    !firstPhaseIds.includes(person.id) && !secondPhase.engineers?.some(engineer=>engineer.user_id===person.id) &&
+    tags.every(tag=>person.licenseByScope[tag]?.cutoff > phaseDates[phases[1]].end))
+  if (backup) payload.planning_backups={[phases[1]]:backup.id}
   if (multiEngineer) {
     const crowded=structuredClone(payload)
     crowded.phase_team[1].engineers.push(...crowded.phase_team[1].engineers)
@@ -279,6 +298,27 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(stored.inquiry_intake.target_end_date,intake.target_end_date)
   assert.equal(stored.inquiry_intake.estimated_budget,updatedBudget)
   assert.deepEqual(stored.phase_scope.phases,phases)
+  assert.deepEqual(stored.phase_scope.phase_dates,phaseDates)
+  if (backup) assert.deepEqual(stored.phase_scope.planning_backups,payload.planning_backups)
+  await db.query("UPDATE user_licenses SET license_expiry=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date+30 WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
+  const stageId = (await db.query("SELECT id FROM project_stages WHERE code=$1",[phases[1]])).rows[0].id
+  const overrideProject = await call(`/licenses/override-options?project_id=${response.project.id}&stage_id=${stageId}`,{token:admin})
+  assert.equal(overrideProject.available,true)
+  assert.equal(overrideProject.requiresAvailabilityConfirmation,true)
+  assert.equal(overrideProject.project.coverageEnd,phaseDates[phases[1]].end)
+  if (backup) {
+    assert.equal(overrideProject.candidates[0]?.id,backup.id)
+    assert.equal(overrideProject.candidates[0].planningBackup,true)
+    const { today } = (await db.query("SELECT ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date)::text as today")).rows[0]
+    await call("/licenses/overrides",{token:admin,status:422,json:{
+      project_id:response.project.id,stage_id:stageId,from_user_id:alternate.id,to_user_id:backup.id,
+      reason:"Coverage required at work access cutoff",appointment_signed:true,signed_on:today,
+    }})
+    const offered = await db.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND spm_user_id=$2",[response.project.id,backup.id])
+    assert.equal(offered.rowCount,0)
+  }
+  await db.query("UPDATE user_licenses SET license_expiry='2027-03-15' WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
+  assert.equal((await call(`/licenses/override-options?project_id=${response.project.id}&stage_id=${stageId}`,{token:admin})).available,false)
   const projectId = response.project.id
   const contract = response.signed_contract
   assert.equal(contract.code,"owner_contract")
