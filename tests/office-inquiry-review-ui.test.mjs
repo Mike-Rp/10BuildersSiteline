@@ -64,9 +64,10 @@ test("proposal approval opens mandatory review with live size and inline validat
         const input = JSON.parse(init.body)
         staffingRequest = input
         const scopes = ["Structural Engineering", "Mechanical", "Acoustic", ...(input.additional_scopes?.Design ?? [])]
+        const phases = ["Design", "Foundation", "Structure"]
         return Response.json({ data: {
-          phases: ["Design"], estimate: { size: "Medium", end: submitted.end },
-          staffing: { assessment_id: "assessment", phases: ["Design"], contract_file_id: inquiry.workflow.signed_contract.id, additional_scopes: input.additional_scopes },
+          phases, estimate: { size: "Medium", end: submitted.end },
+          staffing: { assessment_id: "assessment", phases, contract_file_id: inquiry.workflow.signed_contract.id, additional_scopes: input.additional_scopes },
           ...(input.phases && { additional_scope_options: { Design: [supplemental] },
             team: [{ stage: "Design", user_id: "ana", required_specializations: scopes, engineers: [
               { user_id: "ana", assigned_disciplines: ["Structural Engineering"] },
@@ -75,7 +76,9 @@ test("proposal approval opens mandatory review with live size and inline validat
             candidates: { Design: [
               { id: "ana", name: "Ana Reyes", qualifiedTags: ["Structural Engineering"], experienceYears: 0 },
               { id: "kurt", name: "Kurt Gonzales", qualifiedTags: ["Mechanical"], experienceYears: 2 },
-            ] },
+            ], Foundation: [], Structure: [] },
+            candidateBlockers: { Foundation: "schedule", Structure: "qualifications" },
+            blockedCandidates: { Foundation: [{ id: "blocked", name: "Unavailable Engineer", qualifiedTags: ["Civil"], reason: "schedule" }] },
           }),
         } })
       }
@@ -269,6 +272,22 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.equal(staffingRequest.contract_file_id, inquiry.workflow.signed_contract.id)
   assert.match(document.querySelector(".inquiry-lineup-table tbody tr:first-child").textContent, /Kurt Gonzales.*2 years.*Lead SPM/)
   assert.match(document.querySelector(".inquiry-coverage-warning").textContent, /No eligible Site PM found for Acoustic.*meets its minimum coverage of 2/)
+  const staffingTabs = [...document.querySelectorAll(".inquiry-phase-nav button")]
+  assert.ok(document.querySelector(".inquiry-staffing").compareDocumentPosition(
+    document.querySelector(".inquiry-lineup-table"),
+  ) & Node.DOCUMENT_POSITION_FOLLOWING)
+  assert.equal(staffingTabs[0].dataset.staffingIssue, "false")
+  for (const [tab, phase] of [[staffingTabs[1], "Foundation"], [staffingTabs[2], "Structure"]]) {
+    assert.equal(tab.dataset.staffingIssue, "true")
+    assert.match(tab.textContent, new RegExp(`${phase}.*No eligible engineer available`))
+  }
+  assert.doesNotMatch(document.body.textContent, /Phases that need staffing review/)
+  await click(staffingTabs[1])
+  assert.equal(staffingTabs[1].getAttribute("aria-pressed"), "true")
+  assert.match(document.querySelector(".inquiry-intake [role='status']").textContent, /Foundation.*schedule conflicts/)
+  assert.doesNotMatch(document.querySelector(".inquiry-intake").textContent, /Unavailable matches|Unavailable Engineer/)
+  assert.equal(button("Send assignment offers").disabled, true)
+  await click(staffingTabs[0])
   assert.match(document.body.textContent, /Technical requirements · Extensive specialized systems/)
   assert.match(document.body.textContent, /Phase arrangement · Partially overlapping phases/)
   await select("Additional engineering scope", supplemental)

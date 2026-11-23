@@ -19,6 +19,7 @@ import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
 import { showActionResult } from "./action-feedback"
+import { PROJECT_SETUP_LABEL } from "./workspace-routing"
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import "./project-inquiries.css"
 
@@ -37,20 +38,19 @@ type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
 type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string; client_account_status?: ClientActivationStatus }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number }
-type BlockedCandidate = Candidate & { reason: "availability" | "schedule" | "commitments" }
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability"
 type AdditionalScopes = Record<string, string[]>
-type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>; blockedCandidates?: Record<string, BlockedCandidate[]>;
+type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
   additional_scope_options?: AdditionalScopes;
   staffing?: {assessment_id:string; phases:string[]; contract_file_id:string; additional_scopes?: AdditionalScopes} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
 const classifications = ["Normal", "Priority", "Urgent"]
 const statuses: Record<string,string> = {
   draft: "Ready for routing", offered: "Awaiting OPM response", returned: "Returned to Admin",
-  consulting: "Awaiting client decision", approved: "Ready for project intake", withdrawn: "Client withdrew",
-  dropped: "Dropped", converted: "Project intake complete",
+  consulting: "Awaiting client decision", approved: "Ready for project setup", withdrawn: "Client withdrew",
+  dropped: "Dropped", converted: "Project setup complete",
 }
 
 const statusLabel = (row: Inquiry) => row.project_status === "spm_review" ? "Staffing in progress" : statuses[row.status]
@@ -94,7 +94,7 @@ const adminInquiryActions: Record<string, string> = {
 const inquiryWaiting: Record<string, string> = {
   offered: "Waiting for Office PM response",
   consulting: "Waiting for the client’s decision",
-  approved: "Waiting for project intake",
+  approved: "Waiting for project setup",
 }
 
 const adminInquiryListKey = "admin:inquiry-log"
@@ -103,7 +103,7 @@ function resetInquiryPage() {
   updateListQuery(adminInquiryListKey, query => withPage(query, 1))
 }
 
-const inquiryMilestones = ["Inquiry submitted", "Office PM review", "Client proposal", "Project assessment", "Project intake"]
+const inquiryMilestones = ["Inquiry submitted", "Office PM review", "Client proposal", "Project assessment", PROJECT_SETUP_LABEL]
 
 function inquiryMilestone(item: Inquiry) {
   switch (item.status) {
@@ -305,12 +305,11 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
   </section>
 }
 
-function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, adding, setAdding, onChange, onRecheck, scopeOptions, onAddScope }: {
+function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck, scopeOptions, onAddScope }: {
   stage: string
   entry?: Phase
   suggested?: Phase
   choices: Candidate[]
-  blocked: BlockedCandidate[]
   blocker?: CandidateBlocker
   adding: boolean
   setAdding: (value: boolean) => void
@@ -394,7 +393,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
     <div className="inquiry-form-stack">
     <div className="inquiry-staff-heading">
       <strong>Assigned engineers · {engineers.length}</strong>
-      {!adding && !atLimit && <button className="button inquiry-add-engineer" type="button" disabled={!addOptions.length}
+      {!adding && !atLimit && choices.length > 0 && <button className="button inquiry-add-engineer" type="button" disabled={!addOptions.length}
         aria-describedby={addOptions.length ? undefined : "inquiry-add-engineer-help"}
         onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add engineer</button>}
     </div>
@@ -445,14 +444,6 @@ function StaffingCards({ stage, entry, suggested, choices, blocked, blocker, add
         <button className="button" type="button" onClick={() => setAdding(false)}>Cancel</button>
       </article>}
     </div>
-    {!!blocked.length && <details className="inquiry-summary-card inquiry-blocked-engineers">
-      <summary>Unavailable matches ({blocked.length})</summary>
-      <ul>{blocked.map(candidate => <li key={candidate.id}>
-        <strong>{candidate.name}</strong>
-        <span className="inquiry-pill pending">{{schedule:"Schedule conflict",commitments:"Existing commitments",availability:"Unavailable"}[candidate.reason]}</span>
-        <small>{candidate.qualifiedTags.join(", ")}</small>
-      </li>)}</ul>
-    </details>}
     </div>
     </div>
   </section>
@@ -720,7 +711,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (reason) return [{ stage, reason }]
     return missingExtra.length ? [{ stage, reason: `Assign verified coverage for ${missingExtra.join(", ")}.` }] : []
   }) : []
-  const firstStaffingIssue = staffingIssues[0]
+  const staffingIssueByPhase = new Map(staffingIssues.map(({ stage, reason }) => [stage, reason]))
+  const selectedStaffingIssue = staffingIssueByPhase.get(staffingPhase)
   const canSend = canAllocate && !staffingIssues.length
   const feedback = <>
     {busy && <p role="status">Saving or loading inquiry…</p>}
@@ -1238,25 +1230,19 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
 
-    {dialog === "intake" && row?.status === "approved" && <Modal title="Project intake" subtitle={String(row.details.name)} wide onClose={closeDialog} footer={<>
+    {dialog === "intake" && row?.status === "approved" && <Modal title={PROJECT_SETUP_LABEL} subtitle={String(row.details.name)} wide onClose={closeDialog} footer={<>
       <span className="inquiry-intake-progress">Step {step} of 3</span>
       <button type="button" className="button" disabled={busy} onClick={step === 2 ? closeDialog : () => setStep(2)}>{step === 2 ? "Back to assessment" : "Back"}</button>
       {step === 2 && <button className="button primary" disabled={busy || !canAllocate} onClick={() => {
         if (planning?.candidates) setStep(3)
         else void run(allocate)
       }}>Continue to staffing</button>}
-      {step === 3 && <>
-        {firstStaffingIssue && <p id="inquiry-offer-blocker" className="inquiry-offer-blocker" role="status">
-          <strong>{firstStaffingIssue.stage}</strong> · {firstStaffingIssue.reason}
-          {staffingIssues.length > 1 && ` ${staffingIssues.length - 1} more ${staffingIssues.length === 2 ? "phase needs" : "phases need"} review.`}
-        </p>}
-        <button className="button primary inquiry-send-offers" disabled={busy || !canSend}
-          aria-describedby={firstStaffingIssue ? "inquiry-offer-blocker" : undefined}
-          onClick={() => void run(submit)}>Send assignment offers</button>
-      </>}
+      {step === 3 && <button className="button primary inquiry-send-offers" disabled={busy || !canSend}
+        aria-describedby={staffingIssues.length ? "inquiry-staffing-phases" : undefined}
+        onClick={() => void run(submit)}>Send assignment offers</button>}
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
-        <ol ref={stepperRef} className="inquiry-stepper" aria-label="Project intake steps">
+        <ol ref={stepperRef} className="inquiry-stepper" aria-label={`${PROJECT_SETUP_LABEL} steps`}>
           {["Assessment", "Construction phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
             <span aria-hidden="true">{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span>{label}
           </li>)}
@@ -1302,26 +1288,30 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {technical && <p>Technical requirements · {technical}</p>}
             {arrangement && <p>Phase arrangement · {arrangement}</p>}
           </div>
-          <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
-          <div className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
-            {phases.map(stage => <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage} onClick={() => {
-              setStaffingPhase(stage)
-              setAddingEngineer(false)
-            }}>{stage}</button>)}
+          <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
+            {phases.map(stage => {
+              const reason = staffingIssueByPhase.get(stage)
+              const unavailable = reason && !planning.candidates?.[stage]?.length
+              return <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage}
+                data-staffing-issue={!!reason} onClick={() => {
+                  setStaffingPhase(stage)
+                  setAddingEngineer(false)
+                }}>
+                {stage}
+                {reason && <span className="inquiry-phase-warning"><Icon name="alert" size={14} />
+                  {unavailable ? "No eligible engineer available" : "Needs staffing"}
+                </span>}
+              </button>
+            })}
           </div>
+          {selectedStaffingIssue && <p className="inquiry-coverage-warning" role="status"><strong>{staffingPhase}</strong> · {selectedStaffingIssue}</p>}
           <StaffingCards key={staffingPhase} stage={staffingPhase} entry={team.find(entry => entry.stage === staffingPhase)}
             suggested={planning.team?.find(entry => entry.stage === staffingPhase)}
-            choices={planning.candidates[staffingPhase] || []} blocked={planning.blockedCandidates?.[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
+            choices={planning.candidates[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate(true))}
             scopeOptions={planning.additional_scope_options?.[staffingPhase]} onAddScope={scope => run(() => addStaffingScope(scope))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
-          {staffingIssues.length > 1 && <details className="inquiry-summary-card inquiry-blocked-engineers">
-            <summary>Phases that need staffing review ({staffingIssues.length})</summary>
-            <ul>{staffingIssues.map(({ stage, reason }) => <li key={stage}>
-              <button type="button" className="button" onClick={() => { setStaffingPhase(stage); setAddingEngineer(false) }}>{stage}</button>
-              <small>{reason}</small>
-            </li>)}</ul>
-          </details>}
+          <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
         </fieldset>}
         {feedback}
       </div>

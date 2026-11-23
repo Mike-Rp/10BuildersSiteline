@@ -51,7 +51,7 @@ import { navigationAttention } from "./navigation-attention"
 import { hasPendingSiteReview } from "./active-sites-review"
 import { normalizeWorkspacePage } from "./adminNav"
 import useWorkspacePage from "./useWorkspacePage"
-import { ROUTE_CHANGE } from "./workspace-routing"
+import { PROJECT_SETUP_LABEL, ROUTE_CHANGE, workspacePageLabel } from "./workspace-routing"
 import ActiveSites from "./ActiveSites"
 // @refresh reset
 import {
@@ -201,7 +201,6 @@ function Status({ value }: { value: string }) {
     </Badge>
   )
 }
-const PROJECT_SETUP_LABEL = "Project setup"
 const OPM_NAV = [
   ["Dashboard", "grid"],
   ["Project intake", "check"],
@@ -276,7 +275,6 @@ export default function RoleWorkspace({
   const { page: routePage, navigate: setPage } = useWorkspacePage(actor.role, !extensionDemo)
   const legacyIntakeRoute = isOpm && ["Project inquiries", "Confirmation queue"].includes(routePage)
   const page = legacyIntakeRoute ? "Project intake" : extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
-  const pageLabel = page === "Project intake" ? PROJECT_SETUP_LABEL : page
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -3963,7 +3961,7 @@ export default function RoleWorkspace({
               {confirmTab === "mine" && (
                 <>
                   <ListToolbar list={intakesList} placeholder="Search confirmations" noun="project"
-                    wrapControls={controls => <IntakePipelinePanel title="Setup overview" label="Intake pipeline">
+                    wrapControls={controls => <IntakePipelinePanel title="Setup overview" label="Project setup">
                       <div className="confirmation-intake-filters">
                         <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => {
                           setIntakeView(value)
@@ -4122,12 +4120,12 @@ export default function RoleWorkspace({
               <button
                 aria-current={page === label ? "page" : undefined}
                 className={`nav-item ${page === label ? "active" : ""}`}
-                aria-label={label === "Project intake" ? PROJECT_SETUP_LABEL : label}
+                aria-label={workspacePageLabel(label)}
                 aria-description={navigationCounts[label]?.count ? `${navigationCounts[label].count} ${navigationCounts[label].description}` : undefined}
                 onClick={() => navigate(label)}
               >
                 <Icon name={icon} size={19} />
-                <span>{label === "Project intake" ? PROJECT_SETUP_LABEL : label}</span>
+                <span>{workspacePageLabel(label)}</span>
                 <NavigationCount item={navigationCounts[label]} />
               </button>
             </div>
@@ -4174,7 +4172,7 @@ export default function RoleWorkspace({
             />
             <span>{ROLE_NAMES[actor.role]}</span>
             <Icon name="chevron" size={14} />
-            <strong>{pageLabel}</strong>
+            <strong>{workspacePageLabel(page)}</strong>
           </div>
           <div className="topbar-actions">
             <div className="notification-container">

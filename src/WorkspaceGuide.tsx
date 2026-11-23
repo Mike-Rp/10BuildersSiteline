@@ -4,6 +4,7 @@ import { createPortal } from "react-dom"
 import { Button, Icon, Modal } from "./ui"
 import "./workspace-guide.css"
 import { api, getToken } from "./api/client"
+import { PROJECT_SETUP_LABEL, workspacePageLabel } from "./workspace-routing"
 
 type Role = "admin" | "opm" | "spm" | "client"
 type Step = TourStep
@@ -20,21 +21,21 @@ const targets: Record<string, Partial<Step>> = {
   "Review assignment details": { control: "View assignment details", detail: "This button opens the project's assignment details and supporting information. Read them before responding. Opening the details does not accept the assignment." },
   "Accept your assignment": { control: "Accept Office PM assignment", detail: "This button accepts your Office PM assignment and records your response. Use it only after reviewing the project. A disabled button means prerequisites are not yet satisfied. You can press Next without accepting." },
   "Request intake changes": { control: "Request changes", detail: "This button opens the request-changes form. Describe the concern before submitting your response. Use this when the intake needs correction rather than accepting it." },
-  "Review your queue": { control: "Project intake", detail: "This navigation button opens assignments and intake items awaiting your response. Review the project before accepting or returning an assignment." },
-  "Open Project intake": { control: "Project intake", detail: "This navigation button shows your pending assignments and intake records. Choose a record to inspect its details before responding." },
+  "Review your queue": { control: PROJECT_SETUP_LABEL, detail: "This navigation button opens assignments and inquiries awaiting your response. Review the project before accepting or returning an assignment." },
+  "Open Project setup": { control: PROJECT_SETUP_LABEL, detail: "This navigation button shows pending assignments and project setup records. Choose a record to inspect its details before responding." },
 }
-const step = (title: string, detail: string, page: string): Step => ({ title, detail: `This navigation button opens ${page}. ${detail}`, page, ...targets[title] })
+const step = (title: string, detail: string, page: string): Step => ({ title, detail: `This navigation button opens ${workspacePageLabel(page)}. ${detail}`, page, ...targets[title] })
 const labels: Record<Role, string> = { admin: "Administrator", opm: "Office PM", spm: "Site PM", client: "Client" }
 
 export function guideTopics(role: Role): Topic[] {
-  const assignment = [step("Open Project intake", "Review pending assignments.", "Project intake"), step("Review assignment details", "Read project details.", "Project intake"), step("Accept your assignment", "Accept after review.", "Project intake"), step("Request intake changes", "Return an intake for correction.", "Project intake")]
+  const assignment = [step("Open Project setup", "Review pending assignments.", "Project intake"), step("Review assignment details", "Read project details.", "Project intake"), step("Accept your assignment", "Accept after review.", "Project intake"), step("Request intake changes", "Return an intake for correction.", "Project intake")]
   const sites = step("Find your projects", "Open Active sites and select a project to view its current status and available actions. Only projects you can access appear here.", "Active sites")
   const records = step("Find reports and records", "Open a project to find the documents and reports available to your role. Check the selected project before downloading records.", "Active sites")
   const settings = step("Manage your preferences", "Review your notification and account preferences. Changes to your account should be made from your own workspace.", role === "admin" ? "Settings" : "Preferences")
   const intake = [
     step("Start a project inquiry", "Record the client's details and project requirements for Office PM review.", "Project inquiries"),
     step("Track inquiry review", "Open an inquiry to check its assigned Office PM and review status. The assigned Office PM finalizes the approved inquiry into a project.", "Project inquiries"),
-    step("Review finalized intake", "Open Review intake record to check personnel, eligibility, and agreements. Complete Client account setup here or in project monitoring before project activation.", "Project intake"),
+    step("Review project setup", "Open the inquiry to check its progress and any client account verification needed for the finalized project.", "Project inquiries"),
   ]
   const field = [
     sites,
@@ -52,7 +53,7 @@ export function guideTopics(role: Role): Topic[] {
   ]
   const topic = (title: string, description: string, steps: Step[]): Topic => ({ title, description, steps })
   if (role === "admin") return [
-    topic("Quick workspace overview", "Find your main tools and next actions", [step("Your dashboard", "Review priority items and follow-up actions. Use the sidebar to move between project intake, active sites, records, and organization tools.", "Dashboard"), sites, step("Find people and records", "Use Directory for engineers and subcontractors, Documents for records, and Team for account administration.", "Directory"), settings]),
+    topic("Quick workspace overview", "Find your main tools and next actions", [step("Your dashboard", "Review priority items and follow-up actions. Use the sidebar to move between project inquiries, active sites, records, and organization tools.", "Dashboard"), sites, step("Find people and records", "Use Directory for engineers and subcontractors, Documents for records, and Team for account administration.", "Directory"), settings]),
     topic("Submit and track a project inquiry", "Record requirements and review the finalized intake", intake),
     topic("Review personnel allocation", "Check eligibility, coverage, and agreements", [intake[2]]),
     topic("Monitor an active project", "Find project status and pending work", [sites, records]),
@@ -60,7 +61,7 @@ export function guideTopics(role: Role): Topic[] {
     topic("Find reports and records", "Locate project documents and history", [records, step("Browse saved documents", "Filter documents and open the relevant record. Check the project and document details before downloading.", "Documents")]),
   ]
   if (role === "spm") return [topic("Quick workspace overview", "Find projects, evidence, and feedback", [step("Your dashboard", "Check your pending work and assignment notices. Use Active sites to open your assigned projects.", "Dashboard"), ...field, settings]), topic("Submit activity evidence", "Open your phase workspace and prepare a submission", field), topic("Respond to review feedback", "Find corrections and check approval status", [field[0], field[3]]), topic("Find resources and reports", "Locate available documents and project history", [step("Browse resources", "Open Resources for documents and subcontractor information available to your assignment.", "Resources"), records])]
-  if (role === "opm") return [topic("Quick workspace overview", "Find assignments, reviews, and project records", [step("Review your queue", "Check the Project intake for assignments and intake items awaiting your response. Read the project details before accepting or returning an item.", "Project intake"), sites, updates, settings]), topic("Review assignments", "Check intake details and respond", assignment), topic("Review submitted evidence", "Open the review queue, inspect evidence, and understand decisions", review), topic("Find documents and reports", "Locate records available to your role", [step("Browse documents", "Open Documents and select the relevant project record.", "Documents"), records])]
+  if (role === "opm") return [topic("Quick workspace overview", "Find assignments, reviews, and project records", [step("Review your queue", "Check Project setup for assignments and inquiries awaiting your response. Read the project details before accepting or returning an item.", "Project intake"), sites, updates, settings]), topic("Review assignments", "Check intake details and respond", assignment), topic("Review submitted evidence", "Open the review queue, inspect evidence, and understand decisions", review), topic("Find documents and reports", "Locate records available to your role", [step("Browse documents", "Open Documents and select the relevant project record.", "Documents"), records])]
   return [topic("Quick workspace overview", "Find your projects and published updates", [sites, step("View your project overview", "Select a project to see the information published for you. Internal submissions awaiting review may not appear here.", "Project Overview"), records, settings]), topic("View progress and photos", "Find released project updates", [step("View progress history", "Select your project and review the published progress entries.", "Progress History"), step("View site photographs", "Browse the site photos released for your project.", "Site Photographs")]), topic("Find shared documents", "Open available project records", [step("Open project documents", "Select your project and open a shared document to preview or download it.", "Project Documents")])]
 }
 

@@ -171,7 +171,7 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     const currentStep = card => card.querySelector('[aria-current="step"]').textContent
     assert.equal(currentStep(cards[0]), "2Office PM review")
     assert.equal(currentStep(cards[1]), "4Project assessment")
-    assert.equal(currentStep(cards[2]), "5Project intake")
+    assert.equal(currentStep(cards[2]), "5Project setup")
     assert.equal(currentStep(cards[3]), "3Client proposal")
     assert.equal(cards[0].querySelector(".opm-inquiry-initials").textContent, "MR")
     assert.match(cards[0].querySelector(".opm-inquiry-facts").textContent, /Arbor Living Inc\..*Riverside District/)

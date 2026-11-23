@@ -1,5 +1,8 @@
 import type { Role } from "./model"
 
+export const PROJECT_SETUP_LABEL = "Project setup"
+export const workspacePageLabel = (page: string) => page === "Project intake" ? PROJECT_SETUP_LABEL : page
+
 // Only real pages belong here. Dialogs, filters and in-page tabs stay local.
 export const WORKSPACE_ROUTES: Record<Role, Record<string, string>> = {
   admin: {

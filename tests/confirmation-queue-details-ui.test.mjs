@@ -36,7 +36,7 @@ test("Confirmation Queue opens read-only popups with engineer acceptance statuse
     const click = async element => { assert.ok(element); await act(async () => { element.focus(); element.click(); await new Promise(resolve => setTimeout(resolve, 0)) }) }
     const button = (scope, text) => [...scope.querySelectorAll("button")].find(item => item.textContent.includes(text))
     await act(() => root.render(React.createElement(Workspace, { state, actor, onCommand: async () => { writes++; return { ok: true } }, onRead() {}, onMute() {}, onReload() {}, paused: false, onResume() {}, onPause() {}, idleWarning: false, onStayActive() {} })))
-    await click(document.querySelector('nav [aria-label="Project intake"]'))
+    await click(document.querySelector('nav [aria-label="Project setup"]'))
     const card = document.querySelector(".opm-confirmation-card")
     assert.ok(card)
     assert.equal(card.querySelectorAll("details.opm-confirmation-details").length, 0)

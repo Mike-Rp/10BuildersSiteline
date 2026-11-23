@@ -1,4 +1,5 @@
 import type { Account, Event, Project } from "./model.ts"
+import { workspacePageLabel } from "./workspace-routing.ts"
 
 export type NotificationAction = { label: string } & (
   { kind: "project"; id: string } |
@@ -23,5 +24,5 @@ export function notificationAction(event: Event, actor: Pick<Account, "id" | "ro
     if (actor.role === "admin") return { kind: "page", page: "Team", label: "Open Team accounts" }
     if (["opm", "spm"].includes(actor.role) && /^(License renewal reminder|Your license was not renewed)$/i.test(event.title)) return { kind: "profile", label: "View my license" }
   }
-  if (event.target !== "Dashboard" && pages.includes(event.target)) return { kind: "page", page: event.target, label: `Open ${event.target}` }
+  if (event.target !== "Dashboard" && pages.includes(event.target)) return { kind: "page", page: event.target, label: `Open ${workspacePageLabel(event.target)}` }
 }

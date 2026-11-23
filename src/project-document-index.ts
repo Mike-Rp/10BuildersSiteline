@@ -98,8 +98,8 @@ export function projectDocumentIndex(
       folders: [
         {
           id: "intake",
-          name: "Project Intake",
-          description: "Original registered documents from Project Intake.",
+          name: "Project setup",
+          description: "Original registered documents from project setup.",
           files: [] as ProjectDocumentFile[],
         },
         {
@@ -228,12 +228,12 @@ export function projectDocumentIndex(
             ? "intake"
             : "supporting",
       registered
-        ? "Project Intake · Registered documents"
+        ? "Project setup · Registered documents"
         : "Project Documents · Original upload",
     )
   }
   for (const doc of workflow.documentArchive || [])
-    add(doc, "agreements", "supporting", "Project Intake · Retained original")
+    add(doc, "agreements", "supporting", "Project setup · Retained original")
 
   return categories.map((item) => ({
     ...item,

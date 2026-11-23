@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "./ui"
+import { workspacePageLabel } from "./workspace-routing"
 
 export type TourStep = { title: string; detail: string; page: string; selector?: string; control?: string; readySelector?: string; prerequisite?: { selector: string; readySelector: string; detail: string }; emptySelector?: string; emptyMessage?: string; group?: string }
 
@@ -8,7 +9,7 @@ export function findTourTarget(step: TourStep): HTMLElement | undefined {
   const visible = (el: HTMLElement) => !el.closest('[inert], [hidden], .contextual-tour, .workspace-guide-content') && el.getClientRects().length > 0
   if (step.selector) return [...document.querySelectorAll<HTMLElement>(step.selector)].find(visible)
   return [...document.querySelectorAll<HTMLElement>('button, input, select, [role="tab"]')].find(el => visible(el) &&
-    (el.getAttribute("aria-label") || el.textContent || "").trim() === (step.control || step.page))
+    (el.getAttribute("aria-label") || el.textContent || "").trim() === (step.control || workspacePageLabel(step.page)))
 }
 
 export default function ContextualTour({ steps, index, title, onIndex, onClose, onTopics, onNavigate }: {

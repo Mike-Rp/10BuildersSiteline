@@ -27,7 +27,7 @@ export const createIntake = async (req, res) => {
     const inquiryId = req.body?.inquiry_id;
     const actor = await requireUser(req, res, inquiryId ? ['opm'] : ['admin']);
     if (!actor) return;
-    if (!inquiryId && !req.body?.draft_project_id) throw new HttpError(410, "Create a project inquiry. The assigned Office PM finalizes project intake.");
+    if (!inquiryId && !req.body?.draft_project_id) throw new HttpError(410, "Create a project inquiry. The assigned Office PM finalizes project setup.");
     if (inquiryId && (!isUuid(inquiryId) || req.body.draft_project_id || req.body.intake_id || req.body.client_user_id))
       throw new HttpError(422, "Invalid inquiry intake.");
     if (req.body?.client_subcon_company !== undefined) {

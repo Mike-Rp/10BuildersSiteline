@@ -323,7 +323,7 @@ export function clientDocumentIndex(
       folders: [
         {
           id: "intake",
-          name: "Project Intake",
+          name: "Project setup",
           description: "Registered project documents made available to you.",
           kind: "document" as const,
           files: view.documents.filter((doc) => doc.uploaded),

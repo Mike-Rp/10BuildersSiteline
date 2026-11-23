@@ -12,6 +12,7 @@ test("notifications link only to currently authorized projects and pages", () =>
   assert.deepEqual(notificationAction(event({ projectId: "project" }), actor, projects, [], []), { kind: "project", id: "project", label: "Open project" })
   assert.equal(notificationAction(event({ projectId: "outside", target: "Assignments" }), actor, projects, [], ["Assignments"]), undefined)
   assert.deepEqual(notificationAction(event({ target: "Assignments" }), actor, projects, [], ["Assignments"]), { kind: "page", page: "Assignments", label: "Open Assignments" })
+  assert.deepEqual(notificationAction(event({ target: "Project intake" }), { id: self, role: "opm" }, [], [], ["Project intake"]), { kind: "page", page: "Project intake", label: "Open Project setup" })
   assert.equal(notificationAction(event({ target: "https://example.test", detail: "Open account " + other }), actor, projects, [], ["Assignments"]), undefined)
   assert.equal(notificationAction(event({}), actor, projects, [], ["Dashboard"]), undefined, "generic stored targets must not just send the user back to the dashboard")
   assert.equal(notificationAction(event({ projectId: "project" }), { id: self, role: "client" }, projects, [], []).label, "Open project history")

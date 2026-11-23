@@ -75,7 +75,7 @@ export default function AdminDashboard({ overview, onNavigate, onOpen, onMonthly
       description={`${overview.activeProjects} active ${overview.activeProjects === 1 ? "project" : "projects"} and ${overview.intakeProjects} ${overview.intakeProjects === 1 ? "project" : "projects"} in intake. ${followUpTotal} follow-up ${followUpTotal === 1 ? "item needs" : "items need"} attention across project reviews, intake, requests and licenses.${delayedCount ? ` ${delayedCount} active ${delayedCount === 1 ? "project is" : "projects are"} past the target date.` : ""}`}
       metrics={[
         { label: "Active projects", value: overview.activeProjects, hint: "Open Active sites", icon: "building", onOpen: () => onNavigate("Active sites") },
-        { label: "Projects in intake", value: overview.intakeProjects, hint: "Open Project intake", onOpen: () => onNavigate("Project intake") },
+        { label: "Projects in setup", value: overview.intakeProjects, hint: "Open Project inquiries", onOpen: () => onNavigate("Project inquiries") },
         { label: "Completed projects", value: overview.completedProjects ?? 0, hint: "View completed project records", icon: "check", onOpen: onCompletedProjects || (() => onNavigate("Archive")) },
         { label: "Team accounts", value: overview.teamAccounts, hint: "Active and invited accounts", icon: "users", onOpen: () => onNavigate("Team") },
       ]}
