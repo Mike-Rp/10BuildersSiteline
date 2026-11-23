@@ -201,6 +201,7 @@ function Status({ value }: { value: string }) {
     </Badge>
   )
 }
+const PROJECT_SETUP_LABEL = "Project setup"
 const OPM_NAV = [
   ["Dashboard", "grid"],
   ["Project intake", "check"],
@@ -275,6 +276,7 @@ export default function RoleWorkspace({
   const { page: routePage, navigate: setPage } = useWorkspacePage(actor.role, !extensionDemo)
   const legacyIntakeRoute = isOpm && ["Project inquiries", "Confirmation queue"].includes(routePage)
   const page = legacyIntakeRoute ? "Project intake" : extensionDemo && routePage === "Dashboard" ? isOpm ? "Deadlines" : "Active sites" : routePage
+  const pageLabel = page === "Project intake" ? PROJECT_SETUP_LABEL : page
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<WorkspaceEvent>()
   const [pickedId, setPickedId] = useState(
@@ -3926,9 +3928,9 @@ export default function RoleWorkspace({
       case "Project intake":
         return (
           <>
-            {header("Project intake")}
+            {header(PROJECT_SETUP_LABEL)}
             <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
-            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label="Project intake views">
+            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label={`${PROJECT_SETUP_LABEL} views`}>
               {([
                 ["inquiries", "Project inquiries", inquiryCount, null],
                 ["mine", "Intake overview", intakes.length, "check"],
@@ -4120,12 +4122,12 @@ export default function RoleWorkspace({
               <button
                 aria-current={page === label ? "page" : undefined}
                 className={`nav-item ${page === label ? "active" : ""}`}
-                aria-label={label}
+                aria-label={label === "Project intake" ? PROJECT_SETUP_LABEL : label}
                 aria-description={navigationCounts[label]?.count ? `${navigationCounts[label].count} ${navigationCounts[label].description}` : undefined}
                 onClick={() => navigate(label)}
               >
                 <Icon name={icon} size={19} />
-                <span>{label}</span>
+                <span>{label === "Project intake" ? PROJECT_SETUP_LABEL : label}</span>
                 <NavigationCount item={navigationCounts[label]} />
               </button>
             </div>
@@ -4172,7 +4174,7 @@ export default function RoleWorkspace({
             />
             <span>{ROLE_NAMES[actor.role]}</span>
             <Icon name="chevron" size={14} />
-            <strong>{page}</strong>
+            <strong>{pageLabel}</strong>
           </div>
           <div className="topbar-actions">
             <div className="notification-container">

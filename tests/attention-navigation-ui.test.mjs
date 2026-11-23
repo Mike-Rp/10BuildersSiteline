@@ -43,7 +43,7 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
     const priority = name => [...document.querySelectorAll(".urgent-banner-item")].find(button=>button.textContent.includes(name))
     for (compact of [false,true]) {
       await render(office,"/opm/confirmation-queue")
-      assert.equal(document.querySelector('[aria-label="Project intake"] .nav-count').textContent,"2")
+      assert.equal(document.querySelector('[aria-label="Project setup"] .nav-count').textContent,"2")
       assert.ok(priority("Acceptance needed"))
       assert.ok(!priority("Waiting for Site PM"),"Waiting records do not demand an Office PM action")
       await act(()=>priority("Acceptance needed").click())
@@ -67,8 +67,9 @@ test("staff badges and missing banners link to acceptance, photo reviews and ass
       team: [{phase:"Mobilization",accountId:site.id,status:"pending",isLead:true}],
     })]
     await render(office,"/opm/project-inquiries")
-    assert.equal(document.querySelector("main h1").textContent,"Project intake")
-    assert.equal(document.querySelector('[aria-label="Project intake views"] [aria-selected="true"]').id,"project-intake-tab-inquiries")
+    assert.equal(document.querySelector("main h1").textContent,"Project setup")
+    assert.equal(document.querySelector(".topbar .breadcrumb strong").textContent,"Project setup")
+    assert.equal(document.querySelector('[aria-label="Project setup views"] [aria-selected="true"]').id,"project-intake-tab-inquiries")
     assert.equal(document.querySelector("#project-intake-tab-inquiries svg"), null)
     assert.ok(!document.querySelector('nav [aria-label="Project inquiries"]'),"The inquiry workflow has no separate sidebar entry")
     assert.ok(!document.querySelector('nav [aria-label="Confirmation queue"]'),"The confirmation queue has no separate sidebar entry")
