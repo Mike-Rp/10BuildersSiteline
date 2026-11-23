@@ -221,7 +221,7 @@ export const getOpm = async (projectType, excludedId, db) =>
   (await getOpmCandidates(projectType, excludedId, db))[0] ?? null;
 
 export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers, {
-  requiredScopes, setupAdditionalScopes, blockedCandidates, db = { query: execute },
+  requiredScopes, setupAdditionalScopes, staffingTarget, blockedCandidates, db = { query: execute },
 } = {}) => {
   const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
@@ -344,7 +344,7 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
       const required=requiredScopes?.[row.code] ?? (await db.query('select code from disciplines where id=any($1::int[]) order by code',[row.disciplines.map(Number)])).rows.map(r=>r.code);
       const candidates = details.map(person => ({id:person.id,qualifiedTags:person.matching_scopes}));
       if (candidateMap) candidateMap[row.code] = candidates.map((person,i) => ({...person,name:details[i].full_name,experienceYears:details[i].experience_years}));
-      const result=setupAdditionalScopes ? recommendPhaseEngineer(required,candidates,setupAdditionalScopes[row.code]) : allocatePhaseCoverage(required,candidates);
+      const result=setupAdditionalScopes ? recommendPhaseEngineer(required,candidates,setupAdditionalScopes[row.code],staffingTarget ?? 1) : allocatePhaseCoverage(required,candidates);
       suggestedSpms.push({id:row.project_stage_id,stage:row.code,is_lead:suggestedSpms.length===0,user_id:result.engineers[0]?.id||null,engineers:result.engineers.map(e=>({user_id:e.id,assigned_disciplines:e.tags})),required_specializations:required,coverage_complete:result.complete,coverage_quota:result.quota,quota_met:result.quotaMet,missing_specializations:result.missing});
       continue;
     }

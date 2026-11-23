@@ -51,25 +51,41 @@ export function phaseCoverageQuota(required) {
 }
 
 export const MAX_ENGINEERS_PER_PHASE = 3 // Historical allocation policy.
-export const SETUP_ENGINEER_LIMIT = 2
+export const SETUP_ENGINEER_LIMIT = 3
 
-// Input order is the qualification and availability ranking from the planning service.
-export function recommendPhaseEngineer(required, candidates, additional = []) {
-  let best
-  let extraCovered = -1
+export function recommendedSitePms(size, complexity) {
+  const sizePoints = ["Small", "Medium", "Large"].indexOf(size)
+  const complexityPoints = ["Low", "Moderate", "High"].indexOf(complexity)
+  if (sizePoints < 0 || complexityPoints < 0) return null
+  return Math.min(3, Math.max(1, sizePoints + complexityPoints))
+}
+
+// Prefer uncovered, explicitly requested scopes, then other uncovered work.
+// Keep the incoming eligibility ranking for ties.
+export function recommendPhaseEngineer(required, candidates, additional = [], target = 1) {
+  const engineers = [], covered = new Set(), selected = new Set()
   const tags = [...new Set([...additional, ...required])]
-  for (const person of candidates) {
-    const owned = tags.filter(tag => person.qualifiedTags.includes(tag)).slice(0, 3)
-    if (!owned.length) continue
-    const extra = owned.filter(tag => additional.includes(tag)).length
-    if (extra > extraCovered || (extra === extraCovered && owned.length > best.tags.length)) {
-      best = {id: person.id, tags: owned}
-      extraCovered = extra
+  while (engineers.length < Math.min(SETUP_ENGINEER_LIMIT,target)) {
+    let best, highest = -1
+    for (const person of candidates) {
+      if (selected.has(person.id)) continue
+      const priority = tag => covered.has(tag) ? 0 : additional.includes(tag) ? 10 : 1
+      const owned = tags.filter(tag => person.qualifiedTags.includes(tag))
+        .sort((a,b) => priority(b)-priority(a)).slice(0,3)
+      const score = owned.reduce((sum,tag) => sum + priority(tag),0)
+      if (owned.length && score > highest) {
+        best = {id:person.id,tags:owned}
+        highest = score
+      }
     }
+    if (!best) break
+    engineers.push(best)
+    selected.add(best.id)
+    best.tags.forEach(tag => covered.add(tag))
   }
-  const missing = required.filter(tag => !best?.tags.includes(tag))
-  return {engineers:best ? [best] : [], missing, covered:required.length-missing.length,
-    complete:missing.length===0, quota:1, quotaMet:!!best}
+  const missing = required.filter(tag => !covered.has(tag))
+  return {engineers, missing, covered:required.length-missing.length,
+    complete:missing.length===0, quota:1, quotaMet:engineers.length>0}
 }
 
 function combinations(values, size, visit, start = 0, selected = []) {

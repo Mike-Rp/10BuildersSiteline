@@ -10,7 +10,8 @@ import { ListPager, runList, updateListQuery, useListMemory } from "./ListContro
 import { withPage } from "./listing"
 import { IntakePipelinePanel, IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
-import { SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
+import StaffingPeak from "./StaffingPeak"
+import { recommendedSitePms, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
@@ -42,7 +43,7 @@ type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability"
 type AdditionalScopes = Record<string, string[]>
-type Planning = { phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
+type Planning = { recommended_site_pms?: number | null; phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
   additional_scope_options?: AdditionalScopes;
   staffing?: {assessment_id:string; phases:string[]; contract_file_id:string; additional_scopes?: AdditionalScopes} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
@@ -213,7 +214,7 @@ function staffingIssue(entry: Phase | undefined, required: string[], choices: Ca
   if (assigned.some(person => !matchingInquiryTags(
     person.assigned_disciplines, choices.find(candidate => candidate.id === person.user_id)?.qualifiedTags ?? [],
   ).length)) return "Review the lineup. An assigned engineer is unavailable or has no verified scope selected."
-  if (assigned.length > SETUP_ENGINEER_LIMIT) return "Choose at most two engineers for this phase."
+  if (assigned.length > SETUP_ENGINEER_LIMIT) return "Choose at most three engineers for this phase."
   return ""
 }
 
@@ -492,6 +493,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const end = row?.workflow?.review?.end
   const budget = row?.workflow?.budget
   const technical = row?.workflow?.assessment?.technical ?? row?.workflow?.review?.technical
+  const assessment = row?.workflow?.assessment
+  const recommendation = recommendedSitePms(assessment?.size, assessment?.complexity)
   const arrangement = row?.workflow?.assessment?.arrangement ?? row?.workflow?.review?.arrangement
   const staffingInput = {
     ...row?.details, target_start_date: start, target_end_date: end,
@@ -647,10 +650,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setTeam(current => (result.team || []).map(phase => {
       const selected = current.find(prior => prior.stage === phase.stage)
       if (selected) return selected
-      // Older planning APIs can recommend several engineers. Start with the coordinator.
-      if (!phase.engineers || phase.engineers.length < 2) return phase
-      const [coordinator] = phase.engineers
-      return { ...phase, ...coordinator, engineers: [coordinator] }
+      if (!phase.engineers?.length) return phase
+      const engineers = phase.engineers.slice(0,result.recommended_site_pms ?? recommendation ?? 1)
+      return { ...phase, ...engineers[0], engineers }
     }))
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
     setAddingEngineer(false)
@@ -1288,6 +1290,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {technical && <p>Technical requirements · {technical}</p>}
             {arrangement && <p>Phase arrangement · {arrangement}</p>}
           </div>
+          {recommendation && <p><strong>Recommended per phase: {recommendation} Site PM{recommendation === 1 ? "" : "s"}</strong> ? {assessment?.size} project, {assessment?.complexity} complexity. Adjust each lineup to its scope.</p>}
           <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => {
               const reason = staffingIssueByPhase.get(stage)
@@ -1311,6 +1314,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate())}
             scopeOptions={planning.additional_scope_options?.[staffingPhase]} onAddScope={scope => run(() => addStaffingScope(scope))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
+          <StaffingPeak phases={phases} team={team} arrangement={arrangement} />
           <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
         </fieldset>}
         {feedback}

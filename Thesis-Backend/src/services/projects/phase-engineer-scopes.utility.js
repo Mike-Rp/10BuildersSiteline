@@ -27,7 +27,7 @@ export async function inquiryScopeConfiguration(db, type, phases, additional = {
       throw new HttpError(422, `Choose configured additional engineering scopes for ${phase}.`);
     normalized[phase] = [...tags].sort();
     required[phase] = [...base[phase], ...normalized[phase]];
-    if (tags.length > 6) throw new HttpError(422, `Choose at most six additional specialties for ${phase}. Each engineer can cover up to three.`);
+    if (tags.length > 9) throw new HttpError(422, `Choose at most nine additional specialties for ${phase}. Each engineer can cover up to three.`);
   }
   return { required, additional: normalized, options };
 }

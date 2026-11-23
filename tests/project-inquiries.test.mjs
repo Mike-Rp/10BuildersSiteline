@@ -228,6 +228,12 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.deepEqual(rechecked.candidates[phases[0]].map(person => person.id), eligibleIds)
   assert.equal(rechecked.candidateBlockers[phases[0]], undefined)
   // Use two independently qualified coordinators so that Lead permissions are exercised by both accounts.
+  if (multiEngineer) {
+    for (const phase of recommended.team) {
+      assert.equal(phase.engineers.length, Math.min(recommended.recommended_site_pms,recommended.candidates[phase.stage].length))
+      phase.engineers = phase.engineers.slice(0,1) // Office PM reduces the proposed lineup.
+    }
+  }
   const secondPhase = recommended.team[1]
   const tags = secondPhase.engineers?.[0].assigned_disciplines ?? secondPhase.assigned_disciplines
   const firstPhaseIds = recommended.team[0].engineers?.map(e=>e.user_id) ?? [recommended.team[0].user_id]
@@ -236,7 +242,6 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     && tags.every(tag=>person.qualifiedTags.includes(tag)))
   assert.ok(alternate,"A second qualified Site PM is required for the authorization scenario")
   if (multiEngineer) {
-    assert.ok(recommended.team.every(phase => phase.engineers.length===1))
     const support = recommended.candidates[phases[1]].find(person=>person.id!==alternate.id && person.qualifiedTags.length)
     assert.ok(support)
     secondPhase.engineers.push({user_id:support.id,assigned_disciplines:support.qualifiedTags.slice(0,1)})
@@ -248,7 +253,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
   if (multiEngineer) {
     const crowded=structuredClone(payload)
-    crowded.phase_team[1].engineers.push(crowded.phase_team[1].engineers[0])
+    crowded.phase_team[1].engineers.push(...crowded.phase_team[1].engineers)
     await call("/projects/intake",{token,status:422,json:crowded})
   }
   await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:undefined}})

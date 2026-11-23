@@ -3,6 +3,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError, HttpError, isUuid } from "../../common/utilities/access.utility.js";
 import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
+import { recommendedSitePms } from "../../domain/engineer-phase-coverage.js";
 import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
@@ -406,8 +407,9 @@ export function mountInquiries(router) {
     const configuration = await inquiryScopeConfiguration({ query: execute }, type, selected,
       req.body.additional_scopes ?? Object.fromEntries(selected.map(phase => [phase, stored[phase] || []])));
     const scopes = configuration.required;
+    const staffingTarget = recommendedSitePms(assessment.size, assessment.complexity);
     const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers, {
-      requiredScopes: scopes, setupAdditionalScopes: configuration.additional, blockedCandidates,
+      requiredScopes: scopes, setupAdditionalScopes: configuration.additional, staffingTarget, blockedCandidates,
     });
     for (const phase of selected) {
       if (!Object.hasOwn(candidates, phase)) {
@@ -424,7 +426,7 @@ export function mountInquiries(router) {
         AND (details #>> '{opm_workflow,signed_contract,id}') IS NOT DISTINCT FROM $5::text`,
       [row.id, actor.id, JSON.stringify(staffing), assessment.id, signedContractId]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
-    return { phases, estimate, team, candidates, candidateBlockers, blockedCandidates, staffing,
+    return { phases, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, staffing,
       ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
   }));
 }

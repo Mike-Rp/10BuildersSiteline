@@ -39,7 +39,7 @@ export async function preparePhaseResponsibilities(
       )
     ).rows.map((r) => r.code)
     if (options.setupStaffing && phase.engineers.length > SETUP_ENGINEER_LIMIT)
-      throw new HttpError(422, `Assign one Site PM and at most one additional engineer to ${phase.stage}.`)
+      throw new HttpError(422, `Assign at most three Site PMs to ${phase.stage}.`)
     if (phase.engineers.length > MAX_ENGINEERS_PER_PHASE)
       throw new HttpError(422, `Assign no more than three engineers to ${phase.stage}.`)
     const used = new Set(),
