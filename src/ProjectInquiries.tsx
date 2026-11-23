@@ -502,6 +502,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const row = rows?.find(item => item.id === selected)
   const intakeLocked = row?.status === "approved" && inquiryAssessmentReady(row.details, row.workflow)
   const displayedOfficePage = officePage && intakeLocked ? "assessment" : officePage
+  const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
@@ -1047,7 +1048,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </header>}
     {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
-      <IntakePipelinePanel title="Project inquiries" label="Inquiry pipeline" heading={embedded ? "h2" : "h1"}
+      <IntakePipelinePanel title="Inquiry queue" label="Inquiry pipeline" heading={embedded ? "h2" : "h1"}
         actions={<button type="button" className="button icon-button" aria-label="Refresh inquiries" title="Refresh inquiries"
             disabled={busy} onClick={() => void run(async () => {
             await refresh()
@@ -1325,10 +1326,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         {feedback}
       </div>
     </Modal>}
-    {officePage === "review" && pendingContract && <ContractPreview file={pendingContract.file} busy={busy} error={error}
+    {canViewContract && pendingContract && <ContractPreview file={pendingContract.file} busy={busy} error={error}
       onClose={() => { if (!busy) { setPendingContract(undefined); setError("") } }}
       onConfirm={() => void run(confirmContract)} />}
-    {officePage === "review" && contractPreviewOpen && contractFileId && <ContractPreview fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
+    {canViewContract && contractPreviewOpen && contractFileId && <ContractPreview fileId={contractFileId} onClose={() => setContractPreviewOpen(false)} />}
     {admin && adminPage === "new" && renderAdminInquiryForm()}
     {!dialog && !officePage && adminPage !== "new" && feedback}
   </section>

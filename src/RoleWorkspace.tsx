@@ -3082,8 +3082,8 @@ export default function RoleWorkspace({
     })
     return (
       <>
-        <ListToolbar list={actionList} placeholder="Search Site PM responses" noun="project"
-          wrapControls={controls => <IntakePipelinePanel title="Site PM responses" label="Assignment tracking">{controls}</IntakePipelinePanel>} />
+        <ListToolbar list={actionList} placeholder="Search assignment responses" noun="project"
+          wrapControls={controls => <IntakePipelinePanel title="Assignment responses" label="Assignment tracking">{controls}</IntakePipelinePanel>} />
         <ListSection
           list={actionList}
           toolbar={false}
@@ -3932,9 +3932,9 @@ export default function RoleWorkspace({
             <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
             <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label={`${PROJECT_SETUP_LABEL} views`}>
               {([
-                ["inquiries", "Project inquiries", inquiryCount, null],
-                ["mine", "Intake overview", intakes.length, "check"],
-                ["responses", "Site PM responses", responsesNeedingAction.length, "users"],
+                ["inquiries", "Inquiry queue", inquiryCount, null],
+                ["mine", "Setup overview", intakes.length, "check"],
+                ["responses", "Assignment responses", responsesNeedingAction.length, "users"],
               ] as const).map(([value, label, count, icon]) => (
                 <button
                   key={value}
@@ -3963,7 +3963,7 @@ export default function RoleWorkspace({
               {confirmTab === "mine" && (
                 <>
                   <ListToolbar list={intakesList} placeholder="Search confirmations" noun="project"
-                    wrapControls={controls => <IntakePipelinePanel title="Intake overview" label="Intake pipeline">
+                    wrapControls={controls => <IntakePipelinePanel title="Setup overview" label="Intake pipeline">
                       <div className="confirmation-intake-filters">
                         <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => {
                           setIntakeView(value)

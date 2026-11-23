@@ -576,9 +576,9 @@
 .inquiry-accepted-notice > .button, .inquiry-opm-review .inquiry-sent-notice time, .inquiry-contract-preview > a { margin-inline-start: auto; }
 .inquiry-opm-review time, .inquiry-intake-progress { color: var(--color-muted); font-size: .85rem; }
 .inquiry-intake-progress { align-self: center; margin-inline-end: auto; }
-:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-form-section:has(.inquiry-section-heading) { padding: 16px; box-shadow: none; overflow: visible; }
-:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-section-heading h3 { padding: 0; background: transparent; }
-:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake) .inquiry-form-section:has(.inquiry-section-heading) > div { padding: 0; }
+:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake, .office-workflow) .inquiry-form-section:has(.inquiry-section-heading) { padding: 16px; box-shadow: none; overflow: visible; }
+:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake, .office-workflow) .inquiry-section-heading h3 { padding: 0; background: transparent; }
+:is(.inquiry-opm-review, .inquiry-outcome, .inquiry-intake, .office-workflow) .inquiry-form-section:has(.inquiry-section-heading) > div { padding: 0; }
 .inquiry-contract-preview { align-items: center; flex-wrap: wrap; background: var(--surface-subtle); }
 .inquiry-contract-preview strong { overflow-wrap: anywhere; }
 .inquiry-contract-preview small { display: block; }
