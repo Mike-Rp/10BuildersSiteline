@@ -417,7 +417,7 @@ export default function ClientPortal({
   }
   function photos(compact = false) {
     if (!project) return null
-    if (canShowClientPhotoExamples(actor, project)) return <ClientSamplePhotos key={project.id} compact={compact} projectName={project.name} />
+    if (project.status === "active" && canShowClientPhotoExamples(actor, project)) return <ClientSamplePhotos key={project.id} compact={compact} projectName={project.name} />
     if (!project.photos.length)
       return (
         compact ? <p className="co-empty">No site photos shared yet.</p> :
@@ -477,7 +477,28 @@ export default function ClientPortal({
   }
   function overview() {
     if (!project) return null
-    return <><ExtensionWorkflow actor={{ ...actor, role: "client" }} projectId={project.id} /><ClientOverview project={project} latest={history[0]} photos={photos(true)} onNavigate={navigate} onDetails={() => setSiteDetails(true)} /></>
+    const completionPhoto = project.status === "completed"
+      ? project.photos.reduce<ClientDocument | undefined>((latest, photo) => (
+          photo.uploaded && (!latest || photo.date > latest.date) ? photo : latest
+        ), undefined)
+      : undefined
+    return <>
+      {project.status === "active" && <ExtensionWorkflow actor={{ ...actor, role: "client" }} projectId={project.id} />}
+      <ClientOverview
+        project={project}
+        latest={history[0]}
+        photos={photos(true)}
+        completionPhoto={completionPhoto && <ClientPhoto
+          key={`${project.id}:${completionPhoto.id}`}
+          projectId={project.id}
+          photo={completionPhoto}
+          onResolve={onResolve}
+          hero
+        />}
+        onNavigate={navigate}
+        onDetails={() => setSiteDetails(true)}
+      />
+    </>
   }
   function projectDetails() {
     if (!project) return null
@@ -859,11 +880,13 @@ function ClientPhoto({
   photo,
   onOpen,
   onResolve,
+  hero = false,
 }: {
   projectId: string
   photo: ClientDocument
-  onOpen: () => void
+  onOpen?: () => void
   onResolve: (projectId: string, id: string, kind: "photo") => Doc
+  hero?: boolean
 }) {
   const [url, setUrl] = useState("")
   const resolver = useRef(onResolve)
@@ -889,6 +912,7 @@ function ClientPhoto({
       if (localUrl) URL.revokeObjectURL(localUrl)
     }
   }, [projectId, photo.id])
+  if (hero) return url ? <div className="co-completion-photo"><img src={url} alt={photo.name} /></div> : null
   return (
     <button className="client-photo" onClick={onOpen}>
       {url ? (

@@ -105,11 +105,38 @@ test("client overview shows each highlight once and preserves shared records and
     assert.ok(scheduleBanner.classList.contains('urgent-critical'))
     assert.match(scheduleBanner.textContent, /Target date passed/)
     assert.doesNotMatch(scheduleBanner.textContent, /Approve evidence|Review approvals/)
-    await click('View project contacts')
+    await click(`View project details for ${overdue.name}`)
     assert.match(document.querySelector('[aria-modal="true"]').textContent, /Authorized second project/)
     await click('Close dialog')
     await act(() => root.render(React.createElement(ClientPortal, { ...props, projects: [{ ...overdue, status: "completed" }] })))
     assert.equal(document.querySelector('[aria-label="Project schedule attention"]'), null)
+    const hero = document.querySelector('[aria-label="Project completion"]')
+    assert.match(hero.textContent, /Your project has been handed over/)
+    assert.equal(hero.querySelector("time"), null, "a missing completion date is not inferred")
+    assert.equal(hero.querySelector("img"), null, "no illustration is shown as a project photo")
+    assert.doesNotMatch(document.querySelector(".co-metrics").textContent, /Completed .* (early|late)/)
+    const completed = {
+      ...overdue,
+      status: "completed",
+      phase: "Closeout",
+      phases: ["Foundation", "Closeout"],
+      end: "2027-11-17",
+      completedAt: "2027-11-12T08:00:00Z",
+      overallProgress: 100,
+      photos: [{ id: "denied-photo", uploaded: true, label: "Site photo", name: "closeout.jpg", date: "2027-11-12" }],
+      documents: [{ id: "shared-document", uploaded: true, label: "Notice to Proceed", name: "notice.pdf", date: "2027-01-06" }],
+    }
+    await act(() => root.render(React.createElement(ClientPortal, { ...props, projects: [completed] })))
+    assert.equal(document.querySelector(".co-completion-hero time").dateTime, "2027-11-12")
+    assert.equal(document.querySelector(".co-completion-hero img"), null, "a denied photo stays out of the hero")
+    assert.match(document.querySelector(".co-metrics").textContent, /Final phaseCloseout/)
+    assert.match(document.querySelector(".co-metrics").textContent, /Completed 5 days early/)
+    assert.equal(document.querySelector('progress[aria-label="Overall project progress"]').value, 100)
+    await click("View project contacts")
+    assert.ok(document.querySelector('[aria-modal="true"] .client-project-facts'))
+    await click("Close dialog")
+    await click("View shared documents")
+    assert.ok(document.querySelector(".document-browser"))
     await act(() => root.render(React.createElement(ClientPortal, { ...props, projects: [] })))
     await click('Project Overview')
     assert.equal(document.querySelector('.client-overview'), null)
