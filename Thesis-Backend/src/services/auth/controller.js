@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { authenticate } from "../../common/utilities/auth.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError,sendOk,sendError,handleError,requireUser } from "../../common/utilities/access.utility.js";
+import { CLIENT_ACTIVATION_PASSWORD_MARKER } from "../projects/client-onboarding.js";
 
 export const login = (req,res) => signIn(req,res,["client"]);
 export const staffLogin = (req,res) => signIn(req,res,["opm","spm"]);
@@ -27,6 +28,8 @@ async function signIn(req,res,permittedRoles) {
          WHERE lower(u.email::text)=$1 AND COALESCE(u.is_deleted,false)=false AND NOT EXISTS (SELECT 1 FROM workspace_account_metadata m WHERE m.user_id=u.id AND m.metadata->>'assignmentHold'='true' AND m.metadata->'resignation'->>'status'='notice' AND (m.metadata->'resignation'->>'effectiveDate')::timestamptz<=now()) FOR UPDATE OF u`,
         [email.trim().toLowerCase()]);
       const u=found.rows[0];
+      if (u?.role === "client" && permittedRoles.includes("client") && u.status === "invited" && u.password_hash === CLIENT_ACTIVATION_PASSWORD_MARKER)
+        throw new HttpError(403, "Activate your client account before signing in.", "CLIENT_ACTIVATION_REQUIRED");
       if(!u || !["active","invited"].includes(u.status) || !(await bcrypt.compare(password,u.password_hash))) {
         throw new HttpError(401,"Invalid credentials or unavailable account.");
       }

@@ -104,7 +104,9 @@ test("Admin has a dedicated activity log navigation tab", () => {
   assert.deepEqual(adminBreadcrumb("Activity log", "project", "engineers"), ["Activity log"])
 })
 
-test("monthly reporting lives on Dashboard while Project intake remains in navigation", () => {
+test("Admin starts projects from inquiries and old intake targets open inquiries", () => {
   assert.ok(!labels.includes("Reports"))
-  assert.ok(labels.includes("Project intake"))
+  assert.ok(!labels.includes("Project intake"))
+  assert.ok(labels.includes("Project inquiries"))
+  assert.deepEqual(resolveAdminTarget("Project intake"), { page: "Project inquiries" })
 })

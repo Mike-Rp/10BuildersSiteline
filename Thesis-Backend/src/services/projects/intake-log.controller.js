@@ -1,34 +1,6 @@
 import execute from "../../common/utilities/query.utility.js";
-import { withTransaction } from "../../common/utilities/transaction.utility.js";
-import { HttpError, requireUser, handleError, sendOk, sendError, paging } from "../../common/utilities/access.utility.js";
+import { requireUser, handleError, sendOk, sendError, paging } from "../../common/utilities/access.utility.js";
 
-export const createIntakeDraft = async (req,res) => {
-  try {
-    const actor=await requireUser(req,res,["admin"]);
-    if(!actor) return;
-    const b=req.body || {};
-    if(typeof b.name!=="string" || !b.name.trim() || b.name.trim().length>200 ||
-      typeof b.project_type!=="string" || !b.project_type.trim()) return sendError(res,"Project name and project_type are required.",400);
-    for(const [field,max,integer] of [["floor_area_sqm",100000000,false],["floor_count",32768,true]]) {
-      if(b[field]!=null && (typeof b[field]!=="number" || !Number.isFinite(b[field]) || b[field]<=0 ||
-        b[field]>=max || (integer && !Number.isInteger(b[field])))) return sendError(res,"Invalid "+field+".",400);
-    }
-    if(b.target_start_date!==undefined && (typeof b.target_start_date!=="string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.target_start_date) ||
-      Number.isNaN(Date.parse(b.target_start_date)) || new Date(b.target_start_date).toISOString().slice(0,10)!==b.target_start_date)) {
-      return sendError(res,"Invalid target_start_date.",400);
-    }
-    const data=await withTransaction(async db=>{
-      const type=await db.query("SELECT id FROM project_types WHERE code=$1",[b.project_type]);
-      if(!type.rowCount) throw new HttpError(400,"Unknown project_type.");
-      const saved=await db.query(
-        `INSERT INTO projects (name,project_type_id,floor_area_sqm,floor_count,target_start_date,lifecycle_status,crew_assigned,created_by,updated_by)
-         VALUES ($1,$2,$3,$4,$5,'draft',0,$6,$6) RETURNING id,name,lifecycle_status`,
-        [b.name.trim(),type.rows[0].id,b.floor_area_sqm ?? null,b.floor_count ?? null,b.target_start_date ?? null,actor.id]);
-      return saved.rows[0];
-    });
-    return sendOk(res,"Intake draft created.",1,data,201);
-  } catch(error) { return handleError(res,error); }
-};
 export const getIntakeLog = async (req,res) => {
   try {
     const actor=await requireUser(req,res,["admin"]);

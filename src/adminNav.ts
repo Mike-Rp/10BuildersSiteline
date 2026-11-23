@@ -6,7 +6,6 @@ export const ADMIN_NAV = [
   { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
   { label: "Active sites", icon: "building" },
   { label: "Project inquiries", icon: "plus" },
-  { label: "Project intake", icon: "plus" },
   { label: "Documents", icon: "folder", group: "RESOURCES" },
   { label: "Directory", icon: "users" },
   { label: "Archive", icon: "archive" },
@@ -25,7 +24,7 @@ export const DIRECTORY_TABS: [DirectoryTab, string][] = [
 ]
 
 export type AdminTarget = {
-  page: "Documents" | "Directory"
+  page: "Documents" | "Directory" | "Project inquiries"
   documentsTab?: DocumentsTab
   directoryTab?: DirectoryTab
   subconTab?: "pending"
@@ -34,6 +33,7 @@ export type AdminTarget = {
 // The four former RESOURCES pages (and the pending-requests shortcut) now live in two tabbed pages.
 // Stored notification targets and links still use the old labels, so they are mapped here.
 const LEGACY_TARGETS: Record<string, AdminTarget> = {
+  "Project intake": { page: "Project inquiries" },
   "Project documents": { page: "Documents", documentsTab: "project" },
   "Engineer documents": { page: "Documents", documentsTab: "engineer" },
   "Engineer directory": { page: "Directory", directoryTab: "engineers" },

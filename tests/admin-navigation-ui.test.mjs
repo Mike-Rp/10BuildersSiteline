@@ -53,7 +53,7 @@ test("Admin navigation toggles on desktop and mobile, handles resizing, closes o
     }
     await checkBell()
     assert.equal(document.querySelector('.sidebar [aria-label="Reports"]'), null)
-    assert.ok(document.querySelector('.sidebar [aria-label="Project intake"]'))
+    assert.equal(document.querySelector('.sidebar [aria-label="Project intake"]'), null)
     assert.equal(document.querySelectorAll('.executive-summary').length, 1)
     const monthly = [...document.querySelectorAll('main button')].find(button => button.textContent === "Monthly report")
     assert.ok(monthly)

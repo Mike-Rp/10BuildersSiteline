@@ -7,7 +7,7 @@ export type AdminSearchDestination = {
   recordId: string
   recordKind: "project" | "account" | "company"
   name: string
-  dialog: "project" | "intake-record" | "account" | "company"
+  dialog: "project" | "account" | "company"
   directoryTab?: "engineers" | "subcontractors"
   documentsTab?: "project" | "engineer"
   subconTab?: string
@@ -40,7 +40,7 @@ export function resolveAdminSearchDestination(state: State, result: WorkspaceRes
       const archiveTab = project.status === "completed" ? "closed" : project.status
       return { ...base, page: "Archive", archiveTab, listKey: `admin:archive-${archiveTab}` }
     }
-    return { ...base, page: "Project intake", listKey: "admin:intake", dialog: "intake-record" }
+    return { ...base, page: "Project inquiries", listKey: "admin:inquiries" }
   }
   if (result.category === "people") {
     const account = state.accounts.find(item => item.id === result.id)

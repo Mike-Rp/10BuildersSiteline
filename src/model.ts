@@ -273,7 +273,6 @@ export type Project = {
   projectCompanyAllocation?: import("./api/intake-monitoring").ProjectCompanyAllocation
   overlapMonitoring?: import("./api/intake-monitoring").OverlapMonitoring
   inquiryOverview?: {
-    land_area?: number
     lot_area?: number
     classification?: string
     technical?: string

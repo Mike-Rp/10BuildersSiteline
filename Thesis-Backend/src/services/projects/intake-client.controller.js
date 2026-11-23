@@ -1,7 +1,6 @@
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError, requireUser, sendOk, sendError, handleError, isUuid } from "../../common/utilities/access.utility.js";
-import { createAccountRecord } from "../accounts/manage.controller.js";
-import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
+import { clientLoginEmail, CLIENT_ACTIVATION_PASSWORD_MARKER } from "./client-onboarding.js";
 
 const allowed = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 async function intakeProject(db,id,editable=true) {
@@ -19,42 +18,6 @@ async function attach(db,p,user,company,actorId) {
     [user.id,p.id,actorId]);
   await db.query("UPDATE projects SET client_name=$2,updated_by=$3,updated_at=now() WHERE id=$1",[p.id,company,actorId]);
 }
-export const createIntakeClient = async (req,res) => {
-  try {
-    const actor=await requireUser(req,res,["admin","opm"]);
-    if(!actor) return;
-    const b=req.body || {};
-    const company=b.company_name ?? b.client_name;
-    const person=b.contact_person ?? b.full_name;
-    const phone=b.phone ?? b.contact_number ?? null;
-    const email=typeof b.email==="string" ? b.email.trim().toLowerCase() : b.email;
-    if(typeof company!=="string" || !company.trim() || company.trim().length>150 ||
-      typeof person!=="string" || !person.trim() || person.trim().length>150 ||
-      typeof email!=="string" || email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return sendError(res,"Provide company_name, contact_person, and email.",400);
-    }
-    if (phone !== null && phone !== "" && !isPhilippineMobile(phone)) return sendError(res, PH_MOBILE_ERROR, 400);
-    const data=await withTransaction(async db=>{
-      const p=await intakeProject(db,b.project_id);
-      if (actor.role!=="admin"&&p.suggested_opm_id!==actor.id) throw new HttpError(403,"Only Admin or the assigned Office PM can manage this project's client account.");
-      await db.query("select set_config('app.current_user_id',$1,true)",[actor.id]);
-      await db.query("select pg_advisory_xact_lock(hashtext($1))",[`client-email:${email}`]);
-      const existing=await db.query(
-        `SELECT u.id,u.full_name,u.email,u.phone,u.status,u.is_deleted,r.code AS role FROM users u
-         JOIN roles r ON r.id=u.role_id WHERE lower(u.email::text)=$1 FOR UPDATE OF u`,[email]);
-      let user=existing.rows[0],reused=!!user;
-      if(user && (user.role!=="client" || user.is_deleted || !["active","invited"].includes(user.status))) {
-        throw new HttpError(409,"That email belongs to an unavailable or non-client account.");
-      }
-      if(!user) user=await createAccountRecord(db,actor,{full_name:person,email,phone,role:"client",password:b.password});
-      await attach(db,p,user,company.trim(),actor.id);
-      return {id:user.id,user_id:user.id,full_name:user.full_name,email:user.email,phone:user.phone,status:user.status,
-        role:"client",project_id:p.id,client_name:company.trim(),reused,
-        ...(user.temp_password ? {temp_password:user.temp_password} : {})};
-    });
-    return sendOk(res,"Client saved in Team Accounts and connected to the project.",1,data,data.reused ? 200 : 201);
-  } catch(error) { return handleError(res,error); }
-};
 export const getProjectClientAccount = async (req,res) => {
   try {
     const actor=await requireUser(req,res,["admin","opm"]);
@@ -62,12 +25,20 @@ export const getProjectClientAccount = async (req,res) => {
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,req.params.id,false);
       if (actor.role!=="admin"&&p.suggested_opm_id!==actor.id) throw new HttpError(403,"Only Admin or the assigned Office PM can manage this project's client account.");
-      const clients=(await db.query(`SELECT u.id,u.full_name,u.email,u.phone,u.status FROM user_client_project_links l
+      const clients=(await db.query(`SELECT u.id,u.full_name,u.email,u.phone,u.status,
+        CASE WHEN u.status='invited' AND u.password_hash=$2 THEN 'pending_activation'
+          WHEN u.status='active' AND u.password_hash<>$2 THEN 'active' ELSE NULL END AS activation_status FROM user_client_project_links l
         JOIN users u ON u.id=l.user_id JOIN roles r ON r.id=u.role_id
-        WHERE l.project_id=$1 AND r.code='client' AND NOT COALESCE(u.is_deleted,false) ORDER BY u.full_name,u.id`,[p.id])).rows;
+        WHERE l.project_id=$1 AND r.code='client' AND NOT COALESCE(u.is_deleted,false) ORDER BY u.full_name,u.id`,[p.id,CLIENT_ACTIVATION_PASSWORD_MARKER])).rows;
       const details=p.inquiry_details||{};
-      return {clients,editable:allowed.includes(p.lifecycle_status),defaults:{company_name:p.client_name||"",
-        contact_person:details.primary_contact||details.client_name||p.client_name||"",email:details.email||"",phone:details.phone||""}};
+      const managed = !!p.inquiry_details;
+      const email = clientLoginEmail(details.email);
+      const existing = managed && email && actor.role === "admin" && !clients.length && allowed.includes(p.lifecycle_status)
+        ? (await db.query(`SELECT u.id,u.full_name,u.email FROM users u JOIN roles r ON r.id=u.role_id
+          WHERE lower(u.email::text)=$1 AND r.code='client' AND u.status='active' AND NOT COALESCE(u.is_deleted,false)`, [email])).rows[0]
+        : undefined;
+      return {clients,managed,existing,can_issue_activation_code:actor.role === "opm" && clients.some(account => account.activation_status === "pending_activation"),
+        defaults:{email:details.email||""}};
     });
     res.set("Cache-Control","private, no-store");
     return sendOk(res,"Project client account loaded.",1,data);
@@ -86,7 +57,11 @@ export const selectIntakeClient = async (req,res) => {
         [req.body.client_user_id]);
       if(!found.rowCount) throw new HttpError(422,"Select an available client account.");
       const user=found.rows[0];
-      const company=req.body.client_name ?? user.full_name;
+      if (p.inquiry_details && (req.body.ownership_verified !== true || user.status !== "active" || clientLoginEmail(p.inquiry_details.email) !== user.email.toLowerCase()))
+        throw new HttpError(409, "Verify the active client's ownership and registered inquiry email before linking the project.");
+      if (p.inquiry_details && (await db.query("SELECT 1 FROM user_client_project_links WHERE project_id=$1", [p.id])).rowCount)
+        throw new HttpError(409,"A client account is already linked to this project.");
+      const company=p.inquiry_details ? (p.client_name || user.full_name) : req.body.client_name ?? user.full_name;
       if(typeof company!=="string" || !company.trim() || company.trim().length>150) throw new HttpError(400,"Invalid client_name.");
       await attach(db,p,user,company.trim(),actor.id);
       return {project_id:p.id,client_user_id:user.id,client_name:company.trim(),email:user.email};

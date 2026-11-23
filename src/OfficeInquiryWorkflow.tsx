@@ -3,6 +3,7 @@ import { Icon } from "./ui"
 import { addDays, initials } from "./model"
 import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
+import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
@@ -241,6 +242,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       </select>
       : key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
           onValueChange={value => updateDraft(key, value)} />
+      : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required min={0}
+        value={String(draft[key] ?? "")} onValueChange={value => updateDraft(key, value)} />
       : <input {...describedField(id)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
           max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined} maxLength={numeric ? undefined : key === "address" ? 500 : 150}
@@ -275,7 +278,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         if (control.id === "inquiry-start-date" && !validStart) message = "Choose a valid estimated start date of today or later."
         else if (control.required && !value && !control.validity.badInput) message = "Complete this required field."
         else if (!control.validity.valid) message = key === "phone" ? PH_MOBILE_ERROR : control.validationMessage
-        else if (numericField(key) && value && Number(value) <= 0) message = "Enter a value greater than zero."
+        else if (numericField(key) && value && Number(value.replace(/,/g, "")) <= 0) message = "Enter a value greater than zero."
         else if (key === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) message = "Enter a valid personal or business email address."
       }
       if (message) {
@@ -491,8 +494,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div className="office-workflow-fields">
               {floorArea.mode === "same" ? <div className={`office-review-wide${editedAreaPerFloor ? " office-review-field-changed" : ""}`}>
                 <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²){editedAreaPerFloor && <span className="office-review-edited">Edited</span>}</label>
-                <input {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required type="number" min="0" step="any" value={perFloor}
-                  onChange={event => updateFloorArea({ ...floorArea, perFloor: event.target.value })} />
+                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={0} value={perFloor}
+                  onValueChange={value => updateFloorArea({ ...floorArea, perFloor: value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
                   {averageExceedsCorrectedLot
                     ? "The submitted average is larger than the corrected lot. Enter the actual area per floor."
@@ -506,9 +509,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 const changed = areaWasEdited(value)
                 return <div key={id} className={changed ? "office-review-field-changed" : undefined}>
                   <label htmlFor={id}>Floor {index + 1} area (m²){changed && <span className="office-review-edited">Edited</span>}</label>
-                  <input {...describedField(id)} required type="number" min="0" step="any" value={value} onChange={event => {
+                  <GroupedNumberInput {...describedField(id)} required min={0} value={value} onValueChange={nextArea => {
                     const areas = [...floorArea.areas]
-                    areas[index] = event.target.value
+                    areas[index] = nextArea
                     updateFloorArea({ ...floorArea, areas })
                   }} />
                   {inlineError(id)}
@@ -565,8 +568,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div className={`office-workflow-fields office-review-budget${needsReason ? "" : " single"}`}>
               <div>
                 <label htmlFor={fieldId("budget")}>Authorized budget (₱)</label>
-                <input {...describedField(fieldId("budget"))} type="number" required min="0.01" max="999999999999.99" step="0.01"
-                  placeholder="Enter approved amount" value={budget} onChange={event => setBudget(event.target.value)} />
+                <GroupedNumberInput {...describedField(fieldId("budget"))} required min={0.01} max={999999999999.99} decimalPlaces={2}
+                  placeholder="Enter approved amount" value={budget} onValueChange={setBudget} />
                 {inlineError(fieldId("budget"))}
               </div>
               {needsReason && <div>
@@ -618,8 +621,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             </details>
           <details className="office-workflow-history" open={!workflow?.budget || undefined}>
             <summary>Budget allocation</summary>
-            <label>Authorized amount (₱)<input type="number" required min="0.01" max="999999999999.99" step="0.01"
-              value={budget} onChange={event => setBudget(event.target.value)} /></label>
+            <label>Authorized amount (₱)<GroupedNumberInput required min={0.01} max={999999999999.99} decimalPlaces={2}
+              value={budget} onValueChange={setBudget} /></label>
             {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
               <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
             </details>}

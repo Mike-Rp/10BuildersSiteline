@@ -13,8 +13,6 @@ import "./company-created-notice.css"
 import SitePmAppointmentAgreements, { appointmentStaff, appointmentFor } from "./SitePmAppointmentAgreements"
 import AdminAccountSecurity,{AdminRecoveryNotice} from './AdminAccountSecurity'
 import AccountSignInDetails, { type CreatedAccountDetails } from "./AccountSignInDetails"
-import IntakeRecord from "./IntakeRecord"
-import AdminIntakeCards from "./AdminIntakeCards"
 import ArchiveProjectCards from "./ArchiveProjectCards"
 import InfoPopover from "./InfoPopover"
 import useIdleWarning from "./useIdleWarning"
@@ -52,8 +50,7 @@ import { notificationAction } from "./notification-action"
 import SitePhotoGallery from "./SitePhotoGallery"
 import useNotificationSettings, { NotificationSaveStatus } from "./useNotificationSettings"
 import { sessionDashboardGreeting, type LoginGreeting } from "./dashboard-greeting"
-import IntakeGuidance, { AdminIntakeTable, IntakeTabs } from "./IntakeGuidance"
-import { intakeGuidance, intakeViewCounts, isIntakeHistory, type IntakeView } from "./intake-guidance"
+import IntakeGuidance from "./IntakeGuidance"
 import WorkspaceSkeleton from "./LoadingSkeleton"
 import { clearStoredAccountPreferences, clearStoredWorkspaceData } from "./browser-data"
 import { createInFlight } from "./api/in-flight"
@@ -64,7 +61,7 @@ import { hasPendingSiteReview } from "./active-sites-review"
 import ActiveSites from "./ActiveSites"
 import { leadId } from "./workflows"
 import PasswordReset from "./PasswordReset"
-import { createCompany, persistAdminChanges, saveApiAccount, saveApiProject, PartialProjectSave, PartialAccountSave, sendApiWorkflow } from "./api/actions"
+import { createCompany, persistAdminChanges, saveApiAccount, PartialAccountSave, sendApiWorkflow } from "./api/actions"
 // @refresh reset
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { applyRefreshSetting, isStale, startPolling } from "./refresh-interval"
@@ -113,8 +110,6 @@ import {
   applyWorkflow,
   beginAccountResignation,
   resolveClientSubconIssue,
-  registeredComplete,
-  teamConfirmed,
   workflowFor,
   checklistFor,
   type WorkflowCommand,
@@ -137,7 +132,6 @@ import {
   DocumentList,
   downloadBlob,
   downloadDoc,
-  IntakeForm,
   Preview,
   SettingsForm,
   Upload,
@@ -156,7 +150,6 @@ import {
   uid,
   workload,
   projectDateErrors,
-  PROJECT_TYPES,
   type Account,
   type Company,
   type Doc,
@@ -340,8 +333,6 @@ function AppInner() {
     state.accounts.find((a) => a.id === sessionId) ||
     stubAccount("", "", "client")
   const { page, navigate: setPage } = useWorkspacePage("admin")
-  const [intakeView, setIntakeView] = useState<IntakeView>("all")
-  const [intakeLogTab, setIntakeLogTab] = useState<"current" | "history">("current")
   const [dialog, setDialog] = useState<Dialog>()
   const [securityOpen,setSecurityOpen]=useState(false)
   const [securityTab,setSecurityTab]=useState<'password'|'codes'>('codes')
@@ -353,8 +344,6 @@ function AppInner() {
   const [reportProjectId,setReportProjectId]=useState("")
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [toast, setToast] = useState("")
-  const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState("all")
   const [searchLanding, setSearchLanding] = useState<AdminSearchDestination>()
   const [projectRepositoryPath, setProjectRepositoryPath] = useState<{ projectId?: string; categoryId?: string; folderId?: string }>({})
   useEffect(() => { setSearchLanding(undefined); setProjectRepositoryPath({}) }, [actor.id])
@@ -427,9 +416,6 @@ function AppInner() {
   const [renewalsOpen, setRenewalsOpen] = useState(false)
   const [activityFilter, setActivityFilter] = useState("all")
   const active = state.projects.filter((p) => p.status === "active")
-  const intake = state.projects.filter((p) =>
-    ["pending", "draft", "changes_requested"].includes(p.status),
-  )
   const pending = state.companies.filter((c) => c.status === "pending")
   const engineers = state.accounts.filter((a) => a.role !== "client")
   const unread = state.events.filter(
@@ -655,8 +641,6 @@ function AppInner() {
     } catch(error) { setToast((error as Error).message);return false }
   }
   function resetListState() {
-    setQuery("")
-    setFilter("all")
     setSubconTab("registered")
     setRoleFilter("all")
     setLicenseFilter("all")
@@ -687,7 +671,6 @@ function AppInner() {
     if (destination.documentsTab) setDocumentsTab(destination.documentsTab)
     if (destination.subconTab) setSubconTab(destination.subconTab)
     if (destination.archiveTab) setTab(destination.archiveTab)
-    if (destination.page === "Project intake") { setIntakeLogTab("current"); setIntakeView("all") }
     setProjectRepositoryPath(destination.repositoryPath || {})
     updateListQuery(destination.listKey, query => ({ ...query, search: "", filters: {}, page: 1 }))
     if (destination.repositoryPath) updateListQuery(`admin:documents:files:${destination.recordId}:${destination.repositoryPath.folderId}`, query => ({ ...query, search: "", filters: {}, page: 1 }))
@@ -888,20 +871,6 @@ function AppInner() {
       setToast((error as Error).message);throw error
     }
   }
-  async function addProject(project:Project) {
-    try {
-      const exists=stateRef.current.projects.some(p=>p.id===project.id)
-      const id=await saveApiProject(project,exists)
-      await reloadWorkspace()
-      navigate("Project intake");setDialog({kind:"sent",id})
-    }catch(error){
-      if(error instanceof PartialProjectSave){
-        setToast(error.message);await reloadWorkspace().catch(()=>undefined)
-        navigate("Project intake");setDialog({kind:"sent",id:error.id});return
-      }
-      setToast((error as Error).message);throw error
-    }
-  }
   function updateCompany(c: Company, message: string) {
     return commit(
       (s) => ({
@@ -994,6 +963,25 @@ function AppInner() {
         ),
     })
   }
+  function archiveClientAccount(account: Account) {
+    setConfirmation({
+      title: "Archive client account?",
+      message: `${account.name} will lose sign-in access. Project records and account history will be retained.`,
+      destructive: true,
+      action: () => {
+        void api(`/accounts/${account.id}`, { method: "DELETE", json: { reason: "Client account archived by Administrator." } })
+          .then(async () => {
+            setDialog(undefined)
+            try {
+              await reloadWorkspace()
+              setToast("Client account archived.")
+            } catch {
+              setToast("Client account archived. Refresh Team & Accounts to update the list.")
+            }
+          }).catch(error => setToast(error.message))
+      },
+    })
+  }
   async function startResignation(a: Account, letter: Doc, noticeDays: number) {
     try {
       await api("/accounts/"+a.id+"/resignation",{method:"POST",json:{letter,noticeDays}})
@@ -1075,8 +1063,6 @@ function AppInner() {
       "Project intake",
     )
   }
-  const matches = (value: string) =>
-    value.toLowerCase().includes(query.toLowerCase())
   // Search, filters and paging for the Admin lists. The Administrator sees every
   // record, so there is nothing to scope here; other roles scope first.
   const projectSearch = (p: Project) =>
@@ -1146,31 +1132,6 @@ function AppInner() {
   }
   const accountSearch = (a: Account) =>
     `${a.name} ${a.email} ${a.scope.join(" ")} ${a.license}`
-  const intakeHistory = state.projects.filter(isIntakeHistory)
-  const intakeItems = intakeLogTab === "history" ? intakeHistory : state.projects.filter((p) =>
-    ["pending", "changes_requested", "draft"].includes(p.status),
-  )
-  const intakeCounts = intakeViewCounts(intakeItems, p => intakeGuidance(state, p, actor))
-  const intakeList = runList(intakeLogTab === "history" ? "admin:intake-history" : "admin:intake", focusSearchItems(intakeItems.filter(p => intakeLogTab === "history" || intakeView === "all" || intakeGuidance(state, p, actor)?.kind === intakeView), intakeLogTab === "history" ? "admin:intake-history" : "admin:intake"), {
-    searchText: projectSearch,
-    filters: [
-      {
-        id: "status",
-        label: "Status",
-        allLabel: "All intake",
-        options: intakeLogTab === "history" ? [
-          { value: "active", label: "Project Active" },
-          { value: "completed", label: "Project Completed" },
-        ] : [
-          { value: "pending", label: "Awaiting confirmation" },
-          { value: "changes_requested", label: "Changes requested" },
-          { value: "draft", label: "Drafts" },
-        ],
-        test: (p, value) => p.status === value,
-      },
-      { ...typeFilter(intakeItems), options: PROJECT_TYPES.map(value => ({ value, label: value })) },
-    ],
-  })
   // Engineer Directory: the server filters, counts and pages (/accounts, ordered by
   // name then id). A license or "deactivated" filter is unknown to the server, so
   // then the very same list is filtered in the browser instead.
@@ -1301,143 +1262,6 @@ function AppInner() {
     ],
   })
 
-  function projectTable(projects: Project[], intakeTable = false) {
-    return projects.length ? (
-      <div className="table-scroll">
-        <table className="project-table">
-          <thead>
-            <tr>
-              <th>PROJECT NAME</th>
-              <th>{intakeTable ? "ASSIGNED OFFICE PM" : "CURRENT PHASE"}</th>
-              <th>{intakeTable ? "CONFIRMATIONS" : "PROGRESS"}</th>
-              {!intakeTable && <th>PLANNED TIMELINE</th>}
-              <th>STATUS</th>
-              <th className="right">{intakeTable ? "ACTION" : "SITE LEAD"}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p, i) => (
-              <tr key={p.id}>
-                <td>
-                  <button
-                    className="project-name"
-                    onClick={() => setDialog({ kind: "project", id: p.id })}
-                  >
-                    <span className={`project-symbol symbol-${i % 3}`}>
-                      <Icon name="building" size={21} />
-                    </span>
-                    <span>
-                      <strong>{p.name}</strong>
-                      <small>
-                        {p.type} <span className="mid-dot">·</span> SL-
-                        {p.id.replace(/\D/g, "").padStart(3, "0")}
-                      </small>
-                    </span>
-                  </button>
-                </td>
-                <td>
-                  {intakeTable ? (
-                    <div className="person-cell">
-                      <span className="avatar small">
-                        {initials(nameFor(p.opmId))}
-                      </span>
-                      <span>{nameFor(p.opmId)}</span>
-                    </div>
-                  ) : (
-                    <span className="phase-label">{p.phase}</span>
-                  )}
-                </td>
-                <td>
-                  {intakeTable ? (
-                    <div className="confirmation-progress">
-                      <span>
-                        {p.opmAccepted
-                          ? "Office PM accepted"
-                          : "Office PM pending"}
-                      </span>
-                      <small>
-                        {p.team.filter((t) => t.status === "confirmed").length}/
-                        {p.team.length} Site PM phases confirmed
-                      </small>
-                    </div>
-                  ) : (
-                    <div className="progress-cell">
-                      <progress max="100" value={p.progress} />
-                      <strong>{p.progress}%</strong>
-                    </div>
-                  )}
-                </td>
-                {!intakeTable && (
-                  <td>
-                    <PlannedTimeline project={p} compact />
-                  </td>
-                )}
-                <td>
-                  <Status
-                    status={
-                      p.status === "pending" && p.opmAccepted
-                        ? !registeredComplete(p)
-                          ? "Office PM documents pending"
-                          : !teamConfirmed(p)
-                            ? "Site PM responses pending"
-                            : "Subcontractor coordination"
-                        : p.status
-                    }
-                  />
-                </td>
-                <td className="right">
-                  {intakeTable ? (
-                    <Button
-                      variant="text-button"
-                      onClick={() =>
-                        setDialog({
-                          kind:
-                            p.status === "changes_requested" ||
-                            p.status === "draft"
-                              ? "intake"
-                              : "project",
-                          id: p.id,
-                        })
-                      }
-                    >
-                      {p.status === "changes_requested"
-                        ? "Resubmit"
-                        : "View details"}
-                      <Icon name="arrow" size={16} />
-                    </Button>
-                  ) : (
-                    <div className="lead-cell">
-                      <span className="avatar small">
-                        {initials(nameFor(p.team[0]?.accountId))}
-                      </span>
-                      <span>
-                        {nameFor(p.team[0]?.accountId)
-                          .split(" ")
-                          .filter((x) => x.length > 2)
-                          .slice(0, 2)
-                          .join(" ")}
-                      </span>
-                      <button
-                        className="row-arrow"
-                        aria-label={`View ${p.name}`}
-                        onClick={() => setDialog({ kind: "project", id: p.id })}
-                      >
-                        <Icon name="chevron" size={17} />
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      <Empty title="No projects found">
-        Try another search or create a new project intake.
-      </Empty>
-    )
-  }
   function subconRequests(status: string) {
     const requestList = runList(
       `admin:subcon-${status}`,
@@ -1646,31 +1470,6 @@ function AppInner() {
               }),
             }
           })} onOpen={id => setDialog({ kind: "project", id })} />
-        </>
-      )
-    if (page === "Project intake")
-      return (
-        <>
-          {pageHeading("Project intake")}
-          <Panel
-            title="Project Intake Log"
-            subtitle={`${intake.length} current intake records · ${intakeHistory.length} completed intake records`}
-          >
-            <div className="intake-tabs" role="group" aria-label="Intake log view">
-              <button type="button" aria-pressed={intakeLogTab === "current"} onClick={() => { setSearchLanding(undefined); setIntakeLogTab("current") }}>Current Intake ({intake.length})</button>
-              <button type="button" aria-pressed={intakeLogTab === "history"} onClick={() => { setSearchLanding(undefined); setIntakeLogTab("history") }}>Intake History ({intakeHistory.length})</button>
-            </div>
-            {intakeLogTab === "current" && <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => { setIntakeView(value); updateListQuery("admin:intake", q => withPage(q, 1)) }} />}
-            <ListSection
-              list={intakeList}
-              placeholder="Search intake records"
-              noun="record"
-              render={(items) => intakeLogTab === "history"
-                ? <AdminIntakeTable state={state} projects={items} actor={actor} onOpen={p => setDialog({ kind: "intake-record", id: p.id })} onOpenActive={p => { navigate("Active sites"); setDialog({ kind: "project", id: p.id }) }} />
-                : <AdminIntakeCards highlightedId={searchLanding?.recordId} state={state} projects={items} actor={actor} onOpen={(p, edit) => setDialog({ kind: edit ? "intake" : "intake-record", id: p.id })} />}
-              empty={<Empty title={intakeLogTab === "history" ? "No completed intake records" : !intakeItems.length ? "No intake records" : intakeView === "action" ? "No intake actions for your account" : "No intake records waiting for others"}>{intakeLogTab === "history" ? "Activated projects remain here for reference. Ongoing monitoring is available in Active Sites." : "Existing intake records appear here as projects move through setup."}</Empty>}
-            />
-          </Panel>
         </>
       )
     const projectDocumentsTab = () => (
@@ -2033,7 +1832,7 @@ function AppInner() {
           )}
           <Panel
             title="Organization accounts"
-            subtitle={`${state.accounts.filter((a) => a.status !== "deactivated").length} accounts · Admin-provisioned access`}
+            subtitle={`${state.accounts.filter((a) => a.status !== "deactivated").length} accounts`}
             className="team-accounts-panel"
           >
             {teamAlerts.size > 0 && (
@@ -2045,7 +1844,7 @@ function AppInner() {
             )}
             <ListToolbar
               list={teamList}
-              placeholder="Search name, scope or status"
+              placeholder="Search name or email"
               noun="account"
             />
             <div className="table-scroll">
@@ -2062,7 +1861,10 @@ function AppInner() {
                 </thead>
                 <tbody>
                   {teamList.view.items.map((a) => (
-                      <tr key={a.id} className={`${teamAlerts.has(a.id) ? "team-needs-attention" : ""} ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""}`}>
+                      <tr key={a.id} className={`team-account-row ${teamAlerts.has(a.id) ? "team-needs-attention" : ""} ${searchLanding?.recordId === a.id ? "search-result-highlight" : ""}`}
+                        onClick={event => {
+                          if (!(event.target as HTMLElement).closest("button")) setDialog({ kind: "account", id: a.id })
+                        }}>
                         <td data-label="Person">
                           <button
                             className="person-cell clickable"
@@ -2497,7 +2299,7 @@ function AppInner() {
       .filter(Boolean) as Account[]
     return (
       <>
-        {!docsOnly && <ProjectClientAccount projectId={p.id} onSaved={reloadWorkspace} />}
+        {!docsOnly && <ProjectClientAccount key={p.id} projectId={p.id} onSaved={reloadWorkspace} />}
         {docsOnly && <>
         <div className="detail-hero">
           <span className="project-symbol">
@@ -2667,14 +2469,6 @@ function AppInner() {
         </section>
         <div className="modal-actions">
           <Button onClick={() => setDialog(undefined)}>Close</Button>
-          {p.status === "changes_requested" && (
-            <Button
-              variant="primary"
-              onClick={() => setDialog({ kind: "intake", id: p.id })}
-            >
-              Review staffing & resubmit
-            </Button>
-          )}
         </div>
       </>
     )
@@ -2768,6 +2562,8 @@ function AppInner() {
             )}
             <div className="profile-actions">
               {a.id===actor.id&&actor.role==='admin'&&<><Button icon="shield" onClick={()=>{setDialog(undefined);setSecurityTab('password');setSecurityOpen(true)}}>Change password</Button><Button onClick={()=>{setDialog(undefined);setSecurityTab('codes');setSecurityOpen(true)}}>Recovery codes</Button></>}
+              {a.role === "client" && a.status !== "deactivated" && <Button variant="danger-ghost" icon="archive"
+                onClick={() => archiveClientAccount(a)}>Archive client account</Button>}
               {a.role !== "client" && <Button
                 disabled={a.status === "deactivated"}
                 icon="edit"
@@ -3280,56 +3076,6 @@ function AppInner() {
         </main>
       </div>
       {securityOpen&&<AdminAccountSecurity initialTab={securityTab} onClose={()=>setSecurityOpen(false)} onPasswordChanged={endSession}/>}
-      {dialog?.kind === "intake" && selectedProject && (
-        <Modal
-          title="Resubmit project"
-          wide
-          onClose={() => setDialog(undefined)}
-        >
-          <IntakeForm
-            state={state}
-            project={selectedProject}
-            onClose={() => setDialog(undefined)}
-            onSubmit={addProject}
-          />
-        </Modal>
-      )}
-      {dialog?.kind === "sent" && selectedProject && (
-        <Modal
-          title="Project handed off successfully"
-          onClose={() => setDialog(undefined)}
-        >
-          <div className="success-state">
-            <span>
-              <Icon name="check" size={32} />
-            </span>
-            <h3>{selectedProject.name}</h3>
-            <p>
-              Sent to <strong>{nameFor(selectedProject.opmId)}</strong> for
-              Office PM acceptance.
-            </p>
-          </div>
-          <div className="notice">
-            <Icon name="clock" />
-            <p>
-              The Office PM must accept and upload six required documents before
-              the Site PM team can accept. Client access remains inactive.
-            </p>
-          </div>
-          <div className="modal-actions">
-            <Button variant="primary" onClick={() => setDialog(undefined)}>
-              Back to intake log
-            </Button>
-          </div>
-        </Modal>
-      )}
-      {dialog?.kind === "intake-record" && selectedProject && <Modal title="Project Intake Record" subtitle={selectedProject.name} wide onClose={() => setDialog(undefined)}>
-        <IntakeRecord state={state} project={selectedProject} actor={actor} onOpenActive={() => { navigate("Active sites"); setDialog({ kind: "project", id: selectedProject.id }) }} />
-        {!isIntakeHistory(selectedProject) && <>
-          <ProjectClientAccount projectId={selectedProject.id} onSaved={reloadWorkspace} />
-          {projectAssignments(selectedProject)}
-        </>}
-      </Modal>}
       {(dialog?.kind === "project" || dialog?.kind === "project-docs") &&
         selectedProject && (
           <Modal

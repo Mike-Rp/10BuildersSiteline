@@ -77,8 +77,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   }
   const admin = await login("patricia.domingo@10builders.com","admin")
   const root = "/projects/inquiries"
-  const details = {client_name:"Ana Reyes",email:"ana@example.com",phone:"09123456789",name:"Maple Grove Residence",
-    address:"Quezon City",project_type:"Residential",land_area:500,lot_area:240,floor_area_sqm:180,floor_count:2,consultation:30}
+  const details = {client_name:"Ana Reyes",email:`ana-${crypto.randomUUID()}@example.com`,phone:"09123456789",name:"Maple Grove Residence",
+    address:"Quezon City",project_type:"Residential",lot_area:240,floor_area_sqm:180,floor_count:2,consultation:30}
   const create = () => call(root,{token:admin,json:details})
   const decision = (row,token,action,other={}) => call(`${root}/${row.id}/decision`,{token,json:{action,...other}})
   async function offer(row) {
@@ -98,6 +98,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(root,{token:admin,status:409,json:{...regular,expected_opm_id:null}})
   const delayed = await call(root,{token:admin,json:{...regular,expected_opm_id:candidates[0].id}})
   assert.equal(delayed.status,"offered")
+  assert.equal(delayed.details.land_area, undefined)
+  assert.equal(delayed.details.lot_area, 240)
   assert.equal(delayed.opm_id,candidates[0].id)
   assert.equal(delayed.opm_name,candidates[0].name)
   assert.equal(delayed.details.phone,"+639123456789")
@@ -252,6 +254,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:crypto.randomUUID()}})
   assert.equal(response.project.id,repeated.project.id)
   assert.equal(response.project.lifecycle_status,"spm_review")
+  assert.equal(response.client_account_status,"pending_activation")
   assert.equal((await call(root,{token})).find(inquiry=>inquiry.id===row.id).project_status,"spm_review")
   const [stored] = (await db.query("SELECT inquiry_intake,phase_scope,lifecycle_status FROM projects WHERE id=$1",[response.project.id])).rows
   assert.equal(stored.inquiry_intake.floor_area_sqm,200)
@@ -260,6 +263,10 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(stored.inquiry_intake.estimated_budget,updatedBudget)
   assert.deepEqual(stored.phase_scope.phases,phases)
   const projectId = response.project.id
+  const { clients } = await call(`/projects/${projectId}/client-account`, { token })
+  assert.equal(clients.length, 1)
+  assert.equal(clients[0].email, details.email)
+  assert.equal(clients[0].activation_status, "pending_activation")
   await call("/projects/recommendations/update-phase-team",{token,method:"PUT",json:{project_id:projectId,phase_team:recommended.team}})
   const assignments = (await db.query(`SELECT t.project_stage_id,t.is_lead,u.id,u.email FROM project_phase_team t
     JOIN users u ON u.id=t.spm_user_id WHERE t.project_id=$1 ORDER BY t.is_lead DESC`,[projectId])).rows

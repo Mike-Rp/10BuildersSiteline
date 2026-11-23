@@ -268,6 +268,7 @@ export const createAccount = async (req,res) => {
   try {
     const actor = await requireUser(req,res,["admin"]);
     if (!actor) return;
+    if (req.body?.role === "client") return sendError(res,"Client accounts are created when the assigned Office PM finalizes an inquiry.",409);
     const data = await withTransaction(client=>createAccountRecord(client,actor,req.body || {}));
     return sendOk(res,"Account created.",1,data,201);
   } catch(error) { return fail(res,error); }
@@ -291,8 +292,14 @@ export const deleteAccount = async (req,res) => {
     await withTransaction(async client=>{
       const row = await client.query(
         `UPDATE users SET is_deleted=true,status='suspended',deleted_at=now(),deleted_by=$2,updated_by=$2,updated_at=now()
-         WHERE id=$1 AND COALESCE(is_deleted,false)=false RETURNING id`,[req.params.id,actor.id]);
+         WHERE id=$1 AND COALESCE(is_deleted,false)=false RETURNING id,role_id`,[req.params.id,actor.id]);
       if (!row.rowCount) throw new HttpError(404,"Account not found.");
+      const openProject = await client.query(`SELECT 1 FROM user_client_project_links l
+        JOIN projects p ON p.id=l.project_id JOIN roles r ON r.id=$2 AND r.code='client'
+        WHERE l.user_id=$1 AND NOT COALESCE(p.is_deleted,false)
+          AND p.lifecycle_status IN ('active','spm_review','sent_to_opm','confirmed','suggested_allocation','draft') LIMIT 1`,
+      [req.params.id,row.rows[0].role_id]);
+      if (openProject.rowCount) throw new HttpError(409,"This client still has an open project and cannot be archived.");
       await client.query("DELETE FROM users_token WHERE user_id=$1",[req.params.id]);
       await recordArchiveEvent(client,actor.id,"users",req.params.id,"account_removed",{reason});
     });
@@ -371,6 +378,10 @@ export const updateAccount = async (req, res) => {
         `SELECT u.id, u.email, r.code AS role FROM users u JOIN roles r ON r.id = u.role_id
           WHERE u.id = $1 AND COALESCE(u.is_deleted, false) = false FOR UPDATE OF u`, [id]);
       if (found.rowCount === 0) throw new HttpError(404, "Account not found.");
+      if (found.rows[0].role === "client" && b.email !== undefined && b.email.toLowerCase() !== found.rows[0].email.toLowerCase())
+        throw new HttpError(409, "The registered client login email requires ownership verification before it can be changed.");
+      if (found.rows[0].role === "client" && b.scope !== undefined)
+        throw new HttpError(409, "Link the verified client account from the project record.");
       const assignedId = employeeIdFromWorkEmail(found.rows[0].email);
       if (assignedId && b.email !== undefined && employeeIdFromWorkEmail(b.email) !== assignedId) throw new HttpError(422, "The system-assigned employee ID cannot be changed.");
       if (b.email !== undefined) await assertWorkEmailAvailable(client, b.email, id, b.employee_id);
@@ -417,13 +428,14 @@ export const updateAccountStatus = async (req, res) => {
 
     const data = await withTransaction(async (client) => {
       const updated = await client.query(
-        `UPDATE users SET status = $2, updated_by = $3, updated_at = now()
+        `UPDATE users SET status = CASE WHEN $2='active' AND password_hash='!client-activation-required' THEN 'invited' ELSE $2 END,
+          updated_by = $3, updated_at = now()
           WHERE id = $1 AND COALESCE(is_deleted, false) = false
           RETURNING id, status`, [id, status, actor.id]);
       if (updated.rowCount === 0) throw new HttpError(404, "Account not found.");
       // Anyone who is no longer active is signed out immediately.
-      if (status !== "active") await client.query(`DELETE FROM users_token WHERE user_id = $1`, [id]);
-      await recordArchiveEvent(client,actor.id,"users",id,"account_status_changed",{status,reason});
+      if (updated.rows[0].status !== "active") await client.query(`DELETE FROM users_token WHERE user_id = $1`, [id]);
+      await recordArchiveEvent(client,actor.id,"users",id,"account_status_changed",{status:updated.rows[0].status,reason});
       return updated.rows[0];
     });
     return sendOk(res, "Account status updated.", 1, data);

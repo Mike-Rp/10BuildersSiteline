@@ -217,6 +217,7 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.ok(document.querySelector("#inquiry-review-floor-level-2").closest(".office-review-field-changed"))
   assert.match(originalPanel.textContent, /Total floor area \(m²\)120/)
   await enter("inquiry-review-budget", "5000000")
+  assert.equal(document.getElementById("inquiry-review-budget").value, "5,000,000")
   await click(button("Save and continue"))
   assert.equal(document.activeElement.id, "inquiry-review-reason")
   await enter("inquiry-review-reason", "Updated project drawings")

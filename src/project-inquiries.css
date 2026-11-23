@@ -480,13 +480,17 @@
 .admin-inquiries .inquiry-list-row[aria-pressed=true]:enabled:not(:hover) .inquiry-list-action { background: var(--color-surface); color: var(--color-primary); }
 .admin-inquiries .inquiry-list-empty { margin: 0; padding: 18px clamp(14px, 2.5vw, 28px); }
 .inquiry-log-tabs { padding: 9px clamp(14px, 2.5vw, 28px); }
-.inquiry-log-tabs > button { white-space: nowrap; }
+.inquiry-log-tabs > button { white-space: normal; }
 .inquiry-log-filters { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); align-items: end; gap: 12px; padding: 12px clamp(14px, 2.5vw, 28px) 0; }
 .inquiry-log-filters .inquiry-list-search { width: 100%; }
 .inquiry-log-filters label { min-width: 0; }
+.inquiry-log-clear { margin: 4px clamp(14px, 2.5vw, 28px) 0; }
 @media (max-width: 620px) {
-  .inquiry-log-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inquiry-log-tabs, .inquiry-log-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .inquiry-log-filters .inquiry-list-search { grid-column: 1 / -1; }
+  .inquiry-log-tabs > button { min-height: 44px; }
+  .inquiry-log-cards .inquiry-log-card { padding: 12px; gap: 12px; }
+  .inquiry-log-cards .inquiry-list-name small, .inquiry-log-cards .inquiry-log-footer small { font-size: .875rem; }
 }
 .inquiry-log-count { margin: 10px clamp(14px, 2.5vw, 28px) 0; }
 .inquiry-log-pagination:has(nav) { padding: 0 clamp(14px, 2.5vw, 28px) 16px; }

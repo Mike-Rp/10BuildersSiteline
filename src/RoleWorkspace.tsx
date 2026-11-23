@@ -1058,7 +1058,7 @@ export default function RoleWorkspace({
               </Button>
             </div>
           )}
-          <h3>Admin-uploaded Client Contract Agreement</h3>
+          <h3>Signed Client Contract Agreement</h3>
           {p.opmAccepted && contract ? (
             <DocumentList
               docs={[contract]}
@@ -1068,7 +1068,7 @@ export default function RoleWorkspace({
             <p className="role-muted subsection">
               {" "}
               {p.opmAccepted
-                ? "No original Admin contract file is attached to this intake record. Newly created intake projects include their uploaded agreement."
+                ? "No signed client contract is attached to this project record."
                 : "View and download become available after you accept."}
             </p>
           )}

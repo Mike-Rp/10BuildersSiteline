@@ -17,6 +17,8 @@ import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-ass
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
+import GroupedNumberInput from "./GroupedNumberInput"
+import { showActionResult } from "./action-feedback"
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import "./project-inquiries.css"
 
@@ -688,6 +690,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setPendingContract(undefined)
     setPlanning(undefined)
     setTeam([])
+    showActionResult(`${pendingContract.file.name} was uploaded and saved to this inquiry.`, false, "Signed contract uploaded")
   }
   async function submit() {
     if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
@@ -794,7 +797,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     resetInquiryPage()
   }
   function changeAdminInquiryFilter(filter: typeof adminInquiryFilter) {
-    if (adminInquiryTab === "history") setAdminInquiryStatusFilter("")
+    setAdminInquiryStatusFilter("")
     setAdminInquiryTab("current")
     setAdminInquiryFilter(filter)
     resetInquiryPage()
@@ -823,6 +826,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <MobileNumberInput required value={value} onValueChange={number => change(key, number)}
             aria-invalid={invalid || undefined} aria-describedby={invalid ? "inquiry-phone-notice" : undefined} />
           <small id="inquiry-phone-notice" className="inquiry-input-notice" aria-live="polite">{invalid ? PH_MOBILE_ERROR : ""}</small>
+        </label>
+      }
+      if (key === "lot_area" || key === "floor_area_sqm") {
+        return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
+          <GroupedNumberInput required={required} min={0.01} value={value}
+            placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
         </label>
       }
       const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
@@ -979,6 +988,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         <section className="inquiry-card admin-inquiry-tracking-summary">
           {!submitted && <header><div><p>{inquiryReference(row)}</p><h2>{row.details.name}</h2></div><span className="inquiry-pill">{status}</span></header>}
           <AdminInquirySummary row={row} />
+          {!submitted && row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
           {!submitted && row.reason && <p>Withdrawal reason: {row.reason}</p>}
           {!submitted && row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
           {!submitted && row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
@@ -1005,7 +1015,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
           signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
-            <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
+            {(!intakeLocked || !contractFileId) && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
               const file = event.target.files?.[0]
               event.target.value = ""
               if (!file) return
@@ -1015,7 +1025,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               }
               setError("")
               setPendingContract({ file })
-            }} />
+            }} />}
             {(!intakeLocked || !contractFileId) && <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
               <Icon name="upload" size={17} />{contractFileId ? "Replace signed contract" : "Upload signed contract"}
             </button>}
@@ -1164,6 +1174,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
         </select></label>
       </div>
+      {(search || adminInquiryStatusFilter || adminInquiryTypeFilter) && <div className="inquiry-log-clear">
+        <button type="button" className="button text-button" onClick={() => {
+          setSearch("")
+          setAdminInquiryStatusFilter("")
+          setAdminInquiryTypeFilter("")
+          resetInquiryPage()
+        }}>Clear filters</button>
+      </div>}
       {rows && <p className="list-count inquiry-log-count" role="status">{adminList.count} {adminList.count === 1 ? "inquiry" : "inquiries"}</p>}
       {adminVisibleRows.length ? <ul className="inquiry-log-cards">
         {adminList.view.items.map(item => {
@@ -1216,7 +1234,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     {finalizedClient && <Modal title="Project finalized" subtitle={finalizedClient.name} onClose={() => setFinalizedClient(undefined)}
       footer={<button type="button" className="button primary" onClick={() => setFinalizedClient(undefined)}>Done</button>}>
       <ProjectClientAccount projectId={finalizedClient.projectId} onSaved={onReload} />
-      <p>Complete client account setup before project activation.</p>
       {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
 

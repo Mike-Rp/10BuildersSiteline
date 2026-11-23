@@ -7,12 +7,15 @@ import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
+import { clientLoginEmail } from "./client-onboarding.js";
 import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
 
 function validateInquiryContact(details, previous) {
+  if (details.email !== previous?.email && !clientLoginEmail(details.email))
+    throw new HttpError(422, "Enter the client's existing personal or business email.");
   if (details.phone !== previous?.phone && !isPhilippineMobile(details.phone))
     throw new HttpError(422, PH_MOBILE_ERROR);
 }
@@ -28,9 +31,9 @@ export function inquiryDetails(input) {
     throw new HttpError(422, "Enter a valid email address.");
   if (!inquiryTypes.includes(input.project_type)) throw new HttpError(422, "Select a project type.");
   details.project_type = input.project_type;
-  for (const key of ["lot_area", "land_area", "floor_area_sqm", "floor_count"]) {
-    if (key === "land_area" && (input[key] == null || input[key] === "")) continue;
-    const value = Number(input[key]);
+  for (const key of ["lot_area", "floor_area_sqm", "floor_count"]) {
+    const source = key === "lot_area" && (input.lot_area == null || input.lot_area === "") ? input.land_area : input[key];
+    const value = Number(source);
     if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > MAX_INQUIRY_FLOORS)))
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
@@ -128,7 +131,8 @@ function recordRoutingEvent(details, event) {
 }
 
 function inquiryResponse(row, includeHistory = false) {
-  const { routing_history, opm_workflow, opm_match, ...details } = row.details;
+  const { routing_history, opm_workflow, opm_match, land_area, ...details } = row.details;
+  if (!details.lot_area && land_area) details.lot_area = land_area;
   return { ...row, details, ...(includeHistory
     ? { routing_history }
     : { workflow: opm_workflow }) };

@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { login, adminLogin, refresh, reset, logout } from "./controller.js";
+import { activateClient } from "../projects/client-onboarding.js";
+import { loginFailureLimiter } from "../../common/utilities/rate-limit.utility.js";
 const router = Router();
 router.post('/admin', adminLogin);
+router.post('/client/activate', loginFailureLimiter(), activateClient);
 
 
 router.post('/', async (req, res) => {

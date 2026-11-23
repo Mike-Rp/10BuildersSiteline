@@ -16,6 +16,11 @@
 #root .admin-workspace .team-accounts-panel .avatar { flex-shrink: 0; }
 #root .admin-workspace .team-accounts-panel .tag-list { gap: 5px; }
 #root .admin-workspace .team-accounts-panel :is(.tag-list > span, .badge) { font-size: 13px; line-height: 1.45; white-space: normal; }
+#root .admin-workspace .team-accounts-panel .list-toolbar-controls { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px 12px; }
+#root .admin-workspace .team-accounts-panel .list-toolbar-controls > button { grid-column: 1 / -1; justify-self: start; }
+#root .admin-workspace .team-accounts-panel .list-toolbar-controls > * { min-width: 0; }
+#root .admin-workspace .team-accounts-panel .list-filter select { width: 100%; }
+#root .admin-workspace .team-accounts-panel .team-account-row { cursor: pointer; }
 #root .admin-workspace .team-status-help { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 #root .admin-workspace .team-status-help .intake-info-trigger { width: 30px; min-width: 30px; height: 30px; }
 #root .admin-workspace .admin-archive > .notice { margin-bottom: 12px; padding: 10px 14px; }
@@ -39,9 +44,14 @@
 @media(max-width: 800px) {
   #root .admin-workspace .team-accounts-panel table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   #root .admin-workspace .team-accounts-panel table tbody { display: block; }
-  #root .admin-workspace .team-accounts-panel tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--color-line); }
-  #root .admin-workspace .team-accounts-panel td { display: block; border: 0; }
-  #root .admin-workspace .team-accounts-panel td::before { content: attr(data-label); display: block; color: #193b59; font-size: 12px; font-weight: 650; margin-bottom: 5px; }
+  #root .admin-workspace .team-accounts-panel .list-toolbar-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #root .admin-workspace .team-accounts-panel .list-toolbar-controls .search-field { grid-column: 1 / -1; }
+  #root .admin-workspace .team-accounts-panel tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--color-line); border-radius: 10px; margin: 0 0 10px; }
+  #root .admin-workspace .team-accounts-panel td { display: block; border: 0; padding: 7px 12px; font-size: 15px; }
+  #root .admin-workspace .team-accounts-panel td::before { content: attr(data-label); display: block; color: #193b59; font-size: 13px; font-weight: 650; margin-bottom: 3px; }
+  #root .admin-workspace .team-accounts-panel td[data-label="Actions"] { display: none; }
+  #root .admin-workspace .team-accounts-panel td[data-label="Person"]::before { content: none; }
+  #root .admin-workspace .team-accounts-panel .person-cell { min-height: 44px; width: 100%; }
   #root .admin-workspace .team-accounts-panel td[data-label="Person"], #root .admin-workspace .team-accounts-panel td[data-label="Scope / Specialization"] { grid-column: 1 / -1; }
   #root .admin-workspace .archive-project-cards { grid-template-columns: minmax(0, 1fr); }
 }

@@ -62,6 +62,9 @@ export function accountListQuery(query = {}) {
     countSql:`SELECT count(*)::int AS total ${from} ${filters}`,
     dataSql:`SELECT u.id,u.id AS user_id,u.full_name,u.email,u.phone,u.role_id,r.code AS role,r.label AS role_name,
       u.status,u.date_added::text AS date_added,u.created_at,u.last_login_at,scopes.scope,
+      CASE WHEN r.code='client' AND u.status='active' THEN 'active'
+        WHEN r.code='client' AND u.status='invited' AND NOT u.temp_password_issued THEN 'pending_activation'
+        ELSE NULL END AS activation_status,
       (SELECT m.metadata->>'jobTitle' FROM workspace_account_metadata m WHERE m.user_id=u.id) AS job_title,
       CASE WHEN r.code IN ('opm','spm') THEN EXISTS (
         SELECT 1 FROM user_licenses l WHERE l.user_id=u.id AND l.superseded_at IS NULL

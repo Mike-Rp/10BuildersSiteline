@@ -1,5 +1,5 @@
 import { adminDashboardOverview } from "./admin-dashboard.ts"
-import { intakeGuidance, intakeViewCounts, isIntake } from "./intake-guidance.ts"
+import { isIntake } from "./intake-guidance.ts"
 import type { Account, State } from "./model.ts"
 import { checklistFor, officePmStage, ownedProjects, workflowFor } from "./workflows.ts"
 
@@ -12,10 +12,8 @@ export function navigationAttention(state: State, actor: Account): NavigationAtt
   if (actor.role === "admin") {
     const { items } = adminDashboardOverview(state)
     const count = (category: string) => items.filter(item => item.category === category).length
-    const intakeCounts = intakeViewCounts(state.projects.filter(isIntake), project => intakeGuidance(state, project, actor))
     return {
       "Active sites": { count: count("updates"), description: "projects with pending reviews or blocked phase handoffs" },
-      "Project intake": { count: intakeCounts.action, description: "intake records needing your action" },
       Directory: { count: count("requests"), description: "subcontractor requests awaiting approval" },
       Team: { count: count("licenses"), description: "active staff accounts with license alerts" },
     }

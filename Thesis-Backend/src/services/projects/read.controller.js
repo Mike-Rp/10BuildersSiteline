@@ -145,8 +145,7 @@ export const getProjectById = async (req, res) => {
     const project = await execute(
       `SELECT ${LIST_SELECT}${user.role === "spm" ? `,
         jsonb_strip_nulls(jsonb_build_object(
-          'land_area', to_jsonb(p)#>'{inquiry_intake,land_area}',
-          'lot_area', to_jsonb(p)#>'{inquiry_intake,lot_area}',
+          'lot_area', COALESCE(to_jsonb(p)#>'{inquiry_intake,lot_area}',to_jsonb(p)#>'{inquiry_intake,land_area}'),
           'classification', to_jsonb(p)#>'{inquiry_intake,classification}',
           'technical', to_jsonb(p)#>'{inquiry_intake,assessment,technical}',
           'arrangement', to_jsonb(p)#>'{inquiry_intake,assessment,arrangement}'

@@ -12,7 +12,7 @@ const project = (id, extra = {}) => ({
   workflow:{checklist:{},responses:[],selections:[],notes:[],photos:[]}, ...extra,
 })
 
-test("Administrator intake badge counts their actionable records and other badges keep their existing queues", () => {
+test("Administrator attention uses the active sites, directory, and team queues", () => {
   const state = emptyState()
   state.projects = [project("review",{workflow:{pendingUpdate:{},pendingRework:{}}}),project("draft",{status:"draft"}),project("waiting",{status:"pending",opmAccepted:false}),project("historical",{status:"completed",workflow:{pendingUpdate:{}}})]
   state.companies = [{id:"request",status:"pending"},{id:"old",status:"approved"}]
@@ -20,7 +20,7 @@ test("Administrator intake badge counts their actionable records and other badge
   const before = structuredClone(state)
   const counts = navigationAttention(state,actor("admin"))
   assert.equal(counts["Active sites"].count,1)
-  assert.equal(counts["Project intake"].count,1,"Office PM acceptance belongs to waiting for others")
+  assert.equal(counts["Project intake"],undefined)
   assert.equal(counts.Directory.count,1)
   assert.equal(counts.Team.count,1)
   assert.deepEqual(state,before)
@@ -33,11 +33,11 @@ test("Administrator intake badge counts their actionable records and other badge
   state.companies[0].status = "approved"
   const resolved = navigationAttention(state,actor("admin"))
   assert.equal(resolved["Active sites"].count,0)
-  assert.equal(resolved["Project intake"].count,0)
+  assert.equal(resolved["Project intake"],undefined)
   assert.equal(resolved.Directory.count,0)
 })
 
-test("intake badge matches Needs your action before filters, excludes waiting records, and updates as tasks resolve", () => {
+test("legacy records retain their intake guidance without an Admin navigation badge", () => {
   const state=emptyState()
   const admin=actor("admin")
   state.projects=[
@@ -50,12 +50,11 @@ test("intake badge matches Needs your action before filters, excludes waiting re
   ]
   const pageCounts=()=>intakeViewCounts(state.projects.filter(isIntake),p=>intakeGuidance(state,p,admin))
   assert.deepEqual(pageCounts(),{all:13,action:3,waiting:10})
-  assert.equal(navigationAttention(state,admin)["Project intake"].count,pageCounts().action)
+  assert.equal(navigationAttention(state,admin)["Project intake"],undefined)
   state.projects[0].status="pending"
   state.projects[0].opmAccepted=false
   assert.equal(pageCounts().action,2)
-  assert.equal(navigationAttention(state,admin)["Project intake"].count,2)
-  assert.equal(navigationAttention(state,{...admin,status:"suspended"})["Project intake"].count,0)
+  assert.equal(navigationAttention(state,admin)["Project intake"],undefined)
 })
 
 test("Office PM badges track intake once and map review items to the current Active sites module", () => {

@@ -7,11 +7,11 @@ import { resolveAdminSearchDestination } from "../src/admin-search-destination.t
 test("search destinations follow project lifecycle, account type and company status", () => {
   const state = initialState(), project = state.projects[0], account = state.accounts[0], company = state.companies[0]
   const result = (category, id) => ({ category, id })
-  for (const [status, page, tab] of [["active", "Active sites"], ["draft", "Project intake"], ["pending", "Project intake"], ["changes_requested", "Project intake"], ["completed", "Archive", "closed"], ["declined", "Archive", "declined"], ["expired", "Archive", "expired"]]) {
+  for (const [status, page, tab] of [["active", "Active sites"], ["draft", "Project inquiries"], ["pending", "Project inquiries"], ["changes_requested", "Project inquiries"], ["completed", "Archive", "closed"], ["declined", "Archive", "declined"], ["expired", "Archive", "expired"]]) {
     project.status = status
     const destination = resolveAdminSearchDestination(state, result("projects", project.id))
     assert.equal(destination.page, page); assert.equal(destination.archiveTab, tab)
-    assert.equal(destination.dialog, page === "Project intake" ? "intake-record" : "project")
+    assert.equal(destination.dialog, "project")
   }
   for (const role of ["admin", "opm", "spm", "client"]) {
     account.role = role; account.status = "active"
