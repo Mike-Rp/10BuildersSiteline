@@ -59,7 +59,7 @@ export async function loadPhaseCoverage(db, projectId) {
   if(await responsibilitiesInstalled(db)) {
    const responsibilities=(await db.query(`select assignment.*,s.code,(u.status='active' and not coalesce(u.is_deleted,false) and ${LICENSE_ELIGIBILITY_SQL} and not exists(select 1 from unnest(assignment.assigned_disciplines) tag where not exists(select 1 from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=u.id and d.code=tag))) as engineer_valid from project_phase_responsibilities assignment join project_stages s on s.id=assignment.project_stage_id join users u on u.id=assignment.user_id where assignment.project_id=$1 for update of assignment`,[projectId])).rows;
    if(responsibilities.length)for(const phase of required) {
-    const assigned=responsibilities.filter(r=>String(r.project_stage_id)===String(phase.project_stage_id));
+    const assigned=responsibilities.filter(r=>r.status!=='released' && String(r.project_stage_id)===String(phase.project_stage_id));
     const requiredTags=(await db.query(`select ${projectEngineerScopesSql("p", "s.id", "s.code")} as scopes
       from projects p cross join project_stages s where p.id=$1 and s.id=$2`,[projectId,phase.project_stage_id])).rows[0]?.scopes ?? [];
     const coveredTags = new Set(assigned.filter(r=>r.status==='confirmed'&&r.engineer_valid).flatMap(r=>r.assigned_disciplines||[]));
