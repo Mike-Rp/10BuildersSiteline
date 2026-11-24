@@ -674,6 +674,11 @@
 .inquiry-engineers small { display: block; color: var(--color-muted); }
 .inquiry-staff-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .inquiry-staffing .button { justify-self: start; }
+.inquiry-license-window { border: 1px solid #c4d7e8; border-radius: 10px; padding: 12px; }
+.inquiry-license-window summary { cursor: pointer; font-weight: 650; }
+.inquiry-license-window p { margin: 4px 0 0; }
+.inquiry-phase-dates { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+.inquiry-phase-dates label { display: grid; gap: 4px; }
 .inquiry-candidate-help { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--surface-subtle); }
 #root .project-inquiries :is(.inquiry-add-engineer, .inquiry-send-offers):disabled { color: var(--color-muted); border-color: var(--color-line); background: var(--color-canvas); }
 

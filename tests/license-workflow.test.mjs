@@ -222,6 +222,8 @@ test("Admin-confirmed engineer replacement and company license access policy", {
     assert.deepEqual(await q('select * from project_phase_updates where project_id=$1 order by id',[brook.id]),beforeUpdates)
     assert.deepEqual(await holder(),{spm_user_id:idOf('karlo'),is_lead:true,status:'confirmed'})
     assert.equal(result.data.status,'accepted')
+    const [owner] = await q("select suggested_opm_id from projects where id=$1",[brook.id])
+    assert.ok((await notices(owner.suggested_opm_id,'Coordinate Site PM handover')).some(notice=>notice.detail.includes('Mobilization')))
     assert.deepEqual((await call('karlo','GET','/licenses/requests')).data,[])
     assert.equal((await call('karlo','POST',`/licenses/requests/${result.data.id}/accept`,{})).status,409)
     const record=(await q('select requested_by,response_note from license_overrides where id=$1',[result.data.id]))[0]

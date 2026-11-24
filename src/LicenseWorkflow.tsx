@@ -268,6 +268,8 @@ export function OverrideDialog({
   const [picked, setPicked] = useState("")
   const [reason, setReason] = useState("")
   const [signed, setSigned] = useState(false)
+  const [contacted, setContacted] = useState(false)
+  const [availabilityConfirmed, setAvailabilityConfirmed] = useState(false)
   const [signedOn, setSignedOn] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -289,10 +291,12 @@ export function OverrideDialog({
     e.preventDefault()
     if (!picked) return setError("Choose a replacement.")
     if (!reason.trim()) return setError("A reason is required. It is visible to Administrators only.")
+    if (options?.requiresAvailabilityConfirmation && (!contacted || !availabilityConfirmed))
+      return setError("Confirm contact and availability for the remaining assignment.")
     if (!signed || !signedOn) return setError("Confirm the appointment was signed at the office and enter its signing date.")
     setBusy(true)
     try {
-      await licenses.createOverride({ projectId: target.projectId, stageId: target.stageId, toUserId: picked, fromUserId: options!.current.id, reason: reason.trim(), appointmentSigned: signed, signedOn })
+      await licenses.createOverride({ projectId: target.projectId, stageId: target.stageId, toUserId: picked, fromUserId: options!.current.id, reason: reason.trim(), appointmentSigned: signed, signedOn, contacted, availabilityConfirmed })
       onDone()
     } catch (err) {
       setError(messageOf(err))
@@ -300,9 +304,10 @@ export function OverrideDialog({
     }
   }
   const place = options ? (options.role === "opm" ? "Office PM role" : options.stage) : ""
+  const replacement = options?.candidates.find(candidate => candidate.id === picked)
   return (
     <Modal
-      title="Prepare engineer replacement"
+      title="Replace assigned engineer"
       subtitle={options ? `${options.project.name} · ${place}` : "Loading…"}
       onClose={onClose}
       wide
@@ -317,20 +322,31 @@ export function OverrideDialog({
         )
       ) : (
         <form className="override-form" onSubmit={submit}>
-          <div className="override-current">
+          <div className="override-comparison"><div className="override-current">
             <span className="eyebrow">CURRENT ENGINEER</span>
             <strong>{options.current.name}</strong>
+            {options.current.status === "renewal_under_review" && <Badge tone="amber">Renewal under review</Badge>}
             {options.isLead && <Badge tone="amber">Lead Site PM</Badge>}
             <small>
               License expiry {options.current.expiry ? dateLabel(options.current.expiry) : ""}
               {options.current.reason ? ` · ${options.current.reason}` : ""}
             </small>
+            {options.current.workAccessCutoff && <small>Work access cutoff · {dateLabel(options.current.workAccessCutoff)}</small>}
+            {options.project.coverageEnd && <small>Planned coverage ends · {dateLabel(options.project.coverageEnd)}</small>}
             {options.summary.required !== null && (
               <small>
                 Verified progress: {options.summary.approved} of {options.summary.required} items ({options.summary.pct}%)
               </small>
             )}
-          </div>
+          </div>{replacement && <div className="override-current">
+            <span className="eyebrow">REPLACEMENT ENGINEER</span>
+            <strong>{replacement.name}</strong>
+            {replacement.planningBackup && <Badge tone="green">Planning backup</Badge>}
+            {replacement.licenseExpiry && <small>Verified license expires · {dateLabel(replacement.licenseExpiry)}</small>}
+            {replacement.coverageStart && replacement.coverageEnd && <small>
+              Remaining assignment · {dateLabel(replacement.coverageStart)} – {dateLabel(replacement.coverageEnd)}
+            </small>}
+          </div>}</div>
           {!options.available ? (
             <div className="notice neutral">
               <Icon name="clock" />
@@ -350,7 +366,9 @@ export function OverrideDialog({
                 )}
                 {options.candidates.map((c) => (
                   <label key={c.id} className={picked === c.id ? "selected" : ""}>
-                    <input type="radio" name="replacement" checked={picked === c.id} onChange={() => setPicked(c.id)} />
+                    <input type="radio" name="replacement" checked={picked === c.id} onChange={() => {
+                      setPicked(c.id); setContacted(false); setAvailabilityConfirmed(false); setSigned(false); setSignedOn("")
+                    }} />
                     <span>
                       <strong>{c.name}</strong>
                       <small>Contact number: {c.phone || "Not on file"} · Email: {c.email || "Not on file"}</small>
@@ -360,7 +378,7 @@ export function OverrideDialog({
                         {plural(c.workload, "active assignment")}
                         {c.licenseExpiry ? ` · license valid to ${dateLabel(c.licenseExpiry)}` : ""}
                       </small>
-                      {c.expiresBeforeProjectEnd && (
+                      {!c.coverageEnd && c.expiresBeforeProjectEnd && (
                         <small className="license-warning-inline">
                           <Icon name="alert" size={14} /> License expires before this project ends.
                         </small>
@@ -375,6 +393,10 @@ export function OverrideDialog({
               <section className="appointment-confirmation">
                 <h3>Office appointment confirmation</h3>
                 <p>Contact the chosen engineer and arrange signing at the office. Confirm only after the appointment is signed.</p>
+                {options.requiresAvailabilityConfirmation && <>
+                  <label><input type="checkbox" checked={contacted} onChange={e => setContacted(e.target.checked)} /> I contacted the selected engineer.</label>
+                  <label><input type="checkbox" checked={availabilityConfirmed} onChange={e => setAvailabilityConfirmed(e.target.checked)} /> I confirmed availability for the remaining assignment.</label>
+                </>}
                 <label><input type="checkbox" checked={signed} onChange={e => setSigned(e.target.checked)} /> I confirm the project-specific appointment was signed at the office.</label>
                 <Field label="Actual signing date"><DatePicker calendarTitle="Actual signing date" value={signedOn} max={new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())} onValueChange={date => setSignedOn(date)} required /></Field>
               </section>
@@ -388,6 +410,7 @@ export function OverrideDialog({
                     <li>Your approval confirms office signing and switches the assignment immediately. No in-system acceptance is needed.</li>
                     {options.isLead && <li>The Lead Site PM designation moves with this phase.</li>}
                     <li>The original engineer stays on record.</li>
+                    {options.role === "spm" && <li>The Office PM receives a handover notice.</li>}
                     <li>The client is not notified.</li>
                   </ul>
                 </div>
@@ -414,8 +437,9 @@ export function OverrideDialog({
           <div className="modal-actions">
             <Button onClick={onClose}>{options.available ? "Cancel" : "Close"}</Button>
             {options.available && (
-              <Button type="submit" variant="primary" disabled={busy || !options.candidates.length || !signed || !signedOn}>
-                Approve & switch engineer
+              <Button type="submit" variant="primary" disabled={busy || !picked || !reason.trim() || !signed || !signedOn ||
+                (options.requiresAvailabilityConfirmation && (!contacted || !availabilityConfirmed))}>
+                Confirm reassignment
               </Button>
             )}
           </div>
@@ -565,15 +589,17 @@ export function PhaseLicenseFlag({
   assignment: OverviewItem["assignments"][number]
   onOverride: (target: OverrideTarget) => void
 }) {
-  const expired = item.expiry ? dateLabel(item.expiry) : ""
+  const expiry = assignment.expiry ?? item.expiry
+  const expired = expiry ? dateLabel(expiry) : ""
+  const needsCover = assignment.needsCover ?? (item.daysToExpiry !== null && item.daysToExpiry <= 30)
   return (
     <div className="phase-flag" role="note">
       <Icon name="alert" size={16} />
       <span>
         License expiry {expired} ·{" "}
-        {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? "Replacement overdue; new assignments disabled" : "Prepare replacement before the 30-day notice"}
+        {needsCover ? "Assignment needs license coverage" : "Prepare replacement before the 30-day notice"}
       </span>
-      {item.daysToExpiry !== null && item.daysToExpiry <= 30 ? (
+      {needsCover || assignment.pendingOverrideId ? (
         assignment.pendingOverrideId ? (
           <Badge tone="amber">Waiting for replacement</Badge>
         ) : (
@@ -609,7 +635,7 @@ export function LicenseProfileBlock({
           </span>
         </p>
       )}
-      {item.expiry && <p className="license-note">License expiry: {dateLabel(item.expiry)} · New assignments blocked from: {dateLabel(licenseAccessPolicy(item.expiry).noticeOn || "")} · Viewing-only from: {dateLabel(licenseAccessPolicy(item.expiry).restrictedOn || "")}</p>}
+      {item.expiry && <p className="license-note">License expiry: {dateLabel(item.expiry)} · Work access cutoff: {dateLabel(licenseAccessPolicy(item.expiry).noticeOn || "")} · Self-service submission closes: {dateLabel(licenseAccessPolicy(item.expiry).restrictedOn || "")}</p>}
       {reviewing && (
         <p className="license-warning">
           <Icon name="shield" size={16} />
@@ -627,7 +653,7 @@ export function LicenseProfileBlock({
               {a.pendingOverrideId ? (
                 <Badge tone="amber">Waiting for replacement</Badge>
               ) : (
-                item.daysToExpiry !== null && item.daysToExpiry <= 30 && (
+                (a.needsCover ?? (item.daysToExpiry !== null && item.daysToExpiry <= 30)) && (
                   <Button onClick={() => onOverride({ projectId: a.projectId, stageId: a.stageId })}>Replace engineer</Button>
                 )
               )}

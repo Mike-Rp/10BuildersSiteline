@@ -5,6 +5,7 @@ import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { recommendedSitePms } from "../../domain/engineer-phase-coverage.js";
 import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
+import { normalizePhaseDates } from "./staffing-license.utility.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
@@ -400,7 +401,12 @@ export function mountInquiries(router) {
       throw new HttpError(409, "The signed contract changed. Reopen staffing with the confirmed contract.");
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
     const selected = confirmedPhases(phases, req.body.phases);
+    const review = row.details.opm_workflow.review;
+    const storedDates = row.details.opm_workflow.staffing?.phase_dates;
+    const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
+      selected.filter(phase => storedDates?.[phase]).map(phase => [phase, storedDates[phase]])), selected, review);
     const candidates = {};
+    const licenseUnavailable = {};
     const candidateBlockers = {};
     const blockedCandidates = {};
     const stored = row.details.opm_workflow.staffing?.additional_scopes || {};
@@ -408,8 +414,8 @@ export function mountInquiries(router) {
       req.body.additional_scopes ?? Object.fromEntries(selected.map(phase => [phase, stored[phase] || []])));
     const scopes = configuration.required;
     const staffingTarget = recommendedSitePms(assessment.size, assessment.complexity);
-    const team = await getSpm(type, selected, candidates, row.details.opm_workflow.review, candidateBlockers, {
-      requiredScopes: scopes, setupAdditionalScopes: configuration.additional, staffingTarget, blockedCandidates,
+    const team = await getSpm(type, selected, candidates, review, candidateBlockers, {
+      requiredScopes: scopes, setupAdditionalScopes: configuration.additional, staffingTarget, blockedCandidates, phaseDates, licenseUnavailable,
     });
     for (const phase of selected) {
       if (!Object.hasOwn(candidates, phase)) {
@@ -418,6 +424,7 @@ export function mountInquiries(router) {
       }
     }
     const staffing = {assessment_id:assessment.id, phases:selected, contract_file_id:req.body.contract_file_id,
+      ...(req.body.phase_dates !== undefined || storedDates ? { phase_dates: phaseDates } : {}),
       ...(configuration.options ? { additional_scopes: configuration.additional } : {})};
     // A correction or conversion can finish while the recommendations are being calculated.
     const saved = await execute(`UPDATE project_inquiries
@@ -426,7 +433,7 @@ export function mountInquiries(router) {
         AND (details #>> '{opm_workflow,signed_contract,id}') IS NOT DISTINCT FROM $5::text`,
       [row.id, actor.id, JSON.stringify(staffing), assessment.id, signedContractId]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
-    return { phases, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, staffing,
+    return { phases, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, licenseUnavailable, staffing,
       ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
   }));
 }

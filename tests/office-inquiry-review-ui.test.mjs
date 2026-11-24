@@ -75,7 +75,9 @@ test("proposal approval opens mandatory review with live size and inline validat
             ] }],
             candidates: { Design: [
               { id: "ana", name: "Ana Reyes", qualifiedTags: ["Structural Engineering"], experienceYears: 0 },
-              { id: "kurt", name: "Kurt Gonzales", qualifiedTags: ["Mechanical"], experienceYears: 2 },
+              { id: "kurt", name: "Kurt Gonzales", qualifiedTags: ["Mechanical"], experienceYears: 2, licenseByScope: {
+                Mechanical: { cutoff: start.slice(0,4) + "-01-20", expiry: start.slice(0,4) + "-02-19" },
+              } },
             ], Foundation: [], Structure: [] },
             candidateBlockers: { Foundation: "schedule", Structure: "qualifications" },
             blockedCandidates: { Foundation: [{ id: "blocked", name: "Unavailable Engineer", qualifiedTags: ["Civil"], reason: "schedule" }] },
@@ -281,6 +283,8 @@ test("proposal approval opens mandatory review with live size and inline validat
   assert.equal(document.querySelectorAll(".inquiry-engineers article").length,2)
   assert.match(document.body.textContent,/2 Site PMs needed at the same time/)
   assert.match(document.querySelector(".inquiry-lineup-table tbody tr:first-child").textContent, /Kurt Gonzales.*2 years.*Lead SPM/)
+  assert.match(document.querySelector(".inquiry-engineers").textContent, /Renewal or backup needed.*Lead coverage.*Work access cutoff.*PRC license expires/)
+  assert.match(document.querySelector(".inquiry-staffing").textContent, /Phase dates needed to check license coverage/)
   assert.match(document.querySelector(".inquiry-coverage-warning").textContent, /No eligible Site PM found for Acoustic.*meets its minimum coverage of 1/)
   const staffingTabs = [...document.querySelectorAll(".inquiry-phase-nav button")]
   assert.ok(document.querySelector(".inquiry-staffing").compareDocumentPosition(
