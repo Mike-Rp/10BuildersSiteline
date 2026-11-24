@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { allocatePhaseCoverage } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
+import { allocatePhaseCoverage, recommendPhaseEngineer } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import {
   emptyState,
   spmCandidates,
@@ -41,6 +41,22 @@ test("full specialization coverage needs complementary engineers, not a tag or p
   )
   assert.equal(augment.complete, true)
   assert.ok(augment.engineers.every((e) => e.tags.length <= 3))
+})
+test("staffing recommendations add an engineer only for uncovered scopes", () => {
+  const candidates = [
+    { id: "coordinator", qualifiedTags: ["Civil", "Structural"] },
+    { id: "duplicate", qualifiedTags: ["Civil", "Structural"] },
+  ]
+  const required = ["Civil", "Structural", "Plumbing"]
+  assert.deepEqual(recommendPhaseEngineer(required, candidates, [], 2).engineers, [
+    { id: "coordinator", tags: ["Civil", "Structural"] },
+  ])
+  assert.deepEqual(recommendPhaseEngineer(required, [
+    ...candidates, { id: "support", qualifiedTags: ["Civil", "Plumbing"] },
+  ], [], 2).engineers, [
+    { id: "coordinator", tags: ["Civil", "Structural"] },
+    { id: "support", tags: ["Plumbing"] },
+  ])
 })
 test("revised policy reserves a whole engineer for one project while allowing succeeding phases in that project", () => {
   const state = emptyState()

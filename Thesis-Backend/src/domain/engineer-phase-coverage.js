@@ -43,8 +43,6 @@ function allocate(required, candidates) {
   return { engineers, missing, complete: missing.length === 0 }
 }
 
-// Minimum specialty coverage for every phase: at least half of the unique required
-// tags, rounded up (1→1, 2→1, 3→2, 4→2, 5→3, 6→3). Full coverage is still preferred.
 export function phaseCoverageQuota(required) {
   const count = [...new Set(required || [])].length
   return Math.ceil(count / 2)
@@ -69,8 +67,8 @@ export function recommendPhaseEngineer(required, candidates, additional = [], ta
     let best, highest = -1
     for (const person of candidates) {
       if (selected.has(person.id)) continue
-      const priority = tag => covered.has(tag) ? 0 : additional.includes(tag) ? 10 : 1
-      const owned = tags.filter(tag => person.qualifiedTags.includes(tag))
+      const priority = tag => additional.includes(tag) ? 10 : 1
+      const owned = tags.filter(tag => !covered.has(tag) && person.qualifiedTags.includes(tag))
         .sort((a,b) => priority(b)-priority(a)).slice(0,3)
       const score = owned.reduce((sum,tag) => sum + priority(tag),0)
       if (owned.length && score > highest) {

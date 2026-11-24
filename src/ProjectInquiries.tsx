@@ -1387,7 +1387,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {technical && <p>Technical requirements · {technical}</p>}
             {arrangement && <p>Phase arrangement · {arrangement}</p>}
           </div>
-          {recommendation && <p><strong>Recommended per phase: {recommendation} Site PM{recommendation === 1 ? "" : "s"}</strong> ? {assessment?.size} project, {assessment?.complexity} complexity. Adjust each lineup to its scope.</p>}
+          {recommendation && <p><strong>Recommended per phase: up to {recommendation} Site PM{recommendation === 1 ? "" : "s"}</strong>. Review the scope coverage for each phase.</p>}
           <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => {
               const reason = staffingIssueByPhase.get(stage)

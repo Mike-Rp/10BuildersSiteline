@@ -230,7 +230,9 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   // Use two independently qualified coordinators so that Lead permissions are exercised by both accounts.
   if (multiEngineer) {
     for (const phase of recommended.team) {
-      assert.equal(phase.engineers.length, Math.min(recommended.recommended_site_pms,recommended.candidates[phase.stage].length))
+      assert.ok(phase.engineers.length <= recommended.recommended_site_pms)
+      const tags = phase.engineers.flatMap(person => person.assigned_disciplines)
+      assert.equal(tags.length, new Set(tags).size, "recommended engineers cover distinct scopes")
       phase.engineers = phase.engineers.slice(0,1) // Office PM reduces the proposed lineup.
     }
   }
