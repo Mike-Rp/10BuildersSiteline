@@ -117,9 +117,11 @@ export default function EvidenceReview({projectId,evidenceId,doc:primaryDoc,docs
           if(!blob)throw new Error("Attachment unavailable.");const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=file.original_name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
         }).catch(error=>setHistoryError((error as Error).message))}>Download {file.original_name}</Button>)}
       </div>)}</div>}
-      {!reject && preview.after.phase.percentage === 100 && <p>{manualTurnover
-        ? "The phase checklist will be complete. Confirm phase turnover when the handoff is ready."
-        : "The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass."}</p>}
+      {!reject && preview.after.phase.percentage === 100 && <p>{preview.phase_name.toLowerCase() === "closeout"
+        ? "The project will move to Archive if all closeout requirements are met."
+        : manualTurnover
+          ? "The phase checklist will be complete. Confirm phase turnover when the handoff is ready."
+          : "The phase checklist will be complete. The next phase activates automatically if all handoff requirements pass."}</p>}
       <div className="evidence-decision-choice">
         <span className="evidence-decision-label" id="evidence-decision-label">Your decision</span>
         <div className="evidence-review-choice" role="radiogroup" aria-labelledby="evidence-decision-label"

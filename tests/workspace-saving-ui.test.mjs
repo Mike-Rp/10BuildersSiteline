@@ -116,6 +116,56 @@ test("workspace saves prevent duplicate requests, retain failed notes, and allow
   })
 })
 
+test("Office PM approval opens Completed Archive only when the server confirms archival", async () => {
+  await withUi(async ({ React, root, server, w, click, button }) => {
+    const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
+    const { pagePath } = await server.ssrLoadModule("/src/workspace-routing.ts")
+    const state = activeFixture(), project = currentProject(state)
+    const actor = state.accounts.find(account => account.id === project.opmId)
+    actor.expiry = "2099-01-01"
+    project.phase = "Closeout"
+    project.workflow.reviewQueue = [{
+      id: "turnover", label: "Final turnover acceptance", status: "submitted", evidenceId: "71",
+    }]
+    const completedState = {
+      ...state,
+      projects: state.projects.map(p => p.id === project.id ? { ...p, status: "completed" } : p),
+    }
+    globalThis.fetch = async () => new Response(JSON.stringify({ data: {
+      phase_name: "Closeout", activity: "Final turnover acceptance", review_token: "review",
+      after: { phase: { percentage: 100 } },
+    } }))
+    w.scrollTo = () => {}
+    const activePath = pagePath("opm", "Active sites")
+    const archivePath = pagePath("opm", "Archive")
+
+    for (const projectArchived of [false, true]) {
+      w.history.replaceState({}, "", activePath)
+      const onCommand = async command => {
+        assert.equal(command.type, "approve_checklist")
+        assert.equal(command.projectId, project.id)
+        if (projectArchived) root.render(render(completedState))
+        return { ok: true, projectArchived }
+      }
+      const render = workspaceState => React.createElement(Workspace, {
+        key: String(projectArchived), state: workspaceState, actor, onCommand,
+        onRead() {}, onMute() {}, onReload() {}, paused: false,
+        onResume() {}, onPause() {}, idleWarning: false, onStayActive() {},
+      })
+      await React.act(() => root.render(render(state)))
+      await click(document.querySelector('[data-guide="updates-tab"]'))
+      await click(button("Review evidence"))
+      await click(button("Confirm approval"))
+      await click(button("Yes"))
+      assert.equal(w.location.pathname, projectArchived ? archivePath : activePath)
+      if (projectArchived) {
+        assert.equal(button("Completed & accepted projects").className, "active")
+        assert.equal(document.querySelector('[aria-label="Construction project completed"]'), null)
+      }
+    }
+  })
+})
+
 test("failed signed agreement saves keep the selected file and show the error inline", async () => {
   await withUi(async ({ React, root, server, w, click, button }) => {
     const { default: LeadPanel } = await server.ssrLoadModule("/src/LeadSubcontractorPanel.tsx")

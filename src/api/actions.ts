@@ -195,8 +195,7 @@ export async function sendApiWorkflow(state: State, actor: Account, command: Wor
             const pending = command.updateId ? project.workflow?.pendingUpdates?.find(u=>u.id===command.updateId) : project.workflow?.pendingUpdate;
             if (!pending)
                 throw new Error("No pending phase update was found.");
-            await post(base + "/phase-updates/" + pending.id + "/approve", { resolution_note: command.note || "Reviewed." });
-            return;
+            return await post(base + "/phase-updates/" + pending.id + "/approve", { resolution_note: command.note || "Reviewed." });
         }
         case "reject_update": {
             // Only the report is rejected: no checklist credit changes and no phase advances.

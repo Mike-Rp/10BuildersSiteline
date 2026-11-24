@@ -16,7 +16,9 @@ function setup(options={}) {
 const rows=values=>({rows:values,rowCount:values.length});
 async function query(sql,args=[]) {
  sql=sql.replace(/\s+/g," ").trim();state.queries.push({sql,args});
- if(sql.startsWith('select to_regclass'))return rows([{ready:false}]);
+ if(sql.startsWith("select to_regclass")) {
+   return rows([{ready:!!state.responsibility && sql.includes("public.project_phase_responsibilities")}]);
+ }
  if(sql==="SELECT now() AS now") return rows([{now:state.now}]);
  if(sql.startsWith("SELECT p.*")) return rows(state.projects ?? [structuredClone(state.project)]);
  if(sql.startsWith("SELECT id FROM project_stages")) return rows([{id:7}]);
@@ -26,6 +28,17 @@ async function query(sql,args=[]) {
  if(sql.startsWith("WITH workflow AS")) return rows((state.projectIncomplete ? [7,4] : [7]).flatMap(stage=>CLOSEOUT_ACTIVITIES.map((item,index)=>({project_id:id,phase_id:String(stage),name:stage===7?"Closeout":"Structure",expected:true,configured:true,activity_id:String(stage*10+index),code:item.code,required:true,weight:10,status:stage===4?"missing":"approved",approval_valid:stage===7,position:stage-1,phase_count:7,on_hold:false,started:false}))));
  if(sql.startsWith("SELECT 1 FROM projects p JOIN"))return rows(state.unconfirmed?[{}]:[]);
  if(sql.startsWith("SELECT i.id")) return rows(state.items);
+ if(sql.startsWith("select id,user_id from project_phase_responsibilities")) {
+   return rows(state.responsibility?.completion_status === "pending" ? [state.responsibility] : []);
+ }
+ if(sql.startsWith("select 1 from project_phase_updates")) return rows([]);
+ if(sql.startsWith("update project_phase_responsibilities set completion_status='approved'")) {
+   state.responsibility.completion_status = "approved";
+   return rows([]);
+ }
+ if(sql.startsWith("SELECT 1 FROM project_phase_responsibilities")) {
+   return rows(state.responsibility && state.responsibility.completion_status !== "approved" ? [{}] : []);
+ }
  if(sql.startsWith("SELECT 1 FROM project_phase_updates")) return rows(state.pending ? [{}] : []);
  if(sql.startsWith("SELECT count(*)::int AS headcount")) return rows([{headcount:state.headcount}]);
  if(sql.startsWith("SELECT id FROM audit_log")) return rows([{id:"101"}]);
@@ -140,6 +153,12 @@ test("closed project snapshots final headcount before workers and engineers are 
  assert.equal(state.project.lifecycle_status,"archived");
  assert.equal(state.mutations.some(sql=>sql.startsWith("UPDATE subcontractor_workers")),true);
  assert.equal(state.mutations.some(sql=>sql.startsWith("UPDATE project_engineers")),true);
+});
+test("the last Closeout approval can finalize the engineer and archive in the same transaction", async () => {
+ setup({responsibility:{id:"1",user_id:other,completion_status:"pending"}});
+ assert.equal(await policy.maybeCloseProject({query},state.project,id),true);
+ assert.equal(state.responsibility.completion_status,"approved");
+ assert.equal(state.project.lifecycle_status,"archived");
 });
 test("ordinary stages cannot close a project even with an approved checklist",async()=>{
  setup({project:{id,current_stage_id:4,current_stage:"Structure",lifecycle_status:"active"}});

@@ -1,5 +1,6 @@
 import { readChecklist } from "../progress/phase.utility.js";
 import { readVerifiedProgress } from "../progress/verified.utility.js";
+import { autoApproveCompletions } from "../progress/handoff.utility.js";
 import { blockingReviews, unfinishedPhaseResponsibilities, verifiedComplete } from "../progress/lifecycle.utility.js";
 import { businessDeadline, recordArchiveEvent } from "./audit.utility.js";
 import { projectWorkflowSql } from "../projects/project-workflow.utility.js";
@@ -17,7 +18,9 @@ export async function maybeCloseProject(db, project, actorId = null) {
   const assignments = await db.query(`SELECT 1 FROM projects p JOIN (${projectWorkflowSql}) w ON w.project_id=p.id
     LEFT JOIN project_phase_team t ON t.project_id=p.id AND t.project_stage_id=w.project_stage_id
     WHERE p.id=$1 AND (t.spm_user_id IS NULL OR t.status IS DISTINCT FROM 'confirmed') LIMIT 1`,[project.id]);
-  if (assignments.rowCount || await unfinishedPhaseResponsibilities(db,project.id,project.current_stage_id) || await blockingReviews(db,project.id)) return false;
+  if (assignments.rowCount || await blockingReviews(db,project.id)) return false;
+  await autoApproveCompletions(db, project, actorId);
+  if (await unfinishedPhaseResponsibilities(db,project.id,project.current_stage_id)) return false;
   const crew = await db.query(
     "SELECT count(*)::int AS headcount FROM subcontractor_workers WHERE current_project_id=$1 AND availability_status='assigned' AND status='active'",
     [project.id]);

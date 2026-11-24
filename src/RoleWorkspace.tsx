@@ -222,6 +222,8 @@ type Result = {
   ok: boolean
   error?: string
   message?: string
+  projectArchived?: boolean
+  refreshError?: string
 }
 type RoleDialog = {
   kind: string
@@ -378,6 +380,7 @@ export default function RoleWorkspace({
   const [companyAvailabilityFilter, setCompanyAvailabilityFilter] =
     useState("all")
   const [completedProjectId, setCompletedProjectId] = useState("")
+  const redirectedProjectId = useRef<string | undefined>(undefined)
   const [officeDocumentsPath, setOfficeDocumentsPath] = useState<RepositoryPath>({})
   const [requiredDocumentJump, setRequiredDocumentJump] = useState<{ projectId: string; index: number }>()
   useEffect(() => {
@@ -467,7 +470,9 @@ export default function RoleWorkspace({
     previousStatuses.current = Object.fromEntries(
       projects.map((p) => [p.id, p.status]),
     )
-    if (justCompleted) setCompletedProjectId(justCompleted.id)
+    if (justCompleted && justCompleted.id !== redirectedProjectId.current) {
+      setCompletedProjectId(justCompleted.id)
+    }
   }, [state.projects])
   useEffect(() => {
     setNote("")
@@ -582,7 +587,15 @@ export default function RoleWorkspace({
         return false
       }
       if(submissionSignature)pendingSubmissionRetries.current.delete(submissionSignature)
-      setMessage(result.message || success || "Workspace updated.")
+      if (isOpm && result.projectArchived && command.projectId) {
+        redirectedProjectId.current = command.projectId
+        setCompletedProjectId("")
+        setArchiveTab("completed")
+        navigate("Archive")
+        if (result.refreshError) setError(result.refreshError)
+      } else {
+        setMessage(result.message || success || "Workspace updated.")
+      }
       return true
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "This action could not be saved. Try again.")

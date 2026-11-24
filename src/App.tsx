@@ -832,12 +832,15 @@ function AppInner() {
   }
   async function sendWorkflow(command:WorkflowCommand) {
     if(signedOut)return {ok:false,error:"Your session has ended. Sign in again to continue."}
+    let response: Awaited<ReturnType<typeof sendApiWorkflow>>
     try{
-      const response = await sendApiWorkflow(stateRef.current,actor,command)
+      response = await sendApiWorkflow(stateRef.current,actor,command)
       await reloadWorkspace()
-      const message = undefined
-      return {ok:true, message}
+      return { ok: true, projectArchived: response?.project_archived === true }
     }catch(error){
+      if (response?.project_archived === true) {
+        return { ok: true, projectArchived: true, refreshError: "Project archived. Refresh the workspace to load the completed record." }
+      }
       if (command.phases) await reloadWorkspace().catch(() => {})
       return {ok:false,error:(error as Error).message}
     }
