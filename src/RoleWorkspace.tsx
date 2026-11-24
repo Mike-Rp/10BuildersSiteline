@@ -2023,7 +2023,7 @@ export default function RoleWorkspace({
                             expectedVersion: item.version,
                             docs,
                           },
-                          "Evidence submitted to Office PM for QA/QC.",
+                          "Evidence submitted. Progress is credited after Office PM approval.",
                         )
                       }
                     />
@@ -2379,8 +2379,8 @@ export default function RoleWorkspace({
                   {rework.issues.length > 0 && <div className="tag-list subsection">{rework.issues.map(issue => <span key={issue}>{issue}</span>)}</div>}
                   <p className="submission-note">{rework.note || "No additional note provided."}</p>
                   {submissionDocs(rework).length > 0 && <div className="report-attachments"><h4>Field evidence ({submissionDocs(rework).length})</h4><ul>{submissionDocs(rework).map(doc => <li key={doc.id}><AttachmentPreview doc={doc} onOpen={() => showDoc(project, doc)} /><Button icon="doc" onClick={() => showDoc(project, doc)}>View {doc.name}</Button>{fileSizeLabel(doc.size) && <small>{fileSizeLabel(doc.size)}</small>}</li>)}</ul></div>}
-                  <p className="role-muted">Review the affected activities and progress impact before confirming targeted rework.</p>
-                  <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework impact</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
+                  <p className="role-muted">Select the activities that require correction.</p>
+                  <div className="role-actions"><Button variant="primary" disabled={saving} onClick={() => setReviewAction({ type: "approve_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Review rework</Button><Button disabled={saving} onClick={() => setReviewAction({ type: "decline_rework", projectId: project.id, requestId: rework.id, expectedVersion: rework.version })}>Decline — no change</Button></div>
                 </div>}
                 {(pendingChecklistFor(project).length > 0) && <div className="active-site-review-item">
                   <div className="active-site-review-heading"><strong>QA/QC evidence</strong><Status value={`${pendingChecklistFor(project).length} awaiting review`} /></div>
@@ -2619,7 +2619,7 @@ export default function RoleWorkspace({
                       <Icon name="shield" />
                       <p>
                         {tab === "rework"
-                          ? "Only the selected affected activities require correction. Review the phase and project impact before confirming; dismissing the request leaves approvals unchanged."
+                          ? "Only the selected affected activities require correction. Select the affected activities before confirming."
                           : "Review the report here. Checklist activities are reviewed separately in QA/QC evidence; approving or rejecting this report grants or removes no activity credit and does not change the project phase. A rejection needs a reason, which the Site PM sees."}
                       </p>
                     </div>
@@ -2637,7 +2637,7 @@ export default function RoleWorkspace({
                               })
                             }
                           >
-                            Review rework impact
+                            Review rework
                           </Button>
                           <Button
                             onClick={() =>
