@@ -65,8 +65,8 @@ export async function loadState(me: { id: string; role: Role; full_name?: string
       return state
     }
   }
-  // Catch up completed phases from older sessions and retry resolved blockers
-  // before reading the confirmed workflow position. This never sends a phase or percentage.
+  // Reconcile completed phases and Closeout before fetching the updated project list.
+  // This never sends a phase or percentage.
   const handoffs = me.role === "client" ? [] : await api<{project_id:string;from:string;advanced:boolean;reason?:string}[]>(
     "/workspace/reconcile-phase-handoffs", {method:"POST",json:{}}).catch(error => {
       if (error instanceof ApiError && (error.status === 0 || error.status === 404 || error.status >= 500)) return []

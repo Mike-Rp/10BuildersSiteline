@@ -1,6 +1,7 @@
 import { readEvidenceQueue } from '../progress/evidence-queue.utility.js';
 import { readProjectCompanyAllocation } from "./project-company-allocation.utility.js";
 import { readOverlapMonitoring } from "../progress/overlap.utility.js";
+import { maybeCloseProject } from "../archive/policy.js";
 
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { errorlog } from "../../common/utilities/logger.utility.js";
@@ -44,7 +45,9 @@ export async function reconcilePhaseHandoffs(req,res) {
    await db.query("select set_config('app.current_user_id',$1,true)",[user.id]);
    const candidates=(await db.query(`select p.id,p.current_stage_id,s.code AS current_stage from projects p
     left join project_stages s on s.id=p.current_stage_id where p.lifecycle_status='active'
-    and not coalesce(p.is_deleted,false) and to_jsonb(p)->>'intake_monitoring_version' IS DISTINCT FROM '1' and ${scope} order by p.id`,[user.role,user.id])).rows;
+    and not coalesce(p.is_deleted,false)
+    and (lower(s.code)='closeout' or to_jsonb(p)->>'intake_monitoring_version' IS DISTINCT FROM '1')
+    and ${scope} order by p.id`,[user.role,user.id])).rows;
    const initial=await readVerifiedProgress(db,candidates.map(project=>project.id));
    const results=[];
    for(const candidate of candidates) {
@@ -62,14 +65,21 @@ export async function reconcilePhaseHandoffs(req,res) {
       AND p.lifecycle_status='active' AND NOT COALESCE(p.is_deleted,false) AND ${scope} FOR UPDATE OF p`,
       [user.role,user.id,candidate.id])).rows[0];
      if(project && Number(project.current_stage_id)===Number(candidate.current_stage_id)) {
-      const handoff=await transitionPhase(db,project,null);
-      if(handoff.state!=="final") results.push({project_id:project.id,from:project.current_stage,...handoff});
+      if (project.current_stage?.toLowerCase() === "closeout") {
+       // Final approvals may already be saved without a subsequent archive check.
+       if (await maybeCloseProject(db, project)) {
+        results.push({project_id:project.id,from:project.current_stage,advanced:false,project_archived:true});
+       }
+      } else {
+       const handoff=await transitionPhase(db,project,null);
+       if(handoff.state!=="final") results.push({project_id:project.id,from:project.current_stage,...handoff});
+      }
      }
     } catch(error) {
      await db.query("ROLLBACK TO SAVEPOINT project_handoff");
-     errorlog(`Phase handoff failed for project ${candidate.id}: ${error.message}`);
+     errorlog(`Project reconciliation failed for project ${candidate.id}: ${error.message}`);
      results.push({project_id:candidate.id,from:candidate.current_stage,advanced:false,
-      reason:"Automatic handoff could not be checked. The system will retry on a staff workspace refresh."});
+      reason:"Project readiness could not be checked. The system will retry on a staff workspace refresh."});
     }
     await db.query("RELEASE SAVEPOINT project_handoff");
    }

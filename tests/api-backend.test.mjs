@@ -1303,6 +1303,26 @@ test("the frontend loads each role's data through the real backend", { skip: !av
     assert.equal((await stage()).lifecycle_status,"archived")
     await assert.rejects(api(base+"/advance-phase",{method:"POST",json:{}}),/Archived|active/i)
     assert.equal((await stage()).lifecycle_status,"archived")
+
+    // Reproduce an older record that saved all approvals but stayed in Active sites.
+    await asUser(spmEmail)
+    await db.query("update projects set lifecycle_status='active',archived_at=null where id=$1",[id])
+    const outstanding=await api(base+"/phase-updates",{method:"POST",json:{note:"Review still outstanding at Closeout"}})
+    const siteActor={id:spmId,role:"spm",email:spmEmail}
+    const stillActive=await loadState(siteActor)
+    assert.equal(stillActive.projects.find(p=>p.id===id).status,"active")
+    await db.query("update project_phase_updates set status='approved',resolved_by=$2,resolved_at=now() where id=$1",[outstanding.id,opmId])
+    const archiveCount=async()=>(await db.query(
+      "select count(*)::int as total from audit_log where table_name='projects' and record_id=$1 and new_values->>'_archive_event'='project_archived'",[id]
+    )).rows[0].total
+    const priorClosures=await archiveCount()
+    const [refreshed]=await Promise.all([
+      loadState(siteActor),
+      api("/workspace/reconcile-phase-handoffs",{method:"POST",json:{}}),
+    ])
+    assert.equal(refreshed.projects.find(p=>p.id===id).status,"completed")
+    assert.equal((await stage()).lifecycle_status,"archived")
+    assert.equal(await archiveCount(),priorClosures+1,"concurrent refreshes archive the project once")
   })
 
   await t.test("migrated workflows drive details, filters, validation and unassigned phases",async()=>{
