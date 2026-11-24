@@ -471,7 +471,14 @@ export default function RoleWorkspace({
       projects.map((p) => [p.id, p.status]),
     )
     if (justCompleted && justCompleted.id !== redirectedProjectId.current) {
-      setCompletedProjectId(justCompleted.id)
+      const viewingCompletedSite = (phaseWorkspaceOpen && pickedId === justCompleted.id) || dialog?.projectId === justCompleted.id
+      const openSiteArchive = page === "Active sites" && (allActive.length === 0 || viewingCompletedSite)
+      if (!isOpm && (page === "Archive" || openSiteArchive)) {
+        setArchiveTab("completed")
+        if (page === "Active sites") navigate("Archive")
+      } else {
+        setCompletedProjectId(justCompleted.id)
+      }
     }
   }, [state.projects])
   useEffect(() => {

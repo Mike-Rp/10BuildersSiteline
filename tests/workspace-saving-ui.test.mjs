@@ -116,6 +116,45 @@ test("workspace saves prevent duplicate requests, retain failed notes, and allow
   })
 })
 
+test("Site PM sees the last active site move to Completed projects after a confirmed closeout", async () => {
+  await withUi(async ({ React, root, server, w, click }) => {
+    const { default: App } = await server.ssrLoadModule("/src/App.tsx")
+    const { pagePath } = await server.ssrLoadModule("/src/workspace-routing.ts")
+    const actor = { id: "test-site-pm", role: "spm", full_name: "Site PM", status: "active" }
+    const project = { id: "test-closeout", name: "Closeout site", project_type: "Residential",
+      current_stage: "Closeout", current_pct: 100, lifecycle_status: "active" }
+    const team = [{ stage: "Closeout", spm_user_id: actor.id, spm_name: actor.full_name, status: "confirmed" }]
+    let projectReads = 0
+    w.sessionStorage.setItem("siteline-api-token", `test.${Buffer.from(JSON.stringify({ sub: actor.id, details: actor })).toString("base64url")}.test`)
+    globalThis.fetch = async url => {
+      const path = new URL(String(url), w.location.href).pathname.replace(/^\/api\/v1/, "")
+      if (path === "/auth/me") return Response.json(actor)
+      if (path === "/accounts/" + actor.id) return Response.json({ ...actor, license: { license_expiry: "2099-01-01" } })
+      if (path === "/licenses/me") return Response.json({ status: "valid", daysToExpiry: 365 })
+      if (path === "/workspace") return Response.json({})
+      if (path === "/workspace/project-data") {
+        projectReads++
+        return Response.json([{ list: project, detail: { phase_team: team },
+          documents: [], history: [], photos: [], notes: [], assignments: [], contracts: [] }])
+      }
+      return Response.json([])
+    }
+    w.scrollTo = () => {}
+    w.history.replaceState({}, "", pagePath("spm", "Dashboard"))
+    await React.act(async () => root.render(React.createElement(App)))
+    const readsAtLogin = projectReads
+    await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
+    assert.ok(projectReads > readsAtLogin)
+    assert.ok(document.querySelector(".as-card").textContent.includes(project.name))
+    project.lifecycle_status = "archived"
+    await React.act(async () => w.dispatchEvent(new w.Event("focus")))
+    assert.equal(w.location.pathname, pagePath("spm", "Archive"))
+    assert.ok(document.querySelector(".archive-record").textContent.includes(project.name))
+    await click(document.querySelector('.sidebar [aria-label="Active sites"]'))
+    assert.equal(document.querySelector(".as-card"), null)
+  })
+})
+
 test("Office PM approval opens Completed Archive only when the server confirms archival", async () => {
   await withUi(async ({ React, root, server, w, click, button }) => {
     const { default: Workspace } = await server.ssrLoadModule("/src/RoleWorkspace.tsx")
@@ -250,6 +289,7 @@ async function withUi(run) {
   const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
   const w = dom.window, previous = new Map()
   for (const [key, value] of Object.entries({ window: w, document: w.document, HTMLElement: w.HTMLElement, Element: w.Element, navigator: w.navigator,
+    sessionStorage: w.sessionStorage, localStorage: w.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true, requestAnimationFrame: w.requestAnimationFrame.bind(w), cancelAnimationFrame: w.cancelAnimationFrame.bind(w),
     fetch: async () => new Response(JSON.stringify({ data: { download_url: "/files/test" } }), { status: 200 }),
     ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },

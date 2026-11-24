@@ -28,7 +28,7 @@ import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
 import useSidebarNavigation from "./useSidebarNavigation"
 import useWorkspacePage from "./useWorkspacePage"
-import { changeRoute, ROUTE_CHANGE } from "./workspace-routing"
+import { changeRoute, resolveWorkspaceRoute, ROUTE_CHANGE } from "./workspace-routing"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import useLoginBackConfirmation from "./useLoginBackConfirmation"
 import UrgentActionBanner from "./UrgentActionBanner"
@@ -616,19 +616,40 @@ function AppInner() {
       const snapshot = stateRef.current
       try {
         const loaded = await loadApiState({ id: actor.id, role: actor.role, full_name: actor.name, email: actor.email })
-        if (active && stateRef.current === snapshot) { stateRef.current = loaded; setState(loaded); setReadinessAvailable(true) }
-        lastLoadAt.current = Date.now()
+        if (active && stateRef.current === snapshot) {
+          stateRef.current = loaded
+          setState(loaded)
+          setReadinessAvailable(true)
+          lastLoadAt.current = Date.now()
+        }
       } catch { if(active)setReadinessAvailable(false) /* A failed read does not assert current blockers. */ }
       finally { loading = false }
     }
     const stopPolling = startPolling(refresh)
-    // Coming back to a tab that sat idle for a full interval catches up at once. Quick switches do not reload.
-    const onFocus = () => { if (isStale(lastLoadAt.current)) void refresh() }
+    // A final approval can arrive in the Office PM's session between scheduled reads.
+    const viewingSiteCloseout = () => {
+      if (actor.role !== "spm") return false
+      const page = resolveWorkspaceRoute("spm", window.location.pathname)?.page
+      return (page === "Active sites" || page === "Archive") &&
+        stateRef.current.projects.some(p => p.status === "active" && p.phase === "Closeout")
+    }
+    const onNavigation = () => { if (viewingSiteCloseout()) void refresh() }
+    const onFocus = () => { if (viewingSiteCloseout() || isStale(lastLoadAt.current)) void refresh() }
     const onRestricted = () => { loading = false; void refresh() }
     window.addEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted)
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onFocus)
-    return () => { active = false; stopPolling(); window.removeEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus) }
+    window.addEventListener(ROUTE_CHANGE, onNavigation)
+    window.addEventListener("popstate", onNavigation)
+    return () => {
+      active = false
+      stopPolling()
+      window.removeEventListener(LICENSE_RENEWAL_ONLY_EVENT, onRestricted)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onFocus)
+      window.removeEventListener(ROUTE_CHANGE, onNavigation)
+      window.removeEventListener("popstate", onNavigation)
+    }
   }, [actor.id, actor.role, signedOut])
   async function commit(change:(s:State)=>State,title:string,detail="",type="account",target=page) {
     if(signedOut||actor.role!=="admin"){setToast("Sign in again to continue.");return}
