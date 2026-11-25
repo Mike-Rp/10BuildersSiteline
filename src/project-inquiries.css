@@ -283,7 +283,7 @@
 .office-review-form .office-workflow-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .office-review-wide { grid-column: 1 / -1; }
 .office-review-form label { display: block; margin-bottom: 4px; }
-.office-review-form :is(input, select)[aria-invalid="true"] { border-color: #a8272f; }
+.office-workflow-form :is(input, select)[aria-invalid="true"] { border-color: #a8272f; }
 #root .office-review-field-changed :is(input, select):not([aria-invalid="true"]) { border-color: #b47c30; background: #fff4df; }
 .office-review-edited { display: inline-block; margin-inline-start: 7px; padding: 1px 7px; border-radius: 999px; background: #fff0d4; color: #775019; font-size: .75rem; }
 .office-review-field-helper { display: flex; gap: 4px 10px; flex-wrap: wrap; align-items: center; margin-top: 5px; color: var(--color-muted); font-size: .82rem; }
@@ -300,6 +300,7 @@
 .office-review-options label:has(input:disabled) { cursor: default; }
 #root .office-review-options input[type=radio] { flex: 0 0 auto; margin: 0; padding: 0; }
 .office-review-budget, .office-review-footer { padding: 12px; border: 1px solid #cfe0ed; border-radius: 8px; background: #edf5fb; }
+.office-review-budget-fields { display: grid; gap: 12px; }
 .office-review-form .office-review-budget.single { grid-template-columns: minmax(0, 1fr); }
 .office-review-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .office-review-footer .office-workflow-actions { padding: 0; }

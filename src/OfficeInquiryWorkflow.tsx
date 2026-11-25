@@ -5,7 +5,7 @@ import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -62,6 +62,7 @@ const fieldValue = (key: string, value: Details[string] | null | undefined) => {
 const hasSizeInputs = (details: Record<string, Details[string] | null | undefined>) => projectTypes.includes(String(details.project_type)) &&
   ["lot_area", "floor_area_sqm"].every(key => Number.isFinite(Number(details[key])) && Number(details[key]) > 0)
 const currency = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" })
+const wholePeso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 })
 const date = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "Asia/Manila" })
 const today = () => new Intl.DateTimeFormat("sv-SE", { dateStyle: "short", timeZone: "Asia/Manila" }).format(new Date())
 const latestInquiryStart = addDays("9999-12-31", -MIN_INQUIRY_DURATION_DAYS)
@@ -193,7 +194,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     : undefined
   const earliestCompletion = validStart && scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
   const selectedCompletion = end || earliestCompletion || ""
-  const budgetSaved = !!workflow?.budget && Number(budget) === workflow.budget
+  const budgetDetails = reviewing ? measuredDraft : row.details
+  const budgetComplexity = reviewing ? scheduleEstimate?.complexity : review && hasSizeInputs(budgetDetails)
+    ? assessInquiry(budgetDetails, review.start, review.end, review.technical ?? technicalOptions[0],
+      review.arrangement ?? arrangementOptions[0]).complexity : undefined
+  const costEstimate = budgetComplexity ? inquiryCostEstimate(budgetDetails, budgetComplexity) : null
+  const budgetError = costEstimate && budget && Number(budget) < costEstimate.minimum
+    ? `Enter an authorized budget of at least ${wholePeso.format(costEstimate.minimum)}.` : ""
+  const budgetSaved = !!workflow?.budget && Number(budget) === workflow.budget && !budgetError
   const original = Object.fromEntries(correctionFields.map(([key]) => {
     const firstChange = workflow?.review_history?.find(event => event.changes[key])
     return [key, (firstChange ? firstChange.changes[key].before : row.details[key]) ?? ""]
@@ -237,10 +245,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     const id = fieldId(key)
     return <div key={key} className={changed ? "office-review-field-changed" : undefined}>
       <label htmlFor={id}>{label}{changed && <span className="office-review-edited">Edited</span>}</label>{key === "project_type"
-      ? <select {...describedField(id)} required value={draft[key] ?? ""} onChange={event => updateDraft(key, event.target.value)}>
-        <option value="">Select a project type</option>
-        {projectTypes.map(type => <option key={type}>{type}</option>)}
-      </select>
+      ? <input {...describedField(id)} readOnly value={draft[key] ?? ""} />
       : key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
           onValueChange={value => updateDraft(key, value)} />
       : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required min={0}
@@ -254,7 +259,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   }
   function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy) return
+    if (busy || !costEstimate || budgetError) return
     if (!reviewing) {
       if (!budgetSaved) save("budget", { amount: budget })
       return
@@ -298,6 +303,26 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       floorMeasurements: calculatedArea.measurements,
       ...(hasCorrections ? { correction: measuredDraft } : {}), ...(needsReason ? { reason } : {}) })
   }
+  const budgetFields = <div className="office-review-budget-fields">
+    <div>
+      <label htmlFor={fieldId("estimated-cost")}>Estimated project cost</label>
+      <input id={fieldId("estimated-cost")} readOnly value={costEstimate
+        ? `${wholePeso.format(costEstimate.minimum)}–${wholePeso.format(costEstimate.maximum)}`
+        : "Pending project measurements"} />
+      {budgetComplexity && costEstimate && <p className="office-review-field-helper">
+        Preliminary estimate based on {budgetComplexity.toLowerCase()} complexity.
+      </p>}
+    </div>
+    <div>
+      <label htmlFor={fieldId("budget")}>Authorized budget (₱)</label>
+      <GroupedNumberInput {...describedField(fieldId("budget"), budgetError ? fieldId("budget-minimum") : undefined)}
+        aria-invalid={Boolean(budgetError) || fieldError?.id === fieldId("budget") || undefined}
+        required min={costEstimate?.minimum ?? 0.01} max={999999999999.99} decimalPlaces={2}
+        placeholder="Enter approved amount" value={budget} onValueChange={setBudget} />
+      {budgetError ? <p id={fieldId("budget-minimum")} className="office-review-field-error" role="alert">{budgetError}</p>
+        : inlineError(fieldId("budget"))}
+    </div>
+  </div>
   const recordCards = <div className="office-workflow-grid record-cards office-intake-records">
     <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>
     <Card title="Project information" icon="building"><Facts values={projectFacts} />
@@ -570,12 +595,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               </div>
             </div>
             <div className={`office-workflow-fields office-review-budget${needsReason ? "" : " single"}`}>
-              <div>
-                <label htmlFor={fieldId("budget")}>Authorized budget (₱)</label>
-                <GroupedNumberInput {...describedField(fieldId("budget"))} required min={0.01} max={999999999999.99} decimalPlaces={2}
-                  placeholder="Enter approved amount" value={budget} onValueChange={setBudget} />
-                {inlineError(fieldId("budget"))}
-              </div>
+              {budgetFields}
               {needsReason && <div>
                 <label htmlFor={fieldId("reason")}>Reason for changes</label>
                 <input {...describedField(fieldId("reason"))} required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
@@ -603,7 +623,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 setReason("")
                 setFieldError(undefined)
               }}>Cancel</button>}
-              <button type="submit" className="button primary">Save and continue</button>
+              <button type="submit" className="button primary" disabled={!costEstimate || Boolean(budgetError)}>Save and continue</button>
             </div>
           </div>
         </fieldset> : <fieldset className="office-workflow-form office-reviewed-intake" disabled={busy}>
@@ -623,10 +643,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 ["Project address / location", "Estimated start", "Estimated completion", "Classification"].includes(label))]} />
               {row.details.overview && <p>{row.details.overview}</p>}
             </details>
-          <details className="office-workflow-history" open={!workflow?.budget || undefined}>
+          <details className="office-workflow-history" open={!budgetSaved || undefined}>
             <summary>Budget allocation</summary>
-            <label>Authorized amount (₱)<GroupedNumberInput required min={0.01} max={999999999999.99} decimalPlaces={2}
-              value={budget} onValueChange={setBudget} /></label>
+            {budgetFields}
             {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
               <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
             </details>}
@@ -634,7 +653,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <div className="office-workflow-actions office-workflow-action-bar">
             {budgetSaved
               ? <p className="inquiry-muted">Update the reviewed schedule to continue to assessment.</p>
-              : <button type="submit" className="button primary">Save allocated budget</button>}
+              : <button type="submit" className="button primary" disabled={!costEstimate || Boolean(budgetError)}>Save allocated budget</button>}
           </div>
           </Card>
           {signedContract}

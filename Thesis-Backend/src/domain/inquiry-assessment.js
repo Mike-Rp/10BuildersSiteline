@@ -38,6 +38,23 @@ const planningRules = {
 const overlapDurationFactors = [1, 0.9, 0.8];
 const complexityForScore = score => score <= 7 ? "Low" : score <= 11 ? "Moderate" : "High";
 const complexityDurationFactors = { Low: 0.85, Moderate: 1, High: 1.30 };
+const projectCostRates = {
+  Residential: [24000, 28000],
+  Commercial: [28000, 34000],
+  "Mixed-Use": [30000, 36000],
+};
+const projectCostFactors = { Low: 0.90, Moderate: 1, High: 1.20 };
+
+export function inquiryCostEstimate(details, complexity) {
+  if (!Object.hasOwn(projectCostRates, details.project_type) ||
+      !Object.hasOwn(projectCostFactors, complexity) || !positiveArea(details.floor_area_sqm)) return null;
+  const [lowRate, highRate] = projectCostRates[details.project_type];
+  const area = Number(details.floor_area_sqm);
+  const factor = projectCostFactors[complexity];
+  const minimum = Math.ceil(Number((area * lowRate * factor).toPrecision(15)));
+  const maximum = Math.ceil(Number((area * highRate * factor).toPrecision(15)));
+  return Number.isSafeInteger(minimum) && Number.isSafeInteger(maximum) ? { minimum, maximum } : null;
+}
 
 export function inquirySize(details) {
   const { small, medium } = planningRules[details.project_type];
@@ -96,6 +113,8 @@ export function inquiryAssessmentReady(details, workflow) {
   if (!review || !workflow.budget) return false;
   const estimate = assessInquiry(details, review.start, review.end,
     review.technical ?? technicalOptions[0], review.arrangement ?? arrangementOptions[0]);
+  const cost = inquiryCostEstimate(details, estimate.complexity);
+  if (!cost || workflow.budget < cost.minimum) return false;
   const minimum = earliestInquiryCompletion(review.start, estimate);
   return !!minimum && review.end >= minimum;
 }

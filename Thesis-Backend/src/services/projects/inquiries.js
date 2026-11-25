@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
 import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
-import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -103,11 +103,14 @@ function validateInquiryCompletion(start, end, estimate) {
   if (end < minimum) throw new HttpError(422, `Choose an estimated completion date of ${minimum} or later based on the calculated duration.`);
 }
 
-function recordInquiryBudget(workflow, input, audit) {
+function recordInquiryBudget(workflow, input, audit, cost) {
   const amount = Number(input);
   if (!["number", "string"].includes(typeof input) || !Number.isFinite(amount) ||
       amount < 0.01 || amount > 999999999999.99 || Math.round(amount * 100) / 100 !== amount)
     throw new HttpError(422, "Enter a positive PHP amount with at most two decimal places.");
+  if (!cost) throw new HttpError(422, "Confirm the project details to calculate the minimum budget.");
+  if (amount < cost.minimum)
+    throw new HttpError(422, `Enter an authorized budget of at least ₱${cost.minimum.toLocaleString("en-PH")}.`);
   if (amount !== workflow.budget) {
     workflow.budget_history = [...(workflow.budget_history ?? []), { ...audit, amount }];
     workflow.budget = amount;
@@ -394,6 +397,8 @@ export function mountInquiries(router) {
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details);
+        if (input.correction?.project_type !== undefined && input.correction.project_type !== before.project_type)
+          throw new HttpError(403, "Project type is read-only.");
         for (const key of ["client_name", "email", "phone", "client_type", "company_name", "primary_contact", "designation"]) {
           if (input.correction?.[key] !== undefined && input.correction[key] !== before[key])
             throw new HttpError(403, "Client information is read-only. Request an administrator correction.");
@@ -441,12 +446,15 @@ export function mountInquiries(router) {
           ...(floorMeasurements ? { floorMeasurements } : {}) };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
-        if (input.amount !== undefined) recordInquiryBudget(workflow, input.amount, audit);
+        const budget = input.amount === undefined ? workflow.budget : input.amount;
+        if (budget !== undefined) recordInquiryBudget(workflow, budget, audit, inquiryCostEstimate(after, suggestion.complexity));
         break;
       }
       case "budget": {
         if (!workflow.review) throw new HttpError(409, "Confirm the project information before saving the budget.");
-        recordInquiryBudget(workflow, input.amount, audit);
+        const { start, end, technical = technicalOptions[0], arrangement = arrangementOptions[0] } = workflow.review;
+        const { complexity } = assessInquiry(details, start, end, technical, arrangement);
+        recordInquiryBudget(workflow, input.amount, audit, inquiryCostEstimate(details, complexity));
         break;
       }
       case "assessment": {

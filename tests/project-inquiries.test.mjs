@@ -215,6 +215,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const assessmentInput = {technical:"Several specialized systems",arrangement:"Partially overlapping phases"}
   await save("review",0,{...schedule,end:"2027-02-25",...assessmentInput},422)
   await save("review",0,{...schedule,end:"2027-05-10",...assessmentInput},422)
+  await save("review",0,{...schedule,end:"2027-05-11",amount:1,...assessmentInput},422)
   await save("review",0,{...schedule,end:"2027-05-11",amount:4500000.001,...assessmentInput},422)
   const initialReview = (await save("review",0,{...schedule,end:"2027-05-11",...assessmentInput})).workflow.review
   assert.equal(initialReview.technical,assessmentInput.technical)
@@ -231,7 +232,10 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.deepEqual(review.review_history.at(-1).changes.floor_area_sqm,{before:180,after:200})
   assert.deepEqual(review.review.floorMeasurements,{mode:"individual",areas:[110,90]})
   await save("assessment",1,assessmentInput,409)
-  const updatedBudget = 4600000
+  await save("budget",2,{amount:0},422)
+  await save("budget",2,{amount:1},422)
+  await save("budget",2,{amount:4799999.99},422)
+  const updatedBudget = 4800000
   assert.equal((await save("budget",2,{amount:updatedBudget})).workflow.budget,updatedBudget)
   await save("review",2,{...correction,reason:"Attempt another correction after review and budget."},409)
   await save("budget",2,{amount:4500000},409)
