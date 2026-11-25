@@ -114,7 +114,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [floorPage, setFloorPage] = useState(0)
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
   const [end, setEnd] = useState(review?.end ?? "")
-  const earliestStart = today()
+  const earliestStart = addDays(today(), 14)
   const validStart = /^\d{4}-\d{2}-\d{2}$/.test(start) && start >= earliestStart && start <= latestInquiryStart
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
@@ -275,7 +275,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       } else if (control.willValidate) {
         const key = control.id.replace("inquiry-review-", "")
         const value = control.value.trim()
-        if (control.id === "inquiry-start-date" && !validStart) message = "Choose a valid estimated start date of today or later."
+        if (control.id === "inquiry-start-date" && !validStart) message = "Choose an estimated start date at least 14 calendar days from today."
         else if (control.required && !value && !control.validity.badInput) message = "Complete this required field."
         else if (!control.validity.valid) message = key === "phone" ? PH_MOBILE_ERROR : control.validationMessage
         else if (numericField(key) && value && Number(value.replace(/,/g, "")) <= 0) message = "Enter a value greater than zero."
@@ -547,12 +547,13 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <div>
                 <label htmlFor="inquiry-start-date">Estimated start date</label>
                 <DatePicker {...describedField("inquiry-start-date")} calendarTitle="Estimated start date"
-                  calendarSubtitle="Choose today or a later date."
+                  calendarSubtitle="Allow 14 calendar days for preparation."
                   required disabled={busy} min={earliestStart} max={latestInquiryStart} value={start} onValueChange={value => {
                     setStart(value)
                     setEnd("")
                     setFieldError(undefined)
                   }} />
+                <p className="office-review-field-helper">Earliest start: {earliestStart} (14 calendar days from today).</p>
                 {inlineError("inquiry-start-date")}
               </div>
               <div>

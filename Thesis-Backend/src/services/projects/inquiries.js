@@ -362,6 +362,12 @@ export function mountInquiries(router) {
         if (areas) corrected.floor_area_sqm = areas.total;
         const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
+        const localToday = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+        const earliestStartDate = new Date(localToday + "T00:00:00Z");
+        earliestStartDate.setUTCDate(earliestStartDate.getUTCDate() + 14);
+        const earliestStart = earliestStartDate.toISOString().slice(0, 10);
+        if (typeof input.start !== "string" || input.start < earliestStart)
+          throw new HttpError(422, "Choose an estimated start date at least 14 calendar days from today.");
         const suggestion = assessInquiry(after, input.start, input.end, technical, arrangement);
         validateInquiryCompletion(input.start, input.end, suggestion);
         const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
