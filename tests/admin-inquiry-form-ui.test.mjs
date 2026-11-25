@@ -77,6 +77,6 @@ test("admin inquiry log and form show grouped controls, phone formats, and the r
   await act(() => document.querySelectorAll('input[name="immediate-consultation"]')[1].click())
   assert.equal(document.querySelector(".admin-inquiry-classification").disabled, true)
   assert.equal(document.querySelector('input[name="inquiry-classification"]:checked').value, "Normal")
-  assert.match(document.querySelector(".admin-inquiry-consultation").textContent, /within 24 hours/)
+  assert.match(document.querySelector(".admin-inquiry-consultation").textContent, /within one working day/)
 
 })

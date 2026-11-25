@@ -202,7 +202,7 @@ function AdminInquiryHistory({ row }: { row: Inquiry }) {
   </section>
 }
 
-const consultationLabel = (details: Details) => timing.find(([value]) => value === Number(details.consultation))?.[1] || "—"
+const consultationLabel = (details: Details) => details.response_time_policy === "office_day" ? "Within one working day (Mon–Fri, 8 AM–5 PM)" : timing.find(([value]) => value === Number(details.consultation))?.[1] || "—"
 
 function requiredAreas(entry?: Phase) {
   if (entry?.required_specializations) return entry.required_specializations
@@ -924,6 +924,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const regular = details.immediate_consultation === "no"
     const matching = opmPreview?.type === previewType ? opmPreview : undefined
     const candidates = matching?.candidates
+    const floorLimit = Number(details.lot_area) > 0 && Number(details.floor_count) > 0 ? Number(details.lot_area) * Number(details.floor_count) : undefined
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
       if (key === "phone") {
@@ -936,8 +937,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
         return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-          <GroupedNumberInput required={required} min={0.01} value={value}
+          <GroupedNumberInput required={required} min={0.01} max={key === "floor_area_sqm" ? floorLimit : undefined} value={value}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
+          {key === "floor_area_sqm" && floorLimit !== undefined && <small className="inquiry-input-notice" aria-live="polite">{Number(value) > floorLimit ? "Total floor area exceeds the allowed maximum. " : ""}Maximum total: {floorLimit.toLocaleString("en-PH")} m² (lot area × floors).</small>}
         </label>
       }
       const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
@@ -1071,7 +1073,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   ))}
                 </div>
               </fieldset>
-              {regular && <p className="inquiry-muted">Normal · Requested response within 24 hours.</p>}
+              {regular && <p className="inquiry-muted">Normal · Response within one working day (9 office hours). Monday–Friday, 8:00 AM–5:00 PM; no lunch break.</p>}
             </div>
             <section className="admin-inquiry-opm-preview" aria-label="Available Office PMs" aria-live="polite">
               <h4>Available Office PMs</h4>
@@ -1131,6 +1133,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         <section className="inquiry-card admin-inquiry-tracking-summary">
           {!submitted && <header><div><p>{inquiryReference(row)}</p><h2>{row.details.name}</h2></div><span className="inquiry-pill">{status}</span></header>}
           <AdminInquirySummary row={row} />
+          {row.details.response_due_at && <p>Response due: {new Date(String(row.details.response_due_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} (Philippine time)</p>}
           {!submitted && row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
           {!submitted && row.reason && <p>Withdrawal reason: {row.reason}</p>}
           {!submitted && row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}

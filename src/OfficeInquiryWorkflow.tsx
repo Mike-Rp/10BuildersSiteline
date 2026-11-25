@@ -154,6 +154,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     review: "Review the project details, confirm the dates, and enter the authorized budget.",
     assessment: "Use the reviewed project record to assess size, complexity, and duration before staffing.",
   }
+  const responseDeadline = row.details.response_due_at ? new Date(String(row.details.response_due_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) + " (Philippine time)" : undefined
   const clientFacts: [string, string | number][] = clientFields.map(([key, label]) => [label, amount(row.details[key])])
   if (row.details.primary_contact) clientFacts.push(["Primary contact", row.details.primary_contact])
   const projectFacts: [string, string | number][] = [
@@ -359,6 +360,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         <Facts values={[
           ["Inquiry urgency", row.details.classification || "Normal"],
           ["Preferred consultation timing", consultation],
+          ...(responseDeadline ? [["Response due", responseDeadline] as [string, string]] : []),
         ]} />
         <div className="office-workflow-actions">
           <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>

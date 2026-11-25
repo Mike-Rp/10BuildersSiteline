@@ -1,3 +1,4 @@
+import { normalInquiryDeadline } from "../../domain/inquiry-office-hours.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError, HttpError, isUuid } from "../../common/utilities/access.utility.js";
@@ -227,6 +228,10 @@ export function mountInquiries(router) {
     const clientInput = await resolveInquiryClient(db, input);
     const details = inquiryDetails(regular ? { ...clientInput, classification: "Normal", consultation: 1440 } : clientInput);
     validateInquiryContact(details);
+    if (details.classification === "Normal") {
+      details.response_due_at = normalInquiryDeadline(new Date());
+      details.response_time_policy = "office_day";
+    }
     const expected = input.expected_opm_id;
     if (expected !== undefined && expected !== null && !isUuid(expected))
       throw new HttpError(422, "Invalid Office PM recommendation.");
