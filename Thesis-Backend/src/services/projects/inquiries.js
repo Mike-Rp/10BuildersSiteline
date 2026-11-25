@@ -166,6 +166,7 @@ function excludedOpmIds(row) {
 }
 
 async function matchInquiry(db, row, actorId, requestedId) {
+  await db.query("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE r.code='opm' ORDER BY u.id FOR UPDATE OF u");
   const details = { ...row.details };
   const candidate = await getOpm(details.project_type, excludedOpmIds(row), db);
   if (requestedId !== undefined && (candidate?.id ?? null) !== requestedId)
@@ -177,7 +178,7 @@ async function matchInquiry(db, row, actorId, requestedId) {
   else delete details.opm_match;
   const updated = (await db.query(
     "UPDATE project_inquiries SET status=$2,opm_id=$3,details=$4,updated_at=now() WHERE id=$1 RETURNING *",
-    [row.id, candidate ? "offered" : row.status, candidate?.id ?? row.opm_id, JSON.stringify(details)],
+    [row.id, candidate ? "offered" : row.status, candidate?.id ?? null, JSON.stringify(details)],
   )).rows[0];
   if (candidate) await notifyInquiry(db, actorId, candidate.id, "Consultation request", details.name);
   return candidate ? { ...updated, opm_name: candidate.full_name } : updated;
@@ -216,7 +217,7 @@ export function mountInquiries(router) {
     const type = req.query.project_type;
     if (!inquiryTypes.includes(type)) throw new HttpError(422, "Select a project type.");
     return (await getOpmCandidates(type)).map(person => ({
-      id: person.id, name: person.full_name, experience_years: person.experience_years,
+      id: person.id, name: person.full_name, experience_years: person.experience_years, active_projects: person.active_projects, inquiry_reservations: person.inquiry_reservations,
     }));
   }));
 

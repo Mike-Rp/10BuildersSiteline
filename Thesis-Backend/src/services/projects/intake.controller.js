@@ -131,6 +131,11 @@ export const createIntake = async (req, res) => {
         if(links.rowCount>1) throw Object.assign(new Error("Select a client_user_id."),{status:422});
         selectedClient=links.rows[0]?.user_id ?? null;
       }
+      await client.query("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE r.code='opm' ORDER BY u.id FOR UPDATE OF u");
+      const load = (await client.query(
+        "SELECT (SELECT count(DISTINCT pe.project_id) FROM project_engineers pe JOIN projects p ON p.id=pe.project_id WHERE pe.user_id=$1 AND pe.unassigned_at IS NULL AND NOT coalesce(p.is_deleted,false) AND p.lifecycle_status NOT IN ('completed','closed') AND pe.project_id IS DISTINCT FROM $2::uuid) + (SELECT count(*) FROM project_inquiries i WHERE i.opm_id=$1 AND i.project_id IS NULL AND i.status IN ('offered','consulting','approved') AND i.id IS DISTINCT FROM $3::uuid) AS total",
+        [suggested_opm_id, req.body.draft_project_id ?? null, inquiryId ?? null])).rows[0];
+      if (Number(load.total) >= 2) throw new HttpError(409, "The Office PM has reached the two-commitment limit.");
       let company=client_name ?? draft?.client_name;
       if(selectedClient) {
         if(!isUuid(selectedClient)) throw Object.assign(new Error("Invalid client_user_id."),{status:400});

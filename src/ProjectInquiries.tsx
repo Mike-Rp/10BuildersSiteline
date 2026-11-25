@@ -78,7 +78,7 @@ const inquiryPlaceholders: Record<string, string> = {
   name: "Maple Residence", address: "Street, barangay, city",
   lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
 }
-type InquiryOpmCandidate = { id: string; name: string; experience_years: number }
+type InquiryOpmCandidate = { id: string; name: string; experience_years: number; active_projects?: number; inquiry_reservations?: number }
 
 function inquiryReference(row: Inquiry) {
   return `10BL-${row.created_at?.slice(0, 4) || row.updated_at?.slice(0, 4) || inquiryDay.format(new Date()).slice(0, 4)}-${row.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`
@@ -1081,9 +1081,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   setOpmPreviewVersion(version => version + 1)
                 }}>Retry Office PM match</button></div>
                 : !candidates ? <p>Checking available Office PMs…</p>
-                : !candidates.length ? <p>No eligible Office PM is available. You can save the inquiry and retry matching later.</p>
+                : !candidates.length ? <p>No qualified OPM currently has capacity. You can save the inquiry and retry matching later.</p>
                 : <ul>{candidates.map((person, index) => <li key={person.id}>
-                  <div><strong>{person.name}</strong><small>{Number(person.experience_years).toLocaleString(undefined, { maximumFractionDigits: 2 })} years of relevant experience</small></div>
+                  <div><strong>{person.name}</strong><small>{Number(person.experience_years).toLocaleString(undefined, { maximumFractionDigits: 2 })} years of relevant experience · {person.active_projects ?? 0} active + {person.inquiry_reservations ?? 0} reserved / 2</small></div>
                   {index === 0 && <span className="inquiry-pill ready">Best match · Receives inquiry</span>}
                 </li>)}</ul>}
             </section>
@@ -1113,7 +1113,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         <div><h1 ref={recordHeading} tabIndex={-1}>{submitted ? "Inquiry submitted" : "Inquiry tracking"}</h1>
           <p>{submitted
             ? row.status === "offered" ? "The system generated a reference and sent the consultation request."
-              : status === "No eligible OPM" ? "The inquiry was saved. No eligible Office PM was available for matching."
+              : status === "No eligible OPM" ? "The inquiry was saved. No qualified OPM currently has capacity."
                 : "The inquiry was saved for later consultation."
             : "Monitor matching and acceptance for this inquiry."}</p>
         </div>

@@ -160,6 +160,17 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.notEqual(retried.opm_id,cancelled.opm_id)
   assert.equal(retried.routing_history.at(-1).opm_id,retried.opm_id)
   assert.equal((await call(root,{token:firstToken})).some(item=>item.id===cancelled.id),false)
+  // Earlier contact/draft fixtures reserve slots too; close them before the independent lifecycle scenario.
+  await db.query("UPDATE project_inquiries SET status='dropped' WHERE status IN ('offered','consulting','approved')")
+  const capacityCandidates = await call(candidatesPath,{token:admin})
+  const capacityRows = await Promise.all(Array.from({length:capacityCandidates.length * 2 + 1},create))
+  await Promise.all(capacityRows.map(item=>call(root+'/'+item.id+'/match',{token:admin,json:{}})))
+  const reserved = (await db.query("SELECT opm_id,count(*)::int AS total FROM project_inquiries WHERE status IN ('offered','consulting','approved') AND project_id IS NULL GROUP BY opm_id")).rows
+  assert.ok(reserved.every(item=>item.total<=2),'Concurrent routing must not exceed two reservations')
+  assert.equal((await call(candidatesPath,{token:admin})).length,0,'Full OPMs must be hidden')
+  assert.ok((await call(root,{token:admin})).some(item=>capacityRows.some(r=>r.id===item.id)&&!item.opm_id),'Overflow remains unassigned')
+  await db.query("UPDATE project_inquiries SET status='dropped' WHERE status IN ('offered','consulting','approved')")
+  assert.ok((await call(candidatesPath,{token:admin})).length,'Released reservations restore capacity')
   const withdrawn = await create()
   const second = await offer(withdrawn)
   assert.equal((await decision(withdrawn,second.token,"confirm")).status,"consulting")

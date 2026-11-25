@@ -180,7 +180,9 @@ export const getOpmCandidates = async (project_type, excludedId = null, db = {qu
         u.full_name,
         ${experienceForProjectSql("$1")} AS experience_years,
         array_agg(pt.code) FILTER (WHERE upts.project_type_id IS NOT NULL) AS project_types,
-        CASE WHEN EXISTS (SELECT 1 FROM project_engineers pe WHERE pe.user_id = u.id AND pe.unassigned_at IS NULL) THEN 'unavailable' ELSE 'available' END AS availability
+        (SELECT count(DISTINCT pe.project_id)::int FROM project_engineers pe JOIN projects pr ON pr.id=pe.project_id WHERE pe.user_id=u.id AND pe.unassigned_at IS NULL AND NOT coalesce(pr.is_deleted,false) AND pr.lifecycle_status NOT IN ('completed','closed')) AS active_projects,
+        (SELECT count(*)::int FROM project_inquiries i WHERE i.opm_id=u.id AND i.project_id IS NULL AND i.status IN ('offered','consulting','approved')) AS inquiry_reservations,
+        'available' AS availability
       FROM user_project_type_specializations upts
       LEFT JOIN project_types pt ON pt.id = upts.project_type_id
       JOIN users u ON u.id = upts.user_id AND u.status = 'active' AND COALESCE(u.is_deleted, false) = false
@@ -195,7 +197,7 @@ export const getOpmCandidates = async (project_type, excludedId = null, db = {qu
           m.full_name,
           m.experience_years,
           m.project_types,
-          m.availability,
+          m.availability, m.active_projects, m.inquiry_reservations,
           (
             SELECT COUNT(*)
             FROM unnest(m.project_types) tag
@@ -211,10 +213,12 @@ export const getOpmCandidates = async (project_type, excludedId = null, db = {qu
         full_name AS "MAIN.full_name",
         cast((cast(matching_count as float) / total_requested_tags) * 100 as int) as "MAIN.percentage",
         availability AS "MAIN.availability",
+        active_projects AS "MAIN.active_projects", inquiry_reservations AS "MAIN.inquiry_reservations",
         experience_years AS "MAIN.experience_years"
       FROM ranked_users
-      WHERE matching_count > 0 and availability = 'available' AND NOT (id = ANY($2::uuid[]))
+      WHERE matching_count > 0 AND active_projects + inquiry_reservations < 2 AND NOT (id = ANY($2::uuid[]))
       ORDER BY
+        (active_projects + inquiry_reservations) ASC,
         matching_count DESC,
         experience_years DESC,
         total_user_tags ASC, full_name ASC, id ASC
