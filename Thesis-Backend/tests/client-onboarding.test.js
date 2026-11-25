@@ -107,4 +107,16 @@ test("inquiry provisioning, collision protection, and one-time client activation
   assert.equal((await link(true)).code, 200);
   assert.equal((await database.query("SELECT count(*)::int AS n FROM user_client_project_links WHERE user_id=$1", [account.id])).rows[0].n, 2);
   assert.equal((await database.query("SELECT client_name FROM projects WHERE id=$1", [otherProject])).rows[0].client_name, "Client Company");
+  const returningProject = randomUUID();
+  await database.query("INSERT INTO projects(id,suggested_opm_id) VALUES($1,$2)", [returningProject,actor.id]);
+  assert.equal(await provision(returningProject,{...details,client_record:"existing",existing_client_source:"account",existing_client_id:account.id,existing_client_verified:"yes"}),"active");
+  assert.equal((await database.query("SELECT user_id FROM user_client_project_links WHERE project_id=$1",[returningProject])).rows[0].user_id,account.id);
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM users")).rows[0].n,1);
+  const companyProject = randomUUID();
+  await database.query("INSERT INTO projects(id,suggested_opm_id) VALUES($1,$2)",[companyProject,actor.id]);
+  assert.equal(await provision(companyProject,{...details,email:"company@example.org",client_type:"company",client_record:"new",client_name:"Demo Development",company_name:"Demo Development",primary_contact:"Maria Santos",designation:"Coordinator"}),"pending_activation");
+  const companyProfile = (await database.query("SELECT m.metadata->'clientProfile' AS profile,u.full_name FROM workspace_account_metadata m JOIN users u ON u.id=m.user_id WHERE u.email='company@example.org'")).rows[0];
+  assert.equal(companyProfile.profile.client_type,"company");
+  assert.equal(companyProfile.profile.company_name,"Demo Development");
+  assert.equal(companyProfile.full_name,"Maria Santos");
 });

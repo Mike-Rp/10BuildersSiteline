@@ -693,3 +693,22 @@
   .inquiry-stepper li { flex-direction: column; text-align: center; font-size: .8rem; }
   .inquiry-stepper li span { width: 24px; }
 }
+.admin-inquiry-wizard { display: flex; flex-wrap: wrap; gap: 10px 20px; list-style: none; margin: 0 0 18px; padding: 0 0 14px; border-bottom: 1px solid var(--color-line); color: var(--color-muted); }
+.admin-inquiry-wizard [aria-current=step] { color: var(--color-primary); font-weight: 600; }
+.inquiry-client-fields { display: grid; gap: 18px; }
+.inquiry-client-choice { border: 0; padding: 0; margin: 0; min-width: 0; }
+.inquiry-client-choice legend { font-weight: 600; margin-bottom: 10px; }
+.inquiry-client-choice > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.inquiry-client-choice label.button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 16px; white-space: normal; }
+.inquiry-client-choice label.selected { border-color: var(--color-primary); background: var(--surface-subtle); }
+.inquiry-client-choice input { width: 17px; height: 17px; flex: 0 0 auto; }
+.inquiry-client-choice small, .inquiry-client-results small { display: block; color: var(--color-muted); font-weight: 400; }
+.inquiry-existing-client { display: grid; gap: 12px; }
+.inquiry-client-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.inquiry-client-results li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--color-line); border-radius: 10px; overflow-wrap: anywhere; }
+.inquiry-company-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.inquiry-client-verification { display: flex !important; align-items: flex-start; gap: 10px; }
+.inquiry-client-verification input { width: 18px; height: 18px; margin-top: 3px; flex-shrink: 0; }
+.project-inquiries .modal[aria-label="Save this inquiry as a draft?"],
+.project-inquiries .modal[aria-label="Save this inquiry as a draft?"] > :is(.modal-header, .modal-body, .modal-footer) { background: var(--color-surface); }
+@media (max-width: 640px) { .inquiry-client-choice > div, .inquiry-company-fields { grid-template-columns: 1fr; } }

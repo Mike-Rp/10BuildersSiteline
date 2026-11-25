@@ -1,4 +1,5 @@
 import ProjectClientAccount from "./ProjectClientAccount"
+import InquiryClientFields from "./InquiryClientFields"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { ApiError, api, downloadBlob } from "./api/client"
@@ -83,11 +84,13 @@ function inquiryReference(row: Inquiry) {
 }
 
 function adminInquiryStatus(row: Inquiry) {
+  if (row.details.intake_draft === "yes") return "Unsubmitted draft"
   if (row.status === "draft") return row.routing_history?.at(-1)?.kind === "no_match" ? "No eligible OPM" : "Saved for later"
   return statusLabel(row) || "Status unavailable"
 }
 
 const adminInquiryActions: Record<string, string> = {
+  "Unsubmitted draft": "Continue draft",
   "Saved for later": "Start automatic matching",
   "No eligible OPM": "Retry automatic matching",
   "Returned to Admin": "Retry automatic matching",
@@ -109,6 +112,7 @@ function resetInquiryPage() {
 const inquiryMilestones = ["Inquiry submitted", "Office PM review", "Client proposal", "Project assessment", PROJECT_SETUP_LABEL]
 
 function inquiryMilestone(item: Inquiry) {
+  if (item.details.intake_draft === "yes") return null
   switch (item.status) {
     case "draft": return 0
     case "offered":
@@ -142,6 +146,8 @@ function InquiryDetails({ details, includeClient = false }: { details: Details; 
   return <dl className="inquiry-fields">
     {[...(includeClient ? fields : fields.slice(3)), ["project_type", "Project type"]].map(([key, label]) =>
       <div key={key}><dt>{label}</dt><dd>{details[key] || "—"}</dd></div>)}
+    {includeClient && details.client_type && <div><dt>Client type</dt><dd>{details.client_type === "company" ? "Company / organization" : "Individual"}</dd></div>}
+    {includeClient && details.designation && <div><dt>Position / designation</dt><dd>{details.designation}</dd></div>}
     {includeClient && details.primary_contact && <div><dt>Primary contact</dt><dd>{details.primary_contact}</dd></div>}
     {details.anticipated_start && <div><dt>Anticipated start</dt><dd>{details.anticipated_start}</dd></div>}
     {details.overview && <div className="inquiry-overview"><dt>Project overview</dt><dd>{details.overview}</dd></div>}
@@ -154,7 +160,8 @@ function AdminInquirySummary({ row }: { row: Inquiry }) {
   const date = (value?: string | number) => typeof value === "string" && Number.isFinite(Date.parse(value))
     ? inquiryDate.format(new Date(value)) : "To be determined by Office PM"
   const values = [
-    ["Client", details.client_name], ["Contact", details.phone], ["Email", details.email],
+    ["Client", details.client_name], ...(details.client_type ? [["Client type", details.client_type === "company" ? "Company / organization" : "Individual"]] : []),
+    ...(details.primary_contact ? [["Primary contact", details.primary_contact]] : []), ["Contact", details.phone], ["Email", details.email],
     ["Project type", details.project_type], ["Lot area", area(details.lot_area)],
     ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count], ["Location", details.address],
     ["Estimated start", date(row.target_start_date || details.anticipated_start)],
@@ -518,6 +525,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [finalizedClient, setFinalizedClient] = useState<{ projectId: string; name: string; refreshFailed?: boolean }>()
   const [showOfficeApproval, setShowOfficeApproval] = useState(false)
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
+  const [adminFormStep, setAdminFormStep] = useState(0)
+  const [draftId, setDraftId] = useState("")
+  const [draftBaseline, setDraftBaseline] = useState(JSON.stringify(adminInquiryDraft))
+  const [leaveInquiry, setLeaveInquiry] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
   const [adminInquiryTab, setAdminInquiryTab] = useState<"current" | "history">("current")
   const [adminInquiryFilter, setAdminInquiryFilter] = useState<"all" | "action" | "waiting">("all")
   const [adminInquiryStatusFilter, setAdminInquiryStatusFilter] = useState("")
@@ -568,6 +580,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       .catch(error => { if (!abort.signal.aborted) setOpmPreview({ type: previewType, error: error.message }) })
     return () => abort.abort()
   }, [previewType, opmPreviewVersion])
+  const adminDraftDirty = adminPage === "new" && JSON.stringify(details) !== draftBaseline
+  useEffect(() => {
+    if (role !== "admin" || !adminDraftDirty) return
+    const prevent = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = "" }
+    window.addEventListener("beforeunload", prevent)
+    return () => window.removeEventListener("beforeunload", prevent)
+  }, [role, adminDraftDirty])
   const change = (key: string, value: string | number) => {
     setDetails(previous => ({ ...previous, [key]: value }))
     setPlanning(undefined)
@@ -580,6 +599,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   useEffect(() => {
     if (adminPage !== "list") recordHeading.current?.focus()
   }, [adminPage])
+  useEffect(() => {
+    if (adminPage === "new") formRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
+  }, [adminPage, adminFormStep])
   useEffect(() => {
     if (dialog === "intake") stepperRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
   }, [dialog, step])
@@ -628,6 +650,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     finally { activeAction.current = false; setBusy(false) }
   }
   function open(item?: Inquiry) {
+    if (role === "admin" && item?.details.intake_draft === "yes") {
+      setSelected(item.id); setDetails({ ...item.details }); setDraftId(item.id)
+      setDraftBaseline(JSON.stringify(item.details)); setAdminFormStep(0); setLeaveInquiry(false); setError(""); setAdminPage("new")
+      return
+    }
     setSelected(item?.id || "")
     setDetails(item ? { ...item.details } : { consultation: 30 })
     setPlanning(undefined)
@@ -931,20 +958,45 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     }
     function close() {
       if (busy) return
+      if (adminDraftDirty) { setLeaveInquiry(true); return }
       setError("")
       setAdminPage("list")
     }
-    return <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
-      <button type="button" className="button" disabled={busy} onClick={close}>Cancel</button>
-      <button type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit Project Inquiry</button>
+    function next() {
+      if (!formRef.current?.reportValidity()) return
+      if (adminFormStep === 0 && (details.client_record === "existing" ? !details.existing_client_id : !details.client_type)) {
+        setError(details.client_record === "existing" ? "Select an existing client." : "Choose the client record and client type."); return
+      }
+      if (adminFormStep === 1 && !isPhilippineMobile(String(details.phone ?? ""))) { setError(PH_MOBILE_ERROR); return }
+      setError(""); setAdminFormStep(value => Math.min(value + 1, 3))
+    }
+    async function saveDraft() {
+      await run(async () => {
+        const saved = await post<Inquiry>(`${root}/draft`, { id: draftId || undefined, details })
+        setRows(previous => [saved, ...(previous ?? []).filter(item => item.id !== saved.id)])
+        setDraftId(saved.id); setDraftBaseline(JSON.stringify(details)); setLeaveInquiry(false); setAdminPage("list")
+        showActionResult("Inquiry draft saved. Resume it from the inquiry list.")
+      })
+    }
+    const clientValid = Boolean(details.client_record && details.client_type && (details.client_record !== "existing" || details.existing_client_id))
+    const stepLabels = ["Client path", "Client details", "Project details", "Review"]
+    return <>
+    <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
+      <button type="button" className="button" disabled={busy} onClick={close}>Back to inquiries</button>
+      {adminFormStep > 0 && <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminFormStep(value => value - 1) }}>Previous step</button>}
+      {adminFormStep < 3 ? <button type="button" className="button primary" disabled={busy || (adminFormStep === 0 && !clientValid)} onClick={next}>Next: {stepLabels[adminFormStep + 1]}</button>
+        : <button type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit Project Inquiry</button>}
     </>}>
-      <form id="admin-inquiry-form" className="admin-inquiry-submission" onSubmit={event => {
+      <ol className="admin-inquiry-wizard" aria-label="Inquiry form progress">{stepLabels.map((label, index) => <li key={label} aria-current={index === adminFormStep ? "step" : undefined}>{index + 1}. {label}</li>)}</ol>
+      <form ref={formRef} id="admin-inquiry-form" className="admin-inquiry-submission" onSubmit={event => {
         event.preventDefault()
-        if (busy || !candidates) return
+        if (busy) return
+        if (adminFormStep < 3) { next(); return }
+        if (!candidates) return
         void run(async () => {
           let result: Inquiry
           try {
-            result = await post<Inquiry>(root, { ...details, expected_opm_id: candidates[0]?.id ?? null })
+            result = await post<Inquiry>(root, { ...details, draft_id: draftId || undefined, expected_opm_id: candidates[0]?.id ?? null })
           } catch (error) {
             if (error instanceof ApiError && error.code === "INQUIRY_RECOMMENDATION_CHANGED") {
               setOpmPreview(undefined)
@@ -955,18 +1007,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           setRows(previous => [result, ...(previous ?? []).filter(item => item.id !== result.id)])
           setSelected(result.id)
           setSearch("")
+          setLeaveInquiry(false)
+          setDraftId("")
+          setDraftBaseline(JSON.stringify(details))
           setAdminPage("submitted")
           void onReload()
         })
       }}>
         <fieldset disabled={busy} className="inquiry-form-stack">
-          <FormSection title="Client information" icon="users" description="Required contact details for the project inquiry.">
-            <div className="admin-inquiry-form-grid">
-              {input("client_name", "Client name", "text", true, 150)}
-              {input("phone", "Contact number", "tel")}
-              {input("email", "Email address", "email", true, 150)}
-            </div>
-          </FormSection>
+          {adminFormStep < 2 && <FormSection title={adminFormStep === 0 ? "Client path" : "Client information"} icon="users" description={adminFormStep === 0 ? "Choose a new or existing client, then the appropriate client type." : "Review the required contact details for this inquiry."}>
+            <InquiryClientFields page={adminFormStep === 0 ? "path" : "details"} details={details} onChange={setDetails} disabled={busy} />
+          </FormSection>}
+          {adminFormStep === 2 && <>
           <FormSection title="Project information" icon="building" description="Measurements use square meters (m²).">
             <div className="admin-inquiry-project-identity">
               {input("name", "Project name", "text", true, 150)}
@@ -1035,10 +1087,22 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 </li>)}</ul>}
             </section>
           </FormSection>
+          </>}
+          {adminFormStep === 3 && <FormSection title="Review inquiry" icon="building" description="Confirm the client and project details before submission.">
+            <InquiryDetails details={details} includeClient />
+            <p>{candidates ? candidates.length ? `The inquiry will be sent to ${candidates[0].name}.` : "No eligible Office PM is available; the inquiry will be saved for matching later." : "Checking available Office PMs…"}</p>
+            {matching?.error && <div role="alert"><p>{matching.error}</p><button type="button" className="button" onClick={() => setOpmPreviewVersion(version => version + 1)}>Retry Office PM match</button></div>}
+          </FormSection>}
         </fieldset>
         {feedback}
       </form>
     </Modal>
+    {leaveInquiry && <Modal title="Save this inquiry as a draft?" onClose={() => setLeaveInquiry(false)} footer={<>
+      <button type="button" className="button primary" disabled={busy} onClick={() => void saveDraft()}>Save draft</button>
+      <button type="button" className="button" disabled={busy} onClick={() => { setLeaveInquiry(false); setError(""); setAdminPage("list"); setDraftId(""); setDetails(adminInquiryDraft) }}>Discard changes</button>
+      <button type="button" className="button" disabled={busy} onClick={() => setLeaveInquiry(false)}>Keep editing</button>
+    </>}><p>Your changes can be saved so you can continue this inquiry later.</p>{feedback}</Modal>}
+    </>
   }
   if (admin && row && (adminPage === "submitted" || adminPage === "tracking")) {
     const submitted = adminPage === "submitted"
@@ -1121,7 +1185,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         <p>Review saved inquiries or start a new project request.</p>
       </div>
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
-      <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
+      <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setDraftId(""); setDraftBaseline(JSON.stringify(adminInquiryDraft)); setAdminFormStep(0); setLeaveInquiry(false); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
     </header>}
     {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
@@ -1284,8 +1348,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 {updated && <small>Updated <time dateTime={updated}>{updatedLabel}</time></small>}
               </div>
               <button type="button" className="button primary" disabled={busy} aria-label={`View inquiry for ${name}`}
-                onClick={() => { open(item); setAdminPage("tracking") }}>
-                View inquiry <Icon name="chevron" size={16} />
+                onClick={() => { open(item); if (item.details.intake_draft !== "yes") setAdminPage("tracking") }}>
+                {item.details.intake_draft === "yes" ? "Continue draft" : "View inquiry"} <Icon name="chevron" size={16} />
               </button>
             </div>
           </li>

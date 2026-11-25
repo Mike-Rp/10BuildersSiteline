@@ -10,6 +10,7 @@ import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
+import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
 import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
@@ -23,12 +24,14 @@ function validateInquiryContact(details, previous) {
 }
 
 export function inquiryDetails(input) {
-  const details = {};
+  const details = inquiryClientIdentity(input);
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
-    if (typeof input?.[key] !== "string" || !input[key].trim() || input[key].length > (key === "address" ? 500 : 150))
+    const value = key === "client_name" && details.client_type === "company" ? details.company_name : input?.[key];
+    if (typeof value !== "string" || !value.trim() || value.length > (key === "address" ? 500 : 150))
       throw new HttpError(422, `Enter a valid ${key.replaceAll("_", " ")}.`);
-    details[key] = input[key].trim();
+    details[key] = value.trim();
   }
+  if (details.client_type === "company") details.client_name = details.company_name;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.email))
     throw new HttpError(422, "Enter a valid email address.");
   if (!inquiryTypes.includes(input.project_type)) throw new HttpError(422, "Select a project type.");
@@ -188,6 +191,20 @@ function endpoint(roles, action) {
 }
 
 export function mountInquiries(router) {
+  router.get("/inquiries/clients", endpoint(["admin"], req => findInquiryClients({ query: execute }, req.query.q)));
+
+  router.post("/inquiries/draft", endpoint(["admin"], (req, actor) => withTransaction(async db => {
+    const details = inquiryDraftDetails(req.body?.details);
+    let row;
+    if (req.body?.id) {
+      if (!isUuid(req.body.id)) throw new HttpError(422, "Invalid inquiry draft.");
+      row = (await db.query(`UPDATE project_inquiries SET details=$3,updated_at=now()
+        WHERE id=$1 AND admin_id=$2 AND status='draft' AND details->>'intake_draft'='yes' RETURNING *`,
+        [req.body.id, actor.id, JSON.stringify(details)])).rows[0];
+      if (!row) throw new HttpError(409, "This draft is unavailable or has already been submitted.");
+    } else row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *", [JSON.stringify(details), actor.id])).rows[0];
+    return inquiryResponse(row, true);
+  })));
   router.get("/inquiries", endpoint(["admin", "opm"], async (_, actor) =>
     (await execute(`SELECT i.*,u.full_name AS opm_name,p.lifecycle_status AS project_status,p.target_start_date,p.target_end_date FROM project_inquiries i
       LEFT JOIN users u ON u.id=i.opm_id LEFT JOIN projects p ON p.id=i.project_id WHERE $1='admin' OR (i.opm_id=$2 AND i.status NOT IN ('draft','returned'))
@@ -204,12 +221,20 @@ export function mountInquiries(router) {
   router.post("/inquiries", endpoint(["admin"], (req, actor) => withTransaction(async db => {
     const input = req.body ?? {};
     const regular = input.immediate_consultation === "no";
-    const details = inquiryDetails(regular ? { ...input, classification: "Normal", consultation: 1440 } : input);
+    const clientInput = await resolveInquiryClient(db, input);
+    const details = inquiryDetails(regular ? { ...clientInput, classification: "Normal", consultation: 1440 } : clientInput);
     validateInquiryContact(details);
     const expected = input.expected_opm_id;
     if (expected !== undefined && expected !== null && !isUuid(expected))
       throw new HttpError(422, "Invalid Office PM recommendation.");
-    const row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
+    let row;
+    if (input.draft_id) {
+      if (!isUuid(input.draft_id)) throw new HttpError(422, "Invalid inquiry draft.");
+      row = (await db.query(`UPDATE project_inquiries SET details=$3,updated_at=now()
+        WHERE id=$1 AND admin_id=$2 AND status='draft' AND details->>'intake_draft'='yes' RETURNING *`,
+        [input.draft_id, actor.id, JSON.stringify(details)])).rows[0];
+      if (!row) throw new HttpError(409, "This draft is unavailable or has already been submitted.");
+    } else row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *",
       [JSON.stringify(details), actor.id])).rows[0];
     return inquiryResponse(details.immediate_consultation ? await matchInquiry(db, row, actor.id, expected) : row, true);
   })));
@@ -217,14 +242,14 @@ export function mountInquiries(router) {
   router.post("/inquiries/:id/match", endpoint(["admin"], (req, actor) => withTransaction(async db => {
     if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
     const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
-    if (!row || !["draft", "returned"].includes(row.status)) throw new HttpError(409, "This inquiry is not open for matching.");
+    if (!row || row.details.intake_draft === "yes" || !["draft", "returned"].includes(row.status)) throw new HttpError(409, "Complete and submit the inquiry draft before matching.");
     return inquiryResponse(await matchInquiry(db, row, actor.id), true);
   })));
 
   router.get("/inquiries/:id/recommendation", endpoint(["admin"], async req => {
     if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
     const row = (await execute("SELECT details,opm_id,status FROM project_inquiries WHERE id=$1", [req.params.id])).rows[0];
-    if (!row || !["draft","returned"].includes(row.status)) throw new HttpError(409, "This inquiry is not open for routing.");
+    if (!row || row.details.intake_draft === "yes" || !["draft","returned"].includes(row.status)) throw new HttpError(409, "Complete and submit the inquiry draft before routing.");
     return getOpm(row.details.project_type, excludedOpmIds(row));
   }));
 
@@ -238,6 +263,7 @@ export function mountInquiries(router) {
     let reason = row.reason;
     const details = { ...row.details };
     if (status === "offered") {
+      if (row.details.intake_draft === "yes") throw new HttpError(409, "Complete and submit the inquiry draft before routing.");
       if (!isUuid(req.body.opm_id)) throw new HttpError(422, "Select a valid OPM recommendation.");
       return inquiryResponse(await matchInquiry(db, row, actor.id, req.body.opm_id), true);
     }
@@ -324,6 +350,10 @@ export function mountInquiries(router) {
         const corrected = { ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
         };
+        for (const key of ["client_record", "existing_client_source", "existing_client_id", "existing_client_verified"]) {
+          if (before[key] === undefined) delete corrected[key];
+          else corrected[key] = before[key];
+        }
         const areas = input.floorMeasurements === undefined ? undefined :
           normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count));
         if (areas === null) throw new HttpError(422, "Enter a positive area for every floor.");

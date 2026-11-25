@@ -19,6 +19,15 @@ export async function provisionInquiryClient(db, projectId, details, actorId) {
   const email = clientLoginEmail(details.email);
   if (!email) return "verification_required";
   await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`client-email:${email}`]);
+  if (details.client_record === "existing" && details.existing_client_source === "account" && details.existing_client_verified === "yes") {
+    const existing = (await db.query(`SELECT u.id,u.status,u.password_hash FROM users u JOIN roles r ON r.id=u.role_id
+      WHERE u.id=$1 AND lower(u.email::text)=$2 AND r.code='client' AND u.status IN ('active','invited')
+      AND NOT coalesce(u.is_deleted,false) FOR UPDATE OF u`, [details.existing_client_id, email])).rows[0];
+    if (!existing || (existing.status === "invited" && existing.password_hash !== CLIENT_ACTIVATION_PASSWORD_MARKER)) return "verification_required";
+    await db.query(`INSERT INTO user_client_project_links(user_id,project_id,created_by,updated_by) VALUES($1,$2,$3,$3)
+      ON CONFLICT(user_id,project_id) DO NOTHING`, [existing.id, projectId, actorId]);
+    return existing.status === "active" ? "active" : existing.password_hash === CLIENT_ACTIVATION_PASSWORD_MARKER ? "pending_activation" : "verification_required";
+  }
   const created = await db.query(`INSERT INTO users (full_name,email,phone,password_hash,temp_password_issued,role_id,status,created_by,updated_by)
     SELECT $1,$2,$3,$4,false,id,'invited',$5,$5 FROM roles WHERE code='client'
     ON CONFLICT DO NOTHING RETURNING id`,
@@ -26,6 +35,10 @@ export async function provisionInquiryClient(db, projectId, details, actorId) {
   const account = created.rows[0];
   // An email match alone does not authorize access to another project's records.
   if (!account) return "verification_required";
+  if (details.client_type) await db.query(`INSERT INTO workspace_account_metadata(user_id,metadata) VALUES($1,$2::jsonb)
+    ON CONFLICT(user_id) DO UPDATE SET metadata=workspace_account_metadata.metadata||excluded.metadata`,
+    [account.id, JSON.stringify({ clientProfile: { client_type: details.client_type, client_name: details.client_name,
+      company_name: details.company_name || "", primary_contact: details.primary_contact || "", designation: details.designation || "" } })]);
   await db.query(`INSERT INTO user_client_project_links (user_id,project_id,created_by,updated_by)
     VALUES ($1,$2,$3,$3)`, [account.id, projectId, actorId]);
   return "pending_activation";

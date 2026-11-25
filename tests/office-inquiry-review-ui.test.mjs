@@ -279,7 +279,7 @@ test("proposal approval opens mandatory review with live size and inline validat
   await click(button("Continue to staffing"))
   assert.deepEqual(uploadedContracts, ["signed.pdf"])
   assert.equal(staffingRequest.contract_file_id, inquiry.workflow.signed_contract.id)
-  assert.match(document.body.textContent,/Recommended per phase: 2 Site PMs/)
+  assert.match(document.body.textContent,/Recommended per phase: up to 2 Site PMs/)
   assert.equal(document.querySelectorAll(".inquiry-engineers article").length,2)
   assert.match(document.body.textContent,/2 Site PMs needed at the same time/)
   assert.match(document.querySelector(".inquiry-lineup-table tbody tr:first-child").textContent, /Kurt Gonzales.*2 years.*Lead SPM/)
