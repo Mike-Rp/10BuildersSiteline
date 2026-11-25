@@ -112,13 +112,12 @@ test("status text is readable", () => {
 
 const filesOf = (index) => index.reduce((n, c) => n + c.fileCount, 0)
 
-test("repository file counts reflect only what each role may open, and the four folders are kept", () => {
+test("repository file counts reflect only what each role may open", () => {
   const state = initialState()
   const actor = (id) => state.accounts.find((a) => a.id === id)
   const folders = [
     "Construction Phases",
     "Progress & Site Reports",
-    "Daily Manpower Reports",
     "Project Agreements & Supporting Documents",
   ]
   let sawFewerForSitePm = false

@@ -48,7 +48,7 @@ test("project document index references canonical uploads and never duplicates f
   assert.equal(project.history.at(-1).evidence, evidence)
 })
 
-test("project document index groups source records into the four repository categories", () => {
+test("project document index groups uploads by their original source", () => {
   const project = initialState().projects.find((item) => item.id === "p1")
   const manpower = uploaded("manpower-1", "Daily Manpower Report")
   const progress = uploaded("progress-1", "Weekly Progress Report")
@@ -86,13 +86,12 @@ test("project document index groups source records into the four repository cate
     [
       "Construction Phases",
       "Progress & Site Reports",
-      "Daily Manpower Reports",
       "Project Agreements & Supporting Documents",
     ],
   )
   assert.ok(
     index
-      .find((category) => category.id === "manpower")
+      .find((category) => category.id === "phases")
       .folders.some((folder) =>
         folder.files.some((file) => file.doc === manpower),
       ),
@@ -123,5 +122,6 @@ test("project documents still open when a phase has files but no current assignm
   const index = projectDocumentIndex(project)
   const phaseFolder = index.find((c) => c.id === "phases").folders.find((f) => f.name === "Orphaned Phase")
   assert.equal(phaseFolder.files.length, 1)
-  assert.equal(index.find((c) => c.id === "manpower").folders.flatMap((f) => f.files).length, 1)
+  const gallery = index.find((c) => c.id === "progress").folders.find((f) => f.id === "site-photos")
+  assert.equal(gallery.files[0].doc.id, "manpower-report")
 })

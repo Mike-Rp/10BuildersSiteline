@@ -79,18 +79,6 @@ export function projectDocumentIndex(
       ],
     },
     {
-      id: "manpower",
-      name: "Daily Manpower Reports",
-      description:
-        "Daily labor and crew records grouped by construction phase.",
-      folders: phases.map((phase) => ({
-        id: slug(phase),
-        name: phase,
-        description: "Original daily manpower reports for this phase.",
-        files: [] as ProjectDocumentFile[],
-      })),
-    },
-    {
       id: "agreements",
       name: "Project Agreements & Supporting Documents",
       description:
@@ -143,10 +131,6 @@ export function projectDocumentIndex(
     }
     return found
   }
-  const isManpower = (doc: Doc) =>
-    /manpower|labor|labour|attendance|crew report/i.test(
-      `${doc.label} ${doc.name}`,
-    )
   const add = (
     doc: Doc | undefined,
     categoryId: string,
@@ -156,14 +140,6 @@ export function projectDocumentIndex(
   ) => {
     if (!doc?.uploaded || seen.has(doc.id)) return
     seen.add(doc.id)
-    if (isManpower(doc)) {
-      const phaseName = phase || project.phase || "General"
-      folder("manpower", slug(phaseName) || "general", phaseName).files.push({
-        doc,
-        source,
-      })
-      return
-    }
     folder(categoryId, folderId, phase).files.push({ doc, source })
   }
 

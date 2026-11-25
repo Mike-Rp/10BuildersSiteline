@@ -136,7 +136,7 @@ test("client repository holds only client-visible records and omits empty catego
   const internalNames = projectDocumentIndex(project).map((c) => c.name)
   assert.ok(index.length <= 2)
   assert.ok(!index.some((c) => c.name === "Daily Manpower Reports"))
-  assert.ok(internalNames.includes("Daily Manpower Reports"))
+  assert.ok(!internalNames.includes("Daily Manpower Reports"))
   assert.deepEqual(clientDocumentIndex({ documents: [], photos: [] }), [])
 })
 
