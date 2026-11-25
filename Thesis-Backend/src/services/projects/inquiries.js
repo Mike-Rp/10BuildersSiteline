@@ -43,6 +43,8 @@ export function inquiryDetails(input) {
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
   }
+  if (details.floor_area_sqm / details.floor_count > details.lot_area)
+    throw new HttpError(422, "Total floor area must not exceed the lot area multiplied by the number of floors.");
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
   if (input.classification != null) {
@@ -355,8 +357,8 @@ export function mountInquiries(router) {
           else corrected[key] = before[key];
         }
         const areas = input.floorMeasurements === undefined ? undefined :
-          normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count));
-        if (areas === null) throw new HttpError(422, "Enter a positive area for every floor.");
+          normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
+        if (areas === null) throw new HttpError(422, "Enter a positive area for every floor. Each floor must not exceed the lot area.");
         if (areas) corrected.floor_area_sqm = areas.total;
         const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
@@ -378,6 +380,8 @@ export function mountInquiries(router) {
         // Old callers can still save a total. Clear an old breakdown if it no longer matches those measurements.
         const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
           after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
+        if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
+          throw new HttpError(422, "Each floor must not exceed the lot area. Update the floor measurements.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
           ...(floorMeasurements ? { floorMeasurements } : {}) };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];

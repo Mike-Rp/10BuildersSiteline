@@ -6,7 +6,7 @@ export const MAX_INQUIRY_FLOORS = 32767;
 const positiveArea = value => (typeof value === "number" || typeof value === "string") &&
   Number.isFinite(Number(value)) && Number(value) > 0;
 
-export function normalizeFloorMeasurements(input, floorCount) {
+export function normalizeFloorMeasurements(input, floorCount, lotArea) {
   if (!input || !Number.isInteger(floorCount) || floorCount < 1 || floorCount > MAX_INQUIRY_FLOORS) return null;
   let measurements, total;
   if (input.mode === "same" && positiveArea(input.areaPerFloor)) {
@@ -17,6 +17,9 @@ export function normalizeFloorMeasurements(input, floorCount) {
     measurements = { mode: "individual", areas: input.areas.map(Number) };
     total = measurements.areas.reduce((sum, area) => sum + area, 0);
   }
+  if (lotArea !== undefined && (!positiveArea(lotArea) || !measurements ||
+    (measurements.mode === "same" ? measurements.areaPerFloor > Number(lotArea)
+      : measurements.areas.some(area => area > Number(lotArea))))) return null;
   // Avoid carrying floating-point noise from decimal area inputs into classification and duration.
   return Number.isFinite(total) && total > 0 ? { measurements, total: Number(total.toPrecision(15)) } : null;
 }

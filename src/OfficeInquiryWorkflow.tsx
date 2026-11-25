@@ -185,7 +185,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
     ? { mode: "same", areaPerFloor: perFloor }
-    : { mode: "individual", areas: floorInputs }, floorCount) : null
+    : { mode: "individual", areas: floorInputs }, floorCount, lotArea) : null
   const measuredDraft: Details = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
   const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
     ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement)
@@ -259,10 +259,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       return
     }
     if (validFloorCount && !calculatedArea) {
-      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0)
+      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > lotArea)
       const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
       if (floorArea.mode === "individual") setFloorPage(Math.floor(Math.max(0, invalidFloor) / floorPageSize))
-      setFieldError({ id, message: "Enter a positive area for every floor and check that the total is valid." })
+      setFieldError({ id, message: "Enter a positive area for every floor. Each floor must not exceed the lot area." })
       document.getElementById(id)?.focus()
       return
     }
@@ -494,7 +494,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div className="office-workflow-fields">
               {floorArea.mode === "same" ? <div className={`office-review-wide${editedAreaPerFloor ? " office-review-field-changed" : ""}`}>
                 <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²){editedAreaPerFloor && <span className="office-review-edited">Edited</span>}</label>
-                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={0} value={perFloor}
+                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={0} max={lotArea > 0 ? lotArea : undefined} value={perFloor}
                   onValueChange={value => updateFloorArea({ ...floorArea, perFloor: value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
                   {averageExceedsCorrectedLot
@@ -509,7 +509,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 const changed = areaWasEdited(value)
                 return <div key={id} className={changed ? "office-review-field-changed" : undefined}>
                   <label htmlFor={id}>Floor {index + 1} area (m²){changed && <span className="office-review-edited">Edited</span>}</label>
-                  <GroupedNumberInput {...describedField(id)} required min={0} value={value} onValueChange={nextArea => {
+                  <GroupedNumberInput {...describedField(id)} required min={0} max={lotArea > 0 ? lotArea : undefined} value={value} onValueChange={nextArea => {
                     const areas = [...floorArea.areas]
                     areas[index] = nextArea
                     updateFloorArea({ ...floorArea, areas })
@@ -523,6 +523,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
               <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
             </div>}
+            <p className="office-review-field-helper">Each floor must be no larger than the lot area. Total floor area is the sum of all floors and may exceed the lot area.</p>
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <div><span>Total floor area</span><strong>{calculatedArea ? `${calculatedArea.total.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m²` : "Enter the floor areas"}</strong>
               </div>
