@@ -181,6 +181,21 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(revised.workflow.revisions[0].note,"Confirm the floor area.")
   assert.equal(revised.status,"consulting")
   await decision(row,token,"approve")
+  const correctionPath = root + '/' + row.id + '/client-correction'
+  const requestCorrection = {action:'request',field:'client_name',value:'Corrected client name',reason:'Client confirmed spelling.'}
+  await call(correctionPath,{token:admin,json:requestCorrection,status:403})
+  const requested = await call(correctionPath,{token,json:requestCorrection})
+  const correctionId = requested.corrections[0].id
+  await call(correctionPath,{token,json:{action:'approve',id:correctionId},status:403})
+  await call(correctionPath,{token:admin,json:{action:'approve',id:correctionId}})
+  await call(correctionPath,{token:admin,json:{action:'approve',id:correctionId},status:409})
+  const correctedRecord = (await call(root,{token})).find(item=>item.id===row.id)
+  assert.equal(correctedRecord.details.client_name,'Corrected client name')
+  assert.equal(correctedRecord.details.client_corrections[0].before,details.client_name)
+  // Restore through a second audited request so downstream fixtures remain unchanged.
+  const restore = await call(correctionPath,{token,json:{...requestCorrection,value:details.client_name}})
+  await call(correctionPath,{token:admin,json:{action:'approve',id:restore.corrections[1].id}})
+  await save('review',0,{start:'2027-01-12',end:'2027-08-15',correction:{client_name:'Unauthorized edit'}},403)
   const planning = `${root}/${row.id}/planning`
   const intake = {...details,floor_area_sqm:200,target_start_date:"2027-01-12",target_end_date:"2027-08-15"}
   await call(planning,{token,status:409,json:intake})

@@ -310,6 +310,45 @@ export function mountInquiries(router) {
     return inquiryResponse(result.rows[0], actor.role === "admin");
   })));
 
+  router.post("/inquiries/:id/client-correction", endpoint(["admin", "opm"], (req, actor) => withTransaction(async db => {
+    if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
+    const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+    if (!row || (actor.role === "opm" && row.opm_id !== actor.id)) throw new HttpError(404, "Inquiry not found.");
+    if (row.status === "converted") throw new HttpError(409, "Use the project client record after conversion.");
+    const details = { ...row.details }, input = req.body ?? {};
+    const history = [...(details.client_corrections ?? [])];
+    const fields = details.client_type === "company" ? ["email", "phone", "company_name", "primary_contact", "designation"] : ["client_name", "email", "phone"];
+    if (input.action === "request") {
+      if (actor.role !== "opm") throw new HttpError(403, "Only the assigned OPM can request a correction.");
+      if (history.some(item => item.status === "pending")) throw new HttpError(409, "A correction is already awaiting review.");
+      if (!fields.includes(input.field) || typeof input.value !== "string" || !input.value.trim() || input.value.length > 150 ||
+        typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 1000) throw new HttpError(422, "Enter a valid field, replacement and reason.");
+      const proposed = { ...details, [input.field]: input.value.trim() };
+      if (input.field === "company_name") proposed.client_name = proposed.company_name;
+      inquiryDetails(proposed); validateInquiryContact(proposed, details);
+      if (String(details[input.field] ?? "") === input.value.trim()) throw new HttpError(422, "Enter a different replacement.");
+      history.push({ id: randomUUID(), field: input.field, before: details[input.field] ?? "", after: input.value.trim(), reason: input.reason.trim(), status: "pending", by: actor.id, at: new Date().toISOString() });
+      await notifyInquiry(db, actor.id, row.admin_id, "Client correction requested", details.name);
+    } else {
+      if (actor.role !== "admin") throw new HttpError(403, "Administrator review required.");
+      if (!["approve", "return"].includes(input.action)) throw new HttpError(422, "Choose approve or return.");
+      const item = history.find(item => item.id === input.id && item.status === "pending");
+      if (!item) throw new HttpError(409, "This request has already been reviewed.");
+      if (String(details[item.field] ?? "") !== String(item.before)) throw new HttpError(409, "Client details changed. Request a fresh correction.");
+      if (input.action === "approve") {
+        details[item.field] = item.after;
+        if (item.field === "company_name") details.client_name = item.after;
+        inquiryDetails(details); validateInquiryContact(details, row.details);
+      }
+      item.status = input.action === "approve" ? "approved" : "returned";
+      item.reviewed_by = actor.id; item.reviewed_at = new Date().toISOString();
+      await notifyInquiry(db, actor.id, row.opm_id, "Client correction " + item.status, details.name);
+    }
+    details.client_corrections = history;
+    await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1", [row.id, JSON.stringify(details)]);
+    return { corrections: history };
+  })));
+
   router.post("/inquiries/:id/workflow", endpoint(["opm"], (req, actor) => withTransaction(async db => {
     if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry not found.");
     const row = (await db.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE",
@@ -349,6 +388,10 @@ export function mountInquiries(router) {
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details);
+        for (const key of ["client_name", "email", "phone", "client_type", "company_name", "primary_contact", "designation"]) {
+          if (input.correction?.[key] !== undefined && input.correction[key] !== before[key])
+            throw new HttpError(403, "Client information is read-only. Request an administrator correction.");
+        }
         const corrected = { ...before, ...input.correction,
           consultation: before.consultation, classification: before.classification, immediate_consultation: before.immediate_consultation,
         };

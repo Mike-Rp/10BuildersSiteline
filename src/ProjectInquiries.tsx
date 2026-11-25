@@ -1,3 +1,4 @@
+import ClientCorrections from "./ClientCorrections"
 import ProjectClientAccount from "./ProjectClientAccount"
 import InquiryClientFields from "./InquiryClientFields"
 import { useEffect, useRef, useState, type ReactNode } from "react"
@@ -1145,10 +1146,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         })}>{status === "Saved for later" ? "Start automatic matching" : "Retry automatic matching"}</button>
       </div>}
       {!submitted && row.status === "withdrawn" && <div><button className="button" disabled={busy} onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button></div>}
+      <ClientCorrections key={row.id} id={row.id} details={row.details} admin reload={() => void onReload()} />
       {feedback}
     </section>
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
+    {row && !admin && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={() => void onReload()} />}
     {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
     {displayedOfficePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}

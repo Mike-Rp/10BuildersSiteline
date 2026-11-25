@@ -474,7 +474,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Client information</span>
               <span className="office-review-disclosure-icon" aria-hidden="true"><Icon name="chevron" size={18} /></span>
             </summary>
-            <div className="office-workflow-fields">{clientFields.map(([key, label]) => editField(key, label))}</div>
+            <div className="office-workflow-fields">{clientFields.map(([key, label]) => <label key={key}>{label}<input readOnly value={String(row.details[key] ?? "")} /></label>)}</div>
           </details>
           <div className="office-workflow-fields">
             {projectIdentityFields.slice(0, 2).map(([key, label]) => editField(key, label))}
