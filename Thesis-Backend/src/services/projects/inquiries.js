@@ -1,4 +1,6 @@
 import { normalInquiryDeadline } from "../../domain/inquiry-office-hours.js";
+import { forecastPhaseDelay, phaseWorkday, suggestPhaseSchedule } from "../../domain/phase-schedule.js";
+import { isoDateValid } from "../../domain/engineer-credentials.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError, HttpError, isUuid } from "../../common/utilities/access.utility.js";
@@ -6,7 +8,9 @@ import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
 import { recommendedSitePms } from "../../domain/engineer-phase-coverage.js";
 import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
-import { normalizePhaseDates } from "./staffing-license.utility.js";
+import { normalizePhaseDates, validateStaffingLicenses } from "./staffing-license.utility.js";
+import { scheduleConflicts } from "./inquiry-staffing.js";
+import { responsibilitiesInstalled } from "./phase-responsibilities.utility.js";
 import { inquiryScopeConfiguration } from "./phase-engineer-scopes.utility.js";
 import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
@@ -197,7 +201,71 @@ function endpoint(roles, action) {
   };
 }
 
+async function phaseRevisionStaff(db, projectId, coordinatorScopes) {
+  const parallel = await responsibilitiesInstalled(db);
+  const query = parallel
+    ? `SELECT s.code AS stage, r.user_id, r.assigned_disciplines FROM project_phase_responsibilities r
+       JOIN project_stages s ON s.id=r.project_stage_id WHERE r.project_id=$1`
+    : `SELECT s.code AS stage, t.spm_user_id AS user_id FROM project_phase_team t
+       JOIN project_stages s ON s.id=t.project_stage_id WHERE t.project_id=$1 AND t.status='confirmed'`;
+  const { rows } = await db.query(query, [projectId]);
+  return rows.map(row => ({ ...row, assigned_disciplines: row.assigned_disciplines ?? coordinatorScopes?.[row.stage] ?? [] }));
+}
+
 export function mountInquiries(router) {
+  router.post("/:id/phase-schedule", endpoint(["opm"], (req, actor) => withTransaction(async db => {
+    if (!isUuid(req.params.id)) throw new HttpError(404, "Project not found.");
+    const project = (await db.query(`SELECT id, project_type_id, phase_scope, inquiry_intake, target_start_date::text AS start,
+      target_end_date::text AS end FROM projects WHERE id=$1 AND suggested_opm_id=$2
+      AND lifecycle_status='active' AND NOT coalesce(is_deleted,false) FOR UPDATE`, [req.params.id, actor.id])).rows[0];
+    if (!project) throw new HttpError(404, "Active project not found.");
+    const scope = project.phase_scope;
+    const dates = scope?.phase_dates;
+    if (!dates || !Object.keys(dates).length) throw new HttpError(409, "This project has no confirmed phase dates.");
+    const { action, phase, release, reason, revisionId } = req.body ?? {};
+    const pending = scope.pending_phase_revision;
+    if (action === "discard") {
+      if (!pending || pending.id !== revisionId) throw new HttpError(409, "Reload the pending schedule revision.");
+      delete scope.pending_phase_revision;
+    } else if (action === "approve") {
+      if (!pending || pending.id !== revisionId) throw new HttpError(409, "Reload the pending schedule revision.");
+      if (pending.completion > project.end) throw new HttpError(409, "An approved project extension is required before confirming this revision.");
+      const team = await phaseRevisionStaff(db, project.id, scope.coordinator_scopes);
+      const changed = team.filter(row => pending.dates[row.stage]?.start !== dates[row.stage]?.start ||
+        pending.dates[row.stage]?.end !== dates[row.stage]?.end);
+      await validateStaffingLicenses(db, changed, null, project, pending.dates, {}, project.project_type_id);
+      for (const row of changed) {
+        if ((await scheduleConflicts(db, [row.user_id], pending.dates[row.stage], project.id)).size)
+          throw new HttpError(409, `A Site PM has a conflicting assignment during ${row.stage}.`);
+      }
+      scope.phase_dates = pending.dates;
+      scope.phase_schedule_baseline ??= dates;
+      scope.phase_schedule_history = [...(scope.phase_schedule_history ?? []), { ...pending, approvedBy: actor.id, approvedAt: new Date().toISOString() }];
+      delete scope.pending_phase_revision;
+    } else {
+      if (!["preview", "submit"].includes(action) || !Object.hasOwn(dates, phase) || !isoDateValid(release) ||
+          release > "9998-12-31" || phaseWorkday(release) !== release)
+        throw new HttpError(422, "Select an included phase and a valid working date.");
+      const intake = project.inquiry_intake;
+      const rules = suggestPhaseSchedule({ phases: scope.phases ?? Object.keys(dates), type: intake?.project_type,
+        complexity: intake?.assessment?.complexity, arrangement: intake?.assessment?.arrangement,
+        start: project.start, area: intake?.floor_area_sqm, dates });
+      const revised = forecastPhaseDelay(dates, phase, release, rules);
+      if (!revised) throw new HttpError(422, "Enter a forecast release after the current phase start.");
+      const finishes = Object.values(revised).map(range => range.end);
+      if (scope.phases?.some(name => !revised[name])) finishes.push(project.end);
+      const completion = finishes.sort().at(-1);
+      const impact = { phase, release, dates: revised, completion, requiresExtension: completion > project.end };
+      if (action === "preview") return impact;
+      if (pending) throw new HttpError(409, "Review the pending schedule revision first.");
+      if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 1000)
+        throw new HttpError(422, "Enter a revision reason of up to 1,000 characters.");
+      scope.pending_phase_revision = { ...impact, id: randomUUID(), reason: reason.trim(), submittedBy: actor.id,
+        submittedAt: new Date().toISOString() };
+    }
+    await db.query("UPDATE projects SET phase_scope=$2::jsonb WHERE id=$1", [project.id, JSON.stringify(scope)]);
+    return scope;
+  })));
   router.get("/inquiries/clients", endpoint(["admin"], req => findInquiryClients({ query: execute }, req.query.q)));
 
   router.post("/inquiries/draft", endpoint(["admin"], (req, actor) => withTransaction(async db => {
@@ -502,6 +570,16 @@ export function mountInquiries(router) {
     const storedDates = row.details.opm_workflow.staffing?.phase_dates;
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
       selected.filter(phase => storedDates?.[phase]).map(phase => [phase, storedDates[phase]])), selected, review);
+    if (req.body.confirm_schedule === true) {
+      const dependencies = suggestPhaseSchedule({ phases: selected, type, complexity: assessment.complexity,
+        arrangement: assessment.arrangement, start: review.start, area: row.details.floor_area_sqm, dates: phaseDates });
+      for (const phase of selected) {
+        const range = phaseDates[phase];
+        if (!range || range.start < dependencies[phase].start || phaseWorkday(range.start) !== range.start ||
+            phaseWorkday(range.end) !== range.end)
+          throw new HttpError(422, `Review the working dates and dependencies for ${phase}.`);
+      }
+    }
     const candidates = {};
     const licenseUnavailable = {};
     const candidateBlockers = {};

@@ -7,6 +7,7 @@ import { ApiError, api, downloadBlob } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
 import type { Project } from "./model"
+import { phaseWorkday, suggestPhaseSchedule } from "../Thesis-Backend/src/domain/phase-schedule.js"
 import { phaseEngineerSummary, registeredComplete, registeredCount, teamConfirmed } from "./workflows"
 import { ListPager, runList, updateListQuery, useListMemory } from "./ListControls"
 import { withPage } from "./listing"
@@ -566,6 +567,21 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const assessment = row?.workflow?.assessment
   const recommendation = recommendedSitePms(assessment?.size, assessment?.complexity)
   const arrangement = row?.workflow?.assessment?.arrangement ?? row?.workflow?.review?.arrangement
+  const phaseScheduleInput = {
+    type: String(row?.details.project_type ?? ""), complexity: row?.workflow?.assessment?.complexity,
+    arrangement, start, area: row?.details.floor_area_sqm,
+  }
+  const suggestions = suggestPhaseSchedule({ ...phaseScheduleInput, phases })
+  const dependencies = suggestPhaseSchedule({ ...phaseScheduleInput, phases, dates: phaseDates })
+  const scheduledDates = { ...dependencies, ...phaseDates }
+  const phaseCompletion = phases.map(stage => scheduledDates[stage]?.end).filter(Boolean).sort().at(-1)
+  const phaseScheduleIssue = phases.find(stage => {
+    const range = scheduledDates[stage]
+    return !range?.start || !range.end || range.end < range.start ||
+      range.start < (dependencies[stage]?.start ?? start ?? "") ||
+      Boolean(end && range.end > end) ||
+      phaseWorkday(range.start) !== range.start || phaseWorkday(range.end) !== range.end
+  })
   const staffingInput = {
     ...row?.details, target_start_date: start, target_end_date: end,
     estimated_budget: budget, assessment_id: row?.workflow?.assessment?.id,
@@ -729,14 +745,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   function selectedPhaseDates() {
     return Object.fromEntries(phases.flatMap(stage => {
-      const dates = phaseDates[stage]
-      return dates?.start || dates?.end ? [[stage, dates]] : []
+      const dates = scheduledDates[stage]
+      return dates ? [[stage, { start: dates.start, end: dates.end }]] : []
     }))
   }
   async function allocate() {
     if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const additional = planning?.staffing?.additional_scopes
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), contract_file_id: contractFileId,
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), confirm_schedule: true, contract_file_id: contractFileId,
       ...(additional ? { additional_scopes: Object.fromEntries(Object.entries(additional).filter(([stage]) => phases.includes(stage))) } : {}),
     })
     setPlanning(result)
@@ -755,7 +771,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (!planning?.additional_scope_options?.[staffingPhase]?.includes(scope)) return
     const previous = planning.staffing?.additional_scopes ?? {}
     const additional_scopes = { ...previous, [staffingPhase]: [...new Set([...(previous[staffingPhase] ?? []), scope])] }
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), contract_file_id: contractFileId, additional_scopes })
+    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), confirm_schedule: true, contract_file_id: contractFileId, additional_scopes })
     if (!result.staffing?.additional_scopes?.[staffingPhase]?.includes(scope) || !result.candidates?.[staffingPhase] ||
       !requiredAreas(result.team?.find(phase => phase.stage === staffingPhase)).includes(scope)) {
       throw new Error("The server did not confirm the additional phase scope.")
@@ -793,7 +809,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     try { await Promise.all([refresh(), onReload()]) }
     catch { setFinalizedClient(current => current && { ...current, refreshFailed: true }) }
   }
-  const canAllocate = !!contractFileId && !!row?.workflow?.assessment && phases.length > 0
+  const canAllocate = !!contractFileId && !!row?.workflow?.assessment && phases.length > 0 && !phaseScheduleIssue
   const staffingLead = step === 3 ? proposedStaffingLead(phases, team, planning?.candidates ?? {}) : null
   const staffingIssues = step === 3 ? phases.flatMap(stage => {
     const entry = team.find(item => item.stage === stage)
@@ -808,7 +824,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (reason) return [{ stage, reason }]
     const lead = staffingLead?.stage === stage ? staffingLead : undefined
     const unavailable = assigned.some(person => {
-      const range = person.user_id === lead?.id ? projectRange : phaseDates[stage]
+      const range = person.user_id === lead?.id ? projectRange : scheduledDates[stage]
       const candidate = choices.find(option => option.id === person.user_id)
       const license = licenseForAssignment(candidate, person.assigned_disciplines)
       return range && candidate?.licenseByScope && (!license || license.cutoff <= range.start)
@@ -816,7 +832,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (unavailable) return [{ stage, reason: "A selected engineer’s license cannot cover the planned start. Choose another engineer or recheck after renewal." }]
     if (planningBackups[stage]) {
       const primary = assigned.find(person => person.user_id === lead?.id) ?? assigned[0]
-      const range = lead ? projectRange : phaseDates[stage]
+      const range = lead ? projectRange : scheduledDates[stage]
       const backup = choices.find(candidate => candidate.id === planningBackups[stage])
       if (!range || !backup || assigned.some(person => person.user_id === backup.id) ||
           (licenseForAssignment(backup, primary?.assigned_disciplines)?.cutoff ?? "") <= range.end)
@@ -1391,7 +1407,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       {step === 2 && <button className="button primary" disabled={busy || !canAllocate} onClick={() => {
         if (planning?.candidates) setStep(3)
         else void run(allocate)
-      }}>Continue to staffing</button>}
+      }}>Confirm and continue to staffing</button>}
       {step === 3 && <button className="button primary inquiry-send-offers" disabled={busy || !canSend}
         aria-describedby={staffingIssues.length ? "inquiry-staffing-phases" : undefined}
         onClick={() => void run(submit)}>Send assignment offers</button>}
@@ -1436,18 +1452,37 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               </label>)}
             </div>
             {!phases.length && <p className="inquiry-muted">Select at least one phase to continue.</p>}
-            {!!phases.length && <details className="inquiry-license-window">
+            {!!phases.length && <details className="inquiry-license-window" open>
               <summary>Planned phase dates</summary>
-              <p className="inquiry-muted">Enter dates to check license coverage for each phase. Leave both fields blank if the dates are still unknown.</p>
+              <p><strong>{arrangement}</strong> · {Object.keys(phaseDates).length ? "Review dates" : "System suggested"}</p>
+              <p className="inquiry-muted">Review the suggested dates before staffing. Estimates use a Monday–Friday construction calendar.</p>
+              {phaseCompletion && <p>Scheduled completion · {phaseCompletion}</p>}
+              {phaseCompletion && end && phaseCompletion > end && <p className="error">
+                The phase schedule exceeds the reviewed completion date of {end}.
+              </p>}
+              <button type="button" className="button" onClick={() => {
+                setPhaseDates({})
+                setTeam([])
+                setPlanning({ ...planning, candidates: undefined })
+              }}>Reset to suggested dates</button>
+              {phaseScheduleIssue && <p className="error" role="status">
+                Review {phaseScheduleIssue}. Use working dates within the project window and start no earlier than {dependencies[phaseScheduleIssue]?.start ?? start}.
+              </p>}
               {phases.map(stage => <fieldset className="inquiry-phase-dates" key={stage}>
                 <legend>{stage}</legend>
                 {(["start", "end"] as const).map(field => <label key={field}>{field === "start" ? "Phase start" : "Phase end"}
-                  <input type="date" min={start} max={end} value={phaseDates[stage]?.[field] ?? ""}
+                  <input type="date" min={start} max={end} value={scheduledDates[stage]?.[field] ?? ""}
                     onChange={event => {
                       const value = event.target.value
-                      setPhaseDates(previous => ({ ...previous, [stage]: { ...(previous[stage] ?? { start: "", end: "" }), [field]: value } }))
+                      setPhaseDates(previous => ({ ...previous, [stage]: { ...(scheduledDates[stage] ?? { start: "", end: "" }), [field]: value } }))
+                      setTeam([])
+                      setPlanning({ ...planning, candidates: undefined })
                     }} />
                 </label>)}
+                <p className="inquiry-muted">Estimated duration · {suggestions[stage]?.days} working days</p>
+                {dependencies[stage]?.overlapWith && <p className="inquiry-muted">
+                  May overlap with {dependencies[stage].overlapWith} if its work zone is released by {dependencies[stage].start}.
+                </p>}
               </fieldset>)}
             </details>}
           </div>

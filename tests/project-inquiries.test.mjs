@@ -318,6 +318,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const payload = {...planInput,...documents,inquiry_id:row.id,suggested_opm_id:manager.id,phases,phase_team:recommended.team}
   const phaseDates = {[phases[1]]: {start:"2027-01-20",end:"2027-02-20"}}
   const datedPlan = {...planInput,...documents,phases,phase_dates:phaseDates}
+  await call(planning,{token,status:422,json:{...datedPlan,confirm_schedule:true}})
   await call(planning,{token,status:422,json:{...datedPlan,phase_dates:{[phases[1]]:{start:"2027-01-01",end:"2027-02-20"}}}})
   await db.query("UPDATE user_licenses SET license_expiry='2027-02-19' WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
   const dated = await call(planning,{token,json:datedPlan})
@@ -464,4 +465,16 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(command,{token:otherToken,status:403,json:{type:"upload_agreement"}})
   await allocate(leadToken)
   assert.equal((await db.query("SELECT lifecycle_status FROM projects WHERE id=$1",[response.project.id])).rows[0].lifecycle_status,"spm_review")
+  const phaseSchedulePath = `/projects/${projectId}/phase-schedule`
+  const revision = { phase: phases[1], release: "2027-01-27", reason: "Zone release delayed." }
+  await call(phaseSchedulePath,{token,status:404,json:{...revision,action:"preview"}})
+  await db.query("UPDATE projects SET lifecycle_status='active' WHERE id=$1",[projectId])
+  const impact = await call(phaseSchedulePath,{token,json:{...revision,action:"preview"}})
+  assert.equal(impact.dates[phases[1]].start,revision.release)
+  const submitted = await call(phaseSchedulePath,{token,json:{...revision,action:"submit"}})
+  assert.deepEqual(submitted.phase_dates,phaseDates)
+  const approved = await call(phaseSchedulePath,{token,json:{action:"approve",revisionId:submitted.pending_phase_revision.id}})
+  assert.deepEqual(approved.phase_schedule_baseline,phaseDates)
+  assert.deepEqual(approved.phase_dates,impact.dates)
+  assert.equal(approved.phase_schedule_history[0].reason,revision.reason)
 })

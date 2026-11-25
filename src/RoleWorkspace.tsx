@@ -9,6 +9,7 @@ import useSwipeNavigation from "./useSwipeNavigation"
 import { licenseAccessPolicy, LICENSE_VIEW_ONLY_MESSAGE } from "../Thesis-Backend/src/domain/license-access.js"
 import ProjectScopeSummary from "./ProjectScopeSummary"
 import ExtensionWorkflow from "./ExtensionWorkflow"
+import ProjectPhaseSchedule from "./ProjectPhaseSchedule"
 import useSignOutConfirmation from "./useSignOutConfirmation"
 import useSidebarNavigation from "./useSidebarNavigation"
 import ProjectProgress from "./ProjectProgress"
@@ -3664,6 +3665,7 @@ export default function RoleWorkspace({
         {isOpm ? <ProjectClientAccount projectId={p.id} onSaved={onReload} /> : <ProjectClientDetails project={p} accounts={state.accounts} />}
         <ProjectScopeSummary scope={p.phaseScope} />
         <ProjectScheduleDetails project={p} today={scheduleToday} />
+        {isOpm && <ProjectPhaseSchedule key={p.id} project={p} today={scheduleToday} onReload={onReload} />}
         {!isOpm && <DelayedProjectNotice project={p} today={scheduleToday} />}
         <Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>
         <IntakeGuidance state={state} project={p} actor={actor} />
