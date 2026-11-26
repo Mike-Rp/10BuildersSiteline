@@ -10,6 +10,24 @@ export const MIN_AVERAGE_FLOOR_AREA = 20;
 const positiveArea = value => (typeof value === "number" || typeof value === "string") &&
   Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_INQUIRY_AREA;
 
+export function floorAreaRange(lot, floors) {
+  if (!positiveArea(lot) || !Number.isInteger(floors) || floors < 1 || floors > MAX_INQUIRY_FLOORS) return null;
+  const minimumAverage = Math.max(MIN_AVERAGE_FLOOR_AREA, Number((Number(lot) * 1.5).toPrecision(15)));
+  const maximumAverage = Number((Number(lot) * 1.7).toPrecision(15));
+  return { minimumAverage, maximumAverage,
+    minimum: Number((minimumAverage * floors).toPrecision(15)),
+    maximum: Math.min(MAX_INQUIRY_AREA, Number((maximumAverage * floors).toPrecision(15))) };
+}
+
+export function averageFloorAreaError(lot, total, floors) {
+  const range = floorAreaRange(lot, floors);
+  if (!range || !Number.isFinite(Number(total)) || Number(total) <= 0) return "";
+  const area = Number(Number(total).toPrecision(15));
+  if (area >= range.minimum && area <= range.maximum) return "";
+  const format = value => value.toLocaleString("en-PH", { maximumSignificantDigits: 15 });
+  return `Average floor area must be 150%–170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
+}
+
 export function normalizeFloorMeasurements(input, floorCount, lotArea) {
   if (!input || !Number.isInteger(floorCount) || floorCount < 1 || floorCount > MAX_INQUIRY_FLOORS) return null;
   let measurements, total;
@@ -21,9 +39,7 @@ export function normalizeFloorMeasurements(input, floorCount, lotArea) {
     measurements = { mode: "individual", areas: input.areas.map(Number) };
     total = measurements.areas.reduce((sum, area) => sum + area, 0);
   }
-  if (lotArea !== undefined && (!positiveArea(lotArea) || !measurements ||
-    (measurements.mode === "same" ? measurements.areaPerFloor > Number(lotArea)
-      : measurements.areas.some(area => area > Number(lotArea))))) return null;
+  if (lotArea !== undefined && (!positiveArea(lotArea) || !measurements || averageFloorAreaError(lotArea, total, floorCount))) return null;
   // Avoid carrying floating-point noise from decimal area inputs into classification and duration.
   return Number.isFinite(total) && total >= floorCount * MIN_AVERAGE_FLOOR_AREA && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
 }

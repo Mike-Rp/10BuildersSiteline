@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
 import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
-import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, averageFloorAreaError, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -29,7 +29,7 @@ function validateInquiryContact(details, previous) {
     throw new HttpError(422, PH_MOBILE_ERROR);
 }
 
-export function inquiryDetails(input) {
+export function inquiryDetails(input, { validateAverage = true } = {}) {
   const details = inquiryClientIdentity(input);
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
     const value = key === "client_name" && details.client_type === "company" ? details.company_name : input?.[key];
@@ -53,8 +53,8 @@ export function inquiryDetails(input) {
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
   }
-  if (details.floor_area_sqm / details.floor_count > details.lot_area)
-    throw new HttpError(422, "Total floor area must not exceed the lot area multiplied by the number of floors.");
+  const areaIssue = validateAverage ? averageFloorAreaError(details.lot_area, details.floor_area_sqm, details.floor_count) : "";
+  if (areaIssue) throw new HttpError(422, areaIssue);
   if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
     throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
   if (details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
@@ -520,7 +520,7 @@ export function mountInquiries(router) {
         const arrangement = input.arrangement ?? workflow.review?.arrangement ?? arrangementOptions[0];
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
-        const before = inquiryDetails(details);
+        const before = inquiryDetails(details, { validateAverage: false });
         if (input.correction?.project_type !== undefined && input.correction.project_type !== before.project_type)
           throw new HttpError(403, "Project type is read-only.");
         for (const key of ["client_name", "email", "phone", "client_type", "company_name", "primary_contact", "designation"]) {
@@ -536,7 +536,7 @@ export function mountInquiries(router) {
         }
         const areas = input.floorMeasurements === undefined ? undefined :
           normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
-        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. Each floor must not exceed the lot area.`);
+        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must be 150% to 170% of the lot area.`);
         if (areas) corrected.floor_area_sqm = areas.total;
         const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
@@ -569,7 +569,7 @@ export function mountInquiries(router) {
         const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
           after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
         if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
-          throw new HttpError(422, "Each floor must not exceed the lot area. Update the floor measurements.");
+          throw new HttpError(422, "The average floor area must be 150% to 170% of the lot area. Update the floor measurements.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
           ...(mixedUseScope ? { mixed_use_scope: mixedUseScope } : {}),
           ...(floorMeasurements ? { floorMeasurements } : {}) };

@@ -6,7 +6,7 @@ import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { MIXED_USE_FEATURES, MIXED_USE_USES, mixedUseSelectionsError, type MixedUseSelections } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, MIN_AVERAGE_FLOOR_AREA, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, floorAreaRange, averageFloorAreaError, MAX_INQUIRY_AREA, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, MIN_AVERAGE_FLOOR_AREA, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -190,10 +190,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
   const lotArea = Number(draft.lot_area)
+  const areaRange = floorAreaRange(lotArea, floorCount)
   const submittedAverage = floorArea.submittedAverage
-  const averageExceedsCorrectedLot = submittedAverage !== null && lotArea > 0 &&
-    lotArea !== Number(row.details.lot_area) && submittedAverage > lotArea
-  const perFloor = floorArea.perFloor ?? (averageExceedsCorrectedLot ? "" : String(submittedAverage ?? ""))
+  const averageOutsideCorrectedLot = submittedAverage !== null && lotArea > 0 &&
+    lotArea !== Number(row.details.lot_area) && !!averageFloorAreaError(lotArea, submittedAverage * floorCount, floorCount)
+  const perFloor = floorArea.perFloor ?? (averageOutsideCorrectedLot ? "" : String(submittedAverage ?? ""))
   const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
@@ -274,10 +275,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       return
     }
     if (validFloorCount && !calculatedArea) {
-      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > lotArea)
+      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > MAX_INQUIRY_AREA)
       const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
       if (floorArea.mode === "individual") setFloorPage(Math.floor(Math.max(0, invalidFloor) / floorPageSize))
-      setFieldError({ id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. Each floor must not exceed the lot area.` })
+      setFieldError({ id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must be 150% to 170% of the lot area.` })
       document.getElementById(id)?.focus()
       return
     }
@@ -552,11 +553,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div className="office-workflow-fields">
               {floorArea.mode === "same" ? <div className={`office-review-wide${editedAreaPerFloor ? " office-review-field-changed" : ""}`}>
                 <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²){editedAreaPerFloor && <span className="office-review-edited">Edited</span>}</label>
-                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={MIN_AVERAGE_FLOOR_AREA} max={lotArea > 0 ? lotArea : undefined} value={perFloor}
+                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={areaRange?.minimumAverage ?? MIN_AVERAGE_FLOOR_AREA} max={areaRange?.maximumAverage} value={perFloor}
                   onValueChange={value => updateFloorArea({ ...floorArea, perFloor: value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
-                  {averageExceedsCorrectedLot
-                    ? "The submitted average is larger than the corrected lot. Enter the actual area per floor."
+                  {averageOutsideCorrectedLot
+                    ? "The submitted average is outside 150% to 170% of the corrected lot area. Enter the actual area per floor."
                     : perFloor ? "Prefilled with the submitted average. Update it if the floor area has changed."
                     : "Enter the actual area per floor."}
                 </div>}
@@ -567,7 +568,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 const changed = areaWasEdited(value)
                 return <div key={id} className={changed ? "office-review-field-changed" : undefined}>
                   <label htmlFor={id}>Floor {index + 1} area (m²){changed && <span className="office-review-edited">Edited</span>}</label>
-                  <GroupedNumberInput {...describedField(id)} required min={0} max={lotArea > 0 ? lotArea : undefined} value={value} onValueChange={nextArea => {
+                  <GroupedNumberInput {...describedField(id)} required min={0} max={MAX_INQUIRY_AREA} value={value} onValueChange={nextArea => {
                     const areas = [...floorArea.areas]
                     areas[index] = nextArea
                     updateFloorArea({ ...floorArea, areas })
@@ -581,7 +582,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
               <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
             </div>}
-            <p className="office-review-field-helper">Each floor must be no larger than the lot area. Total floor area is the sum of all floors and may exceed the lot area. The average must be at least {MIN_AVERAGE_FLOOR_AREA} m² per floor.</p>
+            <p className="office-review-field-helper">Total floor area is the sum of all floors. The average must be 150% to 170% of the lot area (50% to 70% larger).</p>
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <div><span>Total floor area</span><strong>{calculatedArea ? `${calculatedArea.total.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m²` : "Enter the floor areas"}</strong>
               </div>

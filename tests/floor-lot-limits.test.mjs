@@ -1,20 +1,31 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { normalizeFloorMeasurements } from '../Thesis-Backend/src/domain/inquiry-assessment.js';
-test('floor measurements respect lot area in both modes without limiting combined floor area', () => {
-  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:235},5,234),null);
-  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:60},5,234).total,300);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[134,60,80,90,100]},5,234).total,464);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[134,235,60]},3,234),null);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[134,60]},2,100),null);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[234,234]},2,234).total,468);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[60,'']},2,234),null);
-});
+import test from "node:test"
+import assert from "node:assert/strict"
+import { averageFloorAreaError, floorAreaRange, normalizeFloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
-test('average floor area must meet the supported minimum in either measurement mode', () => {
-  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:1.17},200,7432),null);
-  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:19.99},200,7432),null);
-  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:20},200,7432).total,4000);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[19,20]},2,100),null);
-  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[20,20]},2,100).total,40);
-});
+test("average floor area is 50% to 70% larger than the lot", () => {
+  assert.deepEqual(floorAreaRange(200, 2), { minimumAverage: 300, maximumAverage: 340, minimum: 600, maximum: 680 })
+  for (const total of [600, 640, 680]) assert.equal(averageFloorAreaError(200, total, 2), "")
+  for (const total of [200, 400, 599.99, 680.01]) assert.match(averageFloorAreaError(200, total, 2), /150%/)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 300}, 2, 200).total, 600)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 340}, 2, 200).total, 680)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 299.99}, 2, 200), null)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 340.01}, 2, 200), null)
+})
+
+test("individual floors use the combined average rather than a separate lot cap", () => {
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 440]}, 2, 200).total, 640)
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 399.99]}, 2, 200), null)
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 480.01]}, 2, 200), null)
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [0, 640]}, 2, 200), null)
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [320, ""]}, 2, 200), null)
+  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [320]}, 2, 200), null)
+})
+
+test("decimal boundaries and existing input limits remain consistent", () => {
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 30.15}, 2, 20.1).total, 60.3)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 34.17}, 2, 20.1).total, 68.34)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 20}, 2).total, 40)
+  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 19.99}, 2), null)
+  assert.equal(floorAreaRange(0, 2), null)
+  assert.equal(floorAreaRange(200, 201), null)
+})
