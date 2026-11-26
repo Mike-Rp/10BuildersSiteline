@@ -1213,7 +1213,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
-          clientCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
           projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType contractLocked={contractLocked} reload={reloadCorrections} />}
           signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
             {!contractLocked && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {

@@ -419,6 +419,7 @@ export function mountInquiries(router) {
     if (["offered", "consulting", "approved"].includes(row.status) && !row.project_id) fields.push("project_type");
     if (input.action === "request") {
       if (actor.role !== "opm") throw new HttpError(403, "Only the assigned OPM can request a correction.");
+      if (input.field !== "project_type") throw new HttpError(409, "Client information is final after inquiry submission.");
       if (input.field === "project_type" && lockedContract)
         throw new HttpError(409, "Project type is locked under the finalized signed contract.");
       if (history.some(item => item.status === "pending")) throw new HttpError(409, "A correction is already awaiting review.");
@@ -435,6 +436,8 @@ export function mountInquiries(router) {
       if (!["approve", "return"].includes(input.action)) throw new HttpError(422, "Choose approve or return.");
       const item = history.find(item => item.id === input.id && item.status === "pending");
       if (!item) throw new HttpError(409, "This request has already been reviewed.");
+      if (input.action === "approve" && item.field !== "project_type")
+        throw new HttpError(409, "Client information is final after inquiry submission.");
       if (!fields.includes(item.field) || String(details[item.field] ?? "") !== String(item.before))
         throw new HttpError(409, "Inquiry details changed. Request a fresh correction.");
       if (input.action === "approve") {

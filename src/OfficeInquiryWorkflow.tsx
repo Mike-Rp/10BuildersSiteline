@@ -28,7 +28,7 @@ export type OfficeRecord = {
 type Props = {
   row: OfficeRecord; page: OfficePage; reference: string; consultation: string; busy: boolean; error: string; pendingCount: number; justApproved?: boolean;
   navigate: (page: OfficePage) => void; back: () => void; startStaffing: () => void;
-  signedContract: ReactNode; hasSignedContract: boolean; projectTypeCorrection: ReactNode; clientCorrection?: ReactNode;
+  signedContract: ReactNode; hasSignedContract: boolean; projectTypeCorrection: ReactNode;
   decide: (action: string, input?: Record<string, string>) => void;
   save: (action: string, input: Record<string, unknown>) => void;
 }
@@ -104,7 +104,7 @@ function Notice({ tone = "", children }: { tone?: string; children: ReactNode })
   </div>
 }
 
-export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, projectTypeCorrection, clientCorrection, decide, save }: Props) {
+export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, projectTypeCorrection, decide, save }: Props) {
   const workflow = row.workflow
   const review = workflow?.review
   const assessment = workflow?.assessment
@@ -443,7 +443,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         {row.details.overview && <div className="office-proposal-scope"><h3>Project overview</h3><p>{row.details.overview}</p></div>}
         {workflow?.revisions?.map(({ date: day, note }, index) =>
           <Notice key={index}><strong>Revision requested · {formatDay(day)}</strong><p>{note}</p></Notice>)}
-        {row.status === "consulting" && clientCorrection}
       </Card>
       <Card title="Client decision" icon="check">
         {!accepted ? <form onSubmit={event => {
