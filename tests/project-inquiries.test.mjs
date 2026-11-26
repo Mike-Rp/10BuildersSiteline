@@ -256,7 +256,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(planning,{token,status:409,json:{...planInput,target_end_date:"2027-04-13"}})
   const preview = await call(planning,{token,json:planInput})
   assert.deepEqual(preview.estimate,{size:"Medium",end:"2027-05-23"})
-  const phases = preview.phases.slice(0,2)
+  const phases = preview.phases
+  assert.deepEqual(phases, ["Mobilization", "Design", "Foundation", "Structure", "Envelope", "MEP Rough-In", "Finishes", "Landscape & Site Works", "Closeout"])
 
   async function upload(name) {
     const id = crypto.randomUUID()
@@ -266,6 +267,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     return (await call("/files",{token,form})).id
   }
   const documents = {contract_file_id:await upload("signed.pdf")}
+  await call(planning,{token,status:422,json:{...planInput,...documents,phases:phases.slice(0,2)}})
   if (multiEngineer) {
     const savedContract = (await save("contract", 2, documents)).workflow
     assert.deepEqual(savedContract.signed_contract,{id:documents.contract_file_id,name:"signed.pdf"})
@@ -344,7 +346,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call("/projects/intake",{token,status:409,json:{...payload,assessment_id:undefined}})
   await call("/projects/intake",{token,status:409,json:{...payload,estimated_budget:updatedBudget-1}})
   await call("/projects/intake",{token,status:422,json:{...payload,contract_file_id:undefined}})
-  await call("/projects/intake",{token,status:409,json:{...payload,phases:[phases[0]],phase_team:[recommended.team[0]]}})
+  await call("/projects/intake",{token,status:422,json:{...payload,phases:[phases[0]],phase_team:[recommended.team[0]]}})
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{...recommended.team[0],stage:preview.phases[1]}]}})
   await call("/projects/intake",{token,status:422,json:{...payload,phase_team:[{stage:phases[0],user_id:manager.id}]}})
   // An invalid second document fails after the project and signed contract were written inside the transaction.
@@ -380,7 +382,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
       project_id:response.project.id,stage_id:stageId,from_user_id:alternate.id,to_user_id:backup.id,
       reason:"Coverage required at work access cutoff",appointment_signed:true,signed_on:today,
     }})
-    const offered = await db.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND spm_user_id=$2",[response.project.id,backup.id])
+    const offered = await db.query("SELECT 1 FROM project_phase_team WHERE project_id=$1 AND spm_user_id=$2 AND project_stage_id=$3",[response.project.id,backup.id,stageId])
     assert.equal(offered.rowCount,0)
   }
   await db.query("UPDATE user_licenses SET license_expiry='2027-03-15' WHERE user_id=$1 AND superseded_at IS NULL",[alternate.id])
@@ -415,8 +417,9 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call("/projects/recommendations/update-phase-team",{token,method:"PUT",json:{project_id:projectId,phase_team:recommended.team}})
   const assignments = (await db.query(`SELECT t.project_stage_id,t.is_lead,u.id,u.email FROM project_phase_team t
     JOIN users u ON u.id=t.spm_user_id WHERE t.project_id=$1 ORDER BY t.is_lead DESC`,[projectId])).rows
-  assert.deepEqual(assignments.map(a=>a.is_lead),[true,false])
-  const [lead,other] = assignments
+  assert.equal(assignments.filter(a=>a.is_lead).length,1)
+  const lead = assignments.find(assignment => assignment.is_lead)
+  const other = assignments.find(assignment => assignment.project_stage_id === stageId)
   assert.ok(firstPhaseIds.includes(lead.id))
   assert.equal(other.id,alternate.id)
   const leadToken = await login(lead.email,"staff")
@@ -458,6 +461,9 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     const pending = (await db.query(`SELECT r.id,u.email FROM project_phase_responsibilities r JOIN users u ON u.id=r.user_id
       WHERE r.project_id=$1 AND r.status='pending'`,[projectId])).rows
     for (const r of pending) await call(`/projects/${projectId}/engineer-responsibilities/${r.id}`,{token:await login(r.email,"staff"),json:{action:"accept"}})
+  } else {
+    for (const assignment of assignments.filter(item => item !== lead && item !== other))
+      await respond(assignment,await login(assignment.email,"staff"),"accept")
   }
   await allocate(leadToken,409)
   for (const index of [0,1,3,4,5]) await uploadRegistered(index,`registered-${index}.pdf`)
@@ -477,4 +483,21 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.deepEqual(approved.phase_schedule_baseline,phaseDates)
   assert.deepEqual(approved.phase_dates,impact.dates)
   assert.equal(approved.phase_schedule_history[0].reason,revision.reason)
+  const wrongType = await create()
+  const oldWorkflow = (await db.query("SELECT details->'opm_workflow' AS workflow FROM project_inquiries WHERE id=$1",[row.id])).rows[0].workflow
+  await db.query("UPDATE project_inquiries SET status='approved',opm_id=$2,details=jsonb_set(details,'{opm_workflow}',$3::jsonb) WHERE id=$1",
+    [wrongType.id,manager.id,JSON.stringify(oldWorkflow)])
+  const typeCorrection = `${root}/${wrongType.id}/client-correction`
+  const typeRequest = {action:"request",field:"project_type",value:"Commercial",reason:"Client confirmed the building use."}
+  await call(typeCorrection,{token,json:{...typeRequest,value:"Invalid"},status:422})
+  const typeSubmitted = await call(typeCorrection,{token,json:typeRequest})
+  const typeId = typeSubmitted.corrections[0].id
+  await call(typeCorrection,{token,json:{action:"approve",id:typeId},status:403})
+  await call(typeCorrection,{token:admin,json:{action:"approve",id:typeId}})
+  const correctedType = (await call(root,{token})).find(inquiry=>inquiry.id===wrongType.id)
+  assert.equal(correctedType.details.project_type,"Commercial")
+  assert.equal(correctedType.details.client_corrections[0].before,"Residential")
+  assert.equal(correctedType.workflow.review.version,oldWorkflow.review.version+1)
+  assert.equal(correctedType.workflow.review.requires_review,true)
+  for (const field of ["assessment","budget","staffing","signed_contract"]) assert.equal(correctedType.workflow[field],undefined)
 })

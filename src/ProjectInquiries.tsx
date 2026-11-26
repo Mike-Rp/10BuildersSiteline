@@ -555,8 +555,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [opmPreview, setOpmPreview] = useState<{ type: string; candidates?: InquiryOpmCandidate[]; error?: string }>()
   const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
+  const fixedPhaseLineup = row?.details.project_type === "Residential" || row?.details.project_type === "Commercial"
   const intakeLocked = row?.status === "approved" && inquiryAssessmentReady(row.details, row.workflow)
-  const displayedOfficePage = officePage && intakeLocked ? "assessment" : officePage
+  const displayedOfficePage = officePage && intakeLocked ? "assessment"
+    : officePage === "assessment" && row?.workflow?.review?.requires_review ? "review" : officePage
   const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const start = row?.workflow?.review?.start
@@ -613,6 +615,17 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setRows(await api<Inquiry[]>(root))
     lastReadAt.current = Date.now()
   }
+  function reloadCorrections() {
+    void refresh().catch(error => setError(error instanceof Error ? error.message : String(error)))
+    void onReload()
+  }
+  useEffect(() => {
+    if (!row?.workflow?.review?.requires_review) return
+    setPlanning(undefined)
+    setTeam([])
+    setPhases([])
+    setDialog(current => current === "intake" ? undefined : current)
+  }, [row?.id, row?.workflow?.review?.requires_review])
   useEffect(() => {
     if (adminPage !== "list") recordHeading.current?.focus()
   }, [adminPage])
@@ -736,7 +749,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (!planning) {
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
-      setPhases(result.staffing?.phases ?? result.phases)
+      setPhases(fixedPhaseLineup ? result.phases : result.staffing?.phases ?? result.phases)
       setPhaseDates(result.staffing?.phase_dates ?? {})
       setPlanningBackups({})
     }
@@ -1165,19 +1178,21 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         })}>{status === "Saved for later" ? "Start automatic matching" : "Retry automatic matching"}</button>
       </div>}
       {!submitted && row.status === "withdrawn" && <div><button className="button" disabled={busy} onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button></div>}
-      <ClientCorrections key={row.id} id={row.id} details={row.details} admin reload={() => void onReload()} />
+      <ClientCorrections key={row.id} id={row.id} details={row.details} admin reload={reloadCorrections} />
+      <ClientCorrections key={`type:${row.id}`} id={row.id} details={row.details} admin projectType reload={reloadCorrections} />
       {feedback}
     </section>
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
-    {row && !admin && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={() => void onReload()} />}
+    {row && !admin && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
     {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
     {displayedOfficePage && row && !admin
-      ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
+      ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}:${row.details.project_type}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
+          projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType reload={reloadCorrections} />}
           signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
             {(!intakeLocked || !contractFileId) && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
               const file = event.target.files?.[0]
@@ -1442,9 +1457,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <div className="inquiry-card"><h3>Reviewed completion date</h3><p>{end}</p></div>
             </div>
             <h3>Construction phases</h3>
+            {fixedPhaseLineup && <p className="inquiry-muted">All phases are required for {String(row.details.project_type)} projects.</p>}
             <div className="inquiry-phase-grid">
               {planning.phases.map(stage => <label className="inquiry-check inquiry-phase-option" key={stage}>
-                <input type="checkbox" checked={phases.includes(stage)} onChange={event => {
+                <input type="checkbox" checked={phases.includes(stage)} disabled={fixedPhaseLineup} onChange={event => {
                   setPhases(previous => event.target.checked ? planning.phases.filter(item => item === stage || previous.includes(item)) : previous.filter(item => item !== stage))
                   setTeam([])
                   setPlanning({ ...planning, candidates: undefined })

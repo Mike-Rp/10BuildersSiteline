@@ -69,12 +69,15 @@ export const createIntake = async (req, res) => {
       if (inquiryId) {
         inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
         if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
+        if (!inquiry.project_id && inquiry.details.client_corrections?.some(item => item.field === "project_type" && item.status === "pending"))
+          throw new HttpError(409, "Resolve the pending project type correction before sending assignment offers.");
         const assessment = staffingAssessment(inquiry, req.body);
         if (!inquiry.project_id && inquiry.status !== "approved") throw new HttpError(409, "Record client approval first.");
         const details = inquiryDetails(inquiry.details);
         const {review, budget} = inquiry.details.opm_workflow;
         if (!isUuid(req.body.contract_file_id)) throw new HttpError(422, "Upload the signed client contract agreement.");
-        phases = confirmedPhases(await inquiryPhases(client,details.project_type),req.body.phases);
+        phases = confirmedPhases(await inquiryPhases(client,details.project_type),req.body.phases,
+          inquiry.project_id ? undefined : details.project_type);
         const confirmed = inquiry.details.opm_workflow.staffing;
         if (!confirmed || confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
             confirmed.phases.length !== phases.length || confirmed.phases.some((phase,index) => phase !== phases[index]))

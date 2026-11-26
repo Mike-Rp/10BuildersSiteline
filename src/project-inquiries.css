@@ -713,3 +713,7 @@
 .project-inquiries .modal[aria-label="Save this inquiry as a draft?"],
 .project-inquiries .modal[aria-label="Save this inquiry as a draft?"] > :is(.modal-header, .modal-body, .modal-footer) { background: var(--color-surface); }
 @media (max-width: 640px) { .inquiry-client-choice > div, .inquiry-company-fields { grid-template-columns: 1fr; } }
+.inquiry-project-type-correction { min-width: 0; }
+.inquiry-locked-project-type { position: relative; }
+.inquiry-locked-project-type input { width: 100%; padding-inline-end: 2rem; background: #edf4fa; }
+.inquiry-locked-project-type svg { position: absolute; inset-inline-end: .65rem; top: 50%; transform: translateY(-50%); pointer-events: none; }

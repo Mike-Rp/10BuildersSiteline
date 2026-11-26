@@ -94,10 +94,12 @@ export async function inquiryPhases(db, type) {
     WHERE t.code=$1 ORDER BY w.sort_order`, [type])).rows.map(row => row.code);
 }
 
-export function confirmedPhases(available, submitted) {
+export function confirmedPhases(available, submitted, type) {
   if (!Array.isArray(submitted) || !submitted.length || new Set(submitted).size !== submitted.length ||
       submitted.some(phase => !available.includes(phase)))
     throw new HttpError(422, "Select at least one valid construction phase.");
+  if ((type === "Residential" || type === "Commercial") && submitted.length !== available.length)
+    throw new HttpError(422, `All construction phases are required for ${type} projects.`);
   return available.filter(phase => submitted.includes(phase));
 }
 
@@ -395,6 +397,7 @@ export function mountInquiries(router) {
     const details = { ...row.details }, input = req.body ?? {};
     const history = [...(details.client_corrections ?? [])];
     const fields = details.client_type === "company" ? ["email", "phone", "company_name", "primary_contact", "designation"] : ["client_name", "email", "phone"];
+    if (["offered", "consulting", "approved"].includes(row.status) && !row.project_id) fields.push("project_type");
     if (input.action === "request") {
       if (actor.role !== "opm") throw new HttpError(403, "Only the assigned OPM can request a correction.");
       if (history.some(item => item.status === "pending")) throw new HttpError(409, "A correction is already awaiting review.");
@@ -405,25 +408,38 @@ export function mountInquiries(router) {
       inquiryDetails(proposed); validateInquiryContact(proposed, details);
       if (String(details[input.field] ?? "") === input.value.trim()) throw new HttpError(422, "Enter a different replacement.");
       history.push({ id: randomUUID(), field: input.field, before: details[input.field] ?? "", after: input.value.trim(), reason: input.reason.trim(), status: "pending", by: actor.id, at: new Date().toISOString() });
-      await notifyInquiry(db, actor.id, row.admin_id, "Client correction requested", details.name);
+      await notifyInquiry(db, actor.id, row.admin_id, input.field === "project_type" ? "Project type correction requested" : "Client correction requested", details.name);
     } else {
       if (actor.role !== "admin") throw new HttpError(403, "Administrator review required.");
       if (!["approve", "return"].includes(input.action)) throw new HttpError(422, "Choose approve or return.");
       const item = history.find(item => item.id === input.id && item.status === "pending");
       if (!item) throw new HttpError(409, "This request has already been reviewed.");
-      if (String(details[item.field] ?? "") !== String(item.before)) throw new HttpError(409, "Client details changed. Request a fresh correction.");
+      if (!fields.includes(item.field) || String(details[item.field] ?? "") !== String(item.before))
+        throw new HttpError(409, "Inquiry details changed. Request a fresh correction.");
       if (input.action === "approve") {
         details[item.field] = item.after;
         if (item.field === "company_name") details.client_name = item.after;
         inquiryDetails(details); validateInquiryContact(details, row.details);
+        if (item.field === "project_type" && details.opm_workflow) {
+          const workflow = { ...details.opm_workflow };
+          if (workflow.review) workflow.review = { ...workflow.review, version: workflow.review.version + 1, requires_review: true };
+          if (workflow.signed_contract) workflow.superseded_contracts = [...(workflow.superseded_contracts ?? []), {
+            ...workflow.signed_contract, correction_id: item.id,
+          }];
+          delete workflow.budget;
+          delete workflow.assessment;
+          delete workflow.staffing;
+          delete workflow.signed_contract;
+          details.opm_workflow = workflow;
+        }
       }
       item.status = input.action === "approve" ? "approved" : "returned";
       item.reviewed_by = actor.id; item.reviewed_at = new Date().toISOString();
-      await notifyInquiry(db, actor.id, row.opm_id, "Client correction " + item.status, details.name);
+      await notifyInquiry(db, actor.id, row.opm_id, (item.field === "project_type" ? "Project type correction " : "Client correction ") + item.status, details.name);
     }
     details.client_corrections = history;
-    await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1", [row.id, JSON.stringify(details)]);
-    return { corrections: history };
+    const updated = (await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1 RETURNING *", [row.id, JSON.stringify(details)])).rows[0];
+    return { corrections: history, inquiry: inquiryResponse(updated, actor.role === "admin") };
   })));
 
   router.post("/inquiries/:id/workflow", endpoint(["opm"], (req, actor) => withTransaction(async db => {
@@ -519,7 +535,7 @@ export function mountInquiries(router) {
         break;
       }
       case "budget": {
-        if (!workflow.review) throw new HttpError(409, "Confirm the project information before saving the budget.");
+        if (!workflow.review || workflow.review.requires_review) throw new HttpError(409, "Confirm the project information before saving the budget.");
         const { start, end, technical = technicalOptions[0], arrangement = arrangementOptions[0] } = workflow.review;
         const { complexity } = assessInquiry(details, start, end, technical, arrangement);
         recordInquiryBudget(workflow, input.amount, audit, inquiryCostEstimate(details, complexity));
@@ -565,7 +581,7 @@ export function mountInquiries(router) {
     if (signedContractId && req.body.contract_file_id !== signedContractId)
       throw new HttpError(409, "The signed contract changed. Reopen staffing with the confirmed contract.");
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
-    const selected = confirmedPhases(phases, req.body.phases);
+    const selected = confirmedPhases(phases, req.body.phases, type);
     const review = row.details.opm_workflow.review;
     const storedDates = row.details.opm_workflow.staffing?.phase_dates;
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(

@@ -11,7 +11,7 @@ export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "rev
 type Details = Record<string, string | number>
 type ReviewEvent = { at: string; version: number; reason: string; changes: Record<string, { before: string | number | null; after: string | number | null }> }
 export type OfficeWorkflow = {
-  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; floorMeasurements?: FloorMeasurements; estimate: { size: string | null; end: string | null } }
+  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; requires_review?: boolean; floorMeasurements?: FloorMeasurements; estimate: { size: string | null; end: string | null } }
   review_history?: ReviewEvent[]
   budget?: number
   budget_history?: { at: string; amount: number }[]
@@ -26,7 +26,7 @@ export type OfficeRecord = {
 type Props = {
   row: OfficeRecord; page: OfficePage; reference: string; consultation: string; busy: boolean; error: string; pendingCount: number; justApproved?: boolean;
   navigate: (page: OfficePage) => void; back: () => void; startStaffing: () => void;
-  signedContract: ReactNode; hasSignedContract: boolean;
+  signedContract: ReactNode; hasSignedContract: boolean; projectTypeCorrection: ReactNode;
   decide: (action: string, input?: Record<string, string>) => void;
   save: (action: string, input: Record<string, unknown>) => void;
 }
@@ -102,7 +102,7 @@ function Notice({ tone = "", children }: { tone?: string; children: ReactNode })
   </div>
 }
 
-export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, decide, save }: Props) {
+export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, projectTypeCorrection, decide, save }: Props) {
   const workflow = row.workflow
   const review = workflow?.review
   const assessment = workflow?.assessment
@@ -173,7 +173,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement) : undefined
   const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
-  const reviewing = editing || !review
+  const reviewing = editing || !review || review.requires_review
   const compactReview = page === "review" && reviewing
   const showIntakeRecord = page !== "pending" && page !== "received" && !compactReview
   const floorCount = Number(draft.floor_count)
@@ -244,9 +244,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     const changed = changedFromAdmin(key)
     const id = fieldId(key)
     return <div key={key} className={changed ? "office-review-field-changed" : undefined}>
-      <label htmlFor={id}>{label}{changed && <span className="office-review-edited">Edited</span>}</label>{key === "project_type"
-      ? <input {...describedField(id)} readOnly value={draft[key] ?? ""} />
-      : key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
+      <label htmlFor={id}>{label}{changed && <span className="office-review-edited">Edited</span>}</label>{key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
           onValueChange={value => updateDraft(key, value)} />
       : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required min={0}
         value={String(draft[key] ?? "")} onValueChange={value => updateDraft(key, value)} />
@@ -509,7 +507,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <section className="office-workflow-subsection" aria-labelledby={fieldId("measurements")}>
             <h3 id={fieldId("measurements")}>Project measurements</h3>
             <div className="office-workflow-fields">
-              {editField("project_type", "Project type")}
+              {projectTypeCorrection}
               {projectMeasurementFields.map(([key, label]) => editField(key, label))}
               <label>Floor sizes<select value={floorArea.mode} onChange={event => {
                 const mode = event.target.value === "individual" ? "individual" : "same"
@@ -631,13 +629,13 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <button type="button" className="button" onClick={startEditing}>Edit project information</button>
           }>
             <Facts values={[
-              ["Project type", amount(row.details.project_type)],
               ["Lot area (m²)", amount(row.details.lot_area)],
               ["Number of floors", amount(row.details.floor_count)],
               ["Total floor area (m²)", amount(row.details.floor_area_sqm)],
               ["Authorized budget", workflow?.budget == null ? "Not saved" : currency.format(workflow.budget)],
               ["Technical requirements", review?.technical ?? technicalOptions[0]],
             ]} />
+            {projectTypeCorrection}
             <details className="office-workflow-history"><summary>Client information and schedule</summary>
               <Facts values={[...clientFacts, ...projectFacts.filter(([label]) =>
                 ["Project address / location", "Estimated start", "Estimated completion", "Classification"].includes(label))]} />
@@ -670,6 +668,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </>}
 
     {page === "assessment" && preview && review && <>
+      {projectTypeCorrection}
     <header className="office-intake-section-heading">
       <div><h2>{title}</h2><p className="inquiry-muted">{descriptions.assessment}</p></div>
       {assessment
