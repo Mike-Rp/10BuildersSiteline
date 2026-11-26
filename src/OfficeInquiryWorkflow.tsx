@@ -7,6 +7,7 @@ import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { MIXED_USE_FEATURES, MIXED_USE_USES, mixedUseSelectionsError, type MixedUseSelections } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
 import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, MIN_AVERAGE_FLOOR_AREA, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { footprintError, PLANNING_SITE_OCCUPANCY } from "../Thesis-Backend/src/domain/site-occupancy.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -39,6 +40,7 @@ const projectIdentityFields = [
 ] as const
 const projectMeasurementFields = [
   ["lot_area", "Lot area (m²)"], ["floor_count", "Number of floors"],
+  ["building_footprint_sqm", "Ground-floor footprint (m²)"],
 ] as const
 const projectFields = [...projectIdentityFields, ...projectMeasurementFields, ["floor_area_sqm", "Total floor area (m²)"]] as const
 const projectTypes = ["Residential", "Commercial", "Mixed-Use"]
@@ -56,7 +58,7 @@ function floorAreaDraft(details: Details, saved?: FloorMeasurements) {
 
 const correctionFields = [...projectFields, ...clientFields]
 const fieldId = (key: string) => `inquiry-review-${key}`
-const numericField = (key: string) => /^(lot_area|floor_area_sqm|floor_count)$/.test(key)
+const numericField = (key: string) => /^(lot_area|floor_area_sqm|floor_count|building_footprint_sqm)$/.test(key)
 const fieldValue = (key: string, value: Details[string] | null | undefined) => {
   const text = String(value ?? "").trim()
   return numericField(key) && text ? Number(text) : text
@@ -257,6 +259,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     return <div key={key} className={changed ? "office-review-field-changed" : undefined}>
       <label htmlFor={id}>{label}{changed && <span className="office-review-edited">Edited</span>}</label>{key === "phone" ? <MobileNumberInput {...describedField(id)} required value={String(draft[key] ?? "")}
           onValueChange={value => updateDraft(key, value)} />
+      : key === "building_footprint_sqm" ? <GroupedNumberInput {...describedField(id)} required={row.details.building_footprint_sqm !== undefined} min={0.01}
+        max={lotArea > 0 ? Math.floor(lotArea * PLANNING_SITE_OCCUPANCY * 100 + 1e-8) / 100 : undefined}
+        value={String(draft[key] ?? "")} onValueChange={value => updateDraft(key, value)} />
       : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required min={0}
         value={String(draft[key] ?? "")} onValueChange={value => updateDraft(key, value)} />
       : <input {...describedField(id)} type={numeric ? "number" : key === "email" ? "email" : "text"}
@@ -271,6 +276,13 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     if (busy || !costEstimate || budgetError || scopeError) return
     if (!reviewing) {
       if (!budgetSaved) save("budget", { amount: budget })
+      return
+    }
+    const footprintIssue = footprintError(lotArea, draft.building_footprint_sqm, calculatedArea?.total, row.details.building_footprint_sqm !== undefined)
+    if (footprintIssue) {
+      const id = fieldId("building_footprint_sqm")
+      setFieldError({id, message: footprintIssue})
+      document.getElementById(id)?.focus()
       return
     }
     if (validFloorCount && !calculatedArea) {
@@ -665,6 +677,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           }>
             <Facts values={[
               ["Lot area (m²)", amount(row.details.lot_area)],
+              ["Ground-floor footprint (m²)", amount(row.details.building_footprint_sqm)],
               ["Number of floors", amount(row.details.floor_count)],
               ["Total floor area (m²)", amount(row.details.floor_area_sqm)],
               ["Authorized budget", workflow?.budget == null ? "Not saved" : currency.format(workflow.budget)],
