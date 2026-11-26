@@ -37,7 +37,11 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   const root = createRoot(document.getElementById("root"))
   t.after(async () => { await act(() => root.unmount()); await server.close(); window.close(); for (const [key, descriptor] of globals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] } })
   const { default: ProjectInquiries } = await server.ssrLoadModule("/src/ProjectInquiries.tsx")
-  const button = name => [...document.querySelectorAll("button")].find(item => item.textContent.trim() === name)
+  const button = name => [...document.querySelectorAll("button")].find(item => {
+    const label = item.cloneNode(true)
+    label.querySelectorAll('[aria-hidden="true"]').forEach(icon => icon.remove())
+    return label.textContent.trim() === name
+  })
   const click = async name => { assert.ok(button(name), name); await act(() => button(name).click()) }
   const set = async (selector, value) => act(() => { const input = document.querySelector(selector); assert.ok(input, selector); Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, value); input.dispatchEvent(new window.Event("input", { bubbles: true })) })
   const radio = async (name, value) => act(() => document.querySelector(`[name="${name}"][value="${value}"]`).click())
@@ -79,7 +83,9 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   await click("Back to inquiries")
   assert.ok(document.querySelector("#existing-inquiries-heading"))
   assert.match(document.querySelector(".inquiry-log-footer").textContent, /Waiting for Avery Reyes \(Office PM\) to respond/)
-  await click("View inquiry"); await click("Back to inquiries"); await click("New project inquiry")
+  await click("View inquiry")
+  assert.ok(button("Back to inquiries").compareDocumentPosition(button("Refresh")) & window.Node.DOCUMENT_POSITION_FOLLOWING)
+  await click("Back to inquiries"); await click("New project inquiry")
   await radio("inquiry-client-record", "existing")
   await set('[aria-label="Find an existing client"]', "existing")
   await act(() => new Promise(resolve => setTimeout(resolve, 300)))

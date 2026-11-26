@@ -1155,6 +1155,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const submitted = adminPage === "submitted"
     const status = adminInquiryStatus(row)
     return <section className="project-inquiries admin-inquiries admin-inquiry-page">
+      <div>
+        <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>
+          <span aria-hidden="true">←</span> Back to inquiries
+        </button>
+      </div>
       <header className="inquiries-page-heading">
         <div><h1 ref={recordHeading} tabIndex={-1}>{submitted ? "Inquiry submitted" : "Inquiry tracking"}</h1>
           <p>{submitted
@@ -1165,14 +1170,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         </div>
         {submitted ? <button className="button" onClick={() => setAdminPage("tracking")}>View inquiry status</button>
           : <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>}
-        <button className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
       </header>
       {submitted && <div className="admin-inquiry-success" role="status">
         <span className="admin-history-icon"><Icon name="check" /></span>
         <div><strong>Saved successfully</strong><h2>{row.details.name}</h2><p>Reference {inquiryReference(row)}</p></div>
         <span className={`inquiry-pill ${status === "No eligible OPM" ? "pending" : "ready"}`}>{status}</span>
       </div>}
-      <div className={submitted ? "" : "admin-inquiry-tracking-grid"}>
+      <div className="inquiry-card admin-inquiry-record">
         <section className="inquiry-card admin-inquiry-tracking-summary">
           {!submitted && <header><div><p>{inquiryReference(row)}</p><h2>{row.details.name}</h2></div><span className="inquiry-pill">{status}</span></header>}
           <AdminInquirySummary row={row} />
@@ -1182,7 +1186,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           {!submitted && row.details.client_decision_date && <p>Client decision confirmed on {row.details.client_decision_date}</p>}
           {!submitted && row.details.client_decision_note && <p className="inquiry-overview">Internal decision note: {row.details.client_decision_note}</p>}
         </section>
-        {!submitted && <AdminInquiryHistory row={row} />}
+        <div className={`admin-inquiry-record-followup${submitted ? "" : " admin-inquiry-record-columns"}`}>
+          {!submitted && <AdminInquiryHistory row={row} />}
+          <div className="admin-inquiry-record-corrections">
+            <ClientCorrections key={row.id} id={row.id} details={row.details} admin reload={reloadCorrections} />
+            <ClientCorrections key={`type:${row.id}`} id={row.id} details={row.details} admin projectType reload={reloadCorrections} />
+          </div>
+        </div>
       </div>
       {!submitted && ["draft", "returned"].includes(row.status) && <div>
         <button className="button primary" disabled={busy} onClick={() => void run(async () => {
@@ -1192,8 +1202,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         })}>{status === "Saved for later" ? "Start automatic matching" : "Retry automatic matching"}</button>
       </div>}
       {!submitted && row.status === "withdrawn" && <div><button className="button" disabled={busy} onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button></div>}
-      <ClientCorrections key={row.id} id={row.id} details={row.details} admin reload={reloadCorrections} />
-      <ClientCorrections key={`type:${row.id}`} id={row.id} details={row.details} admin projectType reload={reloadCorrections} />
       {feedback}
     </section>
   }
