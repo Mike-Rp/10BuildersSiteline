@@ -327,7 +327,6 @@ export default function RoleWorkspace({
     () => routePage === "Confirmation queue" ? "mine" : "inquiries",
   )
   const [inquiryCount, setInquiryCount] = useState<number>()
-  const [inquiryBannerTarget, setInquiryBannerTarget] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
     if (legacyIntakeRoute) setConfirmTab(routePage === "Project inquiries" ? "inquiries" : "mine")
   }, [legacyIntakeRoute, routePage])
@@ -3961,7 +3960,6 @@ export default function RoleWorkspace({
           <>
             {header(PROJECT_SETUP_LABEL)}
             <div className="project-setup-content">
-            <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
             <div className="active-sites-view-tabs confirmation-queue-tabs project-setup-tabs" role="tablist" aria-label={`${PROJECT_SETUP_LABEL} views`}>
               {([
                 ["inquiries", "Inquiry queue", inquiryCount, null],
@@ -3985,7 +3983,6 @@ export default function RoleWorkspace({
             <div role="tabpanel" id="project-intake-panel-inquiries" aria-labelledby="project-intake-tab-inquiries" hidden={confirmTab !== "inquiries"}>
               <ProjectInquiries key={actor.id} role="opm" embedded onReload={onReload}
                 projects={projects} onOpenDocuments={openDocuments} onInquiryCountChange={setInquiryCount}
-                bannerTarget={inquiryBannerTarget} onShowInquiries={() => setConfirmTab("inquiries")}
                 onOpenAssignments={project => setInquiryAssignmentProjectId(project.id)} />
             </div>
             <div role="tabpanel" id="project-intake-panel-responses" aria-labelledby="project-intake-tab-responses" hidden={confirmTab !== "responses"}>
@@ -4257,11 +4254,6 @@ export default function RoleWorkspace({
             <DashboardWelcome greeting={welcomeGreeting} />
           </div>}
           {renderPage()}
-          <div className="workspace-footer">
-            <span>
-              10BuildLine <span>Built for the work ahead.</span>
-            </span>
-          </div>
         </main>
       </div>
       {isOpm && inquiryAssignmentProjectId && (() => {

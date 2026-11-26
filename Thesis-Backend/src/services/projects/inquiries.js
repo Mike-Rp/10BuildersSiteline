@@ -493,10 +493,28 @@ export function mountInquiries(router) {
     const contractLocked = inquiryContractLocked(details, workflow);
     if (contractLocked && !workflow.signed_contract && workflow.staffing?.contract_file_id)
       workflow.signed_contract = { id: workflow.staffing.contract_file_id, name: "Signed Client Contract Agreement" };
-    if (intakeLocked && (input.action === "review" || input.action === "budget"))
-      throw new HttpError(409, "Project information and budget are locked once project assessment is available.");
+    if ((workflow.staffing || row.project_id) && ["review", "budget", "assessment"].includes(input.action))
+      throw new HttpError(409, "Project information and assessment are locked after staffing begins.");
+    if ((workflow.assessment || workflow.staffing || row.project_id) && ["proposal_details", "review", "budget", "assessment"].includes(input.action))
+      throw new HttpError(409, "The assessment is saved. All project setup records are locked and view only.");
     const audit = { by: actor.id, at: new Date().toISOString() };
     switch (input.action) {
+      case "proposal_details": {
+        const decisionDate = input.decision_date;
+        const note = input.decision_note;
+        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
+        if (typeof decisionDate !== "string" || !validSchedule(decisionDate, today))
+          throw new HttpError(422, "Enter a valid client decision date.");
+        if (typeof note !== "string" || note.length > 1000)
+          throw new HttpError(422, "Enter an internal note of up to 1,000 characters.");
+        const previous = { date: details.client_decision_date ?? null, note: details.client_decision_note ?? "" };
+        details.client_decision_date = decisionDate;
+        details.client_decision_note = note.trim();
+        if (previous.date !== decisionDate || previous.note !== note.trim())
+          workflow.proposal_history = [...(workflow.proposal_history ?? []), { ...audit, before: previous,
+            after: { date: decisionDate, note: note.trim() } }];
+        break;
+      }
       case "contract": {
         const previousId = workflow.signed_contract?.id ?? workflow.staffing?.contract_file_id ?? null;
         if (previousId && previousId === input.contract_file_id && input.request_id === previousId) return inquiryResponse(row);
@@ -515,8 +533,8 @@ export function mountInquiries(router) {
         if (!validSchedule(input.start, input.end)) throw new HttpError(422, "Enter a valid project start and completion date.");
         const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short" }).format(new Date());
         if (input.start < today) throw new HttpError(422, "Choose an estimated start date of today or later.");
-        const technical = input.technical ?? workflow.review?.technical ?? technicalOptions[0];
-        const arrangement = input.arrangement ?? workflow.review?.arrangement ?? arrangementOptions[0];
+        const technical = input.technical ?? workflow.review?.technical;
+        const arrangement = input.arrangement ?? workflow.review?.arrangement;
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const before = inquiryDetails(details, { validateAverage: false });
@@ -591,6 +609,8 @@ export function mountInquiries(router) {
           throw new HttpError(409, "Confirm the project schedule and save the approved budget first.");
         if (!technicalOptions.includes(input.technical) || !arrangementOptions.includes(input.arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
+        if (input.technical !== (workflow.review.technical ?? technicalOptions[0]) || input.arrangement !== (workflow.review.arrangement ?? arrangementOptions[0]))
+          throw new HttpError(409, "Assessment settings must match the reviewed project information.");
         const { start, end } = workflow.review;
         if (workflow.assessment?.technical !== input.technical || workflow.assessment?.arrangement !== input.arrangement) {
           const estimate = assessInquiry(details, start, end, input.technical, input.arrangement, workflow.review.mixed_use_scope);

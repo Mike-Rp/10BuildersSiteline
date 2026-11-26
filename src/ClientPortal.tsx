@@ -824,11 +824,6 @@ export default function ClientPortal({
             onOpen={() => setSiteDetails(true)} overdueLabel="target date passed" soonLabel="completion date approaching" />}
           {pageContent()}
           {siteDetails && project && <Modal wide title={project.name} subtitle="Project details" onClose={() => setSiteDetails(false)}>{projectDetails()}</Modal>}
-          <div className="workspace-footer">
-            <span>
-              10BuildLine <span>Built for the work ahead.</span>
-            </span>
-          </div>
         </main>
       </div>
       {selectedNotification && <NotificationDetail notification={selectedNotification} saveState={notificationSave}

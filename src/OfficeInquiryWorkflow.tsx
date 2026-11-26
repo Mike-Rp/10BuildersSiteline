@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
-import { Icon } from "./ui"
+import { Icon, Modal } from "./ui"
 import { addDays, initials } from "./model"
 import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
@@ -17,13 +17,14 @@ export type OfficeWorkflow = {
   budget?: number
   budget_history?: { at: string; amount: number }[]
   revisions?: { date: string; note: string }[]
+  proposal_history?: { at: string; before: { date: string | null; note: string }; after: { date: string; note: string } }[]
   assessment?: ReturnType<typeof assessInquiry> & { id: string; completed_at: string }
   signed_contract?: { id: string; name: string }
   contract_locked?: boolean
   staffing?: { contract_file_id?: string }
 }
 export type OfficeRecord = {
-  details: Details; workflow?: OfficeWorkflow; status: string; opm_name?: string; updated_at?: string;
+  details: Details; workflow?: OfficeWorkflow; status: string; opm_name?: string; updated_at?: string; project_id?: string | null;
 }
 type Props = {
   row: OfficeRecord; page: OfficePage; reference: string; consultation: string; busy: boolean; error: string; pendingCount: number; justApproved?: boolean;
@@ -71,6 +72,17 @@ const latestInquiryStart = addDays("9999-12-31", -MIN_INQUIRY_DURATION_DAYS)
 const formatDay = (value: string) => date.format(new Date(value))
 const amount = (value: string | number | undefined) => value ?? "Not provided"
 const assessmentNumber = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 4 })
+const reviewChangeLabels: Record<string, string> = {
+  ...Object.fromEntries(correctionFields), start: "Estimated start", end: "Estimated completion",
+  technical: "Technical requirements", arrangement: "Phase arrangement", amount: "Authorized budget",
+  mixed_use_scope: "Building scope", floorMeasurements: "Floor measurements",
+}
+function reviewChangeValue(key: string, value: string | number | null) {
+  if (value == null || value === "") return "Not provided"
+  if (["start", "end"].includes(key) && /^\d{4}-\d{2}-\d{2}$/.test(String(value))) return formatDay(String(value))
+  if (numericField(key) && Number.isFinite(Number(value))) return assessmentNumber.format(Number(value))
+  return String(value)
+}
 const durationLabel = (days: number) => {
   const months = Math.ceil(days / 30)
   const years = Math.floor(months / 12)
@@ -116,12 +128,16 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const workflow = row.workflow
   const review = workflow?.review
   const assessment = workflow?.assessment
+  const recordLocked = Boolean(assessment || workflow?.staffing || row.project_id)
+  const [assessmentConfirmation, setAssessmentConfirmation] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
+  const workflowNavigation = useRef<HTMLElement>(null)
   const [showApproval, setShowApproval] = useState(justApproved)
   const [fieldError, setFieldError] = useState<{ id: string; message: string }>()
   const reviewForm = useRef<HTMLFormElement>(null)
   const [reviewIssue, setReviewIssue] = useState<{ id: string; message: string }>()
   const [editing, setEditing] = useState(false)
+  const [editingProposal, setEditingProposal] = useState(false)
   const [draft, setDraft] = useState(row.details)
   const [detailsEditing, setDetailsEditing] = useState(false)
   const [detailsStaged, setDetailsStaged] = useState(false)
@@ -140,12 +156,26 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const validStart = /^\d{4}-\d{2}-\d{2}$/.test(start) && start >= earliestStart && start <= latestInquiryStart
   const [reason, setReason] = useState("")
   const [budget, setBudget] = useState(String(workflow?.budget ?? ""))
-  const [technical, setTechnical] = useState(assessment?.technical ?? review?.technical ?? technicalOptions[0])
-  const [arrangement, setArrangement] = useState(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
-  const [decisionDate, setDecisionDate] = useState(today)
-  const [note, setNote] = useState("")
+  const [technical, setTechnical] = useState(assessment?.technical ?? review?.technical ?? "")
+  const [arrangement, setArrangement] = useState(assessment?.arrangement ?? review?.arrangement ?? "")
+  const [decisionDate, setDecisionDate] = useState(() => String(row.details.client_decision_date || today()))
+  const [note, setNote] = useState(() => String(row.details.client_decision_note || ""))
   const [proposalAction, setProposalAction] = useState<"revise" | "withdraw">()
-  useEffect(() => { heading.current?.focus() }, [])
+  useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }) }, [])
+  useLayoutEffect(() => {
+    const navigation = workflowNavigation.current
+    const topbar = navigation?.closest(".main-shell")?.querySelector<HTMLElement>(".topbar")
+    if (!navigation || !topbar) return
+    const updateOffset = () => {
+      const top = Number.parseFloat(window.getComputedStyle(topbar).top) || 0
+      navigation.style.setProperty("--workflow-nav-top", `${topbar.getBoundingClientRect().height + top + 8}px`)
+    }
+    updateOffset()
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateOffset) : undefined
+    observer?.observe(topbar)
+    window.addEventListener("resize", updateOffset)
+    return () => { observer?.disconnect(); window.removeEventListener("resize", updateOffset) }
+  }, [])
   useEffect(() => {
     if (fieldError && /^inquiry-review-floor-level-/.test(fieldError.id)) document.getElementById(fieldError.id)?.focus()
   }, [fieldError, floorPage])
@@ -192,7 +222,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Estimated completion", review ? formatDay(review.end) : "Not provided"],
     ["Classification", row.details.classification || "Normal"],
   ]
-  const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement, review.mixed_use_scope))
+  const preview = review && (assessment || assessInquiry(row.details, review.start, review.end, review.technical ?? technicalOptions[0], review.arrangement ?? arrangementOptions[0], review.mixed_use_scope))
   const currentEstimate = page === "assessment" && review && preview &&
     (assessment ? assessInquiry(row.details, review.start, review.end, preview.technical, preview.arrangement, review.mixed_use_scope) : preview)
   const assessmentBasis = currentEstimate && preview && currentEstimate.size === preview.size && currentEstimate.score === preview.score &&
@@ -201,7 +231,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement, review?.mixed_use_scope) : undefined
   const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
-  const reviewing = editing || !review || review.requires_review || mixedUse && !review.mixed_use_scope
+  const reviewing = !recordLocked && (editing || !review || review.requires_review || mixedUse && !review.mixed_use_scope)
   const compactReview = page === "review" && reviewing
   const showIntakeRecord = page !== "pending" && page !== "received" && !compactReview
   const floorCount = Number(draft.floor_count)
@@ -218,7 +248,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ? { mode: "same", areaPerFloor: perFloor }
     : { mode: "individual", areas: floorInputs }, floorCount, lotArea) : null
   const measuredDraft: Details = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
-  const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
+  const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft) && technical && arrangement
     ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement, mixedUse ? scope : undefined)
     : undefined
   const earliestCompletion = validStart && scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
@@ -243,7 +273,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const editedAreaPerFloor = floorArea.perFloor !== null && areaWasEdited(perFloor)
   const hasCorrections = correctionFields.some(([key]) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, row.details[key]))
   const needsReason = hasCorrections || !!review && (start !== review.start || selectedCompletion !== review.end ||
-    technical !== (review.technical ?? technicalOptions[0]) || arrangement !== (review.arrangement ?? arrangementOptions[0]))
+    technical !== (review.technical ?? "") || arrangement !== (review.arrangement ?? ""))
   const floorState: ReviewItemState = !calculatedArea ? "input" : reviewedItems.floors ? "complete" : "review"
   const datesValid = validStart && !!earliestCompletion && selectedCompletion >= earliestCompletion
   const dateState: ReviewItemState = !datesValid ? "input" : reviewedItems.dates ? "complete" : "review"
@@ -253,6 +283,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const size = compactReview && hasSizeInputs(measuredDraft) ? inquirySize(measuredDraft) : undefined
   const originalSize = size && hasSizeInputs(original) ? inquirySize(original) : undefined
   function startEditing() {
+    if (recordLocked) return
     setDraft(row.details)
     setDetailsEditing(false)
     setDetailsStaged(false)
@@ -346,6 +377,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
       return { id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.` }
     }
+    if (!technical) return { id: fieldId("technical"), message: "Select the technical requirements." }
+    if (!arrangement) return { id: fieldId("arrangement"), message: "Select the project phase arrangement." }
     const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea")
     for (const control of controls) {
       let message = ""
@@ -433,19 +466,23 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </Card>
   </div>
   const backToInquiries = <button type="button" className="button office-workflow-back" disabled={busy} onClick={back}>{"\u2190 Back"}</button>
+  const projectInformationAction = <div className="office-workflow-actions office-record-actions">
+    <button type="button" className="button primary" disabled={busy} onClick={() => navigate(accepted ? "review" : "proposal")}>
+      {accepted ? "Review project information" : "Open client proposal"} <Icon name="arrow" size={17} />
+    </button>
+  </div>
   const steps = [
     ["accepted", "Accepted inquiry", true, true],
     ["proposal", "Client proposal", true, accepted],
     ["review", "Project information & budget", accepted, assessmentAvailable],
     ["assessment", "Project assessment", assessmentAvailable, Boolean(assessment)],
   ] as const
-  const workflowNav = <nav className="office-workflow-nav office-intake-record-nav" aria-label="Inquiry workflow">
+  const workflowNav = <nav ref={workflowNavigation} className="office-workflow-nav office-intake-record-nav" aria-label="Inquiry workflow">
     {steps.map(([key, label, enabled, complete], index) => {
-      const locked = assessmentAvailable && key !== "assessment"
-      return <button type="button" className="button" key={key} disabled={busy || !enabled || locked}
+      return <button type="button" className="button" key={key} disabled={busy || !enabled}
         aria-current={page === key ? "step" : undefined} onClick={() => navigate(key)}>
         <span className="office-intake-step-marker" data-complete={complete} aria-hidden="true">{complete ? <Icon name="check" size={14} /> : index + 1}</span>
-        <span><strong>{label}</strong><small>{locked ? "Complete · Locked" : page === key ? "Viewing now" : complete ? "Complete" : enabled ? "Available" : "Unavailable"}</small></span>
+        <span><strong>{label}</strong><small>{recordLocked ? "Locked · View only" : page === key ? "Viewing now" : complete ? "Complete · View" : enabled ? "Available" : "Unavailable"}</small></span>
       </button>
     })}
   </nav>
@@ -461,22 +498,27 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       </div>}
     </div>}
     {showIntakeRecord ? <section className="office-intake-record">
-      <div className="office-intake-record-toolbar">
-        <span className="inquiry-muted">Inquiry reference {reference}</span>
-        <span className={`inquiry-pill ${accepted ? "ready" : "pending"}`}>{accepted ? "Proposal approved" : "Proposal decision pending"}</span>
-      </div>
       <header className="office-intake-record-header">
-        <div><h1 ref={heading} tabIndex={-1}>{name}</h1>
-          <p>{[row.details.project_type, row.details.client_name, row.details.address].filter(Boolean).join(" · ")}</p>
+        <div className="office-project-summary-title">
+          <h1 ref={heading} tabIndex={-1}>{name}</h1>
+          <span className={`inquiry-pill ${accepted ? "ready" : "pending"}`}>{accepted ? "Proposal approved" : "Proposal decision pending"}</span>
         </div>
-        <Facts values={[
-          ["Office PM", row.opm_name || "Assigned Office PM"],
-          ...(row.updated_at && Number.isFinite(Date.parse(row.updated_at))
-            ? [["Last updated", new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(row.updated_at))] as [string, string]] : []),
-        ]} />
+        <div className="office-project-summary-details">
+          {row.details.project_type && <span className="office-project-type-tag">{row.details.project_type}</span>}
+          {row.details.client_name && <span>{row.details.client_name}</span>}
+          {row.details.address && <span>{row.details.address}</span>}
+        </div>
+        <div className="office-project-summary-meta">
+          <p className="office-project-reference"><span>Inquiry reference</span><span>{reference}</span></p>
+          <Facts values={[
+            ["Office PM", row.opm_name || "Assigned Office PM"],
+            ...(row.updated_at && Number.isFinite(Date.parse(row.updated_at))
+              ? [["Last updated", new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(row.updated_at))] as [string, string]] : []),
+          ]} />
+        </div>
       </header>
-      {workflowNav}
     </section> : null}
+    {showIntakeRecord && workflowNav}
     {!compactReview && !showIntakeRecord && <header className="office-workflow-heading">
       <div><p className="inquiry-muted">Inquiry reference {reference}</p><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{descriptions[page]}</p></div>
     </header>}
@@ -511,18 +553,16 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     {page === "accepted" && <>
       <header className="office-intake-section-heading">
         <div><span className="inquiry-pill ready">Inquiry accepted</span><h2>Review the client and project record</h2></div>
-        <button type="button" className="button primary" disabled={busy} onClick={() => navigate(accepted ? "review" : "proposal")}>
-          {accepted ? "Review project information" : "Open client proposal"} <Icon name="arrow" size={17} />
-        </button>
       </header>
       <Notice tone={accepted ? "success" : "warning"}>
         <strong>{accepted ? "Client proposal approved" : "Awaiting client proposal approval"}</strong>
         <p>{accepted ? "Review the project information to continue." : "Project information is read-only until the client approves the proposal."}</p>
       </Notice>
       {recordCards}
+      {projectInformationAction}
     </>}
 
-    {page === "proposal" && <div className="office-workflow-grid office-proposal-grid">
+    {page === "proposal" && <><div className="office-workflow-grid office-proposal-grid">
       <Card title="Proposal decision" icon="doc">
         <div className="office-proposal-summary">
           <span className="inquiry-list-icon" aria-hidden="true">{initials(name)}</span>
@@ -568,16 +608,28 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <p>{assessmentAvailable ? "The project information and budget are saved. Project assessment is available."
               : "Review the project information and save the authorized budget to unlock assessment."}</p>
           </Notice>
-          {row.details.client_decision_date && <Facts values={[["Decision confirmed", formatDay(String(row.details.client_decision_date))]]} />}
-          {row.details.client_decision_note && <div className="office-proposal-scope"><h3>Internal note</h3><p>{row.details.client_decision_note}</p></div>}
-          <div className="office-workflow-actions">
-            <button className="button primary" type="button" disabled={busy} onClick={() => navigate("review")}>
-              Review project information <Icon name="arrow" size={17} />
-            </button>
-          </div>
+          {editingProposal && !recordLocked ? <form onSubmit={event => {
+            event.preventDefault()
+            save("proposal_details", { decision_date: decisionDate, decision_note: note })
+            setEditingProposal(false)
+          }}><fieldset className="office-workflow-form" disabled={busy}>
+            <label>Client decision date<DatePicker calendarTitle="Client decision date" required max={today()} value={decisionDate} onValueChange={setDecisionDate} /></label>
+            <label>Internal note (optional)<textarea maxLength={1000} value={note} onChange={event => setNote(event.target.value)} /></label>
+            <div className="office-workflow-actions">
+              <button type="button" className="button" onClick={() => { setDecisionDate(String(row.details.client_decision_date || today())); setNote(String(row.details.client_decision_note || "")); setEditingProposal(false) }}>Cancel editing</button>
+              <button type="submit" className="button primary" disabled={!decisionDate || decisionDate > today()}>Save changes</button>
+            </div>
+          </fieldset></form> : <>
+            {row.details.client_decision_date && <Facts values={[["Decision confirmed", formatDay(String(row.details.client_decision_date))]]} />}
+            {row.details.client_decision_note && <div className="office-proposal-scope"><h3>Internal note</h3><p>{row.details.client_decision_note}</p></div>}
+            {!recordLocked && <button type="button" className="button" disabled={busy} onClick={() => setEditingProposal(true)}>Edit client decision details</button>}
+          </>}
+          {!!workflow?.proposal_history?.length && <details className="office-workflow-history"><summary>Decision detail changes</summary>
+            <ol>{workflow.proposal_history.map((change, index) => <li key={index}>{formatDay(change.at)} · Decision date: {change.before.date || "Not recorded"} to {change.after.date}; note updated.</li>)}</ol>
+          </details>}
         </>}
       </Card>
-    </div>}
+    </div>{accepted && projectInformationAction}</>}
 
     {page === "review" && <>
       <div className={reviewing ? "office-review-layout" : undefined}>
@@ -616,7 +668,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 setDetailsEditing(true)
               }}>Edit project details</button>}
           </div>
-          <section className="office-workflow-subsection" aria-labelledby={fieldId("client-information")}>
+          <section className="office-workflow-subsection office-review-client-information" aria-labelledby={fieldId("client-information")}>
             <h3 id={fieldId("client-information")}>Client information <span className="inquiry-pill">Read only</span></h3>
             <p className="office-review-field-helper">Provided by Admin. Client corrections follow the existing approval process.</p>
             <Facts values={clientFacts} />
@@ -711,12 +763,12 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           {([
             ["Technical requirements", "review-technical", technicalOptions, technical, setTechnical],
             ["Project phase arrangement", "review-arrangement", arrangementOptions, arrangement, setArrangement],
-          ] as const).map(([label, group, options, value, select]) => <fieldset key={group} className="office-review-options office-review-item" data-review-state={reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"}>
-            <legend>{label} <ReviewItemStatus state={reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"} /></legend>
-            {!reviewedItems[group === "review-technical" ? "technical" : "arrangement"] && <p className="office-review-field-helper">Select an option to mark this section reviewed.</p>}
+          ] as const).map(([label, group, options, value, select]) => <fieldset key={group} className="office-review-options office-review-item" data-review-state={!value ? "input" : reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"}>
+            <legend>{label} <ReviewItemStatus state={!value ? "input" : reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"} /></legend>
+            {!value && <p className="office-review-field-helper">Select one option to continue.</p>}
             {mixedUse && group === "review-technical" && <p>Choose based on specialized systems. Podium, tower, and curtain wall are scored from Construction features.</p>}
-            <div>{options.map(option => <label key={option}>
-              <input type="radio" name={group} value={option} checked={value === option}
+            <div>{options.map((option, index) => <label key={option}>
+              <input id={index === 0 ? fieldId(group === "review-technical" ? "technical" : "arrangement") : undefined} type="radio" name={group} value={option} checked={value === option} required
                 onClick={() => markReviewed(group === "review-technical" ? "technical" : "arrangement")}
                 onChange={() => { select(option); setEnd(""); setReviewedItems(previous => ({ ...previous, [group === "review-technical" ? "technical" : "arrangement"]: true, dates: false })) }} />
               {option}
@@ -755,7 +807,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div className={`office-workflow-fields office-review-budget${needsReason ? "" : " single"}`}>
               {budgetFields}
               {needsReason && <div className="office-review-reason">
-                <label htmlFor={fieldId("reason")}>Reason for changes</label>
+                <label htmlFor={fieldId("reason")}>Reason for changes <span className="office-required-mark" aria-hidden="true">*</span></label>
                 <textarea {...describedField(fieldId("reason"), reason.length > 0 && !reason.trim() ? "inquiry-review-reason-error" : undefined)}
                   aria-invalid={reason.length > 0 && !reason.trim() || fieldError?.id === fieldId("reason") || undefined}
                   required rows={5} maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} />
@@ -769,7 +821,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span className="inquiry-list-icon"><Icon name="clock" /></span>
               <div><span>Estimated project duration</span>
                 <strong>{scheduleEstimate?.planningDays != null && Number.isFinite(scheduleEstimate.planningDays)
-                  ? `${scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days` : "Pending measurements"}</strong>
+                  ? `${scheduleEstimate.planningDays.toLocaleString("en-PH")} calendar days` : !technical || !arrangement ? "Select technical requirements and phase arrangement" : "Pending measurements"}</strong>
                 {scheduleEstimate && <span>{scheduleEstimate.complexity} complexity</span>}
               </div>
             </div>
@@ -781,8 +833,8 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 setEditing(false)
                 setStart(review?.start ?? String(row.details.anticipated_start ?? ""))
                 setEnd(review?.end ?? "")
-                setTechnical(assessment?.technical ?? review?.technical ?? technicalOptions[0])
-                setArrangement(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
+                setTechnical(assessment?.technical ?? review?.technical ?? "")
+                setArrangement(assessment?.arrangement ?? review?.arrangement ?? "")
                 setBudget(String(workflow?.budget ?? ""))
                 if (review?.mixed_use_scope) setScope(review.mixed_use_scope)
                 setReason("")
@@ -793,73 +845,87 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             </div>
           </div>
         </fieldset> : <fieldset className="office-workflow-form office-reviewed-intake" disabled={busy}>
-          <Card title="Reviewed intake details" icon="building" actions={
-            <button type="button" className="button" onClick={startEditing}>Edit project information</button>
-          }>
+          <Card title="Reviewed intake details" icon="building" actions={!recordLocked
+            ? <button type="button" className="button" onClick={startEditing}>Edit project information</button>
+            : undefined}>
             <Facts values={[
               ["Lot area (m²)", amount(row.details.lot_area)],
               ["Number of floors", amount(row.details.floor_count)],
               ["Total floor area (m²)", amount(row.details.floor_area_sqm)],
               ["Authorized budget", workflow?.budget == null ? "Not saved" : currency.format(workflow.budget)],
               ["Technical requirements", review?.technical ?? technicalOptions[0]],
+              ["Phase arrangement", review?.arrangement ?? "Not recorded"],
             ]} />
-            <details className="office-workflow-history"><summary>Client information and schedule</summary>
-              <Facts values={[...clientFacts, ...projectFacts.filter(([label]) =>
-                ["Project address / location", "Estimated start", "Estimated completion", "Classification"].includes(label))]} />
-              {row.details.overview && <p>{row.details.overview}</p>}
+            <details className="office-workflow-history" open><summary>Client information and schedule</summary>
+              <div className="office-reviewed-record-groups">
+                <section className="office-reviewed-record-group" aria-labelledby="reviewed-client-heading">
+                  <h3 id="reviewed-client-heading">Client details</h3>
+                  <Facts values={clientFacts} />
+                </section>
+                <section className="office-reviewed-record-group" aria-labelledby="reviewed-schedule-heading">
+                  <h3 id="reviewed-schedule-heading">Project location and schedule</h3>
+                  <Facts values={projectFacts.filter(([label]) =>
+                    ["Project address / location", "Estimated start", "Estimated completion", "Classification"].includes(label))} />
+                  {row.details.overview && <div className="office-reviewed-overview"><h4>Project overview</h4><p>{row.details.overview}</p></div>}
+                </section>
+              </div>
             </details>
-          <details className="office-workflow-history" open={!budgetSaved || undefined}>
+          <details className="office-workflow-history office-reviewed-budget" open>
             <summary>Budget allocation</summary>
-            {budgetFields}
+            {recordLocked ? <Facts values={[
+              ["Estimated project cost", costEstimate ? `${wholePeso.format(costEstimate.minimum)}–${wholePeso.format(costEstimate.maximum)}` : "Not available"],
+              ["Authorized budget", workflow?.budget == null ? "Not saved" : currency.format(workflow.budget)],
+            ]} /> : budgetFields}
             {!!workflow?.budget_history?.length && <details className="office-workflow-history"><summary>Budget change history</summary>
               <ul>{workflow.budget_history.map(({ at, amount }, index) => <li key={index}>{formatDay(at)} · {currency.format(amount)}</li>)}</ul>
             </details>}
           </details>
-          <div className="office-workflow-actions office-workflow-action-bar">
-            {budgetSaved
-              ? <p className="inquiry-muted">Update the reviewed schedule to continue to assessment.</p>
+          {!(budgetSaved && assessmentAvailable) && <div className="office-workflow-actions office-workflow-action-bar">
+            {budgetSaved ? <>
+                  <p className="inquiry-muted">The saved schedule needs review before project assessment.</p>
+                  {!recordLocked && <button type="button" className="button primary" onClick={startEditing}>Review project schedule</button>}
+                </>
               : <button type="submit" className="button primary" disabled={!costEstimate || Boolean(budgetError)}>Save allocated budget</button>}
-          </div>
+          </div>}
           </Card>
           {signedContract}
+          {budgetSaved && assessmentAvailable && <div className="office-workflow-actions office-workflow-action-bar">
+            <button type="button" className="button primary" onClick={() => navigate("assessment")}>
+              {assessment ? "View project assessment" : "Continue to project assessment"} <Icon name="arrow" size={17} />
+            </button>
+          </div>}
         </fieldset>}
       </form>
       </div>
-      {!!workflow?.review_history?.length && <details className="office-workflow-history"><summary>Project information audit history</summary>
-        <ol>{workflow.review_history.map(event => <li key={event.version}>
-          <strong>Version {event.version} · {formatDay(event.at)}</strong> {event.reason || "Information confirmed"}
-          {!!Object.keys(event.changes).length && <ul>{Object.entries(event.changes).map(([key, change]) =>
-            <li key={key}>{key.replace(/_/g, " ")} changed from {amount(change.before ?? undefined)} to {amount(change.after ?? undefined)}</li>)}</ul>}
+      {!!workflow?.review_history?.length && <details className="office-workflow-history office-review-audit">
+        <summary><span>Project information audit history <span className="office-review-audit-count">{workflow.review_history.length}</span></span><Icon name="chevron" size={22} /></summary>
+        <ol className="office-review-audit-entries">{[...workflow.review_history].reverse().map(event => <li key={event.version}>
+          <header><strong>Version {event.version}</strong><time dateTime={event.at}>{formatDay(event.at)}</time></header>
+          {event.reason?.trim() && <p className="office-review-audit-reason">{event.reason}</p>}
+          {Object.keys(event.changes).length ? <div className="office-review-audit-table-wrap"><table>
+            <caption className="sr-only">Changes in version {event.version}</caption>
+            <thead><tr><th scope="col">Field</th><th scope="col">Previous value</th><th scope="col">New value</th></tr></thead>
+            <tbody>{Object.entries(event.changes).map(([key, change]) => <tr key={key}>
+              <th scope="row">{reviewChangeLabels[key] ?? key.replace(/_/g, " ")}</th>
+              <td>{reviewChangeValue(key, change.before)}</td><td>{reviewChangeValue(key, change.after)}</td>
+            </tr>)}</tbody>
+          </table></div> : <p className="office-review-audit-empty">Information confirmed. No field changes.</p>}
         </li>)}</ol>
       </details>}
     </>}
 
     {page === "assessment" && preview && review && <>
     <header className="office-intake-section-heading">
-      <div><h2>{title}</h2><p className="inquiry-muted">{descriptions.assessment}</p></div>
-      <div className="office-workflow-actions">
-        {!assessment && <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
-          onClick={() => save("assessment", { technical, arrangement })}>Complete assessment</button>}
-        <button type="button" className="button primary" disabled={busy || !assessment || !hasSignedContract}
-          aria-describedby={(!assessment || !hasSignedContract) ? "inquiry-contract-requirement" : undefined}
-          onClick={() => { if (!busy && assessment && hasSignedContract) startStaffing() }}>
-          Continue to construction phases</button>
-        {(!assessment || !hasSignedContract) && <p id="inquiry-contract-requirement" className="inquiry-muted" role="status">
-          {!assessment ? "Complete the assessment first." : "Upload the signed client contract."}
-        </p>}
-      </div>
+      <div><h2>{title}</h2></div>
     </header>
     {assessmentNeedsDates && <Notice tone="warning">
       <p>{minimumReviewedEnd
         ? `This assessment requires a completion date of ${formatDay(minimumReviewedEnd)} or later.`
-        : "The estimated completion is outside the supported date range."} Choose assessment settings that fit the saved schedule.</p>
-      <button type="button" className="button" onClick={() => {
-        setTechnical(review.technical ?? technicalOptions[0])
-        setArrangement(review.arrangement ?? arrangementOptions[0])
-      }}>Restore reviewed settings</button>
+        : "The estimated completion is outside the supported date range."} Update the schedule in Project information &amp; budget.</p>
+      <button type="button" className="button" onClick={() => navigate("review")}>Review project information</button>
     </Notice>}
     <div className="office-workflow-grid assessment">
-      <Card title="Project size classification" icon="building" assessmentMetric="size">
+      <Card title="Project size" icon="building" assessmentMetric="size">
         <Facts values={[
           ["Project type", amount(row.details.project_type)],
           ["Lot area", row.details.lot_area ? `${assessmentNumber.format(Number(row.details.lot_area))} m²` : "Not provided"],
@@ -867,22 +933,22 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           ["Floors", amount(row.details.floor_count)],
         ]} />
         <div className="office-workflow-result office-assessment-size">
-          <div><span>Classification</span><strong>{preview.size}</strong>
-            <p>{assessmentBasis ? "Uses the higher size category from the reviewed lot area and total floor area."
-              : "Size recorded when this assessment was completed."}</p>
-          </div>
+          <div><span>Classification</span><strong>{preview.size}</strong></div>
           <span className="office-assessment-size-mark" aria-hidden="true">{preview.size.charAt(0)}</span>
         </div>
         {projectSizes.includes(preview.size) && <ul className="office-assessment-size-scale" aria-label="Project size categories">
           {projectSizes.map(size => <li key={size} aria-current={size === preview.size ? "true" : undefined}>{size}</li>)}
         </ul>}
-        {assessmentBasis?.size === "Large" && <p className="office-assessment-size-note">Large if the lot exceeds {assessmentNumber.format(assessmentBasis.medium[0])} m² or the total floor area exceeds {assessmentNumber.format(assessmentBasis.medium[1])} m² for this project type.</p>}
+        {assessmentBasis && <details className="office-assessment-basis office-assessment-toggle"><summary>Size criteria <Icon name="chevron" size={22} /></summary>
+          <p>Uses the higher category from lot area and total floor area.</p>
+          {assessmentBasis.size === "Large" && <p>Large: lot over {assessmentNumber.format(assessmentBasis.medium[0])} m² or floor area over {assessmentNumber.format(assessmentBasis.medium[1])} m².</p>}
+        </details>}
       </Card>
-      <Card title="Complexity classification" icon="doc" assessmentMetric="complexity">
-        <fieldset className="office-workflow-form" disabled={busy || !!assessment}>
-          <label>Technical requirements<select value={technical} onChange={event => setTechnical(event.target.value)}>{technicalOptions.map(option => <option key={option}>{option}</option>)}</select></label>
-          <label>Project phase arrangement<select value={arrangement} onChange={event => setArrangement(event.target.value)}>{arrangementOptions.map(option => <option key={option}>{option}</option>)}</select></label>
-        </fieldset>
+      <Card title="Complexity" icon="doc" assessmentMetric="complexity">
+        <Facts values={[
+          ["Technical requirements", preview.technical],
+          ["Phase arrangement", preview.arrangement],
+        ]} />
         <div className="office-workflow-result office-assessment-complexity">
           <div className="office-assessment-ring" style={{ backgroundImage: `conic-gradient(#755294 ${preview.score / 15 * 100}%, #dfd9e6 0)` }}>
             <span>{preview.score}<small>/ 15</small></span>
@@ -904,28 +970,49 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <p>Low is 4–7 points, Moderate is 8–11, and High is 12–15.</p>
         </details> : <p>Planning score recorded when this assessment was completed.</p>}
       </Card>
-      <Card title="Estimated project duration" icon="clock" assessmentMetric="duration">
+      <Card title="Estimated duration" icon="clock" assessmentMetric="duration">
         <div className="office-workflow-result duration">
           {preview.planningDays != null && <><strong>About {durationLabel(preview.planningDays)}</strong>
-            <span>{preview.planningDays.toLocaleString("en-PH")} estimated calendar days</span></>}
-          {preview.durationMultiplier != null && <p>Schedule multiplier ×{preview.durationMultiplier.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</p>}
+            <span>{preview.planningDays.toLocaleString("en-PH")} calendar days · Preliminary</span></>}
         </div>
         <div className="office-assessment-schedule">
           <Facts values={[["Reviewed start", formatDay(review.start)], ["Reviewed completion", formatDay(review.end)]]} />
           <div className="office-assessment-date-line" aria-hidden="true" />
-          <p>{preview.durationDays.toLocaleString("en-PH")} reviewed calendar days</p>
-          {preview.suggestedEnd && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
+          {preview.suggestedEnd && preview.suggestedEnd !== review.end && <p>Suggested completion: {formatDay(preview.suggestedEnd)}</p>}
         </div>
-        {assessmentBasis && <details className="office-assessment-basis"><summary>View duration calculation</summary>
+        {assessmentBasis && <details className="office-assessment-basis office-assessment-toggle"><summary>View duration calculation <Icon name="chevron" size={22} /></summary>
           <p>({assessmentNumber.format(Number(row.details.floor_area_sqm))} m² × {assessmentBasis.rate} days/m² + {assessmentNumber.format(assessmentBasis.extraFloorDays)} days for floors above the first) × {assessmentBasis.complexityFactor} × {assessmentBasis.overlapFactor}, rounded up.</p>
           <p>The ×{assessmentBasis.complexityFactor} factor reflects {assessmentBasis.baselineComplexity.toLowerCase()} complexity before adding overlap points. The ×{assessmentBasis.overlapFactor} factor reflects the selected phase arrangement.</p>
         </details>}
-        {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>{!hasSignedContract
-          ? "Attach the signed client contract below to continue to Site PM staffing."
-          : "Review construction phases to continue to Site PM staffing."}</p></Notice>}
       </Card>
     </div>
     {signedContract}
+    {assessment && <Notice tone="success"><strong>Assessment saved</strong></Notice>}
+    <div className="office-workflow-actions office-assessment-actions">
+      {!assessment && <button type="button" className="button primary" disabled={busy || assessmentNeedsDates}
+        onClick={() => setAssessmentConfirmation(true)}>Save assessment</button>}
+      {assessment && <button type="button" className="button primary" disabled={busy || !hasSignedContract}
+        aria-describedby={!hasSignedContract ? "inquiry-contract-requirement" : undefined}
+        onClick={() => { if (!busy && assessment && hasSignedContract) startStaffing() }}>
+        Set up construction phases <Icon name="arrow" size={17} /></button>}
+      {assessment && !hasSignedContract && <p id="inquiry-contract-requirement" className="inquiry-muted" role="status">
+        Upload the signed client contract to continue.
+      </p>}
+    </div>
+    {assessmentConfirmation && <Modal title={assessment ? "Assessment locked" : "Save and lock assessment?"}
+      onClose={() => { if (!busy) setAssessmentConfirmation(false) }}
+      footer={assessment ? <>
+        <button type="button" className="button" disabled={busy} onClick={() => setAssessmentConfirmation(false)}>View assessment</button>
+        <button type="button" className="button primary" disabled={busy || !hasSignedContract} onClick={() => { setAssessmentConfirmation(false); startStaffing() }}>Set up construction phases <Icon name="arrow" size={17} /></button>
+      </> : <>
+        <button type="button" className="button" disabled={busy} onClick={() => setAssessmentConfirmation(false)}>Keep reviewing</button>
+        <button type="button" className="button primary" disabled={busy || assessmentNeedsDates} onClick={() => save("assessment", { technical: preview.technical, arrangement: preview.arrangement })}>{busy ? "Saving…" : "Save and lock"}</button>
+      </>}>
+      <p>{assessment ? "All four setup steps are now view only. Continue to construction phase setup."
+        : "This locks the proposal, project information, budget, and assessment. You can still view all four steps, but you cannot edit them after saving."}</p>
+      {assessment && !hasSignedContract && <p>Upload the signed client contract to continue.</p>}
+      {error && <p role="alert" className="office-workflow-error">{error}</p>}
+    </Modal>}
     </>}
   </div>
 }

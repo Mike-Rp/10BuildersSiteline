@@ -213,7 +213,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(correctionPath,{token,json:requestCorrection,status:409})
   const submittedRecord = (await call(root,{token})).find(item=>item.id===row.id)
   assert.equal(submittedRecord.details.client_name,details.client_name)
-  await save('review',0,{start:'2027-01-12',end:'2027-08-15',correction:{client_name:'Unauthorized edit'}},403)
+  await save('review',0,{start:'2027-01-12',end:'2027-08-15',technical:"Several specialized systems",arrangement:"Partially overlapping phases",correction:{client_name:'Unauthorized edit'}},403)
   const planning = `${root}/${row.id}/planning`
   const intake = {...details,floor_area_sqm:200,target_start_date:"2027-01-12",target_end_date:"2027-08-15"}
   await call(planning,{token,status:409,json:intake})
@@ -246,8 +246,6 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await save("budget",2,{amount:4319999.99},422)
   const updatedBudget = 4800000
   assert.equal((await save("budget",2,{amount:updatedBudget})).workflow.budget,updatedBudget)
-  await save("review",2,{...correction,reason:"Attempt another correction after review and budget."},409)
-  await save("budget",2,{amount:4500000},409)
   const assessed = (await save("assessment",2,assessmentInput)).workflow
   assert.equal(assessed.assessment.durationDays,215)
   assert.equal(assessed.assessment.size,"Medium")
@@ -257,7 +255,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(assessed.budget_history[0].amount,updatedBudget)
   await save("review",2,{...schedule,reason:"Attempt an edit after assessment."},409)
   await save("budget",2,{amount:4500000},409)
-  assert.equal((await save("assessment",2,assessmentInput)).workflow.assessment.id,assessed.assessment.id)
+  await save("assessment",2,assessmentInput,409)
+  await save("proposal_details",2,{decision_date:"2026-11-27",decision_note:"Attempt to edit a locked proposal."},409)
   const adminRecord = (await call(root,{token:admin})).find(item=>item.id===row.id)
   assert.equal(adminRecord.workflow,undefined)
   assert.equal(adminRecord.details.opm_workflow,undefined)

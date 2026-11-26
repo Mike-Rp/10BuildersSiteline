@@ -271,7 +271,7 @@ export function Modal({
   footer,
 }: {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   children: ReactNode
   onClose: () => void
   wide?: boolean

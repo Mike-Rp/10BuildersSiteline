@@ -72,7 +72,7 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
     {!data && !error && <p role="status">Loading client account…</p>}
     {data?.clients.map(client => <div className="project-client-account-record" key={client.id}>
       <strong>{client.full_name}</strong><span>{client.email}</span>
-      <span>{client.activation_status ? clientActivationLabel(client.activation_status)
+      <span className={`project-client-account-status ${client.activation_status === "active" || !client.activation_status && client.status === "active" ? "active" : "pending"}`}>{client.activation_status ? clientActivationLabel(client.activation_status)
         : client.status === "active" ? "Active" : client.status === "invited" ? "Awaiting first sign-in" : "Account needs attention"}</span>
     </div>)}
     {data && !data.clients.length && <p>{data.next_action === "request_email_correction"
@@ -96,8 +96,8 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
       <label><input type="checkbox" checked={ownershipVerified} onChange={event => setOwnershipVerified(event.target.checked)} disabled={busy} /> I verified that this client owns the registered email.</label>
       <Button type="submit" variant="primary" disabled={!ownershipVerified || busy}>Link verified account</Button>
     </form>}
-    {data?.can_issue_activation_code && <div>
-      <p>Verify the client’s identity before sharing their activation code privately. The client sets their own SiteLine password.</p>
+    {data?.can_issue_activation_code && <div className="project-client-activation-action">
+      <p>Verify the client’s identity, then share the code privately so they can set their password.</p>
       {!activation && <Button disabled={busy} onClick={() => void run(async () => {
         setActivation(await api<ActivationCode>(`${path}/activation-code`, { method: "POST", json: {} }))
       })}>{busy ? "Issuing code…" : "Issue activation code"}</Button>}

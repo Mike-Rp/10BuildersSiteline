@@ -1,8 +1,7 @@
 import ClientCorrections from "./ClientCorrections"
 import ProjectClientAccount from "./ProjectClientAccount"
 import InquiryClientFields from "./InquiryClientFields"
-import { useEffect, useRef, useState, type ReactNode } from "react"
-import { createPortal } from "react-dom"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { ApiError, api, downloadBlob } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
@@ -13,7 +12,6 @@ import { ListPager, runList, updateListQuery, useListMemory } from "./ListContro
 import { withPage } from "./listing"
 import InfoPopover from "./InfoPopover"
 import type { IntakeView } from "./intake-guidance"
-import StaffingPeak from "./StaffingPeak"
 import { DEFAULT_SETUP_SPM_COUNT, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
@@ -295,17 +293,17 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
     <div className="inquiry-lineup-lead">
       {lead ? <>
         <strong>Proposed Lead SPM · {phaseCandidate(lead.stage, lead.id)?.name || "Site PM"}</strong>
-        <p>{lead.stage} · {years.format(lead.years)} of relevant experience</p>
-        <p><AssignedScopeMatch assigned={lead.tags} qualified={phaseCandidate(lead.stage, lead.id)?.qualifiedTags ?? []} /> {lead.tags.join(", ")}</p>
+        <span className="inquiry-lineup-lead-meta">{lead.stage} · {years.format(lead.years)} experience</span>
       </> : <p>Assign an eligible Site PM to the first included phase to propose a lead.</p>}
     </div>
     <div className="inquiry-lineup-table">
       <table>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Assigned scope match</th><th scope="col">Designation</th></tr></thead>
+        <colgroup><col style={{ width: "16%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "11%" }} /><col style={{ width: "30%" }} /><col style={{ width: "14%" }} /></colgroup>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Experience</th><th scope="col">Scope match</th><th scope="col">Scope coverage</th><th scope="col">Designation</th></tr></thead>
         <tbody>{phases.flatMap(stage => {
           const entry = team.find(item => item.stage === stage)
           const assigned = entry?.engineers ?? (entry?.user_id ? [{ user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines }] : [])
-          if (!assigned.length) return <tr key={stage}><td>{stage}</td><td colSpan={4}>Unfilled</td></tr>
+          if (!assigned.length) return <tr key={stage}><td data-label="Phase">{stage}</td><td data-label="Assignment" colSpan={5}>Unfilled</td></tr>
           const ordered = lead?.stage === stage
             ? [...assigned.filter(person => person.user_id === lead.id), ...assigned.filter(person => person.user_id !== lead.id)]
             : assigned
@@ -315,20 +313,20 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
             const designation = entry?.user_id === id && lead?.stage !== stage ? "Phase coordinator" : "Phase SPM"
             const tags = matchingInquiryTags(assigned_disciplines, phaseCandidate(stage, id)?.qualifiedTags ?? [])
             return <tr key={`${stage}:${id}`} data-lead={isLead}>
-              <td>{stage}</td><td>{person?.name || "Site PM"}</td>
-              <td>{person?.experienceYears == null ? "—" : years.format(Number(person.experienceYears))}</td>
-              <td><AssignedScopeMatch assigned={assigned_disciplines} qualified={person?.qualifiedTags ?? []} /> {tags.join(", ")}</td>
-              <td>{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
+              <td data-label="Phase">{stage}</td><td data-label="Assigned Site PM"><strong className="inquiry-lineup-name">{person?.name || "Site PM"}</strong></td>
+              <td data-label="Experience">{person?.experienceYears == null ? "—" : years.format(Number(person.experienceYears))}</td>
+              <td data-label="Scope match"><AssignedScopeMatch compact assigned={assigned_disciplines} qualified={person?.qualifiedTags ?? []} /></td>
+              <td data-label="Scope coverage">{tags.join(", ")}</td>
+              <td data-label="Designation">{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
             </tr>
           })
         })}</tbody>
       </table>
     </div>
-    <p className="inquiry-muted">The Lead is the eligible engineer assigned to the first included phase with the most relevant project-type experience. Ties use account ID. The Lead accepts first and manages subcontractor allocation once the project is ready.</p>
   </section>
 }
 
-function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck, scopeOptions, onAddScope,
+function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck,
   phaseRange, leadRange, leadId, unavailable, backup, onBackup }: {
   stage: string
   entry?: Phase
@@ -339,8 +337,6 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   setAdding: (value: boolean) => void
   onChange: (entry: Phase) => void
   onRecheck: () => void
-  scopeOptions?: string[]
-  onAddScope: (scope: string) => Promise<unknown>
   phaseRange?: PhaseDates[string]
   leadRange?: PhaseDates[string]
   leadId?: string
@@ -348,13 +344,13 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   backup?: string
   onBackup: (id: string) => void
 }) {
-  const [scope, setScope] = useState("")
+  const [editingEngineer, setEditingEngineer] = useState<{ originalId: string; draft: Engineer }>()
+  const [removingEngineer, setRemovingEngineer] = useState<{ id: string; name: string }>()
   const multi = !!suggested?.engineers
   const engineers = entry?.engineers ?? (entry?.user_id ? [
     { user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines || [] },
   ] : [])
   const required = requiredAreas(suggested)
-  const newScopes = scopeOptions?.filter(value => !required.includes(value)) ?? []
   const owners = new Map(required.flatMap(area => {
     const names = engineers.filter(person => person.assigned_disciplines.includes(area))
       .map(person => choices.find(candidate => candidate.id === person.user_id && candidate.qualifiedTags.includes(area))?.name)
@@ -416,7 +412,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
       {withoutEligibleMatch.size > 0 && <><br /><button type="button" className="button" onClick={onRecheck}>Recheck eligibility</button></>}
     </p>}
     <div className={`inquiry-staff-layout${required.length ? " with-coverage" : ""}`}>
-    {(required.length > 0 || newScopes.length > 0) && <aside className="inquiry-summary-card inquiry-phase-coverage">
+    {required.length > 0 && <aside className="inquiry-summary-card inquiry-phase-coverage">
       <h4>Phase scope coverage</h4>
       <ul>{required.map(area => {
         const owner = owners.get(area)
@@ -425,15 +421,8 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
           <span>{area}</span><strong>{owner || (withoutEligibleMatch.has(area) ? "No eligible Site PM found" : "Unassigned")}</strong>
         </li>
       })}</ul>
-      {newScopes.length > 0 && <div className="inquiry-form-stack">
-        <label>Additional engineering scope<select value={newScopes.includes(scope) ? scope : ""} onChange={event => setScope(event.target.value)}>
-          <option value="">Select a scope</option>
-          {newScopes.map(value => <option key={value}>{value}</option>)}
-        </select></label>
-        <button type="button" className="button" disabled={!newScopes.includes(scope)} onClick={() => void onAddScope(scope)}>Add scope</button>
-      </div>}
     </aside>}
-    <div className="inquiry-form-stack">
+    <div className="inquiry-form-stack inquiry-assigned-panel">
     <div className="inquiry-staff-heading">
       <strong>Assigned engineers · {engineers.length}</strong>
       {!adding && !atLimit && choices.length > 0 && <button className="button inquiry-add-engineer" type="button" disabled={!addOptions.length}
@@ -460,12 +449,26 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
         const license = licenseForAssignment(assigned, person.assigned_disciplines)
         const unavailableAtStart = !!range && !!license && license.cutoff <= range.start
         const atRisk = !!range && !!license && license.cutoff <= range.end
-        return <article className="inquiry-card" key={person.user_id}>
-          <label>{index === 0 ? "Assigned Site PM" : "Additional Site PM"}<select value={person.user_id} onChange={event => assign(index, event.target.value)}>
+        const editing = editingEngineer?.originalId === person.user_id
+        const draft = editing ? editingEngineer.draft : person
+        const draftCandidate = choices.find(candidate => candidate.id === draft.user_id)
+        return <article className="inquiry-card inquiry-engineer-card" key={person.user_id}>
+          <header className="inquiry-engineer-header">
+            <div><strong>{assigned?.name || "Unavailable Site PM"}</strong><span>{isLead ? "Lead SPM" : index === 0 ? "Phase coordinator" : "Phase SPM"}</span></div>
+            <div className="inquiry-engineer-actions">
+              <button className="button icon-button" type="button" aria-label={`Edit ${assigned?.name || "engineer"}`} title="Edit engineer" onClick={() => setEditingEngineer({ originalId: person.user_id, draft: { ...person, assigned_disciplines: [...person.assigned_disciplines] } })}><Icon name="edit" size={17} /></button>
+              <button className="button icon-button inquiry-remove-engineer" type="button" aria-label={`Remove ${assigned?.name || "engineer"}`} title="Remove engineer" onClick={() => setRemovingEngineer({ id: person.user_id, name: assigned?.name || "this engineer" })}><Icon name="close" size={17} /></button>
+            </div>
+          </header>
+          {editing && <label>Assigned Site PM<select value={draft.user_id} onChange={event => {
+            const replacement = replacements.find(option => option.id === event.target.value)
+            if (replacement) setEditingEngineer({ originalId: person.user_id, draft: { user_id: replacement.id, assigned_disciplines: replacement.tags } })
+          }}>
             {!replacements.some(option => option.id === person.user_id) && <option value={person.user_id}>{assigned?.name || "Site PM"}</option>}
             {replacements.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-          </select></label>
-          <p className="inquiry-muted">{assigned ? `Site PM${assigned.qualifiedTags.length ? ` · ${assigned.qualifiedTags.join(", ")}` : ""}` : "This assignment is no longer eligible. Replace or remove it before sending offers."}</p>
+          </select></label>}
+          {!assigned && <p className="inquiry-coverage-warning">This assignment is no longer eligible. Replace or remove it.</p>}
+          {!editing && <p className="inquiry-engineer-responsibilities">{person.assigned_disciplines.join(" · ") || "No responsibilities assigned"}</p>}
           <p><AssignedScopeMatch assigned={person.assigned_disciplines} qualified={assigned?.qualifiedTags ?? []} /></p>
           {range && license && <div className={atRisk ? "inquiry-coverage-warning inquiry-license-window" : "inquiry-license-window"}>
             <strong>{unavailableAtStart ? "Unavailable at planned start" : atRisk ? "Renewal or backup needed" : isLead ? "Covered through closeout" : "Covered for this phase"}</strong>
@@ -473,21 +476,24 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
             {atRisk && <><p>Work access cutoff · {staffingDate(license.cutoff)}</p><p>PRC license expires · {staffingDate(license.expiry)}</p></>}
             {unavailableAtStart && <p>Choose another engineer or wait for Admin to verify the renewal.</p>}
           </div>}
-          {multi && <fieldset>
-            <legend>Responsibilities in {stage}</legend>
+          {editing && multi && <fieldset>
+            <legend>Responsibilities</legend>
             {required.map(area => {
-              const checked = person.assigned_disciplines.includes(area)
-              const qualified = assigned?.qualifiedTags.includes(area)
+              const checked = draft.assigned_disciplines.includes(area)
+              const qualified = draftCandidate?.qualifiedTags.includes(area)
               return <label className="inquiry-check" key={area}>
-                <input type="checkbox" checked={checked} disabled={!checked && (!qualified || person.assigned_disciplines.length >= 3)}
-                  onChange={() => update(engineers.map(other => other === person ? {
-                    ...person, assigned_disciplines: checked ? person.assigned_disciplines.filter(tag => tag !== area) : [...person.assigned_disciplines, area],
-                  } : other))} />
+                <input type="checkbox" checked={checked} disabled={!checked && (!qualified || draft.assigned_disciplines.length >= 3)}
+                  onChange={() => setEditingEngineer({ originalId: person.user_id, draft: {
+                    ...draft, assigned_disciplines: checked ? draft.assigned_disciplines.filter(tag => tag !== area) : [...draft.assigned_disciplines, area],
+                  } })} />
                 <span>{area}{!qualified && <small>This engineer has no verified match for this scope</small>}</span>
               </label>
             })}
           </fieldset>}
-          <button className="button" type="button" onClick={() => { update(engineers.filter(other => other !== person)); setAdding(false) }}>Remove engineer</button>
+          {editing && <div className="inquiry-engineer-edit-actions">
+            <button className="button" type="button" onClick={() => setEditingEngineer(undefined)}>Cancel editing</button>
+            <button className="button primary" type="button" disabled={!draft.assigned_disciplines.length || draft.assigned_disciplines.some(tag => !draftCandidate?.qualifiedTags.includes(tag))} onClick={() => { update(engineers.map(other => other === person ? draft : other)); setEditingEngineer(undefined) }}>Save changes</button>
+          </div>}
         </article>
       })}
       {adding && <article className="inquiry-card"><label>Add SPM to phase
@@ -507,14 +513,24 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
     </label>}
     </div>
     </div>
+    {removingEngineer && <Modal title="Remove engineer?" onClose={() => setRemovingEngineer(undefined)} footer={<>
+      <button type="button" className="button" onClick={() => setRemovingEngineer(undefined)}>Keep engineer</button>
+      <button type="button" className="button danger" onClick={() => {
+        update(engineers.filter(person => person.user_id !== removingEngineer.id))
+        setAdding(false)
+        if (editingEngineer?.originalId === removingEngineer.id) setEditingEngineer(undefined)
+        setRemovingEngineer(undefined)
+      }}>Remove engineer</button>
+    </>}>
+      <p>Remove {removingEngineer.name} from {stage}? Their assigned scopes may need another engineer.</p>
+    </Modal>}
   </section>
 }
 
-export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments, embedded = false, onInquiryCountChange, bannerTarget, onShowInquiries }: {
+export default function ProjectInquiries({ role, onReload, projects = [], onOpenDocuments, onOpenAssignments, embedded = false, onInquiryCountChange }: {
   role: "admin" | "opm"; onReload: () => unknown; projects?: Project[]
   onOpenDocuments?: (project: Project) => void; onOpenAssignments?: (project: Project) => void
   embedded?: boolean; onInquiryCountChange?: (count: number | undefined) => void
-  bannerTarget?: HTMLElement | null; onShowInquiries?: () => void
 }) {
   const [rows, setRows] = useState<Inquiry[]>()
   const activeAction = useRef(false)
@@ -543,6 +559,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [adminInquiryTypeFilter, setAdminInquiryTypeFilter] = useState("")
   useListMemory()
   const [step, setStep] = useState(2)
+  const [leaveStaffing, setLeaveStaffing] = useState(false)
   const [staffingPhase, setStaffingPhase] = useState("")
   const [addingEngineer, setAddingEngineer] = useState(false)
   const stepperRef = useRef<HTMLOListElement>(null)
@@ -562,8 +579,19 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
   const intakeLocked = row?.status === "approved" && inquiryAssessmentReady(row.details, row.workflow)
-  const displayedOfficePage = officePage && intakeLocked ? "assessment"
-    : officePage === "assessment" && !intakeLocked ? "review" : officePage
+  const displayedOfficePage = officePage === "assessment" && !intakeLocked ? "review" : officePage
+  const officeWorkflowContainer = useRef<HTMLElement>(null)
+  const previousOfficeLocation = useRef({ id: row?.id, page: displayedOfficePage })
+  useLayoutEffect(() => {
+    const previous = previousOfficeLocation.current
+    previousOfficeLocation.current = { id: row?.id, page: displayedOfficePage }
+    if (previous.id !== row?.id || !previous.page || !displayedOfficePage || previous.page === displayedOfficePage) return
+    const navigation = officeWorkflowContainer.current?.querySelector<HTMLElement>(".office-intake-record-nav")
+    if (navigation) {
+      navigation.querySelector<HTMLElement>('[aria-current="step"]')?.focus({ preventScroll: true })
+      navigation.scrollIntoView?.({ block: "start", behavior: "instant" })
+    }
+  }, [row?.id, displayedOfficePage])
   const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const contractStatus = contractFileId ? "uploaded" : "missing"
@@ -711,8 +739,25 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   function closeDialog() {
     if (busy) return
+    if (dialog === "intake" && (step >= 3 || planning?.candidates)) {
+      setLeaveStaffing(true)
+      return
+    }
     setContractPreviewOpen(false)
     setPendingContract(undefined)
+    setDialog(undefined)
+    setError("")
+  }
+  function discardStaffingChanges() {
+    setLeaveStaffing(false)
+    setPlanning(undefined)
+    setTeam([])
+    setPhases([])
+    setPhaseDates({})
+    setPlanningBackups({})
+    setStaffingPhase("")
+    setAddingEngineer(false)
+    setStep(2)
     setDialog(undefined)
     setError("")
   }
@@ -794,17 +839,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setAddingEngineer(false)
     setStep(3)
   }
-  async function addStaffingScope(scope: string) {
-    if (!planning?.additional_scope_options?.[staffingPhase]?.includes(scope)) return
-    const previous = planning.staffing?.additional_scopes ?? {}
-    const additional_scopes = { ...previous, [staffingPhase]: [...new Set([...(previous[staffingPhase] ?? []), scope])] }
-    const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), confirm_schedule: true, contract_file_id: contractFileId, additional_scopes })
-    if (!result.staffing?.additional_scopes?.[staffingPhase]?.includes(scope) || !result.candidates?.[staffingPhase] ||
-      !requiredAreas(result.team?.find(phase => phase.stage === staffingPhase)).includes(scope)) {
-      throw new Error("The server did not confirm the additional phase scope.")
-    }
-    setPlanning(result)
-  }
   async function confirmContract() {
     if (!pendingContract) return
     const id = pendingContract.id
@@ -837,8 +871,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     catch { setFinalizedClient(current => current && { ...current, refreshFailed: true }) }
   }
   const canAllocate = !!contractFileId && !!row?.workflow?.assessment && phases.length > 0 && !phaseScheduleIssue
-  const staffingLead = step === 3 ? proposedStaffingLead(phases, team, planning?.candidates ?? {}) : null
-  const staffingIssues = step === 3 ? phases.flatMap(stage => {
+  const staffingLead = step >= 3 ? proposedStaffingLead(phases, team, planning?.candidates ?? {}) : null
+  const staffingIssues = step >= 3 ? phases.flatMap(stage => {
     const entry = team.find(item => item.stage === stage)
     const choices = planning?.candidates?.[stage] ?? []
     const assigned = entry?.engineers ?? (entry?.user_id ? [entry] : [])
@@ -876,27 +910,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   </>
   const admin = role === "admin"
   const pendingInquiries = admin ? [] : (rows ?? []).filter(item => item.status === "offered")
-  const newestInquiry = pendingInquiries[0]
-  const pendingBanner = newestInquiry && !officePage && <section className="opm-new-inquiries" aria-labelledby="opm-new-inquiries-title">
-    <span className="inquiry-list-icon" aria-hidden="true"><Icon name="bell" /></span>
-    <div className="opm-new-inquiries-copy">
-      <h2 id="opm-new-inquiries-title" aria-live="polite">{pendingInquiries.length === 1 ? "New project inquiry" : `${pendingInquiries.length} new project inquiries`}</h2>
-      <p>{newestInquiry.details.name || "Untitled project"} · Awaiting your response</p>
-    </div>
-    <div className="opm-new-inquiries-actions">
-      {pendingInquiries.length > 1 && <button type="button" className="button" disabled={busy} onClick={() => {
-        setSearch("")
-        setQueueView("action")
-        setQueueStatus(officeReviewStatus)
-        setQueueType("")
-        onShowInquiries?.()
-      }}>View all new inquiries</button>}
-      <button type="button" className="button primary" disabled={busy} onClick={() => {
-        onShowInquiries?.()
-        openOfficeInquiry(newestInquiry)
-      }}>{pendingInquiries.length === 1 ? "Review inquiry" : "Review newest inquiry"}</button>
-    </div>
-  </section>
   const query = search.trim().toLowerCase()
   const projectsById = new Map(projects.map(project => [project.id, project]))
   const setupByInquiry = new Map((rows ?? []).flatMap(item => {
@@ -1222,8 +1235,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       {feedback}
     </section>
   }
-  return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
-    {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
+  return <section ref={officeWorkflowContainer} className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
     {displayedOfficePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}:${row.details.project_type}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}
@@ -1265,7 +1277,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
       <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setDraftId(""); setDraftBaseline(JSON.stringify(adminInquiryDraft)); setAdminFormStep(0); setLeaveInquiry(false); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
     </header>}
-    {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
       <div className="opm-inquiry-controls">
         <div className="opm-inquiry-filters">
@@ -1322,7 +1333,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   <span className="opm-inquiry-initials" aria-hidden="true">{initials}</span>
                   <div><h3>{name}</h3><p>{item.details.project_type || "Project type unavailable"} · {inquiryReference(item)}{setup && " · Project setup"}</p></div>
                 </div>
-                <span className="inquiry-list-status" data-status={setup ? "setup" : item.status}>{officeStatus(item) || "Status unavailable"}</span>
+                <div className="opm-inquiry-card-badges">
+                  <span className="inquiry-priority" data-classification={String(item.details.classification || "Normal").toLowerCase()} aria-label={`Inquiry classification: ${item.details.classification || "Normal"}`}>{item.details.classification || "Normal"}</span>
+                  <span className="inquiry-list-status" data-status={setup ? "setup" : item.status}>{officeStatus(item) || "Status unavailable"}</span>
+                </div>
               </header>
               <div className="opm-inquiry-card-body">
                 <dl className="opm-inquiry-facts">
@@ -1478,24 +1492,30 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </Modal>}
     {finalizedClient && <Modal title="Project finalized" subtitle={finalizedClient.name} onClose={() => setFinalizedClient(undefined)}
       footer={<button type="button" className="button primary" onClick={() => setFinalizedClient(undefined)}>Done</button>}>
-      <ProjectClientAccount projectId={finalizedClient.projectId} onSaved={onReload} />
+      <div className="project-finalized-content">
+        <div className="project-finalized-success"><Icon name="check" size={18} /><span>Assignment offers sent.</span></div>
+        <ProjectClientAccount projectId={finalizedClient.projectId} onSaved={onReload} />
+      </div>
       {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
 
-    {dialog === "intake" && row?.status === "approved" && <Modal title={PROJECT_SETUP_LABEL} subtitle={String(row.details.name)} wide onClose={closeDialog} footer={<>
-      <span className="inquiry-intake-progress">Step {step} of 3</span>
-      <button type="button" className="button" disabled={busy} onClick={step === 2 ? closeDialog : () => setStep(2)}>{step === 2 ? "Back to assessment" : "Back"}</button>
-      {step === 2 && <button className="button primary" disabled={busy || !canAllocate} onClick={() => {
+    {dialog === "intake" && row?.status === "approved" && <Modal title={PROJECT_SETUP_LABEL} subtitle={<>
+      <span className="inquiry-setup-project-name">{String(row.details.name)}</span>
+      <span className="inquiry-intake-progress">Step {step} of 4</span>
+    </>} wide onClose={closeDialog} footer={<>
+      <button type="button" className="button" disabled={busy} onClick={step === 2 ? closeDialog : () => setStep(step - 1)}>{step === 2 ? "Back to assessment" : step === 4 ? "Back to staffing" : "Back"}</button>
+      {step === 2 && <button className="button primary inquiry-staffing-continue" aria-busy={busy} disabled={busy || !canAllocate} onClick={() => {
         if (planning?.candidates) setStep(3)
         else void run(allocate)
-      }}>Confirm and continue to staffing</button>}
-      {step === 3 && <button className="button primary inquiry-send-offers" disabled={busy || !canSend}
-        aria-describedby={staffingIssues.length ? "inquiry-staffing-phases" : undefined}
-        onClick={() => void run(submit)}>Send assignment offers</button>}
+      }}>{busy ? <><span className="inquiry-action-spinner" aria-hidden="true" /><span role="status">Preparing staffing…</span></> : "Confirm and continue to staffing"}</button>}
+      {step === 3 && <button type="button" className="button primary" disabled={busy || !planning?.candidates} onClick={() => setStep(4)}>Preview SPM lineup <Icon name="arrow" size={17} /></button>}
+      {step === 4 && <button className="button primary inquiry-send-offers" aria-busy={busy} disabled={busy || !canSend}
+        aria-describedby={staffingIssues.length ? "inquiry-preview-issues" : undefined}
+        onClick={() => void run(submit)}>{busy ? <><span className="inquiry-action-spinner" aria-hidden="true" /><span role="status">Sending assignment offers…</span></> : "Send assignment offers"}</button>}
     </>}>
       <div className="inquiry-dialog-content inquiry-intake">
         <ol ref={stepperRef} className="inquiry-stepper" aria-label={`${PROJECT_SETUP_LABEL} steps`}>
-          {["Assessment", "Construction phases", "Staffing"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
+          {["Assessment", "Construction phases", "Staffing", "Preview SPM lineup"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}>
             <span aria-hidden="true">{step > index + 1 ? <Icon name="check" size={14} /> : index + 1}</span>{label}
           </li>)}
         </ol>
@@ -1589,24 +1609,30 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>
-          <div><h3>Assign engineers by phase</h3><p className="inquiry-muted">{row.details.name} · {row.details.project_type}</p>
-            {technical && <p>Technical requirements · {technical}</p>}
-            {arrangement && <p>Phase arrangement · {arrangement}</p>}
+          <div className="inquiry-staffing-heading">
+            <h3>Assign engineers by phase</h3>
+            <details className="inquiry-staffing-rules"><summary>Staffing rules</summary>
+              <p>One suggested Site PM per phase. Add engineers for uncovered scopes.</p>
+              <p>Each engineer must match 100% of their assigned responsibilities using verified tags. Team coverage shows how much of the whole phase is covered.</p>
+              {technical && <p>Technical requirements · {technical}</p>}
+              {arrangement && <p>Phase arrangement · {arrangement}</p>}
+            </details>
           </div>
-          <p><strong>One suggested Site PM per phase.</strong> Review the selection and add optional engineers manually when needed.</p>
-          <p className="inquiry-muted">Each engineer must match 100% of their assigned responsibilities using verified tags. Team coverage shows how much of the whole phase is covered; add qualified engineers manually for remaining scopes.</p>
           <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => {
               const reason = staffingIssueByPhase.get(stage)
               const unavailable = reason && !planning.candidates?.[stage]?.length
+              const phaseTeam = team.find(entry => entry.stage === stage)
+              const assignedCount = phaseTeam?.engineers?.length ?? (phaseTeam?.user_id ? 1 : 0)
               return <button key={stage} type="button" className="button" aria-pressed={staffingPhase === stage}
                 data-staffing-issue={!!reason} onClick={() => {
                   setStaffingPhase(stage)
                   setAddingEngineer(false)
                 }}>
                 {stage}
-                {reason && <span className="inquiry-phase-warning"><Icon name="alert" size={14} />
-                  {unavailable ? "No eligible engineer available" : "Needs staffing"}
+                <span className="inquiry-phase-count" aria-label={`${assignedCount} assigned Site PMs`}>{assignedCount}</span>
+                {reason && <span className="inquiry-phase-warning" title={unavailable ? "No eligible engineer available" : "Needs staffing"}><Icon name="alert" size={14} />
+                  <span className="sr-only">{unavailable ? "No eligible engineer available" : "Needs staffing"}</span>
                 </span>}
               </button>
             })}
@@ -1620,13 +1646,23 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             unavailable={planning.licenseUnavailable?.[staffingPhase]} backup={planningBackups[staffingPhase]}
             onBackup={id => setPlanningBackups(previous => ({ ...previous, [staffingPhase]: id }))}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate())}
-            scopeOptions={planning.additional_scope_options?.[staffingPhase]} onAddScope={scope => run(() => addStaffingScope(scope))}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
-          <StaffingPeak phases={phases} team={team} arrangement={arrangement} />
-          <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
         </fieldset>}
+        {step === 4 && planning?.candidates && <div className="inquiry-form-stack">
+          {staffingIssues.length > 0 && <div id="inquiry-preview-issues" className="inquiry-coverage-warning" role="status">
+            <strong>Review staffing before sending offers.</strong>
+            <ul>{staffingIssues.map(({ stage, reason }) => <li key={stage}><button type="button" className="inquiry-preview-fix" onClick={() => { setStaffingPhase(stage); setStep(3) }}>{stage}</button> · {reason}</li>)}</ul>
+          </div>}
+          <StaffingLineup phases={phases} team={team} candidates={planning.candidates} />
+        </div>}
         {feedback}
       </div>
+    </Modal>}
+    {leaveStaffing && <Modal title="Are you sure you want to leave?" onClose={() => setLeaveStaffing(false)} footer={<>
+      <button type="button" className="button" onClick={() => setLeaveStaffing(false)}>Continue editing</button>
+      <button type="button" className="button danger" onClick={discardStaffingChanges}>Discard changes</button>
+    </>}>
+      <p>Your unsent staffing selections will be discarded. Your saved assessment and phase dates will remain.</p>
     </Modal>}
     {canViewContract && pendingContract && <ContractPreview file={pendingContract.file} busy={busy} error={error}
       onClose={() => { if (!busy) { setPendingContract(undefined); setError("") } }}

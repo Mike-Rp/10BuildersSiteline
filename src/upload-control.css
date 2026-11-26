@@ -11,6 +11,7 @@
 #root .attachment-add { border-radius: 24px; background: #0086ae; color: white; border: 1px solid #0086ae; padding: 7px 16px; font-weight: 700; min-height: 40px; }
 #root .attachment-add:hover { background: #006f94; }
 .upload-review { display: grid; gap: 10px; min-width: 0; }
+#root .modal:has(.upload-review) > .modal-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--color-line); flex-shrink: 0; }
 .upload-review-filename { overflow-wrap: anywhere; }
 .upload-review-image { display: block; max-width: 100%; max-height: 65vh; margin-inline: auto; object-fit: contain; }
 @media (pointer: coarse) { #root .attachment-row > button, #root .attachment-add { min-height: 48px; min-width: 48px; } }
