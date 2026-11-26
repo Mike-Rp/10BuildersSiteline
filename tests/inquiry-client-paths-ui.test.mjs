@@ -78,6 +78,7 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   assert.ok(button("View inquiry status"))
   await click("Back to inquiries")
   assert.ok(document.querySelector("#existing-inquiries-heading"))
+  assert.match(document.querySelector(".inquiry-log-footer").textContent, /Waiting for Avery Reyes \(Office PM\) to respond/)
   await click("View inquiry"); await click("Back to inquiries"); await click("New project inquiry")
   await radio("inquiry-client-record", "existing")
   await set('[aria-label="Find an existing client"]', "existing")

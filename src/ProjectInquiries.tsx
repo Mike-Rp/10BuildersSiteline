@@ -1383,7 +1383,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           const updated = item.updated_at && Number.isFinite(Date.parse(item.updated_at)) ? item.updated_at : undefined
           const updatedLabel = updated ? inquiryDate.format(new Date(updated)) : ""
           const nextAction = adminInquiryActions[status]
-          const waiting = inquiryWaiting[item.status]
+          const waiting = item.status === "offered" && item.opm_name
+            ? `Waiting for ${item.opm_name} (Office PM) to respond`
+            : inquiryWaiting[item.status]
           const milestone = inquiryMilestone(item)
           return <li key={item.id} className="inquiry-log-card">
             <div className="inquiry-log-card-header">
