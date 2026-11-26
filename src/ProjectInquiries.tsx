@@ -1061,7 +1061,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         })
       }}>
         <fieldset disabled={busy} className="inquiry-form-stack">
-          {adminFormStep < 2 && <FormSection title={adminFormStep === 0 ? "Client path" : "Client information"} icon="users" description={adminFormStep === 0 ? "Choose a new or existing client, then the appropriate client type." : "Review the required contact details for this inquiry."}>
+          {adminFormStep < 2 && <FormSection title={adminFormStep === 0 ? "Client path" : "Client information"} icon="users" description={adminFormStep === 0 ? "Choose a new or existing client, then the appropriate client type." : "Verify that all client information is accurate and that all required fields are complete before proceeding."}>
             <InquiryClientFields page={adminFormStep === 0 ? "path" : "details"} details={details} onChange={setDetails} disabled={busy} />
           </FormSection>}
           {adminFormStep === 2 && <>
