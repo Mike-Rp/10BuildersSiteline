@@ -560,6 +560,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     : officePage === "assessment" && !intakeLocked ? "review" : officePage
   const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
+  const contractLocked = Boolean(contractFileId && (intakeLocked || row?.workflow?.contract_locked || row?.workflow?.assessment || row?.workflow?.staffing))
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
   const projectRange = start && end ? { start, end } : undefined
@@ -1191,9 +1192,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
-          projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType reload={reloadCorrections} />}
+          projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType contractLocked={contractLocked} reload={reloadCorrections} />}
           signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
-            {(!intakeLocked || !contractFileId) && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
+            {!contractLocked && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
               const file = event.target.files?.[0]
               event.target.value = ""
               if (!file) return
@@ -1204,12 +1205,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               setError("")
               setPendingContract({ file, id: crypto.randomUUID() })
             }} />}
-            {(!intakeLocked || !contractFileId) && <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
+            {!contractLocked && <button type="button" className="button primary" disabled={busy} onClick={() => contractInput.current?.click()}>
               <Icon name="upload" size={17} />{contractFileId ? "Replace signed contract" : "Upload signed contract"}
             </button>}
             {contractFileId && <div className="inquiry-sent-notice inquiry-contract-preview">
               <span className="inquiry-list-icon"><Icon name="doc" /></span>
-              <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>Contract confirmed</small></div>
+              <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>{contractLocked ? "Locked agreement" : "Contract confirmed"}</small></div>
               <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setContractPreviewOpen(true) }}>View contract</button>
             </div>}
           </FormSection>}

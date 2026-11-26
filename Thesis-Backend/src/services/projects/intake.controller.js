@@ -87,6 +87,9 @@ export const createIntake = async (req, res) => {
           : await inquiryPhases(client,details.project_type),req.body.phases,
           inquiry.project_id ? undefined : details.project_type);
         const confirmed = inquiry.details.opm_workflow.staffing;
+        const signedId = inquiry.details.opm_workflow.signed_contract?.id;
+        if (signedId && signedId !== req.body.contract_file_id)
+          throw new HttpError(409, "The finalized signed client contract is locked.");
         if (!confirmed || confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
             confirmed.phases.length !== phases.length || confirmed.phases.some((phase,index) => phase !== phases[index]))
           throw new HttpError(409, "The confirmed phases or signed agreement changed. Reopen staffing before sending offers.");

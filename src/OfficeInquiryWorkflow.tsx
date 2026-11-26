@@ -19,6 +19,7 @@ export type OfficeWorkflow = {
   revisions?: { date: string; note: string }[]
   assessment?: ReturnType<typeof assessInquiry> & { id: string; completed_at: string }
   signed_contract?: { id: string; name: string }
+  contract_locked?: boolean
   staffing?: { contract_file_id?: string }
 }
 export type OfficeRecord = {

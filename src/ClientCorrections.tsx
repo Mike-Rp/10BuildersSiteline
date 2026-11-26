@@ -2,8 +2,8 @@ import { useEffect, useState } from "react"
 import { api } from "./api/client"
 import { Icon } from "./ui"
 type Correction = { id: string; field: string; before: string; after: string; reason: string; status: string }
-export default function ClientCorrections({ id, details, admin, reload, projectType = false }: {
-  id: string; details: Record<string, unknown>; admin: boolean; reload: () => void; projectType?: boolean
+export default function ClientCorrections({ id, details, admin, reload, projectType = false, contractLocked = false }: {
+  id: string; details: Record<string, unknown>; admin: boolean; reload: () => void; projectType?: boolean; contractLocked?: boolean
 }) {
   const [field, setField] = useState(projectType ? "project_type" : "email"), [value, setValue] = useState(""), [reason, setReason] = useState("")
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState("")
@@ -28,13 +28,14 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
         <input id={`inquiry-project-type-${id}`} readOnly value={String(details.project_type ?? "")} />
         <Icon name="lock" size={16} />
       </div>
-      <p>Project type comes from the submitted inquiry. An approved correction requires a new scope and budget review.</p>
+      <p>{contractLocked ? "Project type is locked under the finalized signed contract."
+        : "Project type comes from the submitted inquiry. An approved correction requires a new scope and budget review."}</p>
     </> : <>
       <h3>{projectType ? "Project type corrections" : "Client information corrections"}</h3>
       {!projectType && <p>Client details are read-only for the OPM. Approved corrections retain the previous value in history. Existing signed documents remain unchanged.</p>}
     </>}
-    {!admin && !history.some(item => item.status === "pending") && <button type="button" className="button" onClick={() => setOpen(!open)}>Request correction</button>}
-    {open && <div className="inquiry-form-stack">
+    {!admin && !contractLocked && !history.some(item => item.status === "pending") && <button type="button" className="button" onClick={() => setOpen(!open)}>Request correction</button>}
+    {open && !contractLocked && <div className="inquiry-form-stack">
       {projectType ? <label>Corrected project type<select value={value} onChange={e => setValue(e.target.value)}>
         <option value="">Select a project type</option>
         {["Residential", "Commercial", "Mixed-Use"].filter(type => type !== details.project_type).map(type => <option key={type}>{type}</option>)}

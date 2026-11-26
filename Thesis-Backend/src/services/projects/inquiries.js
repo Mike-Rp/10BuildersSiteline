@@ -104,6 +104,11 @@ export function confirmedPhases(available, submitted, type) {
   return available.filter(phase => submitted.includes(phase));
 }
 
+function inquiryContractLocked(details, workflow) {
+  return Boolean((workflow?.signed_contract?.id || workflow?.staffing?.contract_file_id) &&
+    (workflow.contract_locked || workflow.assessment || workflow.staffing || inquiryAssessmentReady(details, workflow)));
+}
+
 function validateInquiryCompletion(start, end, estimate) {
   const minimum = earliestInquiryCompletion(start, estimate);
   if (!minimum) throw new HttpError(422, "The estimated completion is outside the supported date range. Review the project information or start date.");
@@ -397,10 +402,13 @@ export function mountInquiries(router) {
     if (row.status === "converted") throw new HttpError(409, "Use the project client record after conversion.");
     const details = { ...row.details }, input = req.body ?? {};
     const history = [...(details.client_corrections ?? [])];
+    const lockedContract = inquiryContractLocked(details, details.opm_workflow);
     const fields = details.client_type === "company" ? ["email", "phone", "company_name", "primary_contact", "designation"] : ["client_name", "email", "phone"];
     if (["offered", "consulting", "approved"].includes(row.status) && !row.project_id) fields.push("project_type");
     if (input.action === "request") {
       if (actor.role !== "opm") throw new HttpError(403, "Only the assigned OPM can request a correction.");
+      if (input.field === "project_type" && lockedContract)
+        throw new HttpError(409, "Project type is locked under the finalized signed contract.");
       if (history.some(item => item.status === "pending")) throw new HttpError(409, "A correction is already awaiting review.");
       if (!fields.includes(input.field) || typeof input.value !== "string" || !input.value.trim() || input.value.length > 150 ||
         typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 1000) throw new HttpError(422, "Enter a valid field, replacement and reason.");
@@ -418,6 +426,8 @@ export function mountInquiries(router) {
       if (!fields.includes(item.field) || String(details[item.field] ?? "") !== String(item.before))
         throw new HttpError(409, "Inquiry details changed. Request a fresh correction.");
       if (input.action === "approve") {
+        if (item.field === "project_type" && lockedContract)
+          throw new HttpError(409, "Project type is locked under the finalized signed contract.");
         details[item.field] = item.after;
         if (item.field === "company_name") details.client_name = item.after;
         inquiryDetails(details); validateInquiryContact(details, row.details);
@@ -458,6 +468,9 @@ export function mountInquiries(router) {
     if ((workflow.review?.version ?? 0) !== input.version)
       throw new HttpError(409, "The project record changed. Reopen the inquiry to load the latest version.");
     const intakeLocked = inquiryAssessmentReady(details, workflow);
+    const contractLocked = inquiryContractLocked(details, workflow);
+    if (contractLocked && !workflow.signed_contract && workflow.staffing?.contract_file_id)
+      workflow.signed_contract = { id: workflow.staffing.contract_file_id, name: "Signed Client Contract Agreement" };
     if (intakeLocked && (input.action === "review" || input.action === "budget"))
       throw new HttpError(409, "Project information and budget are locked once project assessment is available.");
     const audit = { by: actor.id, at: new Date().toISOString() };
@@ -465,8 +478,8 @@ export function mountInquiries(router) {
       case "contract": {
         const previousId = workflow.signed_contract?.id ?? workflow.staffing?.contract_file_id ?? null;
         if (previousId && previousId === input.contract_file_id && input.request_id === previousId) return inquiryResponse(row);
-        if (intakeLocked && previousId)
-          throw new HttpError(409, "The confirmed client contract is locked once project assessment is available.");
+        if (contractLocked)
+          throw new HttpError(409, "The finalized signed client contract is locked.");
         if ((input.expected_contract_file_id ?? null) !== previousId)
           throw new HttpError(409, "The signed contract changed. Refresh the inquiry before replacing it.");
         const file = await assertInquiryUpload(db, actor.id, input.contract_file_id, true);
@@ -566,6 +579,7 @@ export function mountInquiries(router) {
       }
       default: throw new HttpError(422, "Select a valid project workflow action.");
     }
+    if (inquiryContractLocked(details, workflow)) workflow.contract_locked = true;
     if (workflow.assessment?.id !== row.details.opm_workflow?.assessment?.id) delete workflow.staffing;
     details.opm_workflow = workflow;
     const updated = (await db.query("UPDATE project_inquiries SET details=$2,updated_at=now() WHERE id=$1 RETURNING *",
@@ -592,10 +606,12 @@ export function mountInquiries(router) {
       const configuration = await inquiryScopeConfiguration({ query: execute }, type, phases, saved?.additional_scopes || {});
       return { phases, phaseReview, estimate, staffing: saved, ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
     }
-    const signedContractId = row.details.opm_workflow.signed_contract?.id ?? null;
+    const signedContractId = row.details.opm_workflow.signed_contract?.id ?? row.details.opm_workflow.staffing?.contract_file_id ?? null;
     if (signedContractId && req.body.contract_file_id !== signedContractId)
       throw new HttpError(409, "The signed contract changed. Reopen staffing with the confirmed contract.");
-    await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
+    const contract = await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
+    if (!["application/pdf", "image/png", "image/jpeg"].includes(contract.content_type))
+      throw new HttpError(422, "Choose a PDF, PNG, or JPEG signed contract.");
     const selected = confirmedPhases(phases, req.body.phases, type);
     const storedDates = row.details.opm_workflow.staffing?.phase_dates;
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
@@ -633,10 +649,12 @@ export function mountInquiries(router) {
       ...(configuration.options ? { additional_scopes: configuration.additional } : {})};
     // A correction or conversion can finish while the recommendations are being calculated.
     const saved = await execute(`UPDATE project_inquiries
-      SET details=jsonb_set(details,'{opm_workflow,staffing}',$3::jsonb), updated_at=now()
+      SET details=jsonb_set(details,'{opm_workflow}',(details->'opm_workflow') || $3::jsonb), updated_at=now()
       WHERE id=$1 AND opm_id=$2 AND status='approved' AND details #>> '{opm_workflow,assessment,id}'=$4
-        AND (details #>> '{opm_workflow,signed_contract,id}') IS NOT DISTINCT FROM $5::text`,
-      [row.id, actor.id, JSON.stringify(staffing), assessment.id, signedContractId]);
+        AND coalesce(details #>> '{opm_workflow,signed_contract,id}', details #>> '{opm_workflow,staffing,contract_file_id}')
+          IS NOT DISTINCT FROM $5::text`,
+      [row.id, actor.id, JSON.stringify({ staffing, signed_contract: { id: contract.id, name: contract.original_name },
+        contract_locked: true }), assessment.id, signedContractId]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
     return { phases, phaseReview, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, licenseUnavailable, staffing,
       ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };

@@ -489,6 +489,15 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     [wrongType.id,manager.id,JSON.stringify(oldWorkflow)])
   const typeCorrection = `${root}/${wrongType.id}/client-correction`
   const typeRequest = {action:"request",field:"project_type",value:"Commercial",reason:"Client confirmed the building use."}
+  await call(typeCorrection,{token,json:typeRequest,status:409})
+  const replacement = await upload("replacement-contract.pdf")
+  await call(`${root}/${wrongType.id}/workflow`,{token,status:409,json:{action:"contract",version:oldWorkflow.review.version,
+    contract_file_id:replacement,expected_contract_file_id:oldWorkflow.signed_contract.id}})
+  const lockedPlan = {...planInput,floor_area_sqm:details.floor_area_sqm,contract_file_id:replacement,phases}
+  await call(`${root}/${wrongType.id}/planning`,{token,status:409,json:lockedPlan})
+  const {signed_contract,contract_locked,staffing,...beforeContract} = oldWorkflow
+  await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{opm_workflow}',$2::jsonb) WHERE id=$1",
+    [wrongType.id,JSON.stringify(beforeContract)])
   await call(typeCorrection,{token,json:{...typeRequest,value:"Invalid"},status:422})
   const typeSubmitted = await call(typeCorrection,{token,json:typeRequest})
   const typeId = typeSubmitted.corrections[0].id
