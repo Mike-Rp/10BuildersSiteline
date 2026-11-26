@@ -2,6 +2,7 @@ export const technicalOptions: string[];
 export const arrangementOptions: string[];
 export const MIN_INQUIRY_DURATION_DAYS: number;
 export const MAX_INQUIRY_FLOORS: number;
+export const MAX_INQUIRY_AREA: number;
 export type FloorMeasurements = { mode: "same"; areaPerFloor: number } | { mode: "individual"; areas: number[] };
 export function normalizeFloorMeasurements(input: unknown, floorCount: number, lotArea?: number): { measurements: FloorMeasurements; total: number } | null;
 export function intakeSize(floorArea: number, floors: number): string;

@@ -19,7 +19,7 @@ import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import AssignedScopeMatch from "./AssignedScopeMatch"
 import FloorAreaReview from "./FloorAreaReview"
-import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { inquiryAssessmentReady, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
@@ -959,7 +959,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const floorCount = Number(details.floor_count)
     const maxFloorArea = lotArea * floorCount
     const floorLimit = lotArea >= 0.01 && Number.isInteger(floorCount) && floorCount > 0 &&
-      floorCount <= 32767 && Number.isFinite(maxFloorArea) ? maxFloorArea : undefined
+      lotArea <= MAX_INQUIRY_AREA && floorCount <= MAX_INQUIRY_FLOORS && Number.isFinite(maxFloorArea) ? Math.min(maxFloorArea, MAX_INQUIRY_AREA) : undefined
     const formatArea = (area: number) => area.toLocaleString("en-PH", { maximumSignificantDigits: 15 })
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
@@ -973,10 +973,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
         const total = key === "floor_area_sqm"
-        const outsideRange = total && value !== "" && (Number(value) < 0.01 ||
+        const outsideRange = value !== "" && (Number(value) < 0.01 || Number(value) > MAX_INQUIRY_AREA ||
           (floorLimit !== undefined && Number(value) > floorLimit))
         return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-          <GroupedNumberInput required={required} min={0.01} max={total ? floorLimit : undefined} value={value}
+          <GroupedNumberInput required={required} min={0.01} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
             aria-describedby={total ? "inquiry-floor-area-range" : undefined} aria-invalid={outsideRange || undefined}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
           {total && <small id="inquiry-floor-area-range" className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">
@@ -996,9 +996,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           pattern={pattern} title={pattern ? hint : undefined}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? noticeId : undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
-          max={key === "floor_count" ? 32767 : undefined}
+          max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
           placeholder={inquiryPlaceholders[key]} onChange={event => change(key, event.target.value)} />
+        {key === "floor_count" && <small className={value && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > MAX_INQUIRY_FLOORS) ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">Enter 1–{MAX_INQUIRY_FLOORS} whole floors. This is the supported application range.</small>}
         {pattern && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{invalid ? hint : ""}</small>}
       </label>
       )
@@ -1088,7 +1089,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
-              <FloorAreaReview area={Number(details.floor_area_sqm)} floors={floorCount} />
+              <FloorAreaReview area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />
             </div>
           </FormSection>
           <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">

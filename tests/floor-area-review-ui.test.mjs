@@ -16,7 +16,7 @@ test("small average floor area requires review and changing measurements resets 
   const root = createRoot(document.getElementById("root"))
   try {
     const { default: Review } = await server.ssrLoadModule("/src/FloorAreaReview.tsx")
-    const render = (area, floors) => React.act(() => root.render(React.createElement("form", {}, React.createElement(Review, { area, floors }))))
+    const render = (area, floors, lot) => React.act(() => root.render(React.createElement("form", {}, React.createElement(Review, { area, floors, lot }))))
     await render(3, 100)
     assert.match(document.body.textContent, /Average floor area: 0.03 m² per floor/)
     assert.match(document.body.textContent, /too small for 100 floors/)
@@ -33,6 +33,14 @@ test("small average floor area requires review and changing measurements resets 
     assert.equal(document.querySelector(".floor-area-review"), null)
     await render(3, 0)
     assert.equal(document.querySelector(".floor-area-review"), null)
+    await render(1e30, 3213211, 321)
+    assert.match(document.querySelector('[role="alert"]').textContent, /no more than 200 floors/)
+    assert.doesNotMatch(document.body.textContent, /Average floor area/)
+    await render(32101, 100, 321)
+    assert.match(document.querySelector('[role="alert"]').textContent, /must not exceed/)
+    assert.doesNotMatch(document.body.textContent, /Average floor area/)
+    await render(32100, 100, 321)
+    assert.match(document.body.textContent, /Average floor area: 321 m² per floor/)
   } finally {
     await React.act(() => root.unmount())
     await server.close()

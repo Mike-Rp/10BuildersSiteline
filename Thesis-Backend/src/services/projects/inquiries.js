@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
 import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
-import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -45,6 +45,10 @@ export function inquiryDetails(input) {
   for (const key of ["lot_area", "floor_area_sqm", "floor_count"]) {
     const source = key === "lot_area" && (input.lot_area == null || input.lot_area === "") ? input.land_area : input[key];
     const value = Number(source);
+    if (key === "floor_count" && value > MAX_INQUIRY_FLOORS)
+      throw new HttpError(422, `Enter no more than ${MAX_INQUIRY_FLOORS} floors. This exceeds the supported application range.`);
+    if (key !== "floor_count" && value > MAX_INQUIRY_AREA)
+      throw new HttpError(422, "The area exceeds the supported input range. Please review your measurements.");
     if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > MAX_INQUIRY_FLOORS)))
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;

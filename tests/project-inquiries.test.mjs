@@ -79,6 +79,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const root = "/projects/inquiries"
   const details = {client_name:"Ana Reyes",email:`ana-${crypto.randomUUID()}@example.com`,phone:"09123456789",name:"Maple Grove Residence",
     address:"Quezon City",project_type:"Residential",lot_area:240,floor_area_sqm:180,floor_count:2,consultation:30}
+  await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_count:3213211} })
+  await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_area_sqm:1e30} })
   const create = () => call(root,{token:admin,json:details})
   const decision = (row,token,action,other={}) => call(`${root}/${row.id}/decision`,{token,json:{action,...other}})
   async function offer(row) {
