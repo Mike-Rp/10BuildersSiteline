@@ -93,11 +93,11 @@ test("shared calendar preserves bounds, cancellation, clearing, and disabled fie
     Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(areaPerFloor, value)
     areaPerFloor.dispatchEvent(new w.Event("input", { bubbles: true }))
   })
-  for (const value of ["480", "544"]) {
+  for (const value of ["20", "200", "320", "480", "544"]) {
     await enterArea(value)
     assert.equal(areaPerFloor.checkValidity(), true)
   }
-  for (const value of ["479.99", "544.01"]) {
+  for (const value of ["19.99", "544.01"]) {
     await enterArea(value)
     assert.equal(areaPerFloor.checkValidity(), false)
   }

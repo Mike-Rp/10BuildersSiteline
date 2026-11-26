@@ -83,7 +83,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_area_sqm:1e30} })
   await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:234} })
   await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:3999.99} })
-  for (const floor_area_sqm of [179.99, 204.01]) {
+  for (const floor_area_sqm of [39.99, 204.01]) {
     await call(root, {token:admin, status:422, json:{...details, floor_area_sqm}})
   }
   const create = () => call(root,{token:admin,json:details})

@@ -278,7 +278,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > MAX_INQUIRY_AREA)
       const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
       if (floorArea.mode === "individual") setFloorPage(Math.floor(Math.max(0, invalidFloor) / floorPageSize))
-      setFieldError({ id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must be 150% to 170% of the lot area.` })
+      setFieldError({ id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.` })
       document.getElementById(id)?.focus()
       return
     }
@@ -557,7 +557,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                   onValueChange={value => updateFloorArea({ ...floorArea, perFloor: value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
                   {averageOutsideCorrectedLot
-                    ? "The submitted average is outside 150% to 170% of the corrected lot area. Enter the actual area per floor."
+                    ? "The submitted average is outside the supported range for the corrected lot area. Enter the actual area per floor."
                     : perFloor ? "Prefilled with the submitted average. Update it if the floor area has changed."
                     : "Enter the actual area per floor."}
                 </div>}
@@ -582,7 +582,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
               <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
             </div>}
-            <p className="office-review-field-helper">Total floor area is the sum of all floors. The average must be 150% to 170% of the lot area (50% to 70% larger).</p>
+            <p className="office-review-field-helper">Total floor area is the sum of all floors. The average must be at least 20 m² per floor and may exceed the lot area by up to 70%.</p>
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <div><span>Total floor area</span><strong>{calculatedArea ? `${calculatedArea.total.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m²` : "Enter the floor areas"}</strong>
               </div>

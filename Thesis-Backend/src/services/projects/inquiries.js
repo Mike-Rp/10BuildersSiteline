@@ -536,7 +536,7 @@ export function mountInquiries(router) {
         }
         const areas = input.floorMeasurements === undefined ? undefined :
           normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
-        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must be 150% to 170% of the lot area.`);
+        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.`);
         if (areas) corrected.floor_area_sqm = areas.total;
         const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
@@ -569,7 +569,7 @@ export function mountInquiries(router) {
         const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
           after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
         if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
-          throw new HttpError(422, "The average floor area must be 150% to 170% of the lot area. Update the floor measurements.");
+          throw new HttpError(422, "The average floor area must not exceed 170% of the lot area. Update the floor measurements.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
           ...(mixedUseScope ? { mixed_use_scope: mixedUseScope } : {}),
           ...(floorMeasurements ? { floorMeasurements } : {}) };

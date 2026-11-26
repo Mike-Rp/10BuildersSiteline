@@ -12,7 +12,7 @@ const positiveArea = value => (typeof value === "number" || typeof value === "st
 
 export function floorAreaRange(lot, floors) {
   if (!positiveArea(lot) || !Number.isInteger(floors) || floors < 1 || floors > MAX_INQUIRY_FLOORS) return null;
-  const minimumAverage = Math.max(MIN_AVERAGE_FLOOR_AREA, Number((Number(lot) * 1.5).toPrecision(15)));
+  const minimumAverage = MIN_AVERAGE_FLOOR_AREA;
   const maximumAverage = Number((Number(lot) * 1.7).toPrecision(15));
   return { minimumAverage, maximumAverage,
     minimum: Number((minimumAverage * floors).toPrecision(15)),
@@ -25,7 +25,7 @@ export function averageFloorAreaError(lot, total, floors) {
   const area = Number(Number(total).toPrecision(15));
   if (area >= range.minimum && area <= range.maximum) return "";
   const format = value => value.toLocaleString("en-PH", { maximumSignificantDigits: 15 });
-  return `Average floor area must be 150%–170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
+  return `Average floor area must be at least 20 m² and no more than 170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
 }
 
 export function normalizeFloorMeasurements(input, floorCount, lotArea) {

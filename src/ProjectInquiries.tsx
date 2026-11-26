@@ -983,7 +983,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             Add the area of every floor. {floorLimit === undefined
               ? "Enter the lot area and number of floors to see the allowed range."
               : floorLimit < minFloorArea ? "The lot area and number of floors exceed the supported total floor area range."
-              : `Allowed range is ${formatArea(minFloorArea)} to ${formatArea(floorLimit)} m². Average floor area must be 150% to 170% of the lot area (50% to 70% larger).`}
+              : `Allowed range is ${formatArea(minFloorArea)} to ${formatArea(floorLimit)} m². Minimum average: 20 m² per floor. The average may exceed the lot area by up to 70%.`}
           </small>}
           {!total && <small className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"}>Minimum lot area: {MIN_AVERAGE_FLOOR_AREA} m².</small>}
         </label>
