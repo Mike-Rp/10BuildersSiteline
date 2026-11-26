@@ -82,12 +82,14 @@ test("shared calendar preserves bounds, cancellation, clearing, and disabled fie
 
   const { default: OfficeInquiryWorkflow } = await server.ssrLoadModule("/src/OfficeInquiryWorkflow.tsx")
   const { assessInquiry } = await import("../Thesis-Backend/src/domain/inquiry-assessment.js")
-  const details = { name: "Test residence", project_type: "Residential", lot_area: 320, floor_area_sqm: 1000, floor_count: 2, anticipated_start: "2080-01-01" }
+  const details = { name: "Test residence", project_type: "Residential", lot_area: 320, floor_area_sqm: 1000, floor_count: 2, anticipated_start: "2080-01-01", building_footprint_sqm: 9999 }
   const props = {
     page: "review", row: { details, status: "approved" }, busy: false, reference: "Test", consultation: "30 minutes",
     error: "", pendingCount: 0, navigate() {}, back() {}, startStaffing() {}, decide() {}, save() {},
   }
   await React.act(() => root.render(React.createElement(OfficeInquiryWorkflow, props)))
+  assert.doesNotMatch(document.body.textContent, /Ground-floor footprint|Site occupancy/i)
+  assert.equal(document.getElementById("inquiry-review-building_footprint_sqm"), null)
   const areaPerFloor = document.getElementById("inquiry-review-area-per-floor")
   const enterArea = value => React.act(() => {
     Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(areaPerFloor, value)
