@@ -18,6 +18,7 @@ import { DEFAULT_SETUP_SPM_COUNT, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import AssignedScopeMatch from "./AssignedScopeMatch"
+import FloorAreaReview from "./FloorAreaReview"
 import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
@@ -1087,6 +1088,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
+              <FloorAreaReview area={Number(details.floor_area_sqm)} floors={floorCount} />
             </div>
           </FormSection>
           <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">
