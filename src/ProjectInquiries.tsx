@@ -17,6 +17,7 @@ import StaffingPeak from "./StaffingPeak"
 import { DEFAULT_SETUP_SPM_COUNT, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
+import AssignedScopeMatch from "./AssignedScopeMatch"
 import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
@@ -293,12 +294,12 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
       {lead ? <>
         <strong>Proposed Lead SPM · {phaseCandidate(lead.stage, lead.id)?.name || "Site PM"}</strong>
         <p>{lead.stage} · {years.format(lead.years)} of relevant experience</p>
-        <p><span className="inquiry-pill ready">Phase requirement matched</span> {lead.tags.join(", ")}</p>
+        <p><AssignedScopeMatch assigned={lead.tags} qualified={phaseCandidate(lead.stage, lead.id)?.qualifiedTags ?? []} /> {lead.tags.join(", ")}</p>
       </> : <p>Assign an eligible Site PM to the first included phase to propose a lead.</p>}
     </div>
     <div className="inquiry-lineup-table">
       <table>
-        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Phase qualification</th><th scope="col">Designation</th></tr></thead>
+        <thead><tr><th scope="col">Phase</th><th scope="col">Assigned Site PM</th><th scope="col">Relevant experience</th><th scope="col">Assigned scope match</th><th scope="col">Designation</th></tr></thead>
         <tbody>{phases.flatMap(stage => {
           const entry = team.find(item => item.stage === stage)
           const assigned = entry?.engineers ?? (entry?.user_id ? [{ user_id: entry.user_id, assigned_disciplines: entry.assigned_disciplines }] : [])
@@ -314,7 +315,7 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
             return <tr key={`${stage}:${id}`} data-lead={isLead}>
               <td>{stage}</td><td>{person?.name || "Site PM"}</td>
               <td>{person?.experienceYears == null ? "—" : years.format(Number(person.experienceYears))}</td>
-              <td>{tags.length ? <><span className="inquiry-pill ready">Matched</span> {tags.join(", ")}</> : <span className="inquiry-pill pending">Matching tag needed</span>}</td>
+              <td><AssignedScopeMatch assigned={assigned_disciplines} qualified={person?.qualifiedTags ?? []} /> {tags.join(", ")}</td>
               <td>{isLead ? <strong className="inquiry-pill">Lead SPM</strong> : designation}</td>
             </tr>
           })
@@ -399,7 +400,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   }
   return <section className="inquiry-card inquiry-staffing">
     <div className="inquiry-staff-heading"><h3>{stage}</h3>
-      {multi && <span className={`inquiry-pill ${coverage >= quota ? "ready" : "pending"}`}>{coverage} of {required.length} scopes covered · minimum {quota}</span>}
+      {multi && <span className={`inquiry-pill ${required.length > 0 && coverage === required.length ? "ready" : "pending"}`}>Team coverage · {required.length ? Math.round(coverage / required.length * 100) : 0}% · {coverage} of {required.length} scopes covered · minimum {quota}</span>}
     </div>
     <p className="inquiry-muted">{phaseRange ? `${staffingDate(phaseRange.start)} – ${staffingDate(phaseRange.end)}` : "Phase dates needed to check license coverage."}</p>
     {!!unavailable?.length && <details className="inquiry-license-window">
@@ -463,6 +464,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
             {replacements.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select></label>
           <p className="inquiry-muted">{assigned ? `Site PM${assigned.qualifiedTags.length ? ` · ${assigned.qualifiedTags.join(", ")}` : ""}` : "This assignment is no longer eligible. Replace or remove it before sending offers."}</p>
+          <p><AssignedScopeMatch assigned={person.assigned_disciplines} qualified={assigned?.qualifiedTags ?? []} /></p>
           {range && license && <div className={atRisk ? "inquiry-coverage-warning inquiry-license-window" : "inquiry-license-window"}>
             <strong>{unavailableAtStart ? "Unavailable at planned start" : atRisk ? "Renewal or backup needed" : isLead ? "Covered through closeout" : "Covered for this phase"}</strong>
             {isLead && <p>Lead coverage · {staffingDate(range.start)} – {staffingDate(range.end)}</p>}
@@ -475,7 +477,7 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
               const checked = person.assigned_disciplines.includes(area)
               const qualified = assigned?.qualifiedTags.includes(area)
               return <label className="inquiry-check" key={area}>
-                <input type="checkbox" checked={checked} disabled={checked ? !qualified : !qualified || person.assigned_disciplines.length >= 3}
+                <input type="checkbox" checked={checked} disabled={!checked && (!qualified || person.assigned_disciplines.length >= 3)}
                   onChange={() => update(engineers.map(other => other === person ? {
                     ...person, assigned_disciplines: checked ? person.assigned_disciplines.filter(tag => tag !== area) : [...person.assigned_disciplines, area],
                   } : other))} />
@@ -1549,6 +1551,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {arrangement && <p>Phase arrangement · {arrangement}</p>}
           </div>
           <p><strong>One suggested Site PM per phase.</strong> Review the selection and add optional engineers manually when needed.</p>
+          <p className="inquiry-muted">Each engineer must match 100% of their assigned responsibilities using verified tags. Team coverage shows how much of the whole phase is covered; add qualified engineers manually for remaining scopes.</p>
           <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => {
               const reason = staffingIssueByPhase.get(stage)
