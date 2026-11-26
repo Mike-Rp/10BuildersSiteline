@@ -78,14 +78,12 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const admin = await login("patricia.domingo@10builders.com","admin")
   const root = "/projects/inquiries"
   const details = {client_name:"Ana Reyes",email:`ana-${crypto.randomUUID()}@example.com`,phone:"09123456789",name:"Maple Grove Residence",
-    address:"Quezon City",project_type:"Residential",lot_area:240,building_footprint_sqm:90,floor_area_sqm:180,floor_count:2,consultation:30}
+    address:"Quezon City",project_type:"Residential",lot_area:240,floor_area_sqm:180,floor_count:2,consultation:30}
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_count:3213211} })
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_area_sqm:1e30} })
   await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:234} })
   await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:3999.99} })
   const create = () => call(root,{token:admin,json:details})
-  await call(root, {token:admin,status:422,json:{...details,building_footprint_sqm:169}})
-  await call(root, {token:admin,status:422,json:{...details,building_footprint_sqm:""}})
   const decision = (row,token,action,other={}) => call(`${root}/${row.id}/decision`,{token,json:{action,...other}})
   async function offer(row) {
     const manager = await call(`${root}/${row.id}/recommendation`,{token:admin})
@@ -240,7 +238,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await save("assessment",1,assessmentInput,409)
   await save("budget",2,{amount:0},422)
   await save("budget",2,{amount:1},422)
-  await save("budget",2,{amount:4799999.99},422)
+  await save("budget",2,{amount:4319999.99},422)
   const updatedBudget = 4800000
   assert.equal((await save("budget",2,{amount:updatedBudget})).workflow.budget,updatedBudget)
   await save("review",2,{...correction,reason:"Attempt another correction after review and budget."},409)
@@ -248,7 +246,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const assessed = (await save("assessment",2,assessmentInput)).workflow
   assert.equal(assessed.assessment.durationDays,215)
   assert.equal(assessed.assessment.size,"Medium")
-  assert.equal(assessed.assessment.score,8)
+  assert.equal(assessed.assessment.score,7)
   assert.equal(assessed.assessment.planningDays,131)
   assert.equal(assessed.assessment.suggestedEnd,"2027-05-23")
   assert.equal(assessed.budget_history[0].amount,updatedBudget)
@@ -526,8 +524,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const scope = {version:1,uses:["hotel","residential","office"],features:{podium:true,tower:false,curtainWall:true,landscaping:false}}
   const reviewed = await call(mixedWorkflow,{token,json:{action:"review",version,...mixedReview,mixed_use_scope:scope,reason:"Confirmed Mixed-Use scope."}})
   const mixedAssessment = (await call(mixedWorkflow,{token,json:{action:"assessment",version:reviewed.workflow.review.version,...assessmentInput}})).workflow.assessment
-  assert.equal(mixedAssessment.score,12)
-  assert.equal(mixedAssessment.complexity,"High")
+  assert.equal(mixedAssessment.score,11)
+  assert.equal(mixedAssessment.complexity,"Moderate")
   const mixedInput = {...details, project_type:"Mixed-Use",target_start_date:mixedReview.start,target_end_date:mixedReview.end,
     estimated_budget:mixedReview.amount,assessment_id:mixedAssessment.id}
   const mixedPreview = await call(mixedPlanning,{token,json:mixedInput})

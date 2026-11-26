@@ -1,0 +1,80 @@
+<div id="opm-lineup-demo" class="viz-dotted-background">
+  <section class="opm-window" aria-label="System suggested OPMs interactive proposal">
+    <header class="opm-brand"><span>10BuildLine <span class="opm-sub">/ Admin inquiry</span></span><span class="opm-tag">Interactive concept</span></header>
+    <div class="opm-content">
+      <div class="opm-heading"><i data-lucide="users" aria-hidden="true"></i><div><h2>System-suggested OPMs</h2><p>Automatically ranked by workload and qualifications</p></div></div>
+      <div class="opm-context"><span>Project type <strong>Residential</strong></span><span>Commitment limit <strong>2 per OPM</strong></span></div>
+      <div id="opm-results" aria-live="polite"></div>
+      <div class="opm-rule"><i data-lucide="info" aria-hidden="true"></i><span>Only qualified OPMs below 2 commitments appear. Lower workload ranks first; relevant experience breaks ties.</span></div>
+      <div class="opm-actions"><span id="opm-recommendation"></span><button type="button" id="opm-assign">Assign recommended OPM</button></div>
+      <p id="opm-feedback" role="status"></p>
+      <details class="opm-controls" open><summary>Adjust sample workloads</summary><div class="opm-control-labels"><span>Sample OPM</span><span>Active projects</span><span>Inquiry reservations</span><span>Qualified</span></div><div id="opm-inputs"></div></details>
+    </div>
+    <footer class="opm-footer">Sample data · Changes stay in this preview</footer>
+  </section>
+</div>
+<style>
+#opm-lineup-demo{color-scheme:light dark;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;padding:16px 0;--opm-bg:light-dark(#fff,#162334);--opm-ink:light-dark(#133454,#e3efff);--opm-muted:light-dark(#526b86,#a8bdd5);--opm-line:light-dark(#cbdaea,#3d5068);--opm-soft:light-dark(#e7f1fc,#223e5a);--opm-selected:light-dark(#f0f6fe,#203a54);--opm-navy:light-dark(#123b64,#b7d7ff);--opm-on:light-dark(#fff,#10253d);--opm-good:light-dark(#e3f4e9,#203e32)}
+#opm-lineup-demo *{box-sizing:border-box}
+#opm-lineup-demo .opm-window{max-width:900px;margin:auto;background:var(--opm-bg);color:var(--opm-ink);border:1px solid var(--opm-line);border-radius:18px;overflow:hidden}
+#opm-lineup-demo .opm-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 22px;background:var(--opm-navy);color:var(--opm-on);font-weight:600}
+#opm-lineup-demo .opm-sub{font-weight:400;opacity:.85}
+#opm-lineup-demo .opm-tag{font-size:12px;border:1px solid currentColor;border-radius:20px;padding:2px 9px}
+#opm-lineup-demo .opm-content{padding:22px;display:grid;gap:16px}
+#opm-lineup-demo h2{font-size:23px;line-height:1.25;margin:0 0 5px;font-weight:600}
+#opm-lineup-demo p{margin:0;color:var(--opm-muted)}
+#opm-lineup-demo .opm-heading{display:flex;align-items:center;gap:14px;padding:18px;background:var(--opm-soft);border-radius:12px}
+#opm-lineup-demo .opm-context{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--opm-muted)}
+#opm-lineup-demo strong{font-weight:600;color:var(--opm-ink)}
+#opm-lineup-demo table{border-collapse:collapse;width:100%;table-layout:fixed}
+#opm-lineup-demo th,#opm-lineup-demo td{padding:14px 8px;border-bottom:1px solid var(--opm-line);text-align:center;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#opm-lineup-demo th{font-weight:400;color:var(--opm-muted);font-size:12px}
+#opm-lineup-demo th:first-child,#opm-lineup-demo td:first-child{text-align:left;width:32%}
+#opm-lineup-demo th:last-child{width:23%}
+#opm-lineup-demo tr.opm-best{background:var(--opm-selected)}
+#opm-lineup-demo .opm-person{font-weight:600;display:block}
+#opm-lineup-demo .opm-years{font-size:12px;color:var(--opm-muted);display:block}
+#opm-lineup-demo .opm-status{border-radius:18px;display:inline-block;background:var(--opm-good);padding:4px 9px;font-size:12px}
+#opm-lineup-demo .opm-best .opm-status{background:var(--opm-soft)}
+#opm-lineup-demo .opm-rule{display:flex;gap:10px;align-items:flex-start;color:var(--opm-muted);font-size:12px}
+#opm-lineup-demo .opm-rule svg{flex-shrink:0}
+#opm-lineup-demo .opm-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+#opm-lineup-demo button{font:inherit;border:0;border-radius:9px;padding:11px 15px;background:var(--opm-navy);color:var(--opm-on);cursor:pointer}
+#opm-lineup-demo button:disabled{opacity:.5;cursor:default}
+#opm-lineup-demo :focus-visible{outline:3px solid var(--opm-navy);outline-offset:3px}
+#opm-lineup-demo .opm-empty{padding:24px 16px;background:var(--opm-soft);border-radius:10px}
+#opm-lineup-demo .opm-empty p{margin-top:6px}
+#opm-lineup-demo #opm-feedback:empty{display:none}
+#opm-lineup-demo #opm-feedback{padding:10px 12px;background:var(--opm-good);border-radius:8px;color:var(--opm-ink)}
+#opm-lineup-demo .opm-controls{border-top:1px solid var(--opm-line);padding-top:16px}
+#opm-lineup-demo summary{cursor:pointer;font-weight:600;margin-bottom:12px}
+#opm-lineup-demo .opm-control-labels,#opm-lineup-demo .opm-control-row{display:grid;grid-template-columns:1.3fr 1fr 1fr .7fr;gap:12px;align-items:center}
+#opm-lineup-demo .opm-control-labels{font-size:12px;color:var(--opm-muted);margin-bottom:8px}
+#opm-lineup-demo .opm-control-row{padding:9px 0;border-bottom:1px solid var(--opm-line)}
+#opm-lineup-demo select{font:inherit;background:var(--opm-bg);color:var(--opm-ink);border:1px solid var(--opm-line);padding:8px;border-radius:7px;width:100%}
+#opm-lineup-demo input[type=checkbox]{width:20px;height:20px;accent-color:var(--opm-navy)}
+#opm-lineup-demo .opm-footer{padding:12px 22px;border-top:1px solid var(--opm-line);color:var(--opm-muted);font-size:12px}
+@media(max-width:520px){#opm-lineup-demo .opm-content{padding:12px;gap:14px}#opm-lineup-demo .opm-brand{padding:12px}#opm-lineup-demo .opm-sub{display:none}#opm-lineup-demo h2{font-size:20px}#opm-lineup-demo th,#opm-lineup-demo td{padding:12px 4px}#opm-lineup-demo .opm-status{padding:3px 5px}#opm-lineup-demo .opm-control-labels,#opm-lineup-demo .opm-control-row{gap:6px;grid-template-columns:1.1fr .85fr .85fr .65fr}#opm-lineup-demo .opm-actions button{width:100%}#opm-lineup-demo .opm-heading{padding:12px}}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('opm-lineup-demo');
+const initial=[{id:'ana',name:'Ana Reyes',active:1,reserved:1,years:6,qualified:true},{id:'rosa',name:'Rosa Lim',active:1,reserved:0,years:8,qualified:true},{id:'luis',name:'Luis Cruz',active:0,reserved:0,years:5,qualified:true}];
+let people=initial.map(p=>({...p}));
+function restore(snapshot){const saved=snapshot?.privateContent?.people;if(!Array.isArray(saved)||saved.length!==initial.length)return;people=initial.map(p=>{const x=saved.find(s=>s.id===p.id);return x&&Number.isInteger(x.active)&&Number.isInteger(x.reserved)&&x.active>=0&&x.reserved>=0&&x.active+x.reserved<=2?{...p,active:x.active,reserved:x.reserved,qualified:x.qualified!==false}:p;});}
+restore(window.openai?.widgetState);
+function ranked(){return people.filter(p=>p.qualified&&p.active+p.reserved<2).sort((a,b)=>(a.active+a.reserved)-(b.active+b.reserved)||b.years-a.years||a.name.localeCompare(b.name));}
+function save(){const snapshot={modelContent:{limit:2,suggestedOpmIds:ranked().map(p=>p.id),workloads:people.map(p=>({name:p.name,active:p.active,inquiryReservations:p.reserved,qualified:p.qualified}))},privateContent:{people}};window.openai?.setWidgetState?.(snapshot)?.catch(()=>{});}
+function render(){
+const candidates=ranked();
+root.querySelector('#opm-results').innerHTML=candidates.length?`<table aria-label="Automatically ranked eligible OPMs"><thead><tr><th>OPM</th><th>Active<br>projects</th><th>Inquiry<br>reservations</th><th>Total</th><th>Status</th></tr></thead><tbody>${candidates.map((p,i)=>`<tr class="${i===0?'opm-best':''}"><td><span class="opm-person">${p.name}</span><span class="opm-years">${p.years} years · Residential</span></td><td>${p.active}</td><td>${p.reserved}</td><td>${p.active+p.reserved}/2</td><td><span class="opm-status">${i===0?'★ Recommended':'Available'}</span></td></tr>`).join('')}</tbody></table>`:`<div class="opm-empty"><strong>No qualified OPM currently has capacity.</strong><p>The inquiry remains pending and unassigned.</p></div>`;
+root.querySelector('#opm-recommendation').textContent=candidates.length?`Automatically suggested: ${candidates[0].name}`:'Awaiting an eligible OPM';
+root.querySelector('#opm-assign').disabled=!candidates.length;
+root.querySelector('#opm-inputs').innerHTML=people.map(p=>`<div class="opm-control-row"><span>${p.name}</span><select aria-label="${p.name} active projects" data-person="${p.id}" data-field="active">${[0,1,2].map(n=>`<option value="${n}" ${p.active===n?'selected':''} ${n+p.reserved>2?'disabled':''}>${n}</option>`).join('')}</select><select aria-label="${p.name} inquiry reservations" data-person="${p.id}" data-field="reserved">${[0,1,2].map(n=>`<option value="${n}" ${p.reserved===n?'selected':''} ${n+p.active>2?'disabled':''}>${n}</option>`).join('')}</select><input type="checkbox" aria-label="${p.name} qualifies for this inquiry" data-person="${p.id}" data-field="qualified" ${p.qualified?'checked':''}></div>`).join('');
+}
+root.addEventListener('change',event=>{const el=event.target;if(!el.dataset.person)return;const p=people.find(p=>p.id===el.dataset.person);p[el.dataset.field]=el.dataset.field==='qualified'?el.checked:Number(el.value);root.querySelector('#opm-feedback').textContent='';render();root.querySelector(`[data-person="${p.id}"][data-field="${el.dataset.field}"]`)?.focus();save();});
+root.querySelector('#opm-assign').addEventListener('click',()=>{const p=ranked()[0];if(!p)return;p.reserved++;render();root.querySelector('#opm-feedback').textContent=`Inquiry reserved for ${p.name}. Workload: ${p.active} active + ${p.reserved} reserved = ${p.active+p.reserved}/2. Suggested lineup updated.`;save();});
+window.addEventListener('openai:set_globals',event=>{const snapshot=event.detail?.globals?.widgetState;if(snapshot){restore(snapshot);render();}});
+render();
+})();
+</script>

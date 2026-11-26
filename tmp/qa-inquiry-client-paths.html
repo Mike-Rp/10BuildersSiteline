@@ -1,0 +1,13 @@
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import ProjectInquiries from '/src/ProjectInquiries.tsx';
+import '/src/index.css';
+import '/src/construction-daylight.css';
+import '/src/workspace-theme.css';
+import '/src/admin-ui-refinements.css';
+import '/src/admin-navigation.css';
+import '/src/header-controls.css';
+window.fetch=async url=>Response.json({data:String(url).includes('opm-candidates')?[{id:'preferred',name:'Avery Reyes',experience_years:10}]:[]});
+createRoot(document.getElementById('root')).render(React.createElement('div',{className:'app-shell'},React.createElement(ProjectInquiries,{role:'admin',onReload(){}})));
+</script></body></html>

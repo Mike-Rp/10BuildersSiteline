@@ -12,7 +12,7 @@ export function inquiryCostEstimate(details: Record<string, string | number>, co
   minimum: number; maximum: number;
 } | null;
 export function inquiryAssessmentBasis(details: Record<string, string | number>, technical: string, arrangement: string, scope?: MixedUseSelections): {
-  size: string; typePoints: number; sizePoints: number; floorPoints: number; technicalPoints: number; overlapPoints: number;
+  size: string; typePoints: number; sizePoints: number; technicalPoints: number; overlapPoints: number;
   baselineComplexity: string; complexityFactor: number; overlapFactor: number; rate: number; usePoints: number; featurePoints: number;
   medium: [number, number]; extraFloorDays: number;
 };

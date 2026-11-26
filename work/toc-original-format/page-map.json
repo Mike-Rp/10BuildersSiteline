@@ -1,0 +1,2550 @@
+[
+  {
+    "kind": "contents",
+    "text": "Title Page",
+    "bookmark": "IndexContents0000",
+    "physicalPage": 1,
+    "pageNumber": 1
+  },
+  {
+    "kind": "contents",
+    "text": "Endorsement form for Oral Defense",
+    "bookmark": "IndexContents0040",
+    "physicalPage": 2,
+    "pageNumber": 2
+  },
+  {
+    "kind": "contents",
+    "text": "Approval Sheet",
+    "bookmark": "IndexContents0082",
+    "physicalPage": 3,
+    "pageNumber": 3
+  },
+  {
+    "kind": "contents",
+    "text": "Acknowledgements",
+    "bookmark": "IndexContents0115",
+    "physicalPage": 4,
+    "pageNumber": 4
+  },
+  {
+    "kind": "contents",
+    "text": "Abstract",
+    "bookmark": "IndexContents0125",
+    "physicalPage": 5,
+    "pageNumber": 5
+  },
+  {
+    "kind": "contents",
+    "text": "Table of Contents",
+    "bookmark": "IndexContents0139",
+    "physicalPage": 6,
+    "pageNumber": 6
+  },
+  {
+    "kind": "contents",
+    "text": "List of Figures",
+    "bookmark": "IndexContents0141",
+    "physicalPage": 8,
+    "pageNumber": 8
+  },
+  {
+    "kind": "contents",
+    "text": "List of Tables",
+    "bookmark": "IndexContents0143",
+    "physicalPage": 15,
+    "pageNumber": 15
+  },
+  {
+    "kind": "contents",
+    "text": "Introduction",
+    "bookmark": "IndexContents0145",
+    "physicalPage": 20,
+    "pageNumber": 1
+  },
+  {
+    "kind": "contents",
+    "text": "Project Context",
+    "bookmark": "IndexContents0146",
+    "physicalPage": 20,
+    "pageNumber": 1
+  },
+  {
+    "kind": "contents",
+    "text": "Purpose and Description",
+    "bookmark": "IndexContents0153",
+    "physicalPage": 22,
+    "pageNumber": 3
+  },
+  {
+    "kind": "contents",
+    "text": "Objectives of the Study",
+    "bookmark": "IndexContents0163",
+    "physicalPage": 24,
+    "pageNumber": 5
+  },
+  {
+    "kind": "contents",
+    "text": "General Objective",
+    "bookmark": "IndexContents0164",
+    "physicalPage": 24,
+    "pageNumber": 5
+  },
+  {
+    "kind": "contents",
+    "text": "Specific Objectives",
+    "bookmark": "IndexContents0167",
+    "physicalPage": 25,
+    "pageNumber": 6
+  },
+  {
+    "kind": "contents",
+    "text": "Scope and Limitations",
+    "bookmark": "IndexContents0174",
+    "physicalPage": 26,
+    "pageNumber": 7
+  },
+  {
+    "kind": "contents",
+    "text": "Review of Related Literature/Studies/Systems",
+    "bookmark": "IndexContents0194",
+    "physicalPage": 30,
+    "pageNumber": 11
+  },
+  {
+    "kind": "contents",
+    "text": "Synthesis",
+    "bookmark": "IndexContents0237",
+    "physicalPage": 38,
+    "pageNumber": 19
+  },
+  {
+    "kind": "contents",
+    "text": "Methodology",
+    "bookmark": "IndexContents0242",
+    "physicalPage": 40,
+    "pageNumber": 21
+  },
+  {
+    "kind": "contents",
+    "text": "Technical Background",
+    "bookmark": "IndexContents0243",
+    "physicalPage": 40,
+    "pageNumber": 21
+  },
+  {
+    "kind": "contents",
+    "text": "Technologies to be Used",
+    "bookmark": "IndexContents0244",
+    "physicalPage": 40,
+    "pageNumber": 21
+  },
+  {
+    "kind": "contents",
+    "text": "Requirements Analysis",
+    "bookmark": "IndexContents0270",
+    "physicalPage": 48,
+    "pageNumber": 29
+  },
+  {
+    "kind": "contents",
+    "text": "Requirements Documentation",
+    "bookmark": "IndexContents0283",
+    "physicalPage": 52,
+    "pageNumber": 33
+  },
+  {
+    "kind": "contents",
+    "text": "Design of Software, System, Product, and/or Processes",
+    "bookmark": "IndexContents0347",
+    "physicalPage": 78,
+    "pageNumber": 59
+  },
+  {
+    "kind": "contents",
+    "text": "Development",
+    "bookmark": "IndexContents0373",
+    "physicalPage": 85,
+    "pageNumber": 66
+  },
+  {
+    "kind": "contents",
+    "text": "Result and Discussion",
+    "bookmark": "IndexContents0617",
+    "physicalPage": 121,
+    "pageNumber": 102
+  },
+  {
+    "kind": "contents",
+    "text": "Testing",
+    "bookmark": "IndexContents0618",
+    "physicalPage": 121,
+    "pageNumber": 102
+  },
+  {
+    "kind": "contents",
+    "text": "Description of Prototype",
+    "bookmark": "IndexContents0705",
+    "physicalPage": 165,
+    "pageNumber": 146
+  },
+  {
+    "kind": "contents",
+    "text": "Implementation Plan",
+    "bookmark": "IndexContents0710",
+    "physicalPage": 166,
+    "pageNumber": 147
+  },
+  {
+    "kind": "contents",
+    "text": "Implementation Result",
+    "bookmark": "IndexContents0796",
+    "physicalPage": 183,
+    "pageNumber": 164
+  },
+  {
+    "kind": "contents",
+    "text": "Conclusion",
+    "bookmark": "IndexContents1125",
+    "physicalPage": 226,
+    "pageNumber": 207
+  },
+  {
+    "kind": "contents",
+    "text": "References",
+    "bookmark": "IndexContents1145",
+    "physicalPage": 230,
+    "pageNumber": 211
+  },
+  {
+    "kind": "contents",
+    "text": "Appendices",
+    "bookmark": "IndexContents1162",
+    "physicalPage": 232,
+    "pageNumber": 213
+  },
+  {
+    "kind": "contents",
+    "text": "Resource Person",
+    "bookmark": "IndexContents1163",
+    "physicalPage": 233,
+    "pageNumber": 214
+  },
+  {
+    "kind": "contents",
+    "text": "Relevant Source Code",
+    "bookmark": "IndexContents1170",
+    "physicalPage": 235,
+    "pageNumber": 216
+  },
+  {
+    "kind": "contents",
+    "text": "Evaluation Tools/Test Documents",
+    "bookmark": "IndexContents1188",
+    "physicalPage": 240,
+    "pageNumber": 221
+  },
+  {
+    "kind": "contents",
+    "text": "User’s Guide",
+    "bookmark": "IndexContents1661",
+    "physicalPage": 320,
+    "pageNumber": 301
+  },
+  {
+    "kind": "contents",
+    "text": "Personal Technical Vitae",
+    "bookmark": "IndexContents1920",
+    "physicalPage": 360,
+    "pageNumber": 341
+  },
+  {
+    "kind": "table",
+    "text": "Table 1: Gantt Chart of Activities",
+    "bookmark": "IndexTable001",
+    "physicalPage": 43,
+    "pageNumber": 24
+  },
+  {
+    "kind": "table",
+    "text": "Table 2. Hardware Specifications",
+    "bookmark": "IndexTable002",
+    "physicalPage": 46,
+    "pageNumber": 27
+  },
+  {
+    "kind": "table",
+    "text": "Table 3. Software Requirements",
+    "bookmark": "IndexTable003",
+    "physicalPage": 46,
+    "pageNumber": 27
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 1: Agile Software Development Life Cycle",
+    "bookmark": "IndexFigure001",
+    "physicalPage": 47,
+    "pageNumber": 28
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 2: Flowchart of the Current Manual Process of 10 Builders Development and Construction Corporation",
+    "bookmark": "IndexFigure002",
+    "physicalPage": 49,
+    "pageNumber": 30
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 3: Use-Case Model of the Current Manual Process of 10 Builders Development and Construction Corporation",
+    "bookmark": "IndexFigure003",
+    "physicalPage": 50,
+    "pageNumber": 31
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 4: Data Flow Diagram Model of the Current Manual Process of 10 Builders Development and Construction Corporation",
+    "bookmark": "IndexFigure004",
+    "physicalPage": 51,
+    "pageNumber": 32
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 5: Flowchart of the Sign in Process of the developed System",
+    "bookmark": "IndexFigure005",
+    "physicalPage": 53,
+    "pageNumber": 34
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 6: Flowchart of the Password Recovery of the Developed System",
+    "bookmark": "IndexFigure006",
+    "physicalPage": 55,
+    "pageNumber": 36
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 7: Flowchart of the Admin Dashboard of the Developed System",
+    "bookmark": "IndexFigure007",
+    "physicalPage": 56,
+    "pageNumber": 37
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 8: Flowchart of the User Account Creation of the Developed System",
+    "bookmark": "IndexFigure008",
+    "physicalPage": 57,
+    "pageNumber": 38
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 9: Flowchart of the Admin Dashboard of the Developed System",
+    "bookmark": "IndexFigure009",
+    "physicalPage": 58,
+    "pageNumber": 39
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 10: Flowchart of the Office Project Manager Dashboard of the Developed System",
+    "bookmark": "IndexFigure010",
+    "physicalPage": 60,
+    "pageNumber": 41
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 11: Flowchart of the Project Proposal of the Developed System",
+    "bookmark": "IndexFigure011",
+    "physicalPage": 61,
+    "pageNumber": 42
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 12: Flowchart of the Project Assessment and Staffing Planning of the Developed System",
+    "bookmark": "IndexFigure012",
+    "physicalPage": 62,
+    "pageNumber": 43
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 13: Flowchart of the Site Project Manager Assignment Response of the Developed System",
+    "bookmark": "IndexFigure013",
+    "physicalPage": 64,
+    "pageNumber": 45
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 14: Flowchart of the Site Project Manager Dashboard of the Developed System",
+    "bookmark": "IndexFigure014",
+    "physicalPage": 65,
+    "pageNumber": 46
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 15: Flowchart of the Subcon Allocation of the Developed System",
+    "bookmark": "IndexFigure015",
+    "physicalPage": 66,
+    "pageNumber": 47
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 16: Flowchart of the Project Documentation Upload of the Developed System",
+    "bookmark": "IndexFigure016",
+    "physicalPage": 68,
+    "pageNumber": 49
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 17: Flowchart of the Project Activation of the Developed System",
+    "bookmark": "IndexFigure017",
+    "physicalPage": 69,
+    "pageNumber": 50
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 18: Flowchart of the Progress Evidence Submission and Review of the Developed System",
+    "bookmark": "IndexFigure018",
+    "physicalPage": 70,
+    "pageNumber": 51
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 19: Flowchart of the Construction Phase Handoff and Project Closure of the Developed System",
+    "bookmark": "IndexFigure019",
+    "physicalPage": 72,
+    "pageNumber": 53
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 20: Flowchart of the Report Generation and Export of the Developed System",
+    "bookmark": "IndexFigure020",
+    "physicalPage": 73,
+    "pageNumber": 54
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 21: Flowchart of the Client Dashboard of the Developed System",
+    "bookmark": "IndexFigure021",
+    "physicalPage": 74,
+    "pageNumber": 55
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 22: Flowchart of the System Workflow of the Developed System",
+    "bookmark": "IndexFigure022",
+    "physicalPage": 75,
+    "pageNumber": 56
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 23: Flowchart of the System Workflow of the Developed System",
+    "bookmark": "IndexFigure023",
+    "physicalPage": 77,
+    "pageNumber": 58
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 24: Use-Case Diagram of the Developed System",
+    "bookmark": "IndexFigure024",
+    "physicalPage": 78,
+    "pageNumber": 59
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 25: Use-Case Diagram of the Developed System",
+    "bookmark": "IndexFigure025",
+    "physicalPage": 80,
+    "pageNumber": 61
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 26: Level 1 Data Flow Diagram of the Developed System",
+    "bookmark": "IndexFigure026",
+    "physicalPage": 81,
+    "pageNumber": 62
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 27: Desktop and Mobile Views of the 10BuildLine Client Landing Page",
+    "bookmark": "IndexFigure027",
+    "physicalPage": 86,
+    "pageNumber": 67
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 28: Administrator Landing Page",
+    "bookmark": "IndexFigure028",
+    "physicalPage": 87,
+    "pageNumber": 68
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 29: Office and Site Project Manager Landing Page",
+    "bookmark": "IndexFigure029",
+    "physicalPage": 89,
+    "pageNumber": 70
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 30: Desktop and mobile views of the administrator dashboard",
+    "bookmark": "IndexFigure030",
+    "physicalPage": 90,
+    "pageNumber": 71
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 31: Desktop and mobile views of the administrator project inquiries",
+    "bookmark": "IndexFigure031",
+    "physicalPage": 91,
+    "pageNumber": 72
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 32: Desktop and mobile views of the administrator active sites",
+    "bookmark": "IndexFigure032",
+    "physicalPage": 92,
+    "pageNumber": 73
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 33: Desktop and mobile views of the administrator project detail",
+    "bookmark": "IndexFigure033",
+    "physicalPage": 93,
+    "pageNumber": 74
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 34: Desktop and mobile views of the administrator project document",
+    "bookmark": "IndexFigure034",
+    "physicalPage": 94,
+    "pageNumber": 75
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 35: Desktop and mobile views of the administrator engineer directory",
+    "bookmark": "IndexFigure035",
+    "physicalPage": 95,
+    "pageNumber": 76
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 36: Desktop and mobile views of the administrator subcontractor directory",
+    "bookmark": "IndexFigure036",
+    "physicalPage": 96,
+    "pageNumber": 77
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 37: Desktop and mobile views of the administrator archive",
+    "bookmark": "IndexFigure037",
+    "physicalPage": 97,
+    "pageNumber": 78
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 38: Desktop and mobile views of the administrator project inquiry form",
+    "bookmark": "IndexFigure038",
+    "physicalPage": 98,
+    "pageNumber": 79
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 39: Desktop and mobile views of the administrator team and accounts",
+    "bookmark": "IndexFigure039",
+    "physicalPage": 99,
+    "pageNumber": 80
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 40: Desktop and mobile views of the administrator activity log",
+    "bookmark": "IndexFigure040",
+    "physicalPage": 100,
+    "pageNumber": 81
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 41: Desktop and mobile views of the administrator organization settings",
+    "bookmark": "IndexFigure041",
+    "physicalPage": 101,
+    "pageNumber": 82
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 42: Desktop and mobile views of the administrator backups",
+    "bookmark": "IndexFigure042",
+    "physicalPage": 102,
+    "pageNumber": 83
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 43:  Desktop and mobile views of the office project manager active sites",
+    "bookmark": "IndexFigure043",
+    "physicalPage": 103,
+    "pageNumber": 84
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 44:  Desktop and mobile views of the office project manager archive",
+    "bookmark": "IndexFigure044",
+    "physicalPage": 104,
+    "pageNumber": 85
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 45: Desktop and mobile views of the office project manager activity log",
+    "bookmark": "IndexFigure045",
+    "physicalPage": 105,
+    "pageNumber": 86
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 46: Desktop and mobile views of the office project manager notification preferences",
+    "bookmark": "IndexFigure046",
+    "physicalPage": 106,
+    "pageNumber": 87
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 47: Desktop and mobile views of the site project manager dashboard",
+    "bookmark": "IndexFigure047",
+    "physicalPage": 107,
+    "pageNumber": 88
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 48: Desktop and mobile views of the site project manager active sites",
+    "bookmark": "IndexFigure048",
+    "physicalPage": 108,
+    "pageNumber": 89
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 49: Desktop and mobile views of the site project manager project monitoring",
+    "bookmark": "IndexFigure049",
+    "physicalPage": 109,
+    "pageNumber": 90
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 50: Desktop and mobile views of the site project manager resources",
+    "bookmark": "IndexFigure050",
+    "physicalPage": 110,
+    "pageNumber": 91
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 51: Desktop and mobile views of the site project manager archive",
+    "bookmark": "IndexFigure051",
+    "physicalPage": 111,
+    "pageNumber": 92
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 52: Desktop and mobile views of the site project manager activity log",
+    "bookmark": "IndexFigure052",
+    "physicalPage": 112,
+    "pageNumber": 93
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 53: Desktop and mobile views of the site project manager notification preferences",
+    "bookmark": "IndexFigure053",
+    "physicalPage": 113,
+    "pageNumber": 94
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 54: Desktop and mobile views of the client project overview",
+    "bookmark": "IndexFigure054",
+    "physicalPage": 114,
+    "pageNumber": 95
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 55: Desktop and mobile views of the client active sites",
+    "bookmark": "IndexFigure055",
+    "physicalPage": 115,
+    "pageNumber": 96
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 56: Desktop and mobile views of the client project detail",
+    "bookmark": "IndexFigure056",
+    "physicalPage": 116,
+    "pageNumber": 97
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 57: Desktop and mobile views of the client project document",
+    "bookmark": "IndexFigure057",
+    "physicalPage": 117,
+    "pageNumber": 98
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 58: Desktop and mobile views of the client progress history",
+    "bookmark": "IndexFigure058",
+    "physicalPage": 118,
+    "pageNumber": 99
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 59: Desktop and mobile views of the client site photograph",
+    "bookmark": "IndexFigure059",
+    "physicalPage": 119,
+    "pageNumber": 100
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 60: Desktop and mobile views of the client notification preferences",
+    "bookmark": "IndexFigure060",
+    "physicalPage": 120,
+    "pageNumber": 101
+  },
+  {
+    "kind": "table",
+    "text": "Table 4: Test Cases for Authentication and sign-out",
+    "bookmark": "IndexTable004",
+    "physicalPage": 121,
+    "pageNumber": 102
+  },
+  {
+    "kind": "table",
+    "text": "Table 5: Test Cases for Password recovery",
+    "bookmark": "IndexTable005",
+    "physicalPage": 123,
+    "pageNumber": 104
+  },
+  {
+    "kind": "table",
+    "text": "Table 6: Test Cases for Navigation and responsive layout",
+    "bookmark": "IndexTable006",
+    "physicalPage": 124,
+    "pageNumber": 105
+  },
+  {
+    "kind": "table",
+    "text": "Table 7: Test Cases for File upload and access",
+    "bookmark": "IndexTable007",
+    "physicalPage": 125,
+    "pageNumber": 106
+  },
+  {
+    "kind": "table",
+    "text": "Table 8: Test Cases for Notifications and access restrictions",
+    "bookmark": "IndexTable008",
+    "physicalPage": 125,
+    "pageNumber": 106
+  },
+  {
+    "kind": "table",
+    "text": "Table 9: Test Cases for Dashboard",
+    "bookmark": "IndexTable009",
+    "physicalPage": 128,
+    "pageNumber": 109
+  },
+  {
+    "kind": "table",
+    "text": "Table 10: Test Cases for Team accounts",
+    "bookmark": "IndexTable010",
+    "physicalPage": 128,
+    "pageNumber": 109
+  },
+  {
+    "kind": "table",
+    "text": "Table 11: Test Cases for Personnel and credentials",
+    "bookmark": "IndexTable011",
+    "physicalPage": 130,
+    "pageNumber": 111
+  },
+  {
+    "kind": "table",
+    "text": "Table 12: Test Cases for Subcontractor directory",
+    "bookmark": "IndexTable012",
+    "physicalPage": 131,
+    "pageNumber": 112
+  },
+  {
+    "kind": "table",
+    "text": "Table 13: Test Cases for Project inquiry creation and routing",
+    "bookmark": "IndexTable013",
+    "physicalPage": 133,
+    "pageNumber": 114
+  },
+  {
+    "kind": "table",
+    "text": "Table 14: Test Cases for Inquiry tracking and client account recovery",
+    "bookmark": "IndexTable014",
+    "physicalPage": 135,
+    "pageNumber": 116
+  },
+  {
+    "kind": "table",
+    "text": "Table 15. Test Cases for Documents",
+    "bookmark": "IndexTable015",
+    "physicalPage": 136,
+    "pageNumber": 117
+  },
+  {
+    "kind": "table",
+    "text": "Table 16: Test Cases for Reports",
+    "bookmark": "IndexTable016",
+    "physicalPage": 137,
+    "pageNumber": 118
+  },
+  {
+    "kind": "table",
+    "text": "Table 17: Test Cases for Activity log",
+    "bookmark": "IndexTable017",
+    "physicalPage": 138,
+    "pageNumber": 119
+  },
+  {
+    "kind": "table",
+    "text": "Table 18: Test Cases for Administrator security",
+    "bookmark": "IndexTable018",
+    "physicalPage": 138,
+    "pageNumber": 119
+  },
+  {
+    "kind": "table",
+    "text": "Table 19: Test Cases for Backup monitoring",
+    "bookmark": "IndexTable019",
+    "physicalPage": 139,
+    "pageNumber": 120
+  },
+  {
+    "kind": "table",
+    "text": "Table 20: Test Cases for Archive",
+    "bookmark": "IndexTable020",
+    "physicalPage": 140,
+    "pageNumber": 121
+  },
+  {
+    "kind": "table",
+    "text": "Table 21: Test Cases for Dashboard",
+    "bookmark": "IndexTable021",
+    "physicalPage": 141,
+    "pageNumber": 122
+  },
+  {
+    "kind": "table",
+    "text": "Table 22: Test Cases for Active sites and project monitoring",
+    "bookmark": "IndexTable022",
+    "physicalPage": 141,
+    "pageNumber": 122
+  },
+  {
+    "kind": "table",
+    "text": "Table 23: Test Cases for Project setup and staffing",
+    "bookmark": "IndexTable023",
+    "physicalPage": 142,
+    "pageNumber": 123
+  },
+  {
+    "kind": "table",
+    "text": "Table 24: Test Cases for Required documents",
+    "bookmark": "IndexTable024",
+    "physicalPage": 144,
+    "pageNumber": 125
+  },
+  {
+    "kind": "table",
+    "text": "Table 25. Test Cases for Progress and evidence review",
+    "bookmark": "IndexTable025",
+    "physicalPage": 145,
+    "pageNumber": 126
+  },
+  {
+    "kind": "table",
+    "text": "Table 26: Test Cases for Phase handoff and completion",
+    "bookmark": "IndexTable026",
+    "physicalPage": 147,
+    "pageNumber": 128
+  },
+  {
+    "kind": "table",
+    "text": "Table 27: Test Cases for Reports",
+    "bookmark": "IndexTable027",
+    "physicalPage": 149,
+    "pageNumber": 130
+  },
+  {
+    "kind": "table",
+    "text": "Table 28: Test Cases for Assignment requests",
+    "bookmark": "IndexTable028",
+    "physicalPage": 150,
+    "pageNumber": 131
+  },
+  {
+    "kind": "table",
+    "text": "Table 29: Test Cases for Active sites and project access",
+    "bookmark": "IndexTable029",
+    "physicalPage": 151,
+    "pageNumber": 132
+  },
+  {
+    "kind": "table",
+    "text": "Table 30: Test Cases for Project-level subcontractor allocation",
+    "bookmark": "IndexTable030",
+    "physicalPage": 151,
+    "pageNumber": 132
+  },
+  {
+    "kind": "table",
+    "text": "Table 31: Test Cases for Phase activities and evidence",
+    "bookmark": "IndexTable031",
+    "physicalPage": 153,
+    "pageNumber": 134
+  },
+  {
+    "kind": "table",
+    "text": "Table 32. Test Cases for Field updates and site photos",
+    "bookmark": "IndexTable032",
+    "physicalPage": 155,
+    "pageNumber": 136
+  },
+  {
+    "kind": "table",
+    "text": "Table 33: Test Cases for Personnel and resources",
+    "bookmark": "IndexTable033",
+    "physicalPage": 156,
+    "pageNumber": 137
+  },
+  {
+    "kind": "table",
+    "text": "Table 34. Test Cases for Documents",
+    "bookmark": "IndexTable034",
+    "physicalPage": 157,
+    "pageNumber": 138
+  },
+  {
+    "kind": "table",
+    "text": "Table 35: Test Cases for Project access",
+    "bookmark": "IndexTable035",
+    "physicalPage": 158,
+    "pageNumber": 139
+  },
+  {
+    "kind": "table",
+    "text": "Table 36: Test Cases for Project overview and progress",
+    "bookmark": "IndexTable036",
+    "physicalPage": 159,
+    "pageNumber": 140
+  },
+  {
+    "kind": "table",
+    "text": "Table 37: Test Cases for Documents",
+    "bookmark": "IndexTable037",
+    "physicalPage": 160,
+    "pageNumber": 141
+  },
+  {
+    "kind": "table",
+    "text": "Table 38: Test Cases for Monthly reports",
+    "bookmark": "IndexTable038",
+    "physicalPage": 161,
+    "pageNumber": 142
+  },
+  {
+    "kind": "table",
+    "text": "Table 39: Test Cases for Notifications and preferences",
+    "bookmark": "IndexTable039",
+    "physicalPage": 161,
+    "pageNumber": 142
+  },
+  {
+    "kind": "table",
+    "text": "Table 40: Test Cases for Project setup and activation",
+    "bookmark": "IndexTable040",
+    "physicalPage": 162,
+    "pageNumber": 143
+  },
+  {
+    "kind": "table",
+    "text": "Table 41: Test Cases for Progress review and publication",
+    "bookmark": "IndexTable041",
+    "physicalPage": 163,
+    "pageNumber": 144
+  },
+  {
+    "kind": "table",
+    "text": "Table 42: Questions for Objective 1 for Administrator",
+    "bookmark": "IndexTable042",
+    "physicalPage": 167,
+    "pageNumber": 148
+  },
+  {
+    "kind": "table",
+    "text": "Table 43: Questions for Objective 2 for Administrator",
+    "bookmark": "IndexTable043",
+    "physicalPage": 168,
+    "pageNumber": 149
+  },
+  {
+    "kind": "table",
+    "text": "Table 44: Questions for Objective 3 for Administrator",
+    "bookmark": "IndexTable044",
+    "physicalPage": 169,
+    "pageNumber": 150
+  },
+  {
+    "kind": "table",
+    "text": "Table 45: Questions for Objective 4 for Administrator",
+    "bookmark": "IndexTable045",
+    "physicalPage": 169,
+    "pageNumber": 150
+  },
+  {
+    "kind": "table",
+    "text": "Table 46: Questions for Objective 5 for Administrator",
+    "bookmark": "IndexTable046",
+    "physicalPage": 170,
+    "pageNumber": 151
+  },
+  {
+    "kind": "table",
+    "text": "Table 47: Overall Feedback Questions for Administrator",
+    "bookmark": "IndexTable047",
+    "physicalPage": 170,
+    "pageNumber": 151
+  },
+  {
+    "kind": "table",
+    "text": "Table 48: Questions for Objective 1 for Office Project Manager",
+    "bookmark": "IndexTable048",
+    "physicalPage": 171,
+    "pageNumber": 152
+  },
+  {
+    "kind": "table",
+    "text": "Table 49: Questions for Objective 2 for Office Project Manager",
+    "bookmark": "IndexTable049",
+    "physicalPage": 172,
+    "pageNumber": 153
+  },
+  {
+    "kind": "table",
+    "text": "Table 50: Questions for Objective 3 for Office Project Manager",
+    "bookmark": "IndexTable050",
+    "physicalPage": 173,
+    "pageNumber": 154
+  },
+  {
+    "kind": "table",
+    "text": "Table 51: Questions for Objective 4 for Office Project Manager",
+    "bookmark": "IndexTable051",
+    "physicalPage": 173,
+    "pageNumber": 154
+  },
+  {
+    "kind": "table",
+    "text": "Table 52: Questions for Objective 5 for Office Project Manager",
+    "bookmark": "IndexTable052",
+    "physicalPage": 174,
+    "pageNumber": 155
+  },
+  {
+    "kind": "table",
+    "text": "Table 53: Overall Feedback Questions for Office Project Manager",
+    "bookmark": "IndexTable053",
+    "physicalPage": 174,
+    "pageNumber": 155
+  },
+  {
+    "kind": "table",
+    "text": "Table 54: Questions for Objective 1 for Site Project Manager",
+    "bookmark": "IndexTable054",
+    "physicalPage": 175,
+    "pageNumber": 156
+  },
+  {
+    "kind": "table",
+    "text": "Table 55: Questions for Objective 2 for Site Project Manager",
+    "bookmark": "IndexTable055",
+    "physicalPage": 176,
+    "pageNumber": 157
+  },
+  {
+    "kind": "table",
+    "text": "Table 56: Questions for Objective 3 for Site Project Manager",
+    "bookmark": "IndexTable056",
+    "physicalPage": 177,
+    "pageNumber": 158
+  },
+  {
+    "kind": "table",
+    "text": "Table 57: Questions for Objective 4 for Site Project Manager",
+    "bookmark": "IndexTable057",
+    "physicalPage": 177,
+    "pageNumber": 158
+  },
+  {
+    "kind": "table",
+    "text": "Table 58: Questions for Objective 5 for Site Project Manager",
+    "bookmark": "IndexTable058",
+    "physicalPage": 178,
+    "pageNumber": 159
+  },
+  {
+    "kind": "table",
+    "text": "Table 59: Overall Feedback Questions for Site Project Manager",
+    "bookmark": "IndexTable059",
+    "physicalPage": 178,
+    "pageNumber": 159
+  },
+  {
+    "kind": "table",
+    "text": "Table 60: Questions for Objective 1 for Client",
+    "bookmark": "IndexTable060",
+    "physicalPage": 179,
+    "pageNumber": 160
+  },
+  {
+    "kind": "table",
+    "text": "Table 61: Questions for Objective 2 for Client",
+    "bookmark": "IndexTable061",
+    "physicalPage": 180,
+    "pageNumber": 161
+  },
+  {
+    "kind": "table",
+    "text": "Table 62: Questions for Objective 3 for Client",
+    "bookmark": "IndexTable062",
+    "physicalPage": 180,
+    "pageNumber": 161
+  },
+  {
+    "kind": "table",
+    "text": "Table 63: Questions for Objective 4 for Client",
+    "bookmark": "IndexTable063",
+    "physicalPage": 181,
+    "pageNumber": 162
+  },
+  {
+    "kind": "table",
+    "text": "Table 64: Questions for Objective 5 for Client",
+    "bookmark": "IndexTable064",
+    "physicalPage": 181,
+    "pageNumber": 162
+  },
+  {
+    "kind": "table",
+    "text": "Table 65: Overall Feedback Questions for Client",
+    "bookmark": "IndexTable065",
+    "physicalPage": 182,
+    "pageNumber": 163
+  },
+  {
+    "kind": "table",
+    "text": "Table 66. Summary of Administrator Responses to Question 1",
+    "bookmark": "IndexTable066",
+    "physicalPage": 183,
+    "pageNumber": 164
+  },
+  {
+    "kind": "table",
+    "text": "Table 67. Summary of Administrator Responses to Question 2",
+    "bookmark": "IndexTable067",
+    "physicalPage": 183,
+    "pageNumber": 164
+  },
+  {
+    "kind": "table",
+    "text": "Table 68. Summary of Administrator Responses to Question 3",
+    "bookmark": "IndexTable068",
+    "physicalPage": 184,
+    "pageNumber": 165
+  },
+  {
+    "kind": "table",
+    "text": "Table 69. Summary of Administrator Responses to Question 4",
+    "bookmark": "IndexTable069",
+    "physicalPage": 184,
+    "pageNumber": 165
+  },
+  {
+    "kind": "table",
+    "text": "Table 70. Summary of Administrator Responses to Question 5",
+    "bookmark": "IndexTable070",
+    "physicalPage": 185,
+    "pageNumber": 166
+  },
+  {
+    "kind": "table",
+    "text": "Table 71. Summary of Administrator Responses to Question 6",
+    "bookmark": "IndexTable071",
+    "physicalPage": 185,
+    "pageNumber": 166
+  },
+  {
+    "kind": "table",
+    "text": "Table 72. Summary of Administrator Responses to Question 7",
+    "bookmark": "IndexTable072",
+    "physicalPage": 186,
+    "pageNumber": 167
+  },
+  {
+    "kind": "table",
+    "text": "Table 73. Summary of Administrator Responses to Question 8",
+    "bookmark": "IndexTable073",
+    "physicalPage": 186,
+    "pageNumber": 167
+  },
+  {
+    "kind": "table",
+    "text": "Table 74. Summary of Administrator Responses to Question 9",
+    "bookmark": "IndexTable074",
+    "physicalPage": 187,
+    "pageNumber": 168
+  },
+  {
+    "kind": "table",
+    "text": "Table 75. Summary of Administrator Responses to Question 10",
+    "bookmark": "IndexTable075",
+    "physicalPage": 187,
+    "pageNumber": 168
+  },
+  {
+    "kind": "table",
+    "text": "Table 76. Summary of Administrator Responses to Question 11",
+    "bookmark": "IndexTable076",
+    "physicalPage": 188,
+    "pageNumber": 169
+  },
+  {
+    "kind": "table",
+    "text": "Table 77. Summary of Administrator Responses to Question 12",
+    "bookmark": "IndexTable077",
+    "physicalPage": 188,
+    "pageNumber": 169
+  },
+  {
+    "kind": "table",
+    "text": "Table 78. Summary of Administrator Responses to Question 13",
+    "bookmark": "IndexTable078",
+    "physicalPage": 189,
+    "pageNumber": 170
+  },
+  {
+    "kind": "table",
+    "text": "Table 79. Summary of Administrator Responses to Question 14",
+    "bookmark": "IndexTable079",
+    "physicalPage": 189,
+    "pageNumber": 170
+  },
+  {
+    "kind": "table",
+    "text": "Table 80. Summary of Administrator Responses to Question 15",
+    "bookmark": "IndexTable080",
+    "physicalPage": 190,
+    "pageNumber": 171
+  },
+  {
+    "kind": "table",
+    "text": "Table 81. Summary of Administrator Responses to Question 16",
+    "bookmark": "IndexTable081",
+    "physicalPage": 190,
+    "pageNumber": 171
+  },
+  {
+    "kind": "table",
+    "text": "Table 82. Summary of Administrator Responses to Question 17",
+    "bookmark": "IndexTable082",
+    "physicalPage": 191,
+    "pageNumber": 172
+  },
+  {
+    "kind": "table",
+    "text": "Table 83. Summary of Administrator Responses to Question 18",
+    "bookmark": "IndexTable083",
+    "physicalPage": 191,
+    "pageNumber": 172
+  },
+  {
+    "kind": "table",
+    "text": "Table 84. Summary of Administrator Responses to Question 19",
+    "bookmark": "IndexTable084",
+    "physicalPage": 192,
+    "pageNumber": 173
+  },
+  {
+    "kind": "table",
+    "text": "Table 85. Summary of Administrator Responses to Question 20",
+    "bookmark": "IndexTable085",
+    "physicalPage": 192,
+    "pageNumber": 173
+  },
+  {
+    "kind": "table",
+    "text": "Table 86. Summary of Administrator Responses to Question 21",
+    "bookmark": "IndexTable086",
+    "physicalPage": 193,
+    "pageNumber": 174
+  },
+  {
+    "kind": "table",
+    "text": "Table 87. Summary of OPM Responses to Question 1",
+    "bookmark": "IndexTable087",
+    "physicalPage": 194,
+    "pageNumber": 175
+  },
+  {
+    "kind": "table",
+    "text": "Table 88. Summary of OPM Responses to Question 2",
+    "bookmark": "IndexTable088",
+    "physicalPage": 194,
+    "pageNumber": 175
+  },
+  {
+    "kind": "table",
+    "text": "Table 89. Summary of OPM Responses to Question 3",
+    "bookmark": "IndexTable089",
+    "physicalPage": 195,
+    "pageNumber": 176
+  },
+  {
+    "kind": "table",
+    "text": "Table 90. Summary of OPM Responses to Question 4",
+    "bookmark": "IndexTable090",
+    "physicalPage": 195,
+    "pageNumber": 176
+  },
+  {
+    "kind": "table",
+    "text": "Table 91. Summary of OPM Responses to Question 5",
+    "bookmark": "IndexTable091",
+    "physicalPage": 196,
+    "pageNumber": 177
+  },
+  {
+    "kind": "table",
+    "text": "Table 92. Summary of OPM Responses to Question 6",
+    "bookmark": "IndexTable092",
+    "physicalPage": 196,
+    "pageNumber": 177
+  },
+  {
+    "kind": "table",
+    "text": "Table 93. Summary of OPM Responses to Question 7",
+    "bookmark": "IndexTable093",
+    "physicalPage": 197,
+    "pageNumber": 178
+  },
+  {
+    "kind": "table",
+    "text": "Table 94. Summary of OPM Responses to Question 8",
+    "bookmark": "IndexTable094",
+    "physicalPage": 197,
+    "pageNumber": 178
+  },
+  {
+    "kind": "table",
+    "text": "Table 95. Summary of OPM Responses to Question 9",
+    "bookmark": "IndexTable095",
+    "physicalPage": 198,
+    "pageNumber": 179
+  },
+  {
+    "kind": "table",
+    "text": "Table 96. Summary of OPM Responses to Question 10",
+    "bookmark": "IndexTable096",
+    "physicalPage": 198,
+    "pageNumber": 179
+  },
+  {
+    "kind": "table",
+    "text": "Table 97. Summary of OPM Responses to Question 11",
+    "bookmark": "IndexTable097",
+    "physicalPage": 199,
+    "pageNumber": 180
+  },
+  {
+    "kind": "table",
+    "text": "Table 98. Summary of OPM Responses to Question 12",
+    "bookmark": "IndexTable098",
+    "physicalPage": 199,
+    "pageNumber": 180
+  },
+  {
+    "kind": "table",
+    "text": "Table 99. Summary of OPM Responses to Question 13",
+    "bookmark": "IndexTable099",
+    "physicalPage": 200,
+    "pageNumber": 181
+  },
+  {
+    "kind": "table",
+    "text": "Table 100. Summary of OPM Responses to Question 14",
+    "bookmark": "IndexTable100",
+    "physicalPage": 200,
+    "pageNumber": 181
+  },
+  {
+    "kind": "table",
+    "text": "Table 101. Summary of OPM Responses to Question 15",
+    "bookmark": "IndexTable101",
+    "physicalPage": 201,
+    "pageNumber": 182
+  },
+  {
+    "kind": "table",
+    "text": "Table 102. Summary of OPM Responses to Question 16",
+    "bookmark": "IndexTable102",
+    "physicalPage": 201,
+    "pageNumber": 182
+  },
+  {
+    "kind": "table",
+    "text": "Table 103. Summary of OPM Responses to Question 17",
+    "bookmark": "IndexTable103",
+    "physicalPage": 202,
+    "pageNumber": 183
+  },
+  {
+    "kind": "table",
+    "text": "Table 104. Summary of OPM Responses to Question 18",
+    "bookmark": "IndexTable104",
+    "physicalPage": 202,
+    "pageNumber": 183
+  },
+  {
+    "kind": "table",
+    "text": "Table 105. Summary of OPM Responses to Question 19",
+    "bookmark": "IndexTable105",
+    "physicalPage": 203,
+    "pageNumber": 184
+  },
+  {
+    "kind": "table",
+    "text": "Table 106. Summary of OPM Responses to Question 20",
+    "bookmark": "IndexTable106",
+    "physicalPage": 203,
+    "pageNumber": 184
+  },
+  {
+    "kind": "table",
+    "text": "Table 107. Summary of OPM Responses to Question 21",
+    "bookmark": "IndexTable107",
+    "physicalPage": 204,
+    "pageNumber": 185
+  },
+  {
+    "kind": "table",
+    "text": "Table 108. Summary of SPM Responses to Question 1",
+    "bookmark": "IndexTable108",
+    "physicalPage": 205,
+    "pageNumber": 186
+  },
+  {
+    "kind": "table",
+    "text": "Table 109. Summary of SPM Responses to Question 2",
+    "bookmark": "IndexTable109",
+    "physicalPage": 205,
+    "pageNumber": 186
+  },
+  {
+    "kind": "table",
+    "text": "Table 110. Summary of SPM Responses to Question 3",
+    "bookmark": "IndexTable110",
+    "physicalPage": 206,
+    "pageNumber": 187
+  },
+  {
+    "kind": "table",
+    "text": "Table 111. Summary of SPM Responses to Question 4",
+    "bookmark": "IndexTable111",
+    "physicalPage": 206,
+    "pageNumber": 187
+  },
+  {
+    "kind": "table",
+    "text": "Table 112. Summary of SPM Responses to Question 5",
+    "bookmark": "IndexTable112",
+    "physicalPage": 207,
+    "pageNumber": 188
+  },
+  {
+    "kind": "table",
+    "text": "Table 113. Summary of SPM Responses to Question 6",
+    "bookmark": "IndexTable113",
+    "physicalPage": 207,
+    "pageNumber": 188
+  },
+  {
+    "kind": "table",
+    "text": "Table 114. Summary of SPM Responses to Question 7",
+    "bookmark": "IndexTable114",
+    "physicalPage": 208,
+    "pageNumber": 189
+  },
+  {
+    "kind": "table",
+    "text": "Table 115. Summary of SPM Responses to Question 8",
+    "bookmark": "IndexTable115",
+    "physicalPage": 208,
+    "pageNumber": 189
+  },
+  {
+    "kind": "table",
+    "text": "Table 116. Summary of SPM Responses to Question 9",
+    "bookmark": "IndexTable116",
+    "physicalPage": 209,
+    "pageNumber": 190
+  },
+  {
+    "kind": "table",
+    "text": "Table 117. Summary of SPM Responses to Question 10",
+    "bookmark": "IndexTable117",
+    "physicalPage": 209,
+    "pageNumber": 190
+  },
+  {
+    "kind": "table",
+    "text": "Table 118. Summary of SPM Responses to Question 11",
+    "bookmark": "IndexTable118",
+    "physicalPage": 210,
+    "pageNumber": 191
+  },
+  {
+    "kind": "table",
+    "text": "Table 119. Summary of SPM Responses to Question 12",
+    "bookmark": "IndexTable119",
+    "physicalPage": 210,
+    "pageNumber": 191
+  },
+  {
+    "kind": "table",
+    "text": "Table 120. Summary of SPM Responses to Question 13",
+    "bookmark": "IndexTable120",
+    "physicalPage": 211,
+    "pageNumber": 192
+  },
+  {
+    "kind": "table",
+    "text": "Table 121. Summary of SPM Responses to Question 14",
+    "bookmark": "IndexTable121",
+    "physicalPage": 211,
+    "pageNumber": 192
+  },
+  {
+    "kind": "table",
+    "text": "Table 122. Summary of SPM Responses to Question 15",
+    "bookmark": "IndexTable122",
+    "physicalPage": 212,
+    "pageNumber": 193
+  },
+  {
+    "kind": "table",
+    "text": "Table 123. Summary of SPM Responses to Question 16",
+    "bookmark": "IndexTable123",
+    "physicalPage": 212,
+    "pageNumber": 193
+  },
+  {
+    "kind": "table",
+    "text": "Table 124. Summary of SPM Responses to Question 17",
+    "bookmark": "IndexTable124",
+    "physicalPage": 213,
+    "pageNumber": 194
+  },
+  {
+    "kind": "table",
+    "text": "Table 125. Summary of SPM Responses to Question 18",
+    "bookmark": "IndexTable125",
+    "physicalPage": 213,
+    "pageNumber": 194
+  },
+  {
+    "kind": "table",
+    "text": "Table 126. Summary of SPM Responses to Question 19",
+    "bookmark": "IndexTable126",
+    "physicalPage": 214,
+    "pageNumber": 195
+  },
+  {
+    "kind": "table",
+    "text": "Table 127. Summary of SPM Responses to Question 20",
+    "bookmark": "IndexTable127",
+    "physicalPage": 214,
+    "pageNumber": 195
+  },
+  {
+    "kind": "table",
+    "text": "Table 128. Summary of SPM Responses to Question 21",
+    "bookmark": "IndexTable128",
+    "physicalPage": 215,
+    "pageNumber": 196
+  },
+  {
+    "kind": "table",
+    "text": "Table 129. Summary of SPM Responses to Question 22",
+    "bookmark": "IndexTable129",
+    "physicalPage": 215,
+    "pageNumber": 196
+  },
+  {
+    "kind": "table",
+    "text": "Table 130. Summary of Client Responses to Question 1",
+    "bookmark": "IndexTable130",
+    "physicalPage": 216,
+    "pageNumber": 197
+  },
+  {
+    "kind": "table",
+    "text": "Table 131. Summary of Client Responses to Question 2",
+    "bookmark": "IndexTable131",
+    "physicalPage": 216,
+    "pageNumber": 197
+  },
+  {
+    "kind": "table",
+    "text": "Table 132. Summary of Client Responses to Question 3",
+    "bookmark": "IndexTable132",
+    "physicalPage": 217,
+    "pageNumber": 198
+  },
+  {
+    "kind": "table",
+    "text": "Table 133. Summary of Client Responses to Question 4",
+    "bookmark": "IndexTable133",
+    "physicalPage": 217,
+    "pageNumber": 198
+  },
+  {
+    "kind": "table",
+    "text": "Table 134. Summary of Client Responses to Question 5",
+    "bookmark": "IndexTable134",
+    "physicalPage": 218,
+    "pageNumber": 199
+  },
+  {
+    "kind": "table",
+    "text": "Table 135. Summary of Client Responses to Question 6",
+    "bookmark": "IndexTable135",
+    "physicalPage": 218,
+    "pageNumber": 199
+  },
+  {
+    "kind": "table",
+    "text": "Table 136. Summary of Client Responses to Question 7",
+    "bookmark": "IndexTable136",
+    "physicalPage": 219,
+    "pageNumber": 200
+  },
+  {
+    "kind": "table",
+    "text": "Table 137. Summary of Client Responses to Question 8",
+    "bookmark": "IndexTable137",
+    "physicalPage": 219,
+    "pageNumber": 200
+  },
+  {
+    "kind": "table",
+    "text": "Table 138. Summary of Client Responses to Question 9",
+    "bookmark": "IndexTable138",
+    "physicalPage": 220,
+    "pageNumber": 201
+  },
+  {
+    "kind": "table",
+    "text": "Table 139. Summary of Client Responses to Question 10",
+    "bookmark": "IndexTable139",
+    "physicalPage": 220,
+    "pageNumber": 201
+  },
+  {
+    "kind": "table",
+    "text": "Table 140. Summary of Client Responses to Question 11",
+    "bookmark": "IndexTable140",
+    "physicalPage": 221,
+    "pageNumber": 202
+  },
+  {
+    "kind": "table",
+    "text": "Table 141. Summary of Client Responses to Question 12",
+    "bookmark": "IndexTable141",
+    "physicalPage": 221,
+    "pageNumber": 202
+  },
+  {
+    "kind": "table",
+    "text": "Table 142. Summary of Client Responses to Question 13",
+    "bookmark": "IndexTable142",
+    "physicalPage": 222,
+    "pageNumber": 203
+  },
+  {
+    "kind": "table",
+    "text": "Table 143. Summary of Client Responses to Question 14",
+    "bookmark": "IndexTable143",
+    "physicalPage": 222,
+    "pageNumber": 203
+  },
+  {
+    "kind": "table",
+    "text": "Table 144. Summary of Client Responses to Question 15",
+    "bookmark": "IndexTable144",
+    "physicalPage": 223,
+    "pageNumber": 204
+  },
+  {
+    "kind": "table",
+    "text": "Table 145. Summary of Client Responses to Question 16",
+    "bookmark": "IndexTable145",
+    "physicalPage": 223,
+    "pageNumber": 204
+  },
+  {
+    "kind": "table",
+    "text": "Table 146. Summary of Client Responses to Question 17",
+    "bookmark": "IndexTable146",
+    "physicalPage": 224,
+    "pageNumber": 205
+  },
+  {
+    "kind": "table",
+    "text": "Table 147. Summary of Client Responses to Question 18",
+    "bookmark": "IndexTable147",
+    "physicalPage": 224,
+    "pageNumber": 205
+  },
+  {
+    "kind": "table",
+    "text": "Table 148. Summary of Client Responses to Question 19",
+    "bookmark": "IndexTable148",
+    "physicalPage": 225,
+    "pageNumber": 206
+  },
+  {
+    "kind": "table",
+    "text": "Table 149. Summary of Client Responses to Question 20",
+    "bookmark": "IndexTable149",
+    "physicalPage": 225,
+    "pageNumber": 206
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 61. Project Inquiry Management",
+    "bookmark": "IndexFigure061",
+    "physicalPage": 236,
+    "pageNumber": 217
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 62. Phase Staffing Recommendations",
+    "bookmark": "IndexFigure062",
+    "physicalPage": 236,
+    "pageNumber": 217
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 63. Peak Staffing for Overlapping Phases",
+    "bookmark": "IndexFigure063",
+    "physicalPage": 237,
+    "pageNumber": 218
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 64. Role-Based Project Workspace",
+    "bookmark": "IndexFigure064",
+    "physicalPage": 237,
+    "pageNumber": 218
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 65. Project Workspace Operations",
+    "bookmark": "IndexFigure065",
+    "physicalPage": 238,
+    "pageNumber": 219
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 66. Phase Checklist and Evidence Submission",
+    "bookmark": "IndexFigure066",
+    "physicalPage": 238,
+    "pageNumber": 219
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 67. Activity Evidence Review",
+    "bookmark": "IndexFigure067",
+    "physicalPage": 239,
+    "pageNumber": 220
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 68. Client Project Overview",
+    "bookmark": "IndexFigure068",
+    "physicalPage": 239,
+    "pageNumber": 220
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 69. Administrator Questionnaire for Objective 1",
+    "bookmark": "IndexFigure069",
+    "physicalPage": 241,
+    "pageNumber": 222
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 70. Administrator Survey Results for Objective 1",
+    "bookmark": "IndexFigure070",
+    "physicalPage": 241,
+    "pageNumber": 222
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 71. Administrator Questionnaire for Objective 2",
+    "bookmark": "IndexFigure071",
+    "physicalPage": 242,
+    "pageNumber": 223
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 72. Administrator Survey Results for Objective 2",
+    "bookmark": "IndexFigure072",
+    "physicalPage": 242,
+    "pageNumber": 223
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 73. Administrator Questionnaire for Objective 3",
+    "bookmark": "IndexFigure073",
+    "physicalPage": 243,
+    "pageNumber": 224
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 74. Administrator Survey Results for Objective 3",
+    "bookmark": "IndexFigure074",
+    "physicalPage": 243,
+    "pageNumber": 224
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 75. Administrator Questionnaire for Objective 4",
+    "bookmark": "IndexFigure075",
+    "physicalPage": 244,
+    "pageNumber": 225
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 76. Administrator Survey Results for Objective 4",
+    "bookmark": "IndexFigure076",
+    "physicalPage": 244,
+    "pageNumber": 225
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 77. Administrator Questionnaire for Objective 5",
+    "bookmark": "IndexFigure077",
+    "physicalPage": 245,
+    "pageNumber": 226
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 78. Administrator Survey Results for Objective 5",
+    "bookmark": "IndexFigure078",
+    "physicalPage": 245,
+    "pageNumber": 226
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 79. Administrator Questionnaire for Overall Feedback",
+    "bookmark": "IndexFigure079",
+    "physicalPage": 246,
+    "pageNumber": 227
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 80. Administrator Survey Results for Overall Feedback",
+    "bookmark": "IndexFigure080",
+    "physicalPage": 246,
+    "pageNumber": 227
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 81. Office Project Manager Questionnaire for Objective 1",
+    "bookmark": "IndexFigure081",
+    "physicalPage": 247,
+    "pageNumber": 228
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 82. Office Project Manager Survey Results for Objective 1",
+    "bookmark": "IndexFigure082",
+    "physicalPage": 247,
+    "pageNumber": 228
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 83. Office Project Manager Questionnaire for Objective 2",
+    "bookmark": "IndexFigure083",
+    "physicalPage": 248,
+    "pageNumber": 229
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 84. Office Project Manager Survey Results for Objective 2",
+    "bookmark": "IndexFigure084",
+    "physicalPage": 248,
+    "pageNumber": 229
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 85. Office Project Manager Questionnaire for Objective 3",
+    "bookmark": "IndexFigure085",
+    "physicalPage": 249,
+    "pageNumber": 230
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 86. Office Project Manager Survey Results for Objective 3",
+    "bookmark": "IndexFigure086",
+    "physicalPage": 249,
+    "pageNumber": 230
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 87. Office Project Manager Questionnaire for Objective 4",
+    "bookmark": "IndexFigure087",
+    "physicalPage": 250,
+    "pageNumber": 231
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 88. Office Project Manager Survey Results for Objective 4",
+    "bookmark": "IndexFigure088",
+    "physicalPage": 250,
+    "pageNumber": 231
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 89. Office Project Manager Questionnaire for Objective 5",
+    "bookmark": "IndexFigure089",
+    "physicalPage": 251,
+    "pageNumber": 232
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 90. Office Project Manager Survey Results for Objective 5",
+    "bookmark": "IndexFigure090",
+    "physicalPage": 251,
+    "pageNumber": 232
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 91. Office Project Manager Questionnaire for Overall Feedback",
+    "bookmark": "IndexFigure091",
+    "physicalPage": 252,
+    "pageNumber": 233
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 92. Office Project Manager Survey Results for Overall Feedback",
+    "bookmark": "IndexFigure092",
+    "physicalPage": 252,
+    "pageNumber": 233
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 93. Site Project Manager Questionnaire for Objective 1",
+    "bookmark": "IndexFigure093",
+    "physicalPage": 253,
+    "pageNumber": 234
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 94. Site Project Manager Survey Results for Objective 1",
+    "bookmark": "IndexFigure094",
+    "physicalPage": 253,
+    "pageNumber": 234
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 95. Site Project Manager Questionnaire for Objective 2",
+    "bookmark": "IndexFigure095",
+    "physicalPage": 254,
+    "pageNumber": 235
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 96. Site Project Manager Survey Results for Objective 2",
+    "bookmark": "IndexFigure096",
+    "physicalPage": 254,
+    "pageNumber": 235
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 97. Site Project Manager Questionnaire for Objective 3",
+    "bookmark": "IndexFigure097",
+    "physicalPage": 255,
+    "pageNumber": 236
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 98. Site Project Manager Survey Results for Objective 3",
+    "bookmark": "IndexFigure098",
+    "physicalPage": 255,
+    "pageNumber": 236
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 99. Site Project Manager Questionnaire for Objective 4",
+    "bookmark": "IndexFigure099",
+    "physicalPage": 256,
+    "pageNumber": 237
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 100. Site Project Manager Survey Results for Objective 4",
+    "bookmark": "IndexFigure100",
+    "physicalPage": 256,
+    "pageNumber": 237
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 101. Site Project Manager Questionnaire for Objective 5",
+    "bookmark": "IndexFigure101",
+    "physicalPage": 257,
+    "pageNumber": 238
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 102. Site Project Manager Survey Results for Objective 5",
+    "bookmark": "IndexFigure102",
+    "physicalPage": 257,
+    "pageNumber": 238
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 103. Site Project Manager Questionnaire for Overall Feedback",
+    "bookmark": "IndexFigure103",
+    "physicalPage": 258,
+    "pageNumber": 239
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 104. Site Project Manager Survey Results for Overall Feedback",
+    "bookmark": "IndexFigure104",
+    "physicalPage": 258,
+    "pageNumber": 239
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 105. Client Questionnaire for Objective 1",
+    "bookmark": "IndexFigure105",
+    "physicalPage": 259,
+    "pageNumber": 240
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 106. Client Survey Results for Objective 1",
+    "bookmark": "IndexFigure106",
+    "physicalPage": 259,
+    "pageNumber": 240
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 107. Client Questionnaire for Objective 2",
+    "bookmark": "IndexFigure107",
+    "physicalPage": 260,
+    "pageNumber": 241
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 108. Client Survey Results for Objective 2",
+    "bookmark": "IndexFigure108",
+    "physicalPage": 260,
+    "pageNumber": 241
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 109. Client Questionnaire for Objective 3",
+    "bookmark": "IndexFigure109",
+    "physicalPage": 261,
+    "pageNumber": 242
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 110. Client Survey Results for Objective 3",
+    "bookmark": "IndexFigure110",
+    "physicalPage": 261,
+    "pageNumber": 242
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 111. Client Questionnaire for Objective 4",
+    "bookmark": "IndexFigure111",
+    "physicalPage": 262,
+    "pageNumber": 243
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 112. Client Survey Results for Objective 4",
+    "bookmark": "IndexFigure112",
+    "physicalPage": 262,
+    "pageNumber": 243
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 113. Client Questionnaire for Objective 5",
+    "bookmark": "IndexFigure113",
+    "physicalPage": 263,
+    "pageNumber": 244
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 114. Client Survey Results for Objective 5",
+    "bookmark": "IndexFigure114",
+    "physicalPage": 263,
+    "pageNumber": 244
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 115. Client Questionnaire for Overall Feedback",
+    "bookmark": "IndexFigure115",
+    "physicalPage": 264,
+    "pageNumber": 245
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 116. Client Survey Results for Overall Feedback",
+    "bookmark": "IndexFigure116",
+    "physicalPage": 264,
+    "pageNumber": 245
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 117. NDA with Kurt Ivan Gonzales (Page 1 of 4)",
+    "bookmark": "IndexFigure117",
+    "physicalPage": 290,
+    "pageNumber": 271
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 118. NDA for Vince Belen (Page 1 of 4)",
+    "bookmark": "IndexFigure118",
+    "physicalPage": 294,
+    "pageNumber": 275
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 119. NDA with Yvanne Jerome Agapito (Page 1 of 4)",
+    "bookmark": "IndexFigure119",
+    "physicalPage": 298,
+    "pageNumber": 279
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 120. Non-Disclosure and Academic Research Agreement (Page 1 of 3)",
+    "bookmark": "IndexFigure120",
+    "physicalPage": 302,
+    "pageNumber": 283
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 121. Non-Disclosure and Academic Research Agreement (Page 2 of 3)",
+    "bookmark": "IndexFigure121",
+    "physicalPage": 303,
+    "pageNumber": 284
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 122. Non-Disclosure and Academic Research Agreement (Signature Page, 3 of 3)",
+    "bookmark": "IndexFigure122",
+    "physicalPage": 304,
+    "pageNumber": 285
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 123. Interview Confidentiality and Consent Agreement (Undated Scan, Page 1 of 4)",
+    "bookmark": "IndexFigure123",
+    "physicalPage": 305,
+    "pageNumber": 286
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 124. Interview Confidentiality and Consent Agreement (Undated Scan, Page 2 of 4)",
+    "bookmark": "IndexFigure124",
+    "physicalPage": 306,
+    "pageNumber": 287
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 125. Interview Confidentiality and Consent Agreement (Undated Scan, Page 3 of 4)",
+    "bookmark": "IndexFigure125",
+    "physicalPage": 307,
+    "pageNumber": 288
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 126. Interview Confidentiality and Consent Agreement (Undated Scan, Page 4 of 4)",
+    "bookmark": "IndexFigure126",
+    "physicalPage": 308,
+    "pageNumber": 289
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 127. Online Meeting with Mel De Vera on October 16, 2026",
+    "bookmark": "IndexFigure127",
+    "physicalPage": 309,
+    "pageNumber": 290
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 128. Online Meeting with Engineer Vince on October 22, 2026",
+    "bookmark": "IndexFigure128",
+    "physicalPage": 309,
+    "pageNumber": 290
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 129. Online Meeting with Engineer Yvanne on October 22, 2026",
+    "bookmark": "IndexFigure129",
+    "physicalPage": 310,
+    "pageNumber": 291
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 130. Online Meeting with Mel De Vera on October 30, 2026",
+    "bookmark": "IndexFigure130",
+    "physicalPage": 310,
+    "pageNumber": 291
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 131. Signing of the Non-Disclosure and Academic Research Agreement",
+    "bookmark": "IndexFigure131",
+    "physicalPage": 311,
+    "pageNumber": 292
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 132. In-Person Review of the 10buildline Prototype",
+    "bookmark": "IndexFigure132",
+    "physicalPage": 312,
+    "pageNumber": 293
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 133. Photo from the 10buildline Prototype Demonstration",
+    "bookmark": "IndexFigure133",
+    "physicalPage": 313,
+    "pageNumber": 294
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 134. Capstone Team Working Session",
+    "bookmark": "IndexFigure134",
+    "physicalPage": 314,
+    "pageNumber": 295
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 135. Capstone Team Collaboration Session",
+    "bookmark": "IndexFigure135",
+    "physicalPage": 315,
+    "pageNumber": 296
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 136. Online Interview with HR Manager",
+    "bookmark": "IndexFigure136",
+    "physicalPage": 316,
+    "pageNumber": 297
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 137. Client Meeting in EDSA",
+    "bookmark": "IndexFigure137",
+    "physicalPage": 317,
+    "pageNumber": 298
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 138. Permits and Legal Documents of 10 Builders Development and Construction Corporation",
+    "bookmark": "IndexFigure138",
+    "physicalPage": 318,
+    "pageNumber": 299
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 139. Signed Letter of Agreement with Sir Mel – HR Manager of 10 Builders Development and Construction Corporation",
+    "bookmark": "IndexFigure139",
+    "physicalPage": 319,
+    "pageNumber": 300
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 140. Administrator — Submit a project inquiry (desktop views)",
+    "bookmark": "IndexFigure140",
+    "physicalPage": 321,
+    "pageNumber": 302
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 141. Submit a project inquiry (mobile view)",
+    "bookmark": "IndexFigure141",
+    "physicalPage": 322,
+    "pageNumber": 303
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 142. Administrator — Track an existing inquiry (desktop views)",
+    "bookmark": "IndexFigure142",
+    "physicalPage": 323,
+    "pageNumber": 304
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 143. Track an existing inquiry (mobile view)",
+    "bookmark": "IndexFigure143",
+    "physicalPage": 324,
+    "pageNumber": 305
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 144. Administrator — Review an active site (desktop views)",
+    "bookmark": "IndexFigure144",
+    "physicalPage": 325,
+    "pageNumber": 306
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 145. Review an active site (mobile view)",
+    "bookmark": "IndexFigure145",
+    "physicalPage": 326,
+    "pageNumber": 307
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 146. Administrator — Find engineers and subcontractors (desktop views)",
+    "bookmark": "IndexFigure146",
+    "physicalPage": 327,
+    "pageNumber": 308
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 147. Find engineers and subcontractors (mobile view)",
+    "bookmark": "IndexFigure147",
+    "physicalPage": 328,
+    "pageNumber": 309
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 148. Administrator — Find project and engineer documents (desktop views)",
+    "bookmark": "IndexFigure148",
+    "physicalPage": 329,
+    "pageNumber": 310
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 149. Find project and engineer documents (mobile view)",
+    "bookmark": "IndexFigure149",
+    "physicalPage": 330,
+    "pageNumber": 311
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 150. Administrator — Look up archived records (desktop views)",
+    "bookmark": "IndexFigure150",
+    "physicalPage": 331,
+    "pageNumber": 312
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 151. Office Project Manager — Review a project assessment (desktop views)",
+    "bookmark": "IndexFigure151",
+    "physicalPage": 332,
+    "pageNumber": 313
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 152. Review a project assessment (mobile view)",
+    "bookmark": "IndexFigure152",
+    "physicalPage": 333,
+    "pageNumber": 314
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 153. Office Project Manager — Find project documents (desktop views)",
+    "bookmark": "IndexFigure153",
+    "physicalPage": 334,
+    "pageNumber": 315
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 154. Find project documents (mobile view)",
+    "bookmark": "IndexFigure154",
+    "physicalPage": 335,
+    "pageNumber": 316
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 155. Office Project Manager — Check active sites (desktop views)",
+    "bookmark": "IndexFigure155",
+    "physicalPage": 336,
+    "pageNumber": 317
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 156. Check active sites (mobile view)",
+    "bookmark": "IndexFigure156",
+    "physicalPage": 337,
+    "pageNumber": 318
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 157. Office Project Manager — Read an archived intake record (desktop views)",
+    "bookmark": "IndexFigure157",
+    "physicalPage": 338,
+    "pageNumber": 319
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 158. Read an archived intake record (mobile view)",
+    "bookmark": "IndexFigure158",
+    "physicalPage": 339,
+    "pageNumber": 320
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 159. Office Project Manager — Find a project activity (desktop views)",
+    "bookmark": "IndexFigure159",
+    "physicalPage": 340,
+    "pageNumber": 321
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 160. Find a project activity (mobile view)",
+    "bookmark": "IndexFigure160",
+    "physicalPage": 341,
+    "pageNumber": 322
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 161. Site Project Manager — Submit evidence for a phase (desktop views)",
+    "bookmark": "IndexFigure161",
+    "physicalPage": 342,
+    "pageNumber": 323
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 162. Submit evidence for a phase (mobile view)",
+    "bookmark": "IndexFigure162",
+    "physicalPage": 343,
+    "pageNumber": 324
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 163. Site Project Manager — Check an assigned site (desktop views)",
+    "bookmark": "IndexFigure163",
+    "physicalPage": 344,
+    "pageNumber": 325
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 164. Check an assigned site (mobile view)",
+    "bookmark": "IndexFigure164",
+    "physicalPage": 345,
+    "pageNumber": 326
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 165. Site Project Manager — Find documents and subcontractors (desktop views)",
+    "bookmark": "IndexFigure165",
+    "physicalPage": 346,
+    "pageNumber": 327
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 166. Find documents and subcontractors (mobile view)",
+    "bookmark": "IndexFigure166",
+    "physicalPage": 347,
+    "pageNumber": 328
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 167. Site Project Manager — Check archived site records (desktop views)",
+    "bookmark": "IndexFigure167",
+    "physicalPage": 348,
+    "pageNumber": 329
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 168. Check archived site records (mobile view)",
+    "bookmark": "IndexFigure168",
+    "physicalPage": 349,
+    "pageNumber": 330
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 169. Site Project Manager — Find a site activity (desktop views)",
+    "bookmark": "IndexFigure169",
+    "physicalPage": 350,
+    "pageNumber": 331
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 170. Find a site activity (mobile view)",
+    "bookmark": "IndexFigure170",
+    "physicalPage": 351,
+    "pageNumber": 332
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 171. Client — Check active project status (desktop views)",
+    "bookmark": "IndexFigure171",
+    "physicalPage": 352,
+    "pageNumber": 333
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 172. Check active project status (mobile view)",
+    "bookmark": "IndexFigure172",
+    "physicalPage": 353,
+    "pageNumber": 334
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 173. Client — Find shared project documents (desktop views)",
+    "bookmark": "IndexFigure173",
+    "physicalPage": 354,
+    "pageNumber": 335
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 174. Find shared project documents (mobile view)",
+    "bookmark": "IndexFigure174",
+    "physicalPage": 355,
+    "pageNumber": 336
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 175. Client — Review project progress history (desktop views)",
+    "bookmark": "IndexFigure175",
+    "physicalPage": 356,
+    "pageNumber": 337
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 176. Review project progress history (mobile view)",
+    "bookmark": "IndexFigure176",
+    "physicalPage": 357,
+    "pageNumber": 338
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 177. Client — View shared site photographs (desktop views)",
+    "bookmark": "IndexFigure177",
+    "physicalPage": 358,
+    "pageNumber": 339
+  },
+  {
+    "kind": "figure",
+    "text": "Figure 178. View shared site photographs (mobile view)",
+    "bookmark": "IndexFigure178",
+    "physicalPage": 359,
+    "pageNumber": 340
+  }
+]

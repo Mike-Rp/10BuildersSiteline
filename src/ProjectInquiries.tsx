@@ -19,7 +19,6 @@ import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import AssignedScopeMatch from "./AssignedScopeMatch"
 import FloorAreaReview from "./FloorAreaReview"
-import { footprintError, PLANNING_SITE_OCCUPANCY } from "../Thesis-Backend/src/domain/site-occupancy.js"
 import { inquiryAssessmentReady, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
@@ -168,7 +167,6 @@ function AdminInquirySummary({ row }: { row: Inquiry }) {
     ["Client", details.client_name], ...(details.client_type ? [["Client type", details.client_type === "company" ? "Company / organization" : "Individual"]] : []),
     ...(details.primary_contact ? [["Primary contact", details.primary_contact]] : []), ["Contact", details.phone], ["Email", details.email],
     ["Project type", details.project_type], ["Lot area", area(details.lot_area)],
-    ["Ground-floor footprint", area(details.building_footprint_sqm)],
     ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count], ["Location", details.address],
     ["Estimated start", date(row.target_start_date || details.anticipated_start)],
     ["Potential completion", date(row.target_end_date)],
@@ -975,17 +973,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <small id="inquiry-phone-notice" className="inquiry-input-notice" aria-live="polite">{invalid ? PH_MOBILE_ERROR : ""}</small>
         </label>
       }
-      if (key === "building_footprint_sqm") {
-        const cap = lotArea > 0 ? Math.floor(lotArea * PLANNING_SITE_OCCUPANCY * 100 + 1e-8) / 100 : undefined
-        const issue = value ? footprintError(lotArea, value, details.floor_area_sqm) : ""
-        return <label><span>{label} <span className="inquiry-required">*</span></span>
-          <GroupedNumberInput required min={0.01} max={Math.min(cap ?? MAX_INQUIRY_AREA, Number(details.floor_area_sqm) > 0 ? Number(details.floor_area_sqm) : MAX_INQUIRY_AREA)}
-            value={value} aria-invalid={!!issue || undefined} aria-describedby="inquiry-footprint-hint" onValueChange={next => change(key, next)} />
-          <small id="inquiry-footprint-hint" className={issue ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">
-            {issue || `Ground floor only. ${cap === undefined ? "Enter the lot area to see the maximum." : `Planning maximum: ${formatArea(cap)} m² (70% of the lot).`}`}
-          </small>
-        </label>
-      }
       if (key === "lot_area" || key === "floor_area_sqm") {
         const total = key === "floor_area_sqm"
         const outsideRange = value !== "" && (Number(value) < (total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA) || Number(value) > MAX_INQUIRY_AREA ||
@@ -1106,10 +1093,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
-              {input("building_footprint_sqm", "Ground-floor footprint (m²)", "number")}
-              <div className="floor-area-review"><p>Site occupancy: <strong>{lotArea > 0 && Number(details.building_footprint_sqm) > 0 ? `${(Number(details.building_footprint_sqm) / lotArea * 100).toLocaleString("en-PH", { maximumFractionDigits: 1 })}%` : "Enter the ground-floor footprint"}</strong></p>
-                <small>The 70% cap is a system planning assumption. Confirm the applicable zoning and setbacks during project review. Total floor area includes every floor and can exceed the lot area.</small>
-              </div>
               <FloorAreaReview area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />
             </div>
           </FormSection>

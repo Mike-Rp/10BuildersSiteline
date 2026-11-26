@@ -1,5 +1,4 @@
 import { normalInquiryDeadline } from "../../domain/inquiry-office-hours.js";
-import { footprintError } from "../../domain/site-occupancy.js";
 import { mixedUsePhaseReview, mixedUseSelectionsError, normalizeMixedUseSelections } from "../../domain/mixed-use-scope.js";
 import { forecastPhaseDelay, phaseWorkday, suggestPhaseSchedule } from "../../domain/phase-schedule.js";
 import { isoDateValid } from "../../domain/engineer-credentials.js";
@@ -30,7 +29,7 @@ function validateInquiryContact(details, previous) {
     throw new HttpError(422, PH_MOBILE_ERROR);
 }
 
-export function inquiryDetails(input, { requireFootprint = false } = {}) {
+export function inquiryDetails(input) {
   const details = inquiryClientIdentity(input);
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
     const value = key === "client_name" && details.client_type === "company" ? details.company_name : input?.[key];
@@ -56,10 +55,6 @@ export function inquiryDetails(input, { requireFootprint = false } = {}) {
   }
   if (details.floor_area_sqm / details.floor_count > details.lot_area)
     throw new HttpError(422, "Total floor area must not exceed the lot area multiplied by the number of floors.");
-  const footprintIssue = footprintError(details.lot_area, input.building_footprint_sqm, details.floor_area_sqm, requireFootprint);
-  if (footprintIssue) throw new HttpError(422, footprintIssue);
-  if (input.building_footprint_sqm != null && input.building_footprint_sqm !== "")
-    details.building_footprint_sqm = Number(input.building_footprint_sqm);
   if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
     throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
   if (details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
@@ -330,7 +325,7 @@ export function mountInquiries(router) {
     const input = req.body ?? {};
     const regular = input.immediate_consultation === "no";
     const clientInput = await resolveInquiryClient(db, input);
-    const details = inquiryDetails(regular ? { ...clientInput, classification: "Normal", consultation: 1440 } : clientInput, { requireFootprint: true });
+    const details = inquiryDetails(regular ? { ...clientInput, classification: "Normal", consultation: 1440 } : clientInput);
     validateInquiryContact(details);
     if (details.classification === "Normal") {
       details.response_due_at = normalInquiryDeadline(new Date());
@@ -543,7 +538,7 @@ export function mountInquiries(router) {
           normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
         if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. Each floor must not exceed the lot area.`);
         if (areas) corrected.floor_area_sqm = areas.total;
-        const after = inquiryDetails(corrected, {requireFootprint: before.building_footprint_sqm !== undefined});
+        const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
         const localToday = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
         const earliestStartDate = new Date(localToday + "T00:00:00Z");

@@ -72,12 +72,11 @@ export function inquiryAssessmentBasis(details, technical, arrangement, scope) {
   const size = inquirySize(details);
   const typePoints = { Residential: 1, Commercial: 2, "Mixed-Use": 3 }[details.project_type];
   const sizePoints = { Small: 1, Medium: 2, Large: 3 }[size];
-  const floorPoints = details.floor_count >= 10 ? 3 : details.floor_count >= 4 ? 2 : 1;
   const technicalPoints = technicalOptions.indexOf(technical) + 1;
   const usePoints = details.project_type === "Mixed-Use" && scope ? Math.max(0, scope.uses.length - 2) : 0;
   const featurePoints = details.project_type === "Mixed-Use" && scope
     ? Number(scope.features.podium) + Number(scope.features.tower) + Number(scope.features.curtainWall) : 0;
-  const sequentialScore = typePoints + sizePoints + floorPoints + technicalPoints + usePoints + featurePoints + 1;
+  const sequentialScore = typePoints + sizePoints + technicalPoints + usePoints + featurePoints + 1;
   const overlapLevel = Math.max(0, arrangementOptions.indexOf(arrangement));
   const overlapPoints = overlapLevel + 1;
   // Overlap adds coordination complexity and reduces elapsed time from the sequential baseline.
@@ -85,15 +84,15 @@ export function inquiryAssessmentBasis(details, technical, arrangement, scope) {
   const complexityFactor = complexityDurationFactors[baselineComplexity];
   const overlapFactor = overlapDurationFactors[overlapLevel];
   const { rate, medium } = planningRules[details.project_type];
-  return { size, typePoints, sizePoints, floorPoints, technicalPoints, overlapPoints, usePoints, featurePoints,
+  return { size, typePoints, sizePoints, technicalPoints, overlapPoints, usePoints, featurePoints,
     baselineComplexity, complexityFactor, overlapFactor, rate, medium,
     extraFloorDays: 20 * (Number(details.floor_count) - 1) };
 }
 
 export function assessInquiry(details, start, end, technical, arrangement, scope) {
   const basis = inquiryAssessmentBasis(details, technical, arrangement, scope);
-  const { size, typePoints, sizePoints, floorPoints, technicalPoints, overlapPoints, usePoints, featurePoints } = basis;
-  const score = Math.min(15, typePoints + sizePoints + floorPoints + technicalPoints + overlapPoints + usePoints + featurePoints);
+  const { size, typePoints, sizePoints, technicalPoints, overlapPoints, usePoints, featurePoints } = basis;
+  const score = Math.min(15, typePoints + sizePoints + technicalPoints + overlapPoints + usePoints + featurePoints);
   const complexity = complexityForScore(score);
   const durationMultiplier = basis.complexityFactor * basis.overlapFactor;
   const planningDays = Math.ceil((Number(details.floor_area_sqm) * basis.rate + basis.extraFloorDays) * durationMultiplier);

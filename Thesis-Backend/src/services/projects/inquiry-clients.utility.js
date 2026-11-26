@@ -1,6 +1,6 @@
 import { HttpError, isUuid } from "../../common/utilities/access.utility.js";
 
-const draftFields = ["client_record", "client_type", "client_name", "company_name", "primary_contact", "designation", "email", "phone", "existing_client_source", "existing_client_id", "existing_client_verified", "existing_client_phone_missing", "name", "address", "project_type", "lot_area", "building_footprint_sqm", "floor_area_sqm", "floor_count", "consultation", "classification", "immediate_consultation", "anticipated_start", "overview"];
+const draftFields = ["client_record", "client_type", "client_name", "company_name", "primary_contact", "designation", "email", "phone", "existing_client_source", "existing_client_id", "existing_client_verified", "existing_client_phone_missing", "name", "address", "project_type", "lot_area", "floor_area_sqm", "floor_count", "consultation", "classification", "immediate_consultation", "anticipated_start", "overview"];
 
 export function inquiryDraftDetails(input) {
   const details = { intake_draft: "yes" };
