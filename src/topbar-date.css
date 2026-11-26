@@ -1,0 +1,33 @@
+#root .topbar-date {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#root .topbar-date svg { flex: none; }
+
+@media (max-width: 600px) {
+  #root .app-shell > .main-shell > .topbar {
+    height: auto;
+    min-height: 72px;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+  #root .app-shell > .main-shell > .topbar > .breadcrumb {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  #root .app-shell > .main-shell > .topbar > .topbar-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  #root .topbar-date { margin-left: auto; gap: 5px; font-size: 14px; }
+}

@@ -1,4 +1,5 @@
 import WorkspaceGuide from "./WorkspaceGuide"
+import TopbarDate from "./TopbarDate"
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
 import { LoadingRoleProvider } from "./LoadingSkeleton"
@@ -718,6 +719,7 @@ export default function ClientPortal({
             <strong>{page}</strong>
           </div>
           <div className="topbar-actions">
+            <TopbarDate />
             <div className="notification-container">
               <Button
                 icon="bell"

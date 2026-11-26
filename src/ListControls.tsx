@@ -154,6 +154,8 @@ export function ListToolbar<T>({
   placeholder = "Search",
   noun = "record",
   showSearch = true,
+  searchLabel,
+  beforeFilters,
   debounceMs = 0,
   extra,
   wrapControls,
@@ -166,6 +168,8 @@ export function ListToolbar<T>({
   wrapControls?: (controls: ReactNode) => ReactNode
   // Off when the page already has its own search box (for example the document browser).
   showSearch?: boolean
+  searchLabel?: string
+  beforeFilters?: ReactNode
   // Wait this long after typing stops before searching (server-side lists use 300).
   debounceMs?: number
 }) {
@@ -189,7 +193,12 @@ export function ListToolbar<T>({
   const controls = (
       <div className="list-toolbar-controls">
         {showSearch && (
-          <div className="search-field">
+          <div className={searchLabel ? "list-search-control" : "search-field"}>
+            {searchLabel && <label htmlFor={`${list.key}-search`}>{searchLabel}</label>}
+            {searchLabel && <div className="search-field"><Icon name="search" size={18} />
+              <input id={`${list.key}-search`} placeholder={placeholder} value={text} onChange={(event) => onSearch(event.target.value)} />
+            </div>}
+            {!searchLabel && <>
             <Icon name="search" size={18} />
             <input
               aria-label={placeholder}
@@ -197,8 +206,10 @@ export function ListToolbar<T>({
               value={text}
               onChange={(event) => onSearch(event.target.value)}
             />
+            </>}
           </div>
         )}
+        {beforeFilters}
         {(config.filters || []).map((def) => (
           <div className="list-filter" key={def.id}>
             <span>{def.label}</span>

@@ -1,6 +1,6 @@
 import { normalInquiryDeadline } from "../../domain/inquiry-office-hours.js";
 import { mixedUsePhaseReview, mixedUseSelectionsError, normalizeMixedUseSelections } from "../../domain/mixed-use-scope.js";
-import { forecastPhaseDelay, phaseWorkday, suggestPhaseSchedule } from "../../domain/phase-schedule.js";
+import { MIN_PHASE_CALENDAR_DAYS, forecastPhaseDelay, phaseWorkday, suggestPhaseSchedule } from "../../domain/phase-schedule.js";
 import { isoDateValid } from "../../domain/engineer-credentials.js";
 import execute from "../../common/utilities/query.utility.js";
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
@@ -57,7 +57,7 @@ export function inquiryDetails(input, { validateAverage = true } = {}) {
   if (areaIssue) throw new HttpError(422, areaIssue);
   if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
     throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
-  if (details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
+  if (validateAverage && details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
     throw new HttpError(422, `Total floor area must be at least ${(details.floor_count * MIN_AVERAGE_FLOOR_AREA).toLocaleString("en-PH")} m² for ${details.floor_count} floors (minimum average ${MIN_AVERAGE_FLOOR_AREA} m² per floor).`);
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
@@ -260,12 +260,11 @@ export function mountInquiries(router) {
       delete scope.pending_phase_revision;
     } else {
       if (!["preview", "submit"].includes(action) || !Object.hasOwn(dates, phase) || !isoDateValid(release) ||
-          release > "9998-12-31" || phaseWorkday(release) !== release)
-        throw new HttpError(422, "Select an included phase and a valid working date.");
+          release > "9998-12-31")
+        throw new HttpError(422, "Select an included phase and a valid date.");
       const intake = project.inquiry_intake;
       const rules = suggestPhaseSchedule({ phases: scope.phases ?? Object.keys(dates), type: intake?.project_type,
-        complexity: intake?.assessment?.complexity, arrangement: intake?.assessment?.arrangement,
-        start: project.start, area: intake?.floor_area_sqm, dates });
+        arrangement: intake?.assessment?.arrangement, start: project.start, end: project.end, dates });
       const revised = forecastPhaseDelay(dates, phase, release, rules);
       if (!revised) throw new HttpError(422, "Enter a forecast release after the current phase start.");
       const finishes = Object.values(revised).map(range => range.end);
@@ -640,13 +639,13 @@ export function mountInquiries(router) {
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
       selected.filter(phase => storedDates?.[phase]).map(phase => [phase, storedDates[phase]])), selected, review);
     if (req.body.confirm_schedule === true) {
-      const dependencies = suggestPhaseSchedule({ phases: selected, type, complexity: assessment.complexity,
-        arrangement: assessment.arrangement, start: review.start, area: row.details.floor_area_sqm, dates: phaseDates });
+      const dependencies = suggestPhaseSchedule({ phases: selected, type, arrangement: assessment.arrangement,
+        start: review.start, end: review.end, dates: phaseDates });
       for (const phase of selected) {
         const range = phaseDates[phase];
-        if (!range || range.start < dependencies[phase].start || phaseWorkday(range.start) !== range.start ||
-            phaseWorkday(range.end) !== range.end)
-          throw new HttpError(422, `Review the working dates and dependencies for ${phase}.`);
+        if (!range || range.start < dependencies[phase].start ||
+            range.end < phaseWorkday(range.start, MIN_PHASE_CALENDAR_DAYS - 1))
+          throw new HttpError(422, `Review the dates and dependencies for ${phase}.`);
       }
     }
     const candidates = {};

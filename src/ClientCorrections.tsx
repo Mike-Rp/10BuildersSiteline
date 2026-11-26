@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { api } from "./api/client"
-import { Icon, Modal } from "./ui"
+import { Modal } from "./ui"
 type Correction = { id: string; field: string; before: string; after: string; reason: string; status: string }
 export default function ClientCorrections({ id, details, admin, reload, projectType = false, contractLocked = false }: {
   id: string; details: Record<string, unknown>; admin: boolean; reload: () => void; projectType?: boolean; contractLocked?: boolean
@@ -27,7 +27,6 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
       <label htmlFor={`inquiry-project-type-${id}`}>Project type</label>
       <div className="inquiry-locked-project-type">
         <input id={`inquiry-project-type-${id}`} readOnly value={String(details.project_type ?? "")} />
-        <Icon name="lock" size={16} />
       </div>
       <p>{contractLocked ? "Project type is locked under the finalized signed contract."
         : "Project type comes from the submitted inquiry. An approved correction requires a new scope and budget review."}</p>

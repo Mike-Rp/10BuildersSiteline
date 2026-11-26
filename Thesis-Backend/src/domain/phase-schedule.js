@@ -1,25 +1,23 @@
 const day = 86400000;
-const profiles = {
-  Residential: [5,20,20,30,15,15,0,20,8,5],
-  Commercial: [7,30,30,45,30,30,15,30,0,10],
-  "Mixed-Use": [10,40,40,60,40,40,20,30,15,12],
-};
+export const MIN_PHASE_CALENDAR_DAYS = 14;
+// Relative work-package weights for an illustrative early schedule. Six
+// construction weights follow the measured low-rise residential process hours
+// in https://7universum.com/en/tech/archive/item/22390 (Table 1): site
+// preparation 120, foundation 150, framing 200, roofing 80, services 100,
+// finishing 140. Design, fire safety, site works and closeout are explicit
+// planning assumptions because that study does not measure those packages.
+// These are proportions only, never absolute days or company benchmarks.
+const phaseWeights = [120, 120, 150, 200, 80, 100, 100, 140, 80, 40];
+const projectTypes = new Set(["Residential", "Commercial", "Mixed-Use"]);
 const stageKinds = [
   /^Mobilization$/, /^Design$/, /^Foundation$/, /Structure/, /^Envelope/,
   /^MEP Rough/i, /^Fire & Life Safety$/, /Finishes|Fit-Out/i, /Landscape|Site Works/i, /^Closeout$/,
 ];
-const complexityFactors = { Low: 0.85, Moderate: 1, High: 1.3 };
 
 export function phaseWorkday(date, offset = 0) {
-  let time = Date.parse(date);
+  const time = Date.parse(date);
   if (!Number.isFinite(time)) return "";
-  const direction = offset < 0 ? -1 : 1;
-  const weekend = () => [0, 6].includes(new Date(time).getUTCDay());
-  while (weekend()) time += direction * day;
-  for (let remaining = Math.abs(offset); remaining; remaining--) {
-    do { time += direction * day; } while (weekend());
-  }
-  return new Date(time).toISOString().slice(0, 10);
+  return new Date(time + offset * day).toISOString().slice(0, 10);
 }
 
 export function forecastPhaseDelay(dates, phase, release, rules = {}) {
@@ -51,38 +49,57 @@ export function forecastPhaseDelay(dates, phase, release, rules = {}) {
   return revised;
 }
 
-export function suggestPhaseSchedule({ phases, type, complexity, arrangement, start, area, dates = {} }) {
-  if (!start || !profiles[type]) return {};
-  const profile = profiles[type];
+export function suggestPhaseSchedule({ phases, type, arrangement, start, end, dates = {} }) {
+  if (!start || !projectTypes.has(type)) return {};
   const priority = phase => phase === "Mobilization" ? 0 : phase === "Design" ? 1 : 2;
   const order = [...phases].sort((a, b) => priority(a) - priority(b));
-  const result = {};
-  const daysByPhase = {};
   const concurrent = arrangement === "Highly concurrent phases";
   const overlaps = concurrent || arrangement === "Partially overlapping phases";
-  for (const [index, phase] of order.entries()) {
+  // Relative planning weights, not asserted construction durations.
+  const weights = Object.fromEntries(order.map(phase => {
     const kind = stageKinds.findIndex(pattern => pattern.test(phase));
-    const baseline = phase === "Podium Structure" ? 30 : phase === "Residential Fit-Out" ? 25 : profile[kind] || 10;
-    const days = Math.ceil(baseline * (complexityFactors[complexity] ?? 1) * Math.sqrt(Math.max(1, Number(area) || 200) / 200));
-    const prior = order.slice(0, index);
-    const structure = prior.findLast(name => /Structure/.test(name));
-    const overlap = overlaps && structure && (kind === 4 || kind === 5 && concurrent);
-    const waitsFor = overlap ? prior.slice(0, prior.indexOf(structure))
-      : concurrent && kind === 7 ? prior.filter(name => !/Fit-Out/i.test(name)) : prior;
-    const after = waitsFor.reduce((latest, name) => {
-      const end = dates[name]?.end || result[name].end;
-      return end > latest ? end : latest;
-    }, "");
-    let earliest = after ? phaseWorkday(after, 1) : phaseWorkday(start);
-    if (overlap) {
-      const range = dates[structure]?.start && dates[structure]?.end ? dates[structure] : result[structure];
-      const release = phaseWorkday(range.start, Math.floor(daysByPhase[structure] * (concurrent ? 0.5 : 2 / 3)));
-      const milestone = release < range.end ? release : phaseWorkday(range.end, 1);
-      if (milestone > earliest) earliest = milestone;
+    return [phase, phaseWeights[kind] || 100];
+  }));
+  function build(scale, overrides) {
+    const result = {};
+    const daysByPhase = {};
+    for (const [index, phase] of order.entries()) {
+      const kind = stageKinds.findIndex(pattern => pattern.test(phase));
+      const days = Math.max(MIN_PHASE_CALENDAR_DAYS, Math.ceil(weights[phase] * scale));
+      const prior = order.slice(0, index);
+      const structure = prior.findLast(name => /Structure/.test(name));
+      const overlap = overlaps && structure && (kind === 4 || kind === 5 && concurrent);
+      const waitsFor = overlap ? prior.slice(0, prior.indexOf(structure))
+        : concurrent && kind === 7 ? prior.filter(name => !/Fit-Out/i.test(name)) : prior;
+      const after = waitsFor.reduce((latest, name) => {
+        const finish = overrides[name]?.end || result[name].end;
+        return finish > latest ? finish : latest;
+      }, "");
+      let earliest = after ? phaseWorkday(after, 1) : phaseWorkday(start);
+      if (overlap) {
+        const range = overrides[structure]?.start && overrides[structure]?.end ? overrides[structure] : result[structure];
+        const release = phaseWorkday(range.start, Math.floor(daysByPhase[structure] * (concurrent ? 0.5 : 2 / 3)));
+        const milestone = release < range.end ? release : phaseWorkday(range.end, 1);
+        if (milestone > earliest) earliest = milestone;
+      }
+      result[phase] = { start: earliest, end: phaseWorkday(earliest, days - 1), days, waitsFor,
+        ...(overlap ? { overlapWith: structure } : {}) };
+      daysByPhase[phase] = days;
     }
-    result[phase] = { start: earliest, end: phaseWorkday(earliest, days - 1), days, waitsFor,
-      ...(overlap ? { overlapWith: structure } : {}) };
-    daysByPhase[phase] = days;
+    return result;
   }
-  return result;
+  if (!end || !Number.isFinite(Date.parse(end)) || end < start || !order.length) return build(1, dates);
+  // Fit the phase allocation within the reviewed window. An impossible
+  // window still shows the minimum schedule for the OPM to resolve.
+  const windowDays = (Date.parse(end) - Date.parse(start)) / day + 1;
+  let low = 0;
+  let high = windowDays / Math.min(...Object.values(weights));
+  for (let index = 0; index < 32; index++) {
+    const middle = (low + high) / 2;
+    const candidate = build(middle, {});
+    const completion = Object.values(candidate).map(range => range.end).sort().at(-1);
+    if (completion <= end) low = middle;
+    else high = middle;
+  }
+  return build(low, dates);
 }

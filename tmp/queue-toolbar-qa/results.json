@@ -1,0 +1,380 @@
+[
+  {
+    "width": 320,
+    "toolbar": {
+      "top": 946.296875,
+      "bottom": 1340.296875,
+      "left": 12,
+      "right": 308,
+      "width": 296,
+      "height": 394
+    },
+    "card": {
+      "top": 1396.296875,
+      "bottom": 2075.53125,
+      "left": 12,
+      "right": 308,
+      "width": 296,
+      "height": 679.234375
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 995.296875,
+        "bottom": 1043.296875,
+        "left": 27,
+        "right": 293,
+        "width": 266,
+        "height": 48
+      },
+      {
+        "top": 1089.296875,
+        "bottom": 1137.296875,
+        "left": 27,
+        "right": 293,
+        "width": 266,
+        "height": 48
+      },
+      {
+        "top": 1183.296875,
+        "bottom": 1231.296875,
+        "left": 27,
+        "right": 293,
+        "width": 266,
+        "height": 48
+      },
+      {
+        "top": 1277.296875,
+        "bottom": 1325.296875,
+        "left": 27,
+        "right": 293,
+        "width": 266,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 1
+  },
+  {
+    "width": 390,
+    "toolbar": {
+      "top": 849.015625,
+      "bottom": 1243.015625,
+      "left": 12,
+      "right": 378,
+      "width": 366,
+      "height": 394
+    },
+    "card": {
+      "top": 1299.015625,
+      "bottom": 1903.484375,
+      "left": 12,
+      "right": 378,
+      "width": 366,
+      "height": 604.46875
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 898.015625,
+        "bottom": 946.015625,
+        "left": 27,
+        "right": 363,
+        "width": 336,
+        "height": 48
+      },
+      {
+        "top": 992.015625,
+        "bottom": 1040.015625,
+        "left": 27,
+        "right": 363,
+        "width": 336,
+        "height": 48
+      },
+      {
+        "top": 1086.015625,
+        "bottom": 1134.015625,
+        "left": 27,
+        "right": 363,
+        "width": 336,
+        "height": 48
+      },
+      {
+        "top": 1180.015625,
+        "bottom": 1228.015625,
+        "left": 27,
+        "right": 363,
+        "width": 336,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 1
+  },
+  {
+    "width": 768,
+    "toolbar": {
+      "top": 625.421875,
+      "bottom": 831.421875,
+      "left": 12,
+      "right": 756,
+      "width": 744,
+      "height": 206
+    },
+    "card": {
+      "top": 887.421875,
+      "bottom": 1206.140625,
+      "left": 12,
+      "right": 756,
+      "width": 744,
+      "height": 318.71875
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 674.421875,
+        "bottom": 722.421875,
+        "left": 27,
+        "right": 378,
+        "width": 351,
+        "height": 48
+      },
+      {
+        "top": 674.421875,
+        "bottom": 722.421875,
+        "left": 390,
+        "right": 741,
+        "width": 351,
+        "height": 48
+      },
+      {
+        "top": 768.421875,
+        "bottom": 816.421875,
+        "left": 27,
+        "right": 378,
+        "width": 351,
+        "height": 48
+      },
+      {
+        "top": 768.421875,
+        "bottom": 816.421875,
+        "left": 390,
+        "right": 741,
+        "width": 351,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 2
+  },
+  {
+    "width": 1024,
+    "toolbar": {
+      "top": 653.828125,
+      "bottom": 859.828125,
+      "left": 264,
+      "right": 1006,
+      "width": 742,
+      "height": 206
+    },
+    "card": {
+      "top": 915.828125,
+      "bottom": 1234.546875,
+      "left": 264,
+      "right": 1006,
+      "width": 742,
+      "height": 318.71875
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 702.828125,
+        "bottom": 750.828125,
+        "left": 279,
+        "right": 629,
+        "width": 350,
+        "height": 48
+      },
+      {
+        "top": 702.828125,
+        "bottom": 750.828125,
+        "left": 641,
+        "right": 991,
+        "width": 350,
+        "height": 48
+      },
+      {
+        "top": 796.828125,
+        "bottom": 844.828125,
+        "left": 279,
+        "right": 629,
+        "width": 350,
+        "height": 48
+      },
+      {
+        "top": 796.828125,
+        "bottom": 844.828125,
+        "left": 641,
+        "right": 991,
+        "width": 350,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 2
+  },
+  {
+    "width": 1440,
+    "toolbar": {
+      "top": 619.78125,
+      "bottom": 731.78125,
+      "left": 264,
+      "right": 1422,
+      "width": 1158,
+      "height": 112
+    },
+    "card": {
+      "top": 787.78125,
+      "bottom": 1106.5,
+      "left": 264,
+      "right": 1422,
+      "width": 1158,
+      "height": 318.71875
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 668.78125,
+        "bottom": 716.78125,
+        "left": 279,
+        "right": 658.8125,
+        "width": 379.8125,
+        "height": 48
+      },
+      {
+        "top": 668.78125,
+        "bottom": 716.78125,
+        "left": 670.8125,
+        "right": 908.203125,
+        "width": 237.390625,
+        "height": 48
+      },
+      {
+        "top": 668.78125,
+        "bottom": 716.78125,
+        "left": 920.203125,
+        "right": 1157.59375,
+        "width": 237.390625,
+        "height": 48
+      },
+      {
+        "top": 668.78125,
+        "bottom": 716.78125,
+        "left": 1169.59375,
+        "right": 1407,
+        "width": 237.40625,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 4
+  },
+  {
+    "width": 1920,
+    "toolbar": {
+      "top": 620.71875,
+      "bottom": 732.71875,
+      "left": 423,
+      "right": 1743,
+      "width": 1320,
+      "height": 112
+    },
+    "card": {
+      "top": 788.71875,
+      "bottom": 1107.4375,
+      "left": 423,
+      "right": 1743,
+      "width": 1320,
+      "height": 318.71875
+    },
+    "background": "rgb(255, 255, 255)",
+    "border": "1px",
+    "controls": [
+      {
+        "top": 669.71875,
+        "bottom": 717.71875,
+        "left": 438,
+        "right": 874.171875,
+        "width": 436.171875,
+        "height": 48
+      },
+      {
+        "top": 669.71875,
+        "bottom": 717.71875,
+        "left": 886.171875,
+        "right": 1158.78125,
+        "width": 272.609375,
+        "height": 48
+      },
+      {
+        "top": 669.71875,
+        "bottom": 717.71875,
+        "left": 1170.78125,
+        "right": 1443.390625,
+        "width": 272.609375,
+        "height": 48
+      },
+      {
+        "top": 669.71875,
+        "bottom": 717.71875,
+        "left": 1455.390625,
+        "right": 1728,
+        "width": 272.609375,
+        "height": 48
+      }
+    ],
+    "labels": [
+      "Search",
+      "Queue view",
+      "Status",
+      "Project type"
+    ],
+    "overflow": false,
+    "columns": 4
+  }
+]

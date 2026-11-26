@@ -7,11 +7,11 @@ import { ApiError, api, downloadBlob } from "./api/client"
 import { uploadFile } from "./api/actions"
 import { Icon, Modal } from "./ui"
 import type { Project } from "./model"
-import { phaseWorkday, suggestPhaseSchedule } from "../Thesis-Backend/src/domain/phase-schedule.js"
+import { MIN_PHASE_CALENDAR_DAYS, phaseWorkday, suggestPhaseSchedule } from "../Thesis-Backend/src/domain/phase-schedule.js"
 import { phaseEngineerSummary, registeredComplete, registeredCount, teamConfirmed } from "./workflows"
 import { ListPager, runList, updateListQuery, useListMemory } from "./ListControls"
 import { withPage } from "./listing"
-import { IntakePipelinePanel, IntakeTabs } from "./IntakeGuidance"
+import InfoPopover from "./InfoPopover"
 import type { IntakeView } from "./intake-guidance"
 import StaffingPeak from "./StaffingPeak"
 import { DEFAULT_SETUP_SPM_COUNT, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
@@ -24,6 +24,7 @@ import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./Off
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
+import DatePicker from "./DatePicker"
 import { showActionResult } from "./action-feedback"
 import { PROJECT_SETUP_LABEL } from "./workspace-routing"
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
@@ -136,11 +137,11 @@ function InquiryProgress({ milestone, numbered = false }: { milestone: number; n
   </ol>
 }
 
-function FormSection({ title, icon, description, children }: { title: string; icon?: string; description?: string; children: ReactNode }) {
-  return <section className="inquiry-form-section">
+function FormSection({ title, icon, description, status, reviewState, className = "", children }: { title: string; icon?: string; description?: string; status?: ReactNode; reviewState?: "input" | "review" | "complete"; className?: string; children: ReactNode }) {
+  return <section className={`inquiry-form-section ${className}${reviewState ? " office-review-item" : ""}`} data-review-state={reviewState}>
     {icon ? <header className="inquiry-section-heading">
       <span className="inquiry-list-icon"><Icon name={icon} /></span>
-      <div><h3>{title}</h3>{description && <p>{description}</p>}</div>
+      <div>{status ? <div className="inquiry-section-title"><h3>{title}</h3>{status}</div> : <h3>{title}</h3>}{description && <p>{description}</p>}</div>
     </header> : <h3>{title}</h3>}
     <div>{children}</div>
   </section>
@@ -252,10 +253,10 @@ function ContractPreview({ file, fileId, onClose, onConfirm, busy, error }: {
     }).catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
   }, [file, fileId])
-  return <Modal title={onConfirm ? "Confirm signed contract" : "Signed contract preview"} subtitle={file?.name} wide onClose={onClose}
+  return <Modal title={onConfirm ? "Upload signed contract" : "Signed contract preview"} subtitle={file?.name} wide onClose={onClose}
     footer={onConfirm && <>
       <button type="button" className="button" disabled={busy} onClick={onClose}>Cancel</button>
-      <button type="button" className="button primary" disabled={!preview || busy} onClick={onConfirm}>{busy ? "Saving contract…" : "Confirm this file"}</button>
+      <button type="button" className="button primary" disabled={!preview || busy} onClick={onConfirm}>{busy ? "Saving contract…" : "Upload this file"}</button>
     </>}>
     {onConfirm && <p>Review the file and confirm it is the signed agreement for this project.</p>}
     {error && <p role="alert">{error}</p>}
@@ -549,6 +550,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [planning, setPlanning] = useState<Planning>()
   const [phases, setPhases] = useState<string[]>([])
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({})
+  const [showPhaseExplanation, setShowPhaseExplanation] = useState(false)
   const [planningBackups, setPlanningBackups] = useState<PlanningBackups>({})
   const [team, setTeam] = useState<Phase[]>([])
   const [pendingContract, setPendingContract] = useState<{ file: File; id: string; uploaded?: boolean }>()
@@ -564,6 +566,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     : officePage === "assessment" && !intakeLocked ? "review" : officePage
   const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
+  const contractStatus = contractFileId ? "uploaded" : "missing"
+  const contractStatusLabel = contractFileId ? "Uploaded" : "Not uploaded"
   const contractLocked = Boolean(contractFileId && (intakeLocked || row?.workflow?.contract_locked || row?.workflow?.assessment || row?.workflow?.staffing))
   const start = row?.workflow?.review?.start
   const end = row?.workflow?.review?.end
@@ -572,20 +576,26 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const technical = row?.workflow?.assessment?.technical ?? row?.workflow?.review?.technical
   const arrangement = row?.workflow?.assessment?.arrangement ?? row?.workflow?.review?.arrangement
   const phaseScheduleInput = {
-    type: String(row?.details.project_type ?? ""), complexity: row?.workflow?.assessment?.complexity,
-    arrangement, start, area: row?.details.floor_area_sqm,
+    type: String(row?.details.project_type ?? ""), arrangement, start, end,
   }
-  const suggestions = suggestPhaseSchedule({ ...phaseScheduleInput, phases })
   const dependencies = suggestPhaseSchedule({ ...phaseScheduleInput, phases, dates: phaseDates })
   const scheduledDates = { ...dependencies, ...phaseDates }
   const phaseCompletion = phases.map(stage => scheduledDates[stage]?.end).filter(Boolean).sort().at(-1)
-  const phaseScheduleIssue = phases.find(stage => {
+  function phaseDateError(stage: string, field: "start" | "end") {
     const range = scheduledDates[stage]
-    return !range?.start || !range.end || range.end < range.start ||
-      range.start < (dependencies[stage]?.start ?? start ?? "") ||
-      Boolean(end && range.end > end) ||
-      phaseWorkday(range.start) !== range.start || phaseWorkday(range.end) !== range.end
-  })
+    const value = range?.[field]
+    if (!value) return `Choose a phase ${field} date.`
+    if (field === "start") {
+      const earliest = dependencies[stage]?.start ?? start ?? ""
+      if (value < earliest) return `Start on or after ${earliest}.`
+    } else {
+      if (range?.start && value < range.start) return "End on or after the phase start."
+      if (range?.start && value < phaseWorkday(range.start, MIN_PHASE_CALENDAR_DAYS - 1)) return `Each phase must last at least ${MIN_PHASE_CALENDAR_DAYS} calendar days.`
+      if (end && value > end) return `End on or before ${end}.`
+    }
+    return ""
+  }
+  const phaseScheduleIssue = phases.find(stage => phaseDateError(stage, "start") || phaseDateError(stage, "end"))
   const staffingInput = {
     ...row?.details, target_start_date: start, target_end_date: end,
     estimated_budget: budget, assessment_id: row?.workflow?.assessment?.id,
@@ -748,6 +758,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     else setDialog("details")
   }
   async function startStaffing() {
+    if (!row?.workflow?.assessment || !contractFileId || pendingContract)
+      throw new Error("Complete the assessment and upload the signed client contract before continuing.")
     if (!planning) {
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
@@ -1218,8 +1230,11 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
-          projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType contractLocked={contractLocked} reload={reloadCorrections} />}
-          signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
+          signedContract={<FormSection title="Signed client contract" icon="doc" className="inquiry-contract-section" reviewState={contractFileId ? "complete" : "input"}
+            status={<span className="inquiry-contract-status" data-status={contractStatus} role="status">
+              <Icon name={contractFileId ? "check" : "upload"} size={15} />
+              {contractStatusLabel}
+            </span>} description="Upload the signed agreement between the Office PM and client before staffing.">
             {!contractLocked && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
               const file = event.target.files?.[0]
               event.target.value = ""
@@ -1236,7 +1251,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             </button>}
             {contractFileId && <div className="inquiry-sent-notice inquiry-contract-preview">
               <span className="inquiry-list-icon"><Icon name="doc" /></span>
-              <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>{contractLocked ? "Locked agreement" : "Contract confirmed"}</small></div>
+              <div><strong>{row.workflow?.signed_contract?.name || "Signed Client Contract Agreement"}</strong><small>Saved to this inquiry</small></div>
               <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setContractPreviewOpen(true) }}>View contract</button>
             </div>}
           </FormSection>}
@@ -1252,31 +1267,38 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </header>}
     {!embedded && pendingBanner}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
-      <IntakePipelinePanel title="Inquiry queue" label="Inquiry pipeline" heading={embedded ? "h2" : "h1"}
-        actions={<button type="button" className="button icon-button" aria-label="Refresh inquiries" title="Refresh inquiries"
-            disabled={busy} onClick={() => void run(async () => {
-            await refresh()
-            await onReload()
-          })}><Icon name="refresh" size={18} /></button>}>
-        <div className="confirmation-intake-filters">
-          <IntakeTabs value={queueView} counts={queueCounts} onChange={setQueueView} allLabel="All inquiries"
-            help="Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action." />
-        </div>
+      <div className="opm-inquiry-controls">
         <div className="opm-inquiry-filters">
-          <div className="inquiry-list-search">
-            <Icon name="search" size={17} />
-            <input type="search" aria-label="Search inquiries" placeholder="Search by project, client, or ID" value={search} onChange={event => setSearch(event.target.value)} />
+          <div className="opm-inquiry-filter">
+            <label className="opm-inquiry-filter-label" htmlFor="opm-inquiry-search">Search</label>
+            <div className="inquiry-list-search">
+              <Icon name="search" size={17} />
+              <input id="opm-inquiry-search" type="search" aria-label="Search inquiries" placeholder="Search by project, client, or ID" value={search} onChange={event => setSearch(event.target.value)} />
+            </div>
           </div>
-          <label>Status<select value={queueStatus} onChange={event => setQueueStatus(event.target.value)}>
+          <div className="opm-inquiry-filter">
+            <div className="opm-inquiry-filter-label">
+              <label htmlFor="opm-inquiry-queue-view">Queue view</label>
+              <InfoPopover title="Who needs to act?" label="Help: Queue view">
+                Needs your action includes inquiry reviews, staffing actions, and missing documents. Waiting for others includes pending client decisions and Site PM responses when you have no remaining action.
+              </InfoPopover>
+            </div>
+            <select id="opm-inquiry-queue-view" value={queueView} onChange={event => setQueueView(event.target.value as IntakeView)}>
+              <option value="all">All inquiries ({queueCounts.all})</option>
+              <option value="action">Needs your action ({queueCounts.action})</option>
+              <option value="waiting">Waiting for others ({queueCounts.waiting})</option>
+            </select>
+          </div>
+          <div className="opm-inquiry-filter"><label className="opm-inquiry-filter-label" htmlFor="opm-inquiry-status">Status</label><select id="opm-inquiry-status" value={queueStatus} onChange={event => setQueueStatus(event.target.value)}>
             <option value="">All statuses</option>
             {statusOptions.map(status => <option key={status}>{status}</option>)}
-          </select></label>
-          <label>Project type<select value={queueType} onChange={event => setQueueType(event.target.value)}>
+          </select></div>
+          <div className="opm-inquiry-filter"><label className="opm-inquiry-filter-label" htmlFor="opm-inquiry-type">Project type</label><select id="opm-inquiry-type" value={queueType} onChange={event => setQueueType(event.target.value)}>
             <option value="">All types</option>
             {projectTypes.map(([type]) => <option key={type}>{type}</option>)}
-          </select></label>
+          </select></div>
         </div>
-      </IntakePipelinePanel>
+      </div>
       {queueRows && <p className="opm-inquiry-count" role="status">{queueRows.length} {queueRows.length === 1 ? "project inquiry" : "project inquiries"}</p>}
       {queueRows?.length ? <ul className="opm-inquiry-cards" aria-label="Assigned project inquiries">
           {queueRows.map(item => {
@@ -1479,9 +1501,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         </ol>
         {step === 2 && planning && <fieldset className="inquiry-review" disabled={busy}>
           <aside className="inquiry-summary-card">
-            <h3>Inquiry summary</h3>
+            <div className="inquiry-summary-heading"><h3>Inquiry summary</h3><span className="inquiry-pill">{statusLabel(row)}</span></div>
             {row.details.overview && <p>{row.details.overview}</p>}
-            <span className="inquiry-pill">{statusLabel(row)}</span>
             <dl>
               <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
               <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
@@ -1490,9 +1511,16 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <div><dt>Number of floors</dt><dd>{row.details.floor_count}</dd></div>
               <div><dt>Target start</dt><dd>{start || "—"}</dd></div>
             </dl>
-            <details><summary>View full inquiry</summary>
-              <InquiryDetails details={row.details} includeClient />
-              <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
+            <details><summary>Additional inquiry details</summary>
+              <dl className="inquiry-summary-extra">
+                <div><dt>Email</dt><dd>{row.details.email || "-"}</dd></div>
+                <div><dt>Phone</dt><dd>{row.details.phone || "-"}</dd></div>
+                <div><dt>Lot area (m²)</dt><dd>{row.details.lot_area || "-"}</dd></div>
+                {row.details.client_type && <div><dt>Client type</dt><dd>{row.details.client_type === "company" ? "Company / organization" : "Individual"}</dd></div>}
+                {row.details.primary_contact && <div><dt>Primary contact</dt><dd>{row.details.primary_contact}</dd></div>}
+                {row.details.designation && <div><dt>Position / designation</dt><dd>{row.details.designation}</dd></div>}
+                <div><dt>Preferred consultation timing</dt><dd>{consultationLabel(row.details)}</dd></div>
+              </dl>
             </details>
           </aside>
           <div className="inquiry-review-main">
@@ -1513,41 +1541,51 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                     ? <><Icon name="lock" size={14} /> Required</> : "Included" : "Out of scope"}</td>
                 </tr>)}</tbody>
             </table>
-            {!!phases.length && <details className="inquiry-license-window" open>
-              <summary>Planned phase dates</summary>
-              <p><strong>{arrangement}</strong> · {Object.keys(phaseDates).length ? "Review dates" : "System suggested"}</p>
-              <p className="inquiry-muted">Review the suggested dates before staffing. Estimates use a Monday–Friday construction calendar.</p>
-              <p className="inquiry-coverage-warning" role="note"><strong>Scheduling reminder:</strong> Mobilization must start first, on or after the reviewed project start date. Design and subsequent phases must follow their required predecessors, even when phases overlap.</p>
-              {phaseCompletion && <p>Scheduled completion · {phaseCompletion}</p>}
+            {!!phases.length && <section className="inquiry-license-window" aria-labelledby="inquiry-planned-dates-title">
+              <div className="inquiry-phase-schedule-header">
+                <div>
+                  <h3 id="inquiry-planned-dates-title">Planned phase dates</h3>
+                  <p><strong>{arrangement}</strong> · {Object.keys(phaseDates).length ? "OPM-adjusted dates" : "Planning draft"}</p>
+                </div>
+              </div>
+              <div className="inquiry-phase-intro">Review these planning dates before staffing. Each phase must last at least 14 calendar days. <button type="button" className="inquiry-phase-explanation-toggle" aria-expanded={showPhaseExplanation} aria-controls="inquiry-phase-explanation" onClick={() => setShowPhaseExplanation(value => !value)}>{showPhaseExplanation ? "See less" : "See how dates are planned"}</button>
+                {showPhaseExplanation && <p id="inquiry-phase-explanation" className="inquiry-phase-explanation">The draft divides the OPM-reviewed project period using indicative phase proportions. Some proportions come from published low-rise residential work measurements; other phases and project types use planning assumptions. Mobilization starts on or after the reviewed project start, and later phases follow required predecessors, including allowed overlaps.</p>}
+              </div>
+              {phaseCompletion && <p className="inquiry-phase-completion">Scheduled completion · <strong>{phaseCompletion}</strong></p>}
               {phaseCompletion && end && phaseCompletion > end && <p className="error">
                 The phase schedule exceeds the reviewed completion date of {end}.
               </p>}
-              <button type="button" className="button" onClick={() => {
-                setPhaseDates({})
-                setTeam([])
-                setPlanning({ ...planning, candidates: undefined })
-              }}>Reset to suggested dates</button>
               {phaseScheduleIssue && <p className="error" role="status">
-                Warning: Review {phaseScheduleIssue}. Use working dates within the project window and start no earlier than {dependencies[phaseScheduleIssue]?.start ?? start}. Mobilization must come first. Correct the dates or reset to suggested dates before continuing to Staffing.
+                Review the highlighted {phaseScheduleIssue} date before continuing to Staffing.
               </p>}
-              {phases.map(stage => <fieldset className="inquiry-phase-dates" key={stage}>
-                <legend>{stage}</legend>
-                {(["start", "end"] as const).map(field => <label key={field}>{field === "start" ? "Phase start" : "Phase end"}
-                  <input type="date" min={field === "start" ? dependencies[stage]?.start ?? start : scheduledDates[stage]?.start ?? start} max={end}
-                    aria-invalid={phaseScheduleIssue === stage || undefined} value={scheduledDates[stage]?.[field] ?? ""}
-                    onChange={event => {
-                      const value = event.target.value
+              <div className="inquiry-phase-date-list">{phases.map((stage, index) => <div className="inquiry-phase-dates" key={stage}>
+                <h4>{stage}<span className="inquiry-phase-order">{index === 0 ? "First phase" : `Follows ${dependencies[stage]?.waitsFor?.at(-1) ?? phases[index - 1]}`}</span></h4>
+                {(["start", "end"] as const).map(field => {
+                  const issue = phaseDateError(stage, field)
+                  const id = `inquiry-phase-date-${index}-${field}`
+                  return <label key={field}>{field === "start" ? "Phase start" : "Phase end"}
+                  <DatePicker calendarTitle={`${stage} phase ${field}`} calendarSubtitle="Choose a date within the project window."
+                    min={field === "start" ? dependencies[stage]?.start ?? start : phaseWorkday(scheduledDates[stage]?.start ?? start ?? "", MIN_PHASE_CALENDAR_DAYS - 1)} max={end}
+                    aria-invalid={issue ? true : undefined} aria-describedby={issue ? `${id}-error` : undefined}
+                    value={scheduledDates[stage]?.[field] ?? ""}
+                    onValueChange={value => {
                       setPhaseDates(previous => ({ ...previous, [stage]: { ...(scheduledDates[stage] ?? { start: "", end: "" }), [field]: value } }))
                       setTeam([])
                       setPlanning({ ...planning, candidates: undefined })
                     }} />
-                </label>)}
-                <p className="inquiry-muted">Estimated duration · {suggestions[stage]?.days} working days</p>
+                  {issue && <small id={`${id}-error`} className="inquiry-phase-date-error" role="alert">{issue}</small>}
+                </label>})}
+                <div className="inquiry-phase-duration"><span>Scheduled duration</span><strong>{(() => {
+                  const range = scheduledDates[stage]
+                  if (!range?.start || !range?.end || range.end < range.start) return "—"
+                  const days = Math.round((Date.parse(range.end) - Date.parse(range.start)) / 86400000) + 1
+                  return `${days} calendar ${days === 1 ? "day" : "days"}`
+                })()}</strong></div>
                 {dependencies[stage]?.overlapWith && <p className="inquiry-muted">
                   May overlap with {dependencies[stage].overlapWith} if its work zone is released by {dependencies[stage].start}.
                 </p>}
-              </fieldset>)}
-            </details>}
+              </div>)}</div>
+            </section>}
           </div>
         </fieldset>}
         {step === 3 && planning?.candidates && <fieldset className="inquiry-form-stack" disabled={busy}>

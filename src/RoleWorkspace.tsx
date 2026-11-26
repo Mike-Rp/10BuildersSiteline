@@ -1,5 +1,7 @@
 import ProjectClientAccount from "./ProjectClientAccount"
 import ProjectInquiries from "./ProjectInquiries"
+import TopbarDate from "./TopbarDate"
+import InfoPopover from "./InfoPopover"
 import WorkspaceGuide from "./WorkspaceGuide"
 import AttachmentPreview from "./AttachmentPreview"
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
@@ -322,7 +324,7 @@ export default function RoleWorkspace({
   const [tab, setTab] = useState("progress")
   const [archiveTab, setArchiveTab] = useState("completed")
   const [confirmTab, setConfirmTab] = useState<"inquiries" | "mine" | "responses">(
-    () => routePage === "Project inquiries" ? "inquiries" : "mine",
+    () => routePage === "Confirmation queue" ? "mine" : "inquiries",
   )
   const [inquiryCount, setInquiryCount] = useState<number>()
   const [inquiryBannerTarget, setInquiryBannerTarget] = useState<HTMLDivElement | null>(null)
@@ -616,7 +618,8 @@ export default function RoleWorkspace({
   function navigate(next: string) {
     if (next === "Reports") { setMonthlySummaryOpen(true); return }
     const openInquiryTab = isOpm && next === "Project inquiries"
-    if (openInquiryTab || (isOpm && next === "Confirmation queue")) next = "Project intake"
+    const openConfirmationTab = isOpm && next === "Confirmation queue"
+    if (openInquiryTab || openConfirmationTab) next = "Project intake"
     if (next === "Documents" && page !== "Documents") setOfficeDocumentsPath({})
     let nextActiveSitesView: typeof activeSitesView | undefined
     if (!isOpm && next === "Document repository") {
@@ -638,7 +641,7 @@ export default function RoleWorkspace({
     setActiveSitesScheduleFilter("")
     if (nextActiveSitesView) setActiveSitesView(nextActiveSitesView)
     setPage(normalizeWorkspacePage(next))
-    setConfirmTab(openInquiryTab ? "inquiries" : "mine")
+    setConfirmTab(openConfirmationTab ? "mine" : "inquiries")
     setQuery("")
     setError("")
     navigation.closeMobile()
@@ -684,6 +687,7 @@ export default function RoleWorkspace({
       requestAnimationFrame(() => document.getElementById("active-sites-photo-review")?.scrollIntoView({ block: "start" }))
     } else if (priority.target === "confirm") {
       navigate("Project intake")
+      setConfirmTab("mine")
       setIntakeView("action")
       updateListQuery(`${actor.role}:confirmations`, q => ({ ...q, search: project.name, filters: {}, page: 1 }))
     } else if (priority.target === "assignment" || priority.target === "coordinate") {
@@ -1075,7 +1079,7 @@ export default function RoleWorkspace({
                 Accept your Office PM assignment before uploading any required
                 project document.
               </p>
-              <Button onClick={() => navigate("Project intake")}>
+              <Button onClick={() => { navigate("Project intake"); setConfirmTab("mine") }}>
                 Review assignment
               </Button>
             </div>
@@ -2742,6 +2746,7 @@ export default function RoleWorkspace({
             onClick={() => {
               setPickedId(p.id)
               navigate("Project intake")
+              setConfirmTab("mine")
             }}
           >
             <span className="activity-icon request">
@@ -3107,8 +3112,8 @@ export default function RoleWorkspace({
     })
     return (
       <>
-        <ListToolbar list={actionList} placeholder="Search assignment responses" noun="project"
-          wrapControls={controls => <IntakePipelinePanel title="Assignment responses" label="Assignment tracking">{controls}</IntakePipelinePanel>} />
+        <ListToolbar list={actionList} placeholder="Search assignment responses" searchLabel="Search" noun="project"
+          wrapControls={controls => <div className="opm-inquiry-pipeline filters-only">{controls}</div>} />
         <ListSection
           list={actionList}
           toolbar={false}
@@ -3955,8 +3960,9 @@ export default function RoleWorkspace({
         return (
           <>
             {header(PROJECT_SETUP_LABEL)}
+            <div className="project-setup-content">
             <div className="opm-inquiry-banner-slot" ref={setInquiryBannerTarget} />
-            <div className="active-sites-view-tabs confirmation-queue-tabs" role="tablist" aria-label={`${PROJECT_SETUP_LABEL} views`}>
+            <div className="active-sites-view-tabs confirmation-queue-tabs project-setup-tabs" role="tablist" aria-label={`${PROJECT_SETUP_LABEL} views`}>
               {([
                 ["inquiries", "Inquiry queue", inquiryCount, null],
                 ["mine", "Setup overview", intakes.length, "check"],
@@ -3988,16 +3994,23 @@ export default function RoleWorkspace({
             <div role="tabpanel" id="project-intake-panel-mine" aria-labelledby="project-intake-tab-mine" hidden={confirmTab !== "mine"}>
               {confirmTab === "mine" && (
                 <>
-                  <ListToolbar list={intakesList} placeholder="Search confirmations" noun="project"
-                    wrapControls={controls => <IntakePipelinePanel title="Setup overview" label="Project setup">
-                      <div className="confirmation-intake-filters">
-                        <IntakeTabs value={intakeView} counts={intakeCounts} onChange={value => {
-                          setIntakeView(value)
-                          updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1))
-                        }} />
+                  <ListToolbar list={intakesList} placeholder="Search confirmations" searchLabel="Search" noun="project"
+                    beforeFilters={<div className="list-filter queue-view-filter">
+                      <div className="queue-view-label"><label htmlFor="setup-overview-view">Queue view</label>
+                        <InfoPopover title="Who needs to act?" label="Help: Queue view">
+                          Needs your action shows steps available to your account. Waiting for others means another role's response or a prerequisite is needed.
+                        </InfoPopover>
                       </div>
-                      {controls}
-                    </IntakePipelinePanel>} />
+                      <select id="setup-overview-view" value={intakeView} onChange={event => {
+                        setIntakeView(event.target.value as IntakeView)
+                        updateListQuery(`${actor.role}:confirmations`, q => withPage(q, 1))
+                      }}>
+                        <option value="all">All intake ({intakeCounts.all})</option>
+                        <option value="action">Needs your action ({intakeCounts.action})</option>
+                        <option value="waiting">Waiting for others ({intakeCounts.waiting})</option>
+                      </select>
+                    </div>}
+                    wrapControls={controls => <div className="opm-inquiry-pipeline filters-only">{controls}</div>} />
                   <ListSection
                     list={intakesList}
                     toolbar={false}
@@ -4010,6 +4023,7 @@ export default function RoleWorkspace({
                   />
                 </>
               )}
+            </div>
             </div>
           </>
         )
@@ -4203,6 +4217,7 @@ export default function RoleWorkspace({
             <strong>{workspacePageLabel(page)}</strong>
           </div>
           <div className="topbar-actions">
+            <TopbarDate />
             <div className="notification-container">
               <Button
                 icon="bell"
@@ -4238,13 +4253,9 @@ export default function RoleWorkspace({
         </header>
         <main className="main-content">
           {notificationSave && <NotificationSaveStatus {...notificationSave} />}
-          <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
-            {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
-            <span>
-              <Icon name="calendar" size={15} />
-              {page === "Dashboard" ? new Date(`${today()}T12:00:00`).toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : dateLabel(today())}
-            </span>
-          </div>
+          {page === "Dashboard" && welcomeGreeting && <div className="workspace-meta has-greeting">
+            <DashboardWelcome greeting={welcomeGreeting} />
+          </div>}
           {renderPage()}
           <div className="workspace-footer">
             <span>

@@ -14,6 +14,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | 
   max?: string
   start?: string
   onValueChange: (value: string, badInput?: boolean) => void
+  isDateDisabled?: (value: string) => boolean
 }
 const months = Array.from({ length: 12 }, (_, month) => new Date(2000, month, 1).toLocaleDateString("en-US", { month: "long" }))
 const calendarDate = (year: number, month: number, day: number) => {
@@ -29,7 +30,7 @@ const dateParts = (iso: string) => {
 }
 const isoDate = (year: number, month: number, day: number) => `${String(year).padStart(4, "0")}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 
-export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel = "No date selected.", clearable = true, value, min = "0001-01-01", highlightMin = false, max = "9999-12-31", start = "", onValueChange, disabled, readOnly, ...inputProps }: Props) {
+export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel = "No date selected.", clearable = true, value, min = "0001-01-01", highlightMin = false, max = "9999-12-31", start = "", onValueChange, isDateDisabled, disabled, readOnly, ...inputProps }: Props) {
   const [view, setView] = useState<{ year: number; month: number }>()
   function openCalendar() {
     if (disabled || readOnly) return
@@ -91,7 +92,7 @@ export default function DatePicker({ calendarTitle, calendarSubtitle, emptyLabel
           {Array.from({ length: offset }, (_, index) => <span key={`blank-${index}`} aria-hidden="true" />)}
           {Array.from({ length: days }, (_, index) => {
             const iso = isoDate(view.year, view.month, index + 1)
-            return <Button key={iso} aria-label={dateLabel(iso)} aria-pressed={iso === value} disabled={iso < min || iso > max}
+            return <Button key={iso} aria-label={dateLabel(iso)} aria-pressed={iso === value} disabled={iso < min || iso > max || isDateDisabled?.(iso)}
               className={iso === value ? "completion-selected" : highlightMin && iso === min ? "completion-earliest" : ""}
               onClick={() => { onValueChange(iso); setView(undefined) }}>{index + 1}</Button>
           })}

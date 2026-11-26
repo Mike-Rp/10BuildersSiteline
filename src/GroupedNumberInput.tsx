@@ -6,9 +6,10 @@ type Props = Omit<ComponentProps<"input">, "type" | "inputMode" | "value" | "onC
   min?: number
   max?: number
   decimalPlaces?: number
+  normalizeLeadingZeros?: boolean
 }
 
-export default function GroupedNumberInput({ value, onValueChange, min, max, decimalPlaces, ...props }: Props) {
+export default function GroupedNumberInput({ value, onValueChange, min, max, decimalPlaces, normalizeLeadingZeros = false, ...props }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const caret = useRef<number | undefined>(undefined)
   const display = value.replace(/^[0-9]+/, whole => whole.replace(/\B(?=(\d{3})+(?!\d))/g, ","))
@@ -43,8 +44,20 @@ export default function GroupedNumberInput({ value, onValueChange, min, max, dec
   }} onChange={event => {
     const field = event.currentTarget
     const raw = field.value.replace(/,/g, "")
-    if (!/^\d*(?:\.\d*)?$/.test(raw) || raw === value) return
-    caret.current = field.value.slice(0, field.selectionStart ?? field.value.length).replace(/,/g, "").length
-    onValueChange(raw)
+    if (!/^\d*(?:\.\d*)?$/.test(raw)) return
+    if (!normalizeLeadingZeros && raw === value) return
+    const next = normalizeLeadingZeros ? raw.replace(/^0+(?=\d)/, "") : raw
+    const offset = field.value.slice(0, field.selectionStart ?? field.value.length).replace(/,/g, "").length
+    caret.current = Math.max(0, offset - (raw.length - next.length))
+    if (next === value) {
+      // React need not render when stripping zeros leaves the value unchanged.
+      field.value = display
+      let position = 0, remaining = caret.current
+      for (; position < display.length && remaining > 0; position++) if (display[position] !== ",") remaining--
+      field.setSelectionRange(position, position)
+      caret.current = undefined
+      return
+    }
+    onValueChange(next)
   }} />
 }

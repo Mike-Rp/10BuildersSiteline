@@ -1,0 +1,656 @@
+[
+  {
+    "width": 320,
+    "tabs": {
+      "width": 294,
+      "scroll": 294,
+      "buttons": [
+        {
+          "width": 276,
+          "height": 45.09375,
+          "scroll": 276,
+          "client": 276,
+          "top": 769.015625
+        },
+        {
+          "width": 276,
+          "height": 45.09375,
+          "scroll": 276,
+          "client": 276,
+          "top": 821.109375
+        },
+        {
+          "width": 276,
+          "height": 45.09375,
+          "scroll": 276,
+          "client": 276,
+          "top": 873.203125
+        }
+      ]
+    },
+    "queue": {
+      "width": 296,
+      "scroll": 296,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 246,
+          "scroll": 246
+        },
+        {
+          "width": 294,
+          "scroll": 294
+        },
+        {
+          "width": 294,
+          "scroll": 294
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -930.703125,
+        "left": 12,
+        "height": 804.421875,
+        "bottom": -126.28125
+      },
+      "edit": {
+        "top": -110.28125,
+        "left": 12,
+        "height": 3251.703125
+      },
+      "options": [
+        {
+          "columns": "244px",
+          "scroll": 264,
+          "width": 264,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "244px",
+          "scroll": 264,
+          "width": 264,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "tabs": {
+      "width": 364,
+      "scroll": 364,
+      "buttons": [
+        {
+          "width": 346,
+          "height": 45.09375,
+          "scroll": 346,
+          "client": 346,
+          "top": 671.734375
+        },
+        {
+          "width": 346,
+          "height": 45.09375,
+          "scroll": 346,
+          "client": 346,
+          "top": 723.828125
+        },
+        {
+          "width": 346,
+          "height": 45.09375,
+          "scroll": 346,
+          "client": 346,
+          "top": 775.921875
+        }
+      ]
+    },
+    "queue": {
+      "width": 366,
+      "scroll": 366,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 316,
+          "scroll": 316
+        },
+        {
+          "width": 364,
+          "scroll": 364
+        },
+        {
+          "width": 364,
+          "scroll": 364
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -2896.984375,
+        "left": 12,
+        "height": 804.421875,
+        "bottom": -2092.5625
+      },
+      "edit": {
+        "top": -2076.5625,
+        "left": 12,
+        "height": 3002.21875
+      },
+      "options": [
+        {
+          "columns": "314px",
+          "scroll": 334,
+          "width": 334,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "314px",
+          "scroll": 334,
+          "width": 334,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "width": 768,
+    "tabs": {
+      "width": 742,
+      "scroll": 742,
+      "buttons": [
+        {
+          "width": 236.65625,
+          "height": 70.78125,
+          "scroll": 237,
+          "client": 237,
+          "top": 526.640625
+        },
+        {
+          "width": 236.671875,
+          "height": 70.78125,
+          "scroll": 237,
+          "client": 237,
+          "top": 526.640625
+        },
+        {
+          "width": 236.671875,
+          "height": 70.78125,
+          "scroll": 237,
+          "client": 237,
+          "top": 526.640625
+        }
+      ]
+    },
+    "queue": {
+      "width": 744,
+      "scroll": 744,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 258,
+          "scroll": 258
+        },
+        {
+          "width": 204,
+          "scroll": 204
+        },
+        {
+          "width": 204,
+          "scroll": 204
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -1472.390625,
+        "left": 12,
+        "height": 345.578125,
+        "bottom": -1126.8125
+      },
+      "edit": {
+        "top": -1110.8125,
+        "left": 12,
+        "height": 2036.40625
+      },
+      "options": [
+        {
+          "columns": "224.422px 224.422px 224.422px",
+          "scroll": 709,
+          "width": 709,
+          "labels": [
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "224.422px 224.422px 224.422px",
+          "scroll": 709,
+          "width": 709,
+          "labels": [
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "width": 1024,
+    "tabs": {
+      "width": 740,
+      "scroll": 740,
+      "buttons": [
+        {
+          "width": 236,
+          "height": 70.78125,
+          "scroll": 236,
+          "client": 236,
+          "top": 555.046875
+        },
+        {
+          "width": 236,
+          "height": 70.78125,
+          "scroll": 236,
+          "client": 236,
+          "top": 555.046875
+        },
+        {
+          "width": 236,
+          "height": 70.78125,
+          "scroll": 236,
+          "client": 236,
+          "top": 555.046875
+        }
+      ]
+    },
+    "queue": {
+      "width": 742,
+      "scroll": 742,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 257,
+          "scroll": 257
+        },
+        {
+          "width": 203,
+          "scroll": 203
+        },
+        {
+          "width": 203,
+          "scroll": 203
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -1206.984375,
+        "left": 264,
+        "height": 355.796875,
+        "bottom": -851.1875
+      },
+      "edit": {
+        "top": -835.1875,
+        "left": 264,
+        "height": 2046.625
+      },
+      "options": [
+        {
+          "columns": "220.344px 220.359px 220.359px",
+          "scroll": 697,
+          "width": 697,
+          "labels": [
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "220.344px 220.359px 220.359px",
+          "scroll": 697,
+          "width": 697,
+          "labels": [
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 62.78125,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "width": 1440,
+    "tabs": {
+      "width": 1156,
+      "scroll": 1156,
+      "buttons": [
+        {
+          "width": 374.65625,
+          "height": 45.09375,
+          "scroll": 375,
+          "client": 375,
+          "top": 546.6875
+        },
+        {
+          "width": 374.671875,
+          "height": 45.09375,
+          "scroll": 375,
+          "client": 375,
+          "top": 546.6875
+        },
+        {
+          "width": 374.65625,
+          "height": 45.09375,
+          "scroll": 375,
+          "client": 375,
+          "top": 546.6875
+        }
+      ]
+    },
+    "queue": {
+      "width": 1158,
+      "scroll": 1158,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 435,
+          "scroll": 435
+        },
+        {
+          "width": 322,
+          "scroll": 322
+        },
+        {
+          "width": 322,
+          "scroll": 322
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -1241.03125,
+        "left": 264,
+        "height": 292.921875,
+        "bottom": -948.109375
+      },
+      "edit": {
+        "top": -932.109375,
+        "left": 264,
+        "height": 1870.9375
+      },
+      "options": [
+        {
+          "columns": "358px 358px 358px",
+          "scroll": 1110,
+          "width": 1110,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "358px 358px 358px",
+          "scroll": 1110,
+          "width": 1110,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "width": 1920,
+    "tabs": {
+      "width": 1636,
+      "scroll": 1636,
+      "buttons": [
+        {
+          "width": 534.65625,
+          "height": 45.09375,
+          "scroll": 535,
+          "client": 535,
+          "top": 547.625
+        },
+        {
+          "width": 534.671875,
+          "height": 45.09375,
+          "scroll": 535,
+          "client": 535,
+          "top": 547.625
+        },
+        {
+          "width": 534.671875,
+          "height": 45.09375,
+          "scroll": 535,
+          "client": 535,
+          "top": 547.625
+        }
+      ]
+    },
+    "queue": {
+      "width": 1320,
+      "scroll": 1320,
+      "border": "0px",
+      "inputs": [
+        {
+          "width": 504,
+          "scroll": 504
+        },
+        {
+          "width": 368,
+          "scroll": 368
+        },
+        {
+          "width": 368,
+          "scroll": 368
+        }
+      ]
+    },
+    "review": {
+      "overflow": false,
+      "aside": {
+        "top": -1196.09375,
+        "left": 423,
+        "height": 226.984375,
+        "bottom": -969.109375
+      },
+      "edit": {
+        "top": -953.109375,
+        "left": 423,
+        "height": 1870.9375
+      },
+      "options": [
+        {
+          "columns": "412px 412px 412px",
+          "scroll": 1272,
+          "width": 1272,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        },
+        {
+          "columns": "412px 412px 412px",
+          "scroll": 1272,
+          "width": 1272,
+          "labels": [
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            },
+            {
+              "height": 44,
+              "display": "flex",
+              "overflow": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

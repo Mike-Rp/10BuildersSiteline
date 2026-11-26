@@ -1,0 +1,4 @@
+import {createServer} from 'vite';
+import {chromium} from 'file:///C:/Users/ADMIN/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+const server=await createServer({server:{host:'127.0.0.1',port:0,watch:null},logLevel:'error'});let browser;
+try{await server.listen();browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>console.log('PAGEERROR',e.message));await page.goto(server.resolvedUrls.local[0]+'tmp/project-setup-qa/index.html');await page.waitForTimeout(1800);console.log((await page.locator('body').innerText()).slice(0,3500));await page.screenshot({path:'tmp/project-setup-qa/initial.png',fullPage:true})}finally{await browser?.close();await server.close()}

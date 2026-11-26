@@ -1,43 +1,44 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { forecastPhaseDelay, suggestPhaseSchedule } from "../Thesis-Backend/src/domain/phase-schedule.js"
+import { forecastPhaseDelay, MIN_PHASE_CALENDAR_DAYS, phaseWorkday, suggestPhaseSchedule } from "../Thesis-Backend/src/domain/phase-schedule.js"
 
 const input = {
-  phases: ["Mobilization", "Foundation", "Structure", "Envelope", "Closeout"],
-  type: "Residential", complexity: "Moderate", start: "2027-01-11", area: 200,
+  phases: ["Mobilization", "Design", "Foundation", "Structure", "Envelope", "Closeout"],
+  type: "Residential", start: "2027-01-11", end: "2027-12-31", area: 200,
 }
-
-test("suggests working dates with the reviewed start and selected arrangement", () => {
-  const sequential = suggestPhaseSchedule({ ...input, arrangement: "Sequential phases" })
-  const partial = suggestPhaseSchedule({ ...input, arrangement: "Partially overlapping phases" })
-  assert.equal(partial.Mobilization.start, input.start)
-  assert.equal(partial.Foundation.start, "2027-01-18")
-  assert.equal(partial.Structure.end, "2027-03-26")
-  assert.equal(partial.Envelope.start, "2027-03-15")
-  assert.equal(partial.Envelope.overlapWith, "Structure")
-  assert.equal(sequential.Envelope.start, "2027-03-29")
-  assert.equal(partial.Envelope.days, sequential.Envelope.days)
-})
-
-test("previews a delayed zone release and preserves unrelated overlapping work", () => {
-  const rules = suggestPhaseSchedule({ ...input, arrangement: "Partially overlapping phases" })
-  const dates = Object.fromEntries(Object.entries(rules).map(([phase, { start, end }]) => [phase, { start, end }]))
-  const forecast = forecastPhaseDelay(dates, "Envelope", "2027-03-22", rules)
-  assert.deepEqual(forecast.Structure, dates.Structure)
-  assert.deepEqual(forecast.Envelope, { start: "2027-03-22", end: "2027-04-09" })
-  assert.equal(forecast.Closeout.start, "2027-04-12")
-  assert.equal(dates.Envelope.start, "2027-03-15")
-})
 
 for (const arrangement of ["Sequential phases", "Partially overlapping phases", "Highly concurrent phases"]) {
-  test(`Mobilization precedes Design with ${arrangement}`, () => {
-    const schedule = suggestPhaseSchedule({ ...input, phases: ["Design", ...input.phases], arrangement })
+  test(`allocates the reviewed window and preserves dependencies: ${arrangement}`, () => {
+    const schedule = suggestPhaseSchedule({ ...input, arrangement })
     assert.equal(schedule.Mobilization.start, input.start)
-    assert.ok(schedule.Design.start > schedule.Mobilization.end)
-    assert.ok(schedule.Foundation.start > schedule.Design.end)
-    const delayed = suggestPhaseSchedule({ ...input, phases: ["Design", ...input.phases], arrangement,
-      dates: { Mobilization: { start: input.start, end: "2027-02-05" } } })
-    assert.equal(delayed.Design.start, "2027-02-08")
-    assert.ok(delayed.Foundation.start > delayed.Design.end)
+    assert.ok(Object.values(schedule).every(range => range.days >= MIN_PHASE_CALENDAR_DAYS))
+    assert.ok(Object.values(schedule).every(range => range.end <= input.end))
+    assert.equal(schedule.Design.start, phaseWorkday(schedule.Mobilization.end, 1))
+    assert.equal(schedule.Foundation.start, phaseWorkday(schedule.Design.end, 1))
+    if (arrangement === "Sequential phases") assert.ok(schedule.Envelope.start > schedule.Structure.end)
+    else assert.equal(schedule.Envelope.overlapWith, "Structure")
   })
 }
+
+test("uses the same reviewed window regardless of floor area or complexity", () => {
+  const first = suggestPhaseSchedule({ ...input, arrangement: "Sequential phases" })
+  const second = suggestPhaseSchedule({ ...input, area: 2200, complexity: "High", arrangement: "Sequential phases" })
+  assert.deepEqual(first, second)
+})
+
+test("keeps a delayed phase's calendar duration and moves dependent phases", () => {
+  const rules = suggestPhaseSchedule({ ...input, arrangement: "Partially overlapping phases" })
+  const dates = Object.fromEntries(Object.entries(rules).map(([phase, { start, end }]) => [phase, { start, end }]))
+  const release = phaseWorkday(dates.Envelope.start, 7)
+  const forecast = forecastPhaseDelay(dates, "Envelope", release, rules)
+  assert.equal(forecast.Structure.start, dates.Structure.start)
+  assert.equal(forecast.Envelope.start, release)
+  assert.equal(forecast.Envelope.end, phaseWorkday(dates.Envelope.end, 7))
+  assert.ok(forecast.Closeout.start > forecast.Envelope.end)
+})
+
+test("keeps the 14-day minimum visible when the project window is too short", () => {
+  const schedule = suggestPhaseSchedule({ ...input, end: "2027-02-01", arrangement: "Sequential phases" })
+  assert.ok(Object.values(schedule).every(range => range.days >= MIN_PHASE_CALENDAR_DAYS))
+  assert.ok(schedule.Closeout.end > "2027-02-01")
+})

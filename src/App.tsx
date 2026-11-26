@@ -69,6 +69,7 @@ import { flushSync } from "react-dom"
 import MonthlyReport from "./MonthlyReport"
 import MonthlySummaryDialog from "./MonthlySummaryDialog"
 import ProjectInquiries from "./ProjectInquiries"
+import TopbarDate from "./TopbarDate"
 import RoleWorkspace from "./RoleWorkspace"
 import LoginPage from "./LoginPage"
 import ClientActivationPage from "./ClientActivationPage"
@@ -3036,6 +3037,7 @@ function AppInner() {
               <span>Search workspace</span>
             </button>
             <span className="topbar-divider" />
+            <TopbarDate />
             <div className="notification-container">
               <Button
                 icon="bell"
@@ -3079,18 +3081,9 @@ function AppInner() {
         </header>
         <main className="main-content">
           <NotificationSaveStatus {...notificationSettings} />
-          <div className={page === "Dashboard" && welcomeGreeting ? "workspace-meta has-greeting" : "workspace-meta"}>
-            {page === "Dashboard" && <DashboardWelcome greeting={welcomeGreeting} />}
-            <span>
-              <Icon name="calendar" size={15} />
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </span>
-          </div>
+          {page === "Dashboard" && welcomeGreeting && <div className="workspace-meta has-greeting">
+            <DashboardWelcome greeting={welcomeGreeting} />
+          </div>}
           <AdminRecoveryNotice onManage={()=>{setSecurityTab('codes');setSecurityOpen(true)}}/>
           {searchLanding && <div className="search-landing-notice" role="status">
             <Icon name="search" size={20} />
