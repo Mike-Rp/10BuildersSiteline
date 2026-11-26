@@ -49,14 +49,14 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
         <fieldset className="inquiry-correction-options">
           <legend>{projectType ? "Corrected project type" : "Field to update"}</legend>
           <div>
-            {options.map(([key, label]) => <label key={key}>
-              <input type="radio" name={`inquiry-correction-${id}-${projectType ? "type" : "field"}`}
-                value={key} checked={key === (projectType ? value : field)} onChange={() => {
+            {options.map(([key, label]) => <button key={key} type="button" className="button"
+                aria-pressed={key === (projectType ? value : field)} onClick={() => {
+                  if (key === (projectType ? value : field)) return
                   if (projectType) setValue(key)
                   else { setField(key); setValue("") }
-                }} />
+                }}>
               {label}
-            </label>)}
+            </button>)}
           </div>
         </fieldset>
         {!projectType && <>

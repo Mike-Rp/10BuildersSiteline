@@ -319,28 +319,6 @@
 .office-floor-pagination { align-items: center; padding-top: 0; }
 .office-floor-pagination > span { font-size: .86rem; color: var(--color-muted); }
 .office-review-field-error { color: #9b292d; margin-top: 4px; font-size: .85rem; }
-.office-review-additional { border: 1px solid #bbd1e4; border-radius: 8px; }
-.office-review-additional > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  list-style: none;
-  border-radius: 7px;
-  background: #f0f7fc;
-  color: var(--color-primary);
-  font-size: .9rem;
-  font-weight: 650;
-  cursor: pointer;
-}
-.office-review-additional > summary::-webkit-details-marker { display: none; }
-.office-review-additional > summary:hover { background: #e4f0fa; }
-.office-review-additional > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.office-review-disclosure-icon { display: grid; place-items: center; flex: 0 0 30px; height: 30px; border-radius: 6px; background: #dcecf9; }
-.office-review-additional[open] > summary { border-bottom: 1px solid #bbd1e4; border-radius: 7px 7px 0 0; }
-.office-review-additional[open] .office-review-disclosure-icon svg { rotate: 90deg; }
-.office-review-additional[open] > div { padding: 12px; }
 .office-review-toast { display: flex; gap: 10px; align-items: center; justify-self: end; max-width: 100%; padding: 8px 10px; color: #174576; background: #e8f3ff; border: 1px solid #a7c8e9; border-radius: 10px; }
 .office-review-toast > svg { flex: 0 0 auto; }
 .office-review-toast p { font-size: .88rem; }
@@ -455,9 +433,7 @@
 .inquiry-correction-options { min-width: 0; margin: 0; padding: 0; border: 0; }
 .inquiry-correction-options legend { margin-bottom: 8px; font-weight: 600; }
 .inquiry-correction-options > div { display: flex; flex-wrap: wrap; gap: 8px; }
-.inquiry-correction-options > div > label { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: 8px; cursor: pointer; }
-.inquiry-correction-options input[type="radio"] { width: auto; margin: 0; }
-.inquiry-correction-options label:has(input:checked) { background: var(--surface-subtle); }
+.inquiry-correction-options > div > .button[aria-pressed="true"] { background: #d8e8f9; border-color: #36739e; color: #174572; }
 .inquiry-input-notice:empty { margin-block-start: -6px; }
 .inquiry-required { color: var(--color-danger); }
 .admin-inquiry-preference { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }

@@ -1443,7 +1443,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
         <InquiryDetails details={row.details} includeClient />
-        {!displayedOfficePage && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
         {row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
         <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
         {row.reason && <p>Withdrawal reason: {row.reason}</p>}

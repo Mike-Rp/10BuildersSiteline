@@ -165,6 +165,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const responseDeadline = row.details.response_due_at ? new Date(String(row.details.response_due_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) + " (Philippine time)" : undefined
   const clientFacts: [string, string | number][] = clientFields.map(([key, label]) => [label, amount(row.details[key])])
   if (row.details.primary_contact) clientFacts.push(["Primary contact", row.details.primary_contact])
+  if (row.details.client_type === "company") {
+    clientFacts.push(["Company name", amount(row.details.company_name)])
+    if (row.details.designation) clientFacts.push(["Position / designation", row.details.designation])
+  }
   const projectFacts: [string, string | number][] = [
     ...projectFields.filter(([key]) => key !== "name").map(([key, label]): [string, string | number] => [label, amount(row.details[key])]),
     ["Estimated start", review ? formatDay(review.start) : row.details.anticipated_start ? formatDay(String(row.details.anticipated_start)) : "Not provided"],
@@ -330,7 +334,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>
   </div>
   const recordCards = <div className="office-workflow-grid record-cards office-intake-records">
-    <Card title="Client information" icon="users"><Facts values={clientFacts} />{clientCorrection}</Card>
+    <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>
     <Card title="Project information" icon="building"><Facts values={projectFacts} />
       {row.details.overview && <p>{row.details.overview}</p>}
     </Card>
@@ -403,7 +407,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       <Card title="Inquiry summary" icon="building">
         <h3>{name}</h3><Facts values={[...clientFacts, ...projectFacts]} />
         {row.details.overview && <p>{row.details.overview}</p>}
-        {clientCorrection}
       </Card>
     </div>}
 
@@ -440,6 +443,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
         {row.details.overview && <div className="office-proposal-scope"><h3>Project overview</h3><p>{row.details.overview}</p></div>}
         {workflow?.revisions?.map(({ date: day, note }, index) =>
           <Notice key={index}><strong>Revision requested · {formatDay(day)}</strong><p>{note}</p></Notice>)}
+        {row.status === "consulting" && clientCorrection}
       </Card>
       <Card title="Client decision" icon="check">
         {!accepted ? <form onSubmit={event => {
@@ -505,13 +509,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div><span className="inquiry-muted">Step 2 of 3</span><h1 ref={heading} tabIndex={-1}>{title}</h1></div>
             <span className="inquiry-pill">Live estimate</span>
           </header>
-          <details className="office-review-additional">
-            <summary>
-              <span>Client information</span>
-              <span className="office-review-disclosure-icon" aria-hidden="true"><Icon name="chevron" size={18} /></span>
-            </summary>
-            <div className="office-workflow-fields">{clientFields.map(([key, label]) => <label key={key}>{label}<input readOnly value={String(row.details[key] ?? "")} /></label>)}</div>
-          </details>
+          <section className="office-workflow-subsection" aria-labelledby={fieldId("client-information")}>
+            <h3 id={fieldId("client-information")}>Client information <span className="inquiry-pill">Read only</span></h3>
+            <Facts values={clientFacts} />
+          </section>
           <div className="office-workflow-fields">
             {projectIdentityFields.slice(0, 2).map(([key, label]) => editField(key, label))}
           </div>
@@ -790,6 +791,5 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>
     {signedContract}
     </>}
-    {page !== "pending" && page !== "accepted" && clientCorrection}
   </div>
 }
