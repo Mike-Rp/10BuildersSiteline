@@ -28,7 +28,7 @@ export type OfficeRecord = {
 type Props = {
   row: OfficeRecord; page: OfficePage; reference: string; consultation: string; busy: boolean; error: string; pendingCount: number; justApproved?: boolean;
   navigate: (page: OfficePage) => void; back: () => void; startStaffing: () => void;
-  signedContract: ReactNode; hasSignedContract: boolean; projectTypeCorrection: ReactNode;
+  signedContract: ReactNode; hasSignedContract: boolean; projectTypeCorrection: ReactNode; clientCorrection?: ReactNode;
   decide: (action: string, input?: Record<string, string>) => void;
   save: (action: string, input: Record<string, unknown>) => void;
 }
@@ -104,7 +104,7 @@ function Notice({ tone = "", children }: { tone?: string; children: ReactNode })
   </div>
 }
 
-export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, projectTypeCorrection, decide, save }: Props) {
+export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, projectTypeCorrection, clientCorrection, decide, save }: Props) {
   const workflow = row.workflow
   const review = workflow?.review
   const assessment = workflow?.assessment
@@ -330,7 +330,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>
   </div>
   const recordCards = <div className="office-workflow-grid record-cards office-intake-records">
-    <Card title="Client information" icon="users"><Facts values={clientFacts} /></Card>
+    <Card title="Client information" icon="users"><Facts values={clientFacts} />{clientCorrection}</Card>
     <Card title="Project information" icon="building"><Facts values={projectFacts} />
       {row.details.overview && <p>{row.details.overview}</p>}
     </Card>
@@ -403,6 +403,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       <Card title="Inquiry summary" icon="building">
         <h3>{name}</h3><Facts values={[...clientFacts, ...projectFacts]} />
         {row.details.overview && <p>{row.details.overview}</p>}
+        {clientCorrection}
       </Card>
     </div>}
 
@@ -789,5 +790,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>
     {signedContract}
     </>}
+    {page !== "pending" && page !== "accepted" && clientCorrection}
   </div>
 }

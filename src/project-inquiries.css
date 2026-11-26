@@ -178,6 +178,7 @@
 .office-pending-request { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 24px; }
 .office-pending-request > .office-workflow-facts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); flex: 1 1 390px; margin: 0; }
 .office-pending-request > .office-workflow-actions { margin: 0; }
+.office-workflow-card > .inquiry-client-corrections { padding: 12px 0 0; border: 0; border-top: 1px solid var(--color-line); border-radius: 0; background: transparent; }
 .office-workflow-facts, .office-workflow-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr)); gap: 14px; min-width: 0; }
 .office-workflow-facts dt { margin-bottom: 3px; font-size: .82rem; }
 .office-workflow-facts dd { font-size: .92rem; }

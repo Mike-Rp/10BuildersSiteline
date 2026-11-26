@@ -24,7 +24,7 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
     : Object.entries(labels)
   const relevant = history.filter(item => (item.field === "project_type") === projectType)
   if (admin && projectType && !relevant.length) return null
-  return <section className={projectType && !admin ? "inquiry-project-type-correction" : "inquiry-card"}>
+  return <section className={projectType && !admin ? "inquiry-project-type-correction" : "inquiry-card inquiry-client-corrections"}>
     {projectType && !admin ? <>
       <label htmlFor={`inquiry-project-type-${id}`}>Project type</label>
       <div className="inquiry-locked-project-type">

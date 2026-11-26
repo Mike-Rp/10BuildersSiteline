@@ -1206,7 +1206,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </section>
   }
   return <section className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
-    {row && !admin && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
     {pendingBanner && bannerTarget && createPortal(pendingBanner, bannerTarget)}
     {displayedOfficePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}:${row.details.project_type}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
@@ -1214,6 +1213,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           pendingCount={pendingInquiries.length} justApproved={showOfficeApproval}
           navigate={navigateOffice} back={() => navigateOffice()} startStaffing={() => void run(startStaffing)}
           hasSignedContract={!!contractFileId}
+          clientCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
           projectTypeCorrection={<ClientCorrections id={row.id} details={row.details} admin={false} projectType contractLocked={contractLocked} reload={reloadCorrections} />}
           signedContract={<FormSection title="Signed client contract" icon="doc" description="Upload the signed agreement between the Office PM and client before staffing.">
             {!contractLocked && <input ref={contractInput} type="file" aria-label="Signed client contract file" accept=".pdf,.png,.jpg,.jpeg" hidden onChange={event => {
@@ -1443,6 +1443,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
         <InquiryDetails details={row.details} includeClient />
+        {!displayedOfficePage && <ClientCorrections key={row.id} id={row.id} details={row.details} admin={false} reload={reloadCorrections} />}
         {row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
         <p>Preferred consultation timing: {consultationLabel(row.details)}</p>
         {row.reason && <p>Withdrawal reason: {row.reason}</p>}
