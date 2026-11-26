@@ -286,12 +286,24 @@ export function mountInquiries(router) {
         [req.body.id, actor.id, JSON.stringify(details)])).rows[0];
       if (!row) throw new HttpError(409, "This draft is unavailable or has already been submitted.");
     } else row = (await db.query("INSERT INTO project_inquiries(details,status,admin_id) VALUES($1,'draft',$2) RETURNING *", [JSON.stringify(details), actor.id])).rows[0];
-    return inquiryResponse(row, true);
+    return { ...inquiryResponse(row, true), can_delete_draft: true };
   })));
+  router.delete("/inquiries/draft/:id", endpoint(["admin"], async (req, actor) => {
+    if (!isUuid(req.params.id)) throw new HttpError(404, "Inquiry draft not found.");
+    const deleted = await execute(`DELETE FROM project_inquiries
+      WHERE id=$1 AND admin_id=$2 AND status='draft' AND details->>'intake_draft'='yes'
+        AND project_id IS NULL AND opm_id IS NULL`, [req.params.id, actor.id]);
+    if (!deleted.rowCount) throw new HttpError(409, "This draft is unavailable or has already been submitted.");
+    return { id: req.params.id };
+  }));
   router.get("/inquiries", endpoint(["admin", "opm"], async (_, actor) =>
     (await execute(`SELECT i.*,u.full_name AS opm_name,p.lifecycle_status AS project_status,p.target_start_date,p.target_end_date FROM project_inquiries i
       LEFT JOIN users u ON u.id=i.opm_id LEFT JOIN projects p ON p.id=i.project_id WHERE $1='admin' OR (i.opm_id=$2 AND i.status NOT IN ('draft','returned'))
-      ORDER BY i.updated_at DESC`, [actor.role, actor.id])).rows.map(row => inquiryResponse(row, actor.role === "admin"))));
+      ORDER BY i.updated_at DESC`, [actor.role, actor.id])).rows.map(row => ({
+        ...inquiryResponse(row, actor.role === "admin"),
+        can_delete_draft: actor.role === "admin" && row.admin_id === actor.id && row.status === "draft" &&
+          row.details.intake_draft === "yes" && !row.project_id && !row.opm_id,
+      }))));
 
   router.get("/inquiries/opm-candidates", endpoint(["admin"], async req => {
     const type = req.query.project_type;

@@ -9,7 +9,10 @@ test("admin inquiry log and form show grouped controls, phone formats, and the r
   for (const [key, value] of Object.entries({
     window, document: window.document, HTMLElement: window.HTMLElement, Node: window.Node, IS_REACT_ACT_ENVIRONMENT: true,
     fetch: async url => Response.json({ data: String(url).includes("opm-candidates?project_type=Residential")
-      ? [{ id: "preferred", name: "Avery Reyes", experience_years: 10 }, { id: "alternate", name: "Sam Cruz", experience_years: 6 }] : [] }),
+      ? [{ id: "preferred", name: "Avery Reyes", experience_years: 10 },
+        { id: "second", name: "Jordan Santos", experience_years: 8 },
+        { id: "third", name: "Sam Cruz", experience_years: 6 },
+        { id: "fourth", name: "Alex Ramos", experience_years: 4 }] : [] }),
   })) {
     globals.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
@@ -73,6 +76,8 @@ test("admin inquiry log and form show grouped controls, phone formats, and the r
   await act(() => document.querySelector('input[name="inquiry-project-type"][value="Residential"]').click())
   assert.match(document.querySelector(".admin-inquiry-opm-preview li:first-child").textContent, /Avery Reyes.*Best match/)
   assert.match(document.querySelector(".admin-inquiry-opm-preview li:last-child").textContent, /Sam Cruz/)
+  assert.equal(document.querySelectorAll(".admin-inquiry-opm-preview li").length, 3)
+  assert.equal(document.querySelector(".admin-inquiry-opm-preview li input, .admin-inquiry-opm-preview li button"), null)
   await act(() => document.querySelector('input[name="inquiry-classification"][value="Urgent"]').click())
   await act(() => document.querySelectorAll('input[name="immediate-consultation"]')[1].click())
   assert.equal(document.querySelector(".admin-inquiry-classification").disabled, true)

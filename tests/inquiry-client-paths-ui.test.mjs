@@ -13,12 +13,20 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
       if (path.includes("/inquiries/clients?")) return Response.json({ data: [client] })
       if (path.includes("opm-candidates?project_type=Residential")) return Response.json({ data: [{ id: "preferred", name: "Avery Reyes", experience_years: 10 }] })
       if (path.endsWith("/inquiries/draft")) {
-        const row = { id: body.id || "00000000-0000-4000-8000-000000000001", status: "draft", details: { ...body.details, intake_draft: "yes" } }
-        records.splice(0, records.length, row); return Response.json({ data: row })
+        const row = { id: body.id || (submitted.length ? "second-draft" : "00000000-0000-4000-8000-000000000001"), status: "draft", can_delete_draft: true, details: { ...body.details, intake_draft: "yes" } }
+        const index = records.findIndex(record => record.id === row.id)
+        if (index < 0) records.unshift(row)
+        else records[index] = row
+        return Response.json({ data: row })
+      }
+      if (options.method === "DELETE" && path.endsWith("/inquiries/draft/second-draft")) {
+        records.splice(records.findIndex(record => record.id === "second-draft"), 1)
+        return Response.json({ data: { id: "second-draft" } })
       }
       if (body && path.endsWith("/inquiries")) {
         submitted.push(body)
-        const row = { id: body.draft_id || "new", status: "offered", opm_name: "Avery Reyes", details: body }
+        const { intake_draft, ...details } = body
+        const row = { id: body.draft_id || "new", status: "offered", opm_name: "Avery Reyes", details }
         records.splice(0, records.length, row); return Response.json({ data: row })
       }
       return Response.json({ data: records })
@@ -45,8 +53,9 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   await set('input[type="tel"]', "123456789")
   await click("Next: Project details")
   await set('[placeholder="Maple Residence"]', "Office Renovation")
-  await set('[placeholder="Street, barangay, city"]', "Santa Rosa, Laguna")
+  await set('[placeholder="Location"]', "Santa Rosa, Laguna")
   await set('[placeholder="e.g. 250"]', "250"); await set('[placeholder="e.g. 180"]', "180"); await set('[placeholder="e.g. 2"]', "2")
+  assert.match(document.querySelector("#inquiry-floor-area-range").textContent, /0\.01 to 500 m².*250 m² × 2 floors/)
   await radio("inquiry-project-type", "Residential")
   await click("Previous step")
   assert.equal(document.querySelector('[aria-label="Company name"]').value, "Sample Development Corporation")
@@ -66,7 +75,10 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   await act(() => document.querySelector('#admin-inquiry-form').dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })))
   assert.equal(submitted[0].draft_id, "00000000-0000-4000-8000-000000000001")
   assert.equal(submitted[0].client_type, "company"); assert.equal(submitted[0].primary_contact, "Maria Santos")
-  await click("View inquiry status"); await click("Back to inquiries"); await click("New project inquiry")
+  assert.ok(button("View inquiry status"))
+  await click("Back to inquiries")
+  assert.ok(document.querySelector("#existing-inquiries-heading"))
+  await click("View inquiry"); await click("Back to inquiries"); await click("New project inquiry")
   await radio("inquiry-client-record", "existing")
   await set('[aria-label="Find an existing client"]', "existing")
   await act(() => new Promise(resolve => setTimeout(resolve, 300)))
@@ -79,5 +91,15 @@ test("company inquiry steps preserve data, save/resume a draft, submit once and 
   await act(() => document.querySelector('.inquiry-client-verification input').click())
   await click("Next: Project details")
   await click("Back to inquiries"); await click("Discard changes")
-  assert.equal(document.querySelector('#admin-inquiry-form'), null); assert.equal(submitted.length, 1)
+  assert.ok(!document.querySelector('#admin-inquiry-form'), "Discard closes the inquiry form")
+  assert.equal(submitted.length, 1)
+  assert.ok(!button("Delete draft"), "Submitted inquiries cannot be deleted as drafts")
+  await click("New project inquiry")
+  await radio("inquiry-client-record", "new")
+  await click("Back to inquiries"); await click("Save draft")
+  await click("Delete draft"); await click("Cancel")
+  assert.ok(button("Continue draft"))
+  await click("Delete draft"); await click("Delete permanently")
+  assert.ok(!button("Continue draft"), "Deleted drafts are removed from the inquiry log")
+  assert.ok(button("View inquiry"))
 })

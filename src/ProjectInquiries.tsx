@@ -34,13 +34,13 @@ const projectTypes = [
 ] as const
 const fields = [
   ["client_name", "Client name", "text"], ["email", "Email", "email"], ["phone", "Phone", "tel"],
-  ["name", "Project name", "text"], ["address", "Project address", "text"],
+  ["name", "Project name", "text"], ["address", "Location", "text"],
   ["lot_area", "Lot area (m²)", "number"],
   ["floor_area_sqm", "Total floor area (m²)", "number"], ["floor_count", "Number of floors", "number"],
 ] as const
 type Details = Record<string, string | number>
 type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; opm?: string; at?: string }
-type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string; client_account_status?: ClientActivationStatus }
+type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string; client_account_status?: ClientActivationStatus; can_delete_draft?: boolean }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number; licenseByScope?: Record<string, { expiry: string; cutoff: string }> }
 type PhaseDates = Record<string, { start: string; end: string }>
 type PlanningBackups = Record<string, string>
@@ -76,7 +76,7 @@ const post = <T,>(path: string, json: unknown) => api<T>(path, { method: "POST",
 const adminInquiryDraft = { consultation: 30, classification: "Normal", immediate_consultation: "yes" }
 const inquiryPlaceholders: Record<string, string> = {
   client_name: "Lastname, FirstName", email: "name@example.com",
-  name: "Maple Residence", address: "Street, barangay, city",
+  name: "Maple Residence", address: "Location",
   lot_area: "e.g. 250", floor_area_sqm: "e.g. 180", floor_count: "e.g. 2",
 }
 type InquiryOpmCandidate = { id: string; name: string; experience_years: number; active_projects?: number; inquiry_reservations?: number }
@@ -529,6 +529,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminFormStep, setAdminFormStep] = useState(0)
   const [draftId, setDraftId] = useState("")
+  const [draftToDelete, setDraftToDelete] = useState<Inquiry>()
   const [draftBaseline, setDraftBaseline] = useState(JSON.stringify(adminInquiryDraft))
   const [leaveInquiry, setLeaveInquiry] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -953,7 +954,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const regular = details.immediate_consultation === "no"
     const matching = opmPreview?.type === previewType ? opmPreview : undefined
     const candidates = matching?.candidates
-    const floorLimit = Number(details.lot_area) > 0 && Number(details.floor_count) > 0 ? Number(details.lot_area) * Number(details.floor_count) : undefined
+    const lotArea = Number(details.lot_area)
+    const floorCount = Number(details.floor_count)
+    const maxFloorArea = lotArea * floorCount
+    const floorLimit = lotArea >= 0.01 && Number.isInteger(floorCount) && floorCount > 0 &&
+      floorCount <= 32767 && Number.isFinite(maxFloorArea) ? maxFloorArea : undefined
+    const formatArea = (area: number) => area.toLocaleString("en-PH", { maximumSignificantDigits: 15 })
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
       const value = String(details[key] ?? "")
       if (key === "phone") {
@@ -965,10 +971,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         </label>
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
+        const total = key === "floor_area_sqm"
+        const outsideRange = total && value !== "" && (Number(value) < 0.01 ||
+          (floorLimit !== undefined && Number(value) > floorLimit))
         return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-          <GroupedNumberInput required={required} min={0.01} max={key === "floor_area_sqm" ? floorLimit : undefined} value={value}
+          <GroupedNumberInput required={required} min={0.01} max={total ? floorLimit : undefined} value={value}
+            aria-describedby={total ? "inquiry-floor-area-range" : undefined} aria-invalid={outsideRange || undefined}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
-          {key === "floor_area_sqm" && floorLimit !== undefined && <small className="inquiry-input-notice" aria-live="polite">{Number(value) > floorLimit ? "Total floor area exceeds the allowed maximum. " : ""}Maximum total: {floorLimit.toLocaleString("en-PH")} m² (lot area × floors).</small>}
+          {total && <small id="inquiry-floor-area-range" className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">
+            Add the area of every floor. {floorLimit === undefined
+              ? "Enter the lot area and number of floors to see the allowed range."
+              : `Allowed range is 0.01 to ${formatArea(floorLimit)} m². Maximum = ${formatArea(lotArea)} m² × ${floorCount} ${floorCount === 1 ? "floor" : "floors"}.`}
+          </small>}
         </label>
       }
       const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
@@ -1054,7 +1068,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <FormSection title="Project information" icon="building" description="Measurements use square meters (m²).">
             <div className="admin-inquiry-project-identity">
               {input("name", "Project name", "text", true, 150)}
-              {input("address", "Project address / location", "text", true, 500)}
+              {input("address", "Location", "text", true, 500)}
             </div>
             <fieldset className="admin-inquiry-project-types">
               <legend>Project type <span className="inquiry-required">*</span></legend>
@@ -1071,8 +1085,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             </fieldset>
             <div className="admin-inquiry-form-grid admin-inquiry-measurements">
               {input("lot_area", "Lot area (m²)", "number")}
-              {input("floor_area_sqm", "Total floor area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
+              {input("floor_area_sqm", "Total floor area (m²)", "number")}
             </div>
           </FormSection>
           <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">
@@ -1104,8 +1118,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               </fieldset>
               {regular && <p className="inquiry-muted">Normal · Response within one working day (9 office hours). Monday–Friday, 8:00 AM–5:00 PM; no lunch break.</p>}
             </div>
-            <section className="admin-inquiry-opm-preview" aria-label="Available Office PMs" aria-live="polite">
-              <h4>Available Office PMs</h4>
+            <section className="admin-inquiry-opm-preview" aria-label="Top Office PM matches" aria-live="polite">
+              <h4>Top Office PM matches</h4>
               {!previewType ? <p>Select a project type to see matching Office PMs.</p>
                 : matching?.error ? <div><p>{matching.error}</p><button type="button" className="button" onClick={() => {
                   setOpmPreview(undefined)
@@ -1113,16 +1127,17 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 }}>Retry Office PM match</button></div>
                 : !candidates ? <p>Checking available Office PMs…</p>
                 : !candidates.length ? <p>No qualified OPM currently has capacity. You can save the inquiry and retry matching later.</p>
-                : <ul>{candidates.map((person, index) => <li key={person.id}>
+                : <><p>{regular ? "Recommendations only. Routing happens after submission." : "The system routes the inquiry to the best available match."}</p>
+                <ul>{candidates.slice(0, 3).map((person, index) => <li key={person.id}>
                   <div><strong>{person.name}</strong><small>{Number(person.experience_years).toLocaleString(undefined, { maximumFractionDigits: 2 })} years of relevant experience · {person.active_projects ?? 0} active + {person.inquiry_reservations ?? 0} reserved / 2</small></div>
-                  {index === 0 && <span className="inquiry-pill ready">Best match · Receives inquiry</span>}
-                </li>)}</ul>}
+                  {index === 0 && <span className="inquiry-pill ready">Best match</span>}
+                </li>)}</ul></>}
             </section>
           </FormSection>
           </>}
           {adminFormStep === 3 && <FormSection title="Review inquiry" icon="building" description="Confirm the client and project details before submission.">
             <InquiryDetails details={details} includeClient />
-            <p>{candidates ? candidates.length ? `The inquiry will be sent to ${candidates[0].name}.` : "No eligible Office PM is available; the inquiry will be saved for matching later." : "Checking available Office PMs…"}</p>
+            <p>{regular ? "The inquiry will be saved for routing after submission." : candidates ? candidates.length ? `The inquiry will be sent to ${candidates[0].name}.` : "No eligible Office PM is available; the inquiry will be saved for matching later." : "Checking available Office PMs…"}</p>
             {matching?.error && <div role="alert"><p>{matching.error}</p><button type="button" className="button" onClick={() => setOpmPreviewVersion(version => version + 1)}>Retry Office PM match</button></div>}
           </FormSection>}
         </fieldset>
@@ -1148,10 +1163,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 : "The inquiry was saved for later consultation."
             : "Monitor matching and acceptance for this inquiry."}</p>
         </div>
-        {submitted ? <button className="button" onClick={() => setAdminPage("tracking")}>View inquiry status</button> : <>
-          <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
-          <button className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
-        </>}
+        {submitted ? <button className="button" onClick={() => setAdminPage("tracking")}>View inquiry status</button>
+          : <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>}
+        <button className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>Back to inquiries</button>
       </header>
       {submitted && <div className="admin-inquiry-success" role="status">
         <span className="admin-history-icon"><Icon name="check" /></span>
@@ -1384,10 +1398,14 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 {adminInquiryTab === "current" && (nextAction || waiting) && <p>{nextAction || waiting}</p>}
                 {updated && <small>Updated <time dateTime={updated}>{updatedLabel}</time></small>}
               </div>
-              <button type="button" className="button primary" disabled={busy} aria-label={`View inquiry for ${name}`}
-                onClick={() => { open(item); if (item.details.intake_draft !== "yes") setAdminPage("tracking") }}>
-                {item.details.intake_draft === "yes" ? "Continue draft" : "View inquiry"} <Icon name="chevron" size={16} />
-              </button>
+              <div className="inquiry-actions">
+                {item.can_delete_draft && <button type="button" className="button danger-ghost" disabled={busy}
+                  onClick={() => { setError(""); setDraftToDelete(item) }}>Delete draft</button>}
+                <button type="button" className="button primary" disabled={busy} aria-label={`View inquiry for ${name}`}
+                  onClick={() => { open(item); if (item.details.intake_draft !== "yes") setAdminPage("tracking") }}>
+                  {item.details.intake_draft === "yes" ? "Continue draft" : "View inquiry"} <Icon name="chevron" size={16} />
+                </button>
+              </div>
             </div>
           </li>
         })}
@@ -1399,6 +1417,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       <div className="inquiry-log-pagination"><ListPager list={adminList} unit="inquiries" /></div>
     </section>}
     </>}
+    {admin && draftToDelete && <Modal title="Delete inquiry draft?" onClose={() => { if (!busy) setDraftToDelete(undefined) }} footer={<>
+      <button type="button" className="button" disabled={busy} onClick={() => setDraftToDelete(undefined)}>Cancel</button>
+      <button type="button" className="button danger" disabled={busy} onClick={() => void run(async () => {
+        await api(`${root}/draft/${draftToDelete.id}`, { method: "DELETE" })
+        setRows(previous => previous?.filter(item => item.id !== draftToDelete.id))
+        setDraftToDelete(undefined)
+        showActionResult("Inquiry draft deleted.")
+      })}>Delete permanently</button>
+    </>}>
+      <p>Delete the draft for <strong>{draftToDelete.details.name || "Untitled project"}</strong>? You can’t undo this.</p>
+      {error && <p role="alert">{error}</p>}
+    </Modal>}
     {dialog === "details" && role === "opm" && row && <Modal title={String(row.details.name || "Inquiry details")} wide onClose={closeDialog}>
       <div className="inquiry-dialog-content">
         <div><span className="inquiry-pill">{statusLabel(row) || "Status unavailable"}</span></div>
@@ -1441,7 +1471,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             <dl>
               <div><dt>Client</dt><dd>{row.details.client_name}</dd></div>
               <div><dt>Project type</dt><dd>{row.details.project_type}</dd></div>
-              <div><dt>Project address</dt><dd>{row.details.address}</dd></div>
+              <div><dt>Location</dt><dd>{row.details.address}</dd></div>
               <div><dt>Total floor area (m²)</dt><dd>{row.details.floor_area_sqm}</dd></div>
               <div><dt>Number of floors</dt><dd>{row.details.floor_count}</dd></div>
               <div><dt>Target start</dt><dd>{start || "—"}</dd></div>
