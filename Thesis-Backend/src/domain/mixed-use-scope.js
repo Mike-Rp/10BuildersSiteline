@@ -19,8 +19,8 @@ export function mixedUsePhaseReview(scope) {
     row("Mobilization", ["Civil", "Geotechnical"], true, "", true),
     row("Design", ["Civil", "Structural", "Mechanical", "Electrical", "Plumbing", "Acoustic"], true, "", true),
     row("Foundation", ["Geotechnical", "Structural"], true, "", true),
-    row("Podium Structure", ["Structural", "Civil"], scope.features.podium, "No podium in the proposed design."),
-    row("Tower Structure", ["Structural"], scope.features.tower, "No tower in the proposed design."),
+    row("Podium Structure", ["Structural", "Civil"], scope.features.podium, scope.features.podium ? "" : "No podium in the proposed design.", scope.features.podium),
+    row("Tower Structure", ["Structural"], scope.features.tower, scope.features.tower ? "" : "No tower in the proposed design.", scope.features.tower),
     ...(!scope.features.tower ? [row("Structure", ["Structural", "Civil"], true, "General building structure remains covered.", true)] : []),
     row(scope.features.curtainWall ? "Envelope / Curtain Wall" : "Envelope", ["Structural", "Civil"], true,
       scope.features.curtainWall ? "" : "Curtain wall not applicable; building enclosure remains covered.", true),
@@ -35,22 +35,31 @@ export function mixedUsePhaseReview(scope) {
     row("Closeout", ["Civil", "Fire Protection", "Interior/Finishes"], true, "", true),
   ];
 }
-export function mixedUseScopeError(scope, requireConfirmation = true) {
+export function mixedUseSelectionsError(scope) {
   if (!scope || typeof scope !== "object" || scope.version !== 1 || !Array.isArray(scope.uses) ||
       scope.uses.length < 2 || new Set(scope.uses).size !== scope.uses.length ||
       scope.uses.some(use => !MIXED_USE_USES.some(option => option.code === use))) return "Select at least two different supported building uses for Mixed-Use.";
   if (!scope.features || MIXED_USE_FEATURES.some(feature => typeof scope.features[feature.code] !== "boolean") ||
       Object.keys(scope.features).some(code => !MIXED_USE_FEATURES.some(feature => feature.code === code))) return "Review all construction features.";
+  return "";
+}
+export function mixedUseScopeError(scope, requireConfirmation = true) {
+  const error = mixedUseSelectionsError(scope);
+  if (error) return error;
   if (typeof scope.basis !== "string" || scope.basis.trim().length < 20 || scope.basis.trim().length > 2000) return "Describe the scope basis and non-applicable work in 20–2,000 characters.";
   if (requireConfirmation && scope.confirmed !== true) return "Confirm the proposed scope and professional review requirement.";
   return "";
 }
+export function normalizeMixedUseSelections(scope) {
+  const error = mixedUseSelectionsError(scope);
+  if (error) throw new Error(error);
+  return { version: 1, uses: MIXED_USE_USES.filter(use => scope.uses.includes(use.code)).map(use => use.code),
+    features: Object.fromEntries(MIXED_USE_FEATURES.map(feature => [feature.code, scope.features[feature.code]])) };
+}
 export function normalizeMixedUseScope(scope) {
   const error = mixedUseScopeError(scope);
   if (error) throw new Error(error);
-  const result = { version: 1, uses: MIXED_USE_USES.filter(use => scope.uses.includes(use.code)).map(use => use.code),
-    features: Object.fromEntries(MIXED_USE_FEATURES.map(feature => [feature.code, scope.features[feature.code]])),
-    basis: scope.basis.trim(), confirmed: true };
+  const result = { ...normalizeMixedUseSelections(scope), basis: scope.basis.trim(), confirmed: true };
   const review = mixedUsePhaseReview(result);
   return { ...result, phases: review.filter(phase => phase.included).map(phase => phase.name),
     notApplicable: review.filter(phase => !phase.included).map(({name, reason}) => ({name, reason})) };

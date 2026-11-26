@@ -243,9 +243,9 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
        ARRAY(SELECT d.id FROM disciplines d WHERE d.code IN (
          SELECT jsonb_array_elements_text($2::jsonb->s.code)
        ) ORDER BY d.id) AS disciplines
-     FROM project_type_stages workflow JOIN project_stages s ON s.id=workflow.project_stage_id
-     WHERE workflow.project_type_id=$1 AND $2::jsonb ? s.code ORDER BY workflow.sort_order`,
-    [typeId, JSON.stringify(requiredScopes)],
+     FROM unnest($1::text[]) WITH ORDINALITY AS workflow(code, position)
+     JOIN project_stages s ON s.code=workflow.code ORDER BY workflow.position`,
+    [Object.keys(requiredScopes), JSON.stringify(requiredScopes)],
   ) : await db.query(
     `
     SELECT
@@ -254,13 +254,14 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
       jsonb_agg(discipline_id ORDER BY discipline_id ASC) AS disciplines
     FROM project_stage_discipline_links pstdl
     join project_stages ps on ps.id = pstdl.project_stage_id
-    join project_type_stages workflow on workflow.project_type_id=pstdl.project_type_id and workflow.project_stage_id=ps.id
+    left join project_type_stages workflow on workflow.project_type_id=pstdl.project_type_id and workflow.project_stage_id=ps.id
     WHERE pstdl.project_type_id = (SELECT id from project_types where code = $1)
+      AND (CASE WHEN $2::text[] IS NULL THEN workflow.project_stage_id IS NOT NULL ELSE ps.code=ANY($2) END)
     GROUP BY pstdl.project_stage_id, workflow.sort_order, ps.code
-    ORDER BY workflow.sort_order ASC;
+    ORDER BY array_position($2::text[],ps.code), workflow.sort_order ASC;
     `,
     [
-      project_type
+      project_type, phases ?? null
     ]
   );
 

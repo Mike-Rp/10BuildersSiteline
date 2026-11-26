@@ -48,7 +48,7 @@ type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability" | "license"
 type AdditionalScopes = Record<string, string[]>
-type Planning = { recommended_site_pms?: number | null; phases: string[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
+type Planning = { recommended_site_pms?: number | null; phases: string[]; phaseReview?: { name: string; included: boolean; required: boolean }[]; estimate: { size: string | null; end: string | null }; team?: Phase[]; candidates?: Record<string, Candidate[]>; candidateBlockers?: Record<string, CandidateBlocker>;
   additional_scope_options?: AdditionalScopes; licenseUnavailable?: Record<string, Pick<Candidate, "id" | "name" | "licenseByScope">[]>;
   staffing?: {assessment_id:string; phases:string[]; contract_file_id:string; additional_scopes?: AdditionalScopes; phase_dates?: PhaseDates} }
 const timing = [[30, "30 minutes"], [60, "1 hour"], [1440, "1 day"]] as const
@@ -555,10 +555,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [opmPreview, setOpmPreview] = useState<{ type: string; candidates?: InquiryOpmCandidate[]; error?: string }>()
   const [opmPreviewVersion, setOpmPreviewVersion] = useState(0)
   const row = rows?.find(item => item.id === selected)
-  const fixedPhaseLineup = row?.details.project_type === "Residential" || row?.details.project_type === "Commercial"
   const intakeLocked = row?.status === "approved" && inquiryAssessmentReady(row.details, row.workflow)
   const displayedOfficePage = officePage && intakeLocked ? "assessment"
-    : officePage === "assessment" && row?.workflow?.review?.requires_review ? "review" : officePage
+    : officePage === "assessment" && !intakeLocked ? "review" : officePage
   const canViewContract = displayedOfficePage === "review" || displayedOfficePage === "assessment"
   const contractFileId = row?.workflow?.signed_contract?.id ?? row?.workflow?.staffing?.contract_file_id ?? planning?.staffing?.contract_file_id
   const start = row?.workflow?.review?.start
@@ -749,7 +748,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (!planning) {
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
       setPlanning(result)
-      setPhases(fixedPhaseLineup ? result.phases : result.staffing?.phases ?? result.phases)
+      setPhases(result.phases)
       setPhaseDates(result.staffing?.phase_dates ?? {})
       setPlanningBackups({})
     }
@@ -1457,17 +1456,18 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <div className="inquiry-card"><h3>Reviewed completion date</h3><p>{end}</p></div>
             </div>
             <h3>Construction phases</h3>
-            {fixedPhaseLineup && <p className="inquiry-muted">All phases are required for {String(row.details.project_type)} projects.</p>}
-            <div className="inquiry-phase-grid">
-              {planning.phases.map(stage => <label className="inquiry-check inquiry-phase-option" key={stage}>
-                <input type="checkbox" checked={phases.includes(stage)} disabled={fixedPhaseLineup} onChange={event => {
-                  setPhases(previous => event.target.checked ? planning.phases.filter(item => item === stage || previous.includes(item)) : previous.filter(item => item !== stage))
-                  setTeam([])
-                  setPlanning({ ...planning, candidates: undefined })
-                }} />{stage}
-              </label>)}
-            </div>
-            {!phases.length && <p className="inquiry-muted">Select at least one phase to continue.</p>}
+            <p className="inquiry-muted">{planning.phaseReview
+              ? "Generated from the building uses and features confirmed in Project Details."
+              : `All phases are required for ${String(row.details.project_type)} projects.`}</p>
+            <table className="inquiry-phase-lineup">
+              <thead><tr><th scope="col">Phase</th><th scope="col">Status</th></tr></thead>
+              <tbody>{(planning.phaseReview ?? planning.phases.map(name => ({ name, required: true, included: true }))).map(phase =>
+                <tr key={phase.name}>
+                  <th scope="row">{phase.name}</th>
+                  <td>{phase.included ? phase.required
+                    ? <><Icon name="lock" size={14} /> Required</> : "Included" : "Out of scope"}</td>
+                </tr>)}</tbody>
+            </table>
             {!!phases.length && <details className="inquiry-license-window" open>
               <summary>Planned phase dates</summary>
               <p><strong>{arrangement}</strong> · {Object.keys(phaseDates).length ? "Review dates" : "System suggested"}</p>

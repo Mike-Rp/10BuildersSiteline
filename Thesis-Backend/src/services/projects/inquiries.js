@@ -1,4 +1,5 @@
 import { normalInquiryDeadline } from "../../domain/inquiry-office-hours.js";
+import { mixedUsePhaseReview, mixedUseSelectionsError, normalizeMixedUseSelections } from "../../domain/mixed-use-scope.js";
 import { forecastPhaseDelay, phaseWorkday, suggestPhaseSchedule } from "../../domain/phase-schedule.js";
 import { isoDateValid } from "../../domain/engineer-credentials.js";
 import execute from "../../common/utilities/query.utility.js";
@@ -98,7 +99,7 @@ export function confirmedPhases(available, submitted, type) {
   if (!Array.isArray(submitted) || !submitted.length || new Set(submitted).size !== submitted.length ||
       submitted.some(phase => !available.includes(phase)))
     throw new HttpError(422, "Select at least one valid construction phase.");
-  if ((type === "Residential" || type === "Commercial") && submitted.length !== available.length)
+  if (inquiryTypes.includes(type) && submitted.length !== available.length)
     throw new HttpError(422, `All construction phases are required for ${type} projects.`);
   return available.filter(phase => submitted.includes(phase));
 }
@@ -422,7 +423,10 @@ export function mountInquiries(router) {
         inquiryDetails(details); validateInquiryContact(details, row.details);
         if (item.field === "project_type" && details.opm_workflow) {
           const workflow = { ...details.opm_workflow };
-          if (workflow.review) workflow.review = { ...workflow.review, version: workflow.review.version + 1, requires_review: true };
+          if (workflow.review) {
+            workflow.review = { ...workflow.review, version: workflow.review.version + 1, requires_review: true };
+            delete workflow.review.mixed_use_scope;
+          }
           if (workflow.signed_contract) workflow.superseded_contracts = [...(workflow.superseded_contracts ?? []), {
             ...workflow.signed_contract, correction_id: item.id,
           }];
@@ -506,7 +510,11 @@ export function mountInquiries(router) {
         const earliestStart = earliestStartDate.toISOString().slice(0, 10);
         if (typeof input.start !== "string" || input.start < earliestStart)
           throw new HttpError(422, "Choose an estimated start date at least 14 calendar days from today.");
-        const suggestion = assessInquiry(after, input.start, input.end, technical, arrangement);
+        const scopeInput = input.mixed_use_scope ?? workflow.review?.mixed_use_scope;
+        const scopeError = after.project_type === "Mixed-Use" && mixedUseSelectionsError(scopeInput);
+        if (scopeError) throw new HttpError(422, scopeError);
+        const mixedUseScope = after.project_type === "Mixed-Use" ? normalizeMixedUseSelections(scopeInput) : undefined;
+        const suggestion = assessInquiry(after, input.start, input.end, technical, arrangement, mixedUseScope);
         validateInquiryCompletion(input.start, input.end, suggestion);
         const changes = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])]
           .filter(key => before[key] !== after[key]).map(key => [key, { before: before[key] ?? null, after: after[key] ?? null }]));
@@ -527,6 +535,7 @@ export function mountInquiries(router) {
         if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
           throw new HttpError(422, "Each floor must not exceed the lot area. Update the floor measurements.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
+          ...(mixedUseScope ? { mixed_use_scope: mixedUseScope } : {}),
           ...(floorMeasurements ? { floorMeasurements } : {}) };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
@@ -535,9 +544,10 @@ export function mountInquiries(router) {
         break;
       }
       case "budget": {
-        if (!workflow.review || workflow.review.requires_review) throw new HttpError(409, "Confirm the project information before saving the budget.");
+        if (!workflow.review || workflow.review.requires_review || details.project_type === "Mixed-Use" && !workflow.review.mixed_use_scope)
+          throw new HttpError(409, "Confirm the project information before saving the budget.");
         const { start, end, technical = technicalOptions[0], arrangement = arrangementOptions[0] } = workflow.review;
-        const { complexity } = assessInquiry(details, start, end, technical, arrangement);
+        const { complexity } = assessInquiry(details, start, end, technical, arrangement, workflow.review.mixed_use_scope);
         recordInquiryBudget(workflow, input.amount, audit, inquiryCostEstimate(details, complexity));
         break;
       }
@@ -548,7 +558,7 @@ export function mountInquiries(router) {
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
         const { start, end } = workflow.review;
         if (workflow.assessment?.technical !== input.technical || workflow.assessment?.arrangement !== input.arrangement) {
-          const estimate = assessInquiry(details, start, end, input.technical, input.arrangement);
+          const estimate = assessInquiry(details, start, end, input.technical, input.arrangement, workflow.review.mixed_use_scope);
           validateInquiryCompletion(start, end, estimate);
           workflow.assessment = { ...estimate, id: randomUUID(), completed_at: audit.at };
         }
@@ -570,19 +580,23 @@ export function mountInquiries(router) {
     if (!row) throw new HttpError(404, "Approved inquiry not found.");
     const assessment = staffingAssessment(row, req.body);
     const type = row.details.project_type;
-    const phases = await inquiryPhases({query: execute}, type);
+    const review = row.details.opm_workflow.review;
+    if (type === "Mixed-Use" && !review.mixed_use_scope)
+      throw new HttpError(409, "Confirm Mixed-Use building uses and construction features in Project Details.");
+    const phaseReview = type === "Mixed-Use" ? mixedUsePhaseReview(review.mixed_use_scope) : undefined;
+    const phases = phaseReview ? phaseReview.filter(phase => phase.included).map(phase => phase.name)
+      : await inquiryPhases({query: execute}, type);
     const estimate = { size: assessment.size, end: assessment.suggestedEnd };
     if (!req.body.phases) {
       const saved = row.details.opm_workflow.staffing;
       const configuration = await inquiryScopeConfiguration({ query: execute }, type, phases, saved?.additional_scopes || {});
-      return { phases, estimate, staffing: saved, ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
+      return { phases, phaseReview, estimate, staffing: saved, ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
     }
     const signedContractId = row.details.opm_workflow.signed_contract?.id ?? null;
     if (signedContractId && req.body.contract_file_id !== signedContractId)
       throw new HttpError(409, "The signed contract changed. Reopen staffing with the confirmed contract.");
     await assertInquiryUpload({ query:execute },actor.id,req.body.contract_file_id);
     const selected = confirmedPhases(phases, req.body.phases, type);
-    const review = row.details.opm_workflow.review;
     const storedDates = row.details.opm_workflow.staffing?.phase_dates;
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
       selected.filter(phase => storedDates?.[phase]).map(phase => [phase, storedDates[phase]])), selected, review);
@@ -624,7 +638,7 @@ export function mountInquiries(router) {
         AND (details #>> '{opm_workflow,signed_contract,id}') IS NOT DISTINCT FROM $5::text`,
       [row.id, actor.id, JSON.stringify(staffing), assessment.id, signedContractId]);
     if (!saved.rowCount) throw new HttpError(409, "The inquiry changed. Reopen staffing with the current assessment.");
-    return { phases, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, licenseUnavailable, staffing,
+    return { phases, phaseReview, estimate, recommended_site_pms:staffingTarget, team, candidates, candidateBlockers, blockedCandidates, licenseUnavailable, staffing,
       ...(configuration.options ? { additional_scope_options: configuration.options } : {}) };
   }));
 }

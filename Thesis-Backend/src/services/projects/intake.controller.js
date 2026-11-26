@@ -1,4 +1,5 @@
 import { inquiryDetails, inquiryPhases, confirmedPhases, notifyInquiry, assertInquiryUpload, staffingAssessment } from "./inquiries.js";
+import { mixedUsePhaseReview } from "../../domain/mixed-use-scope.js";
 import { intakeSize } from "../../domain/inquiry-assessment.js";
 import { prepareInquiryLead } from "./inquiry-staffing.js";
 import { normalizePhaseDates, validateStaffingLicenses } from "./staffing-license.utility.js";
@@ -65,7 +66,7 @@ export const createIntake = async (req, res) => {
     const intakeId = req.body?.intake_id ?? null;
     if (intakeId !== null && !isUuid(intakeId)) return responseError(res,"Invalid intake_id.",400);
     const result = await withTransaction(async (client) => {
-      let inquiry, intake, phases, deadline, scopeConfiguration, phaseDates, planningBackups;
+      let inquiry, intake, phases, deadline, scopeConfiguration, phaseDates, planningBackups, inquiryScope;
       if (inquiryId) {
         inquiry = (await client.query("SELECT * FROM project_inquiries WHERE id=$1 AND opm_id=$2 FOR UPDATE", [inquiryId,actor.id])).rows[0];
         if (!inquiry || suggested_opm_id !== actor.id) throw new HttpError(404, "Approved inquiry not found.");
@@ -76,7 +77,14 @@ export const createIntake = async (req, res) => {
         const details = inquiryDetails(inquiry.details);
         const {review, budget} = inquiry.details.opm_workflow;
         if (!isUuid(req.body.contract_file_id)) throw new HttpError(422, "Upload the signed client contract agreement.");
-        phases = confirmedPhases(await inquiryPhases(client,details.project_type),req.body.phases,
+        const mixedUse = details.project_type === "Mixed-Use";
+        if (mixedUse && !review.mixed_use_scope && !inquiry.project_id)
+          throw new HttpError(409, "Confirm Mixed-Use building uses and construction features in Project Details.");
+        const rows = mixedUse && review.mixed_use_scope ? mixedUsePhaseReview(review.mixed_use_scope) : undefined;
+        if (rows) inquiryScope = { ...review.mixed_use_scope, confirmed: true,
+          notApplicable: rows.filter(phase => !phase.included).map(({ name, reason }) => ({ name, reason })) };
+        phases = confirmedPhases(rows ? rows.filter(phase => phase.included).map(phase => phase.name)
+          : await inquiryPhases(client,details.project_type),req.body.phases,
           inquiry.project_id ? undefined : details.project_type);
         const confirmed = inquiry.details.opm_workflow.staffing;
         if (!confirmed || confirmed.assessment_id !== assessment.id || confirmed.contract_file_id !== req.body.contract_file_id ||
@@ -201,7 +209,7 @@ export const createIntake = async (req, res) => {
       if (inquiry) {
         await client.query("UPDATE projects SET lifecycle_status='spm_review',location=$2,target_end_date=$3,inquiry_intake=$4,phase_scope=$5 WHERE id=$1",
           [project.id,intake.address,req.body.target_end_date,JSON.stringify(intake),JSON.stringify({
-            phases, staffingPolicy:"primary_with_optional_engineer", engineerScopes:requiredScopes,
+            ...inquiryScope, phases, staffingPolicy:"primary_with_optional_engineer", engineerScopes:requiredScopes,
             additional_scopes:scopeConfiguration.additional, phase_dates:phaseDates, planning_backups:planningBackups,
             coordinator_scopes:Object.fromEntries(phase_team.map(phase => [phase.stage, phase.assigned_disciplines])),
             confirmedBy:actor.id, confirmedAt:new Date().toISOString(),

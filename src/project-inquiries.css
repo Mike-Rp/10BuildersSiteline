@@ -615,7 +615,6 @@
 .inquiry-intake .inquiry-stepper li[aria-current=step] span { background: #fff; color: #123760; }
 .inquiry-intake .inquiry-stepper li[data-complete=true] span { background: #287453; color: white; }
 .inquiry-intake .inquiry-phase-grid { grid-template-columns: 1fr; }
-.inquiry-intake .inquiry-phase-option { min-height: 48px; align-items: center; padding: 10px; }
 .inquiry-staff-layout { display: grid; gap: 14px; }
 .inquiry-lineup-table { overflow-x: auto; border: 1px solid var(--color-line); border-radius: 8px; }
 .inquiry-lineup-table table { width: 100%; text-align: left; }
@@ -646,8 +645,10 @@
 .inquiry-phase-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
 .project-inquiries label.inquiry-check { display: flex; align-items: flex-start; gap: 8px; }
 .inquiry-check input { flex: 0 0 auto; margin-top: 4px; }
-.inquiry-phase-option { min-height: 40px; padding: 8px; border: 1px solid #c4d6ec; border-radius: 7px; background: white; cursor: pointer; }
-.inquiry-phase-option:has(input:checked) { background: #e2efff; border-color: #98b9dd; }
+.inquiry-phase-lineup { width: 100%; border-collapse: collapse; margin-block: .75rem; }
+.inquiry-phase-lineup :is(th, td) { padding: .65rem; border-bottom: 1px solid #c4d6ec; text-align: start; }
+.inquiry-phase-lineup thead { background: #edf5fb; }
+.inquiry-phase-lineup td svg { display: inline-block; vertical-align: text-bottom; }
 .inquiry-phase-nav { display: flex; flex-wrap: wrap; gap: 6px; }
 #root .project-inquiries .inquiry-phase-nav > button[data-staffing-issue=true] {
   display: inline-flex;
@@ -717,3 +718,5 @@
 .inquiry-locked-project-type { position: relative; }
 .inquiry-locked-project-type input { width: 100%; padding-inline-end: 2rem; background: #edf4fa; }
 .inquiry-locked-project-type svg { position: absolute; inset-inline-end: .65rem; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.inquiry-mixed-use-options { display: grid; gap: .4rem; margin-block: .5rem; }
+.inquiry-mixed-use-options .inquiry-check { display: flex; align-items: center; gap: .5rem; }

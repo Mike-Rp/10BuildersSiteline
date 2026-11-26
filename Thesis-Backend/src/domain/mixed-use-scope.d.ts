@@ -10,7 +10,10 @@ export type MixedUseScope = {
 }
 export const MIXED_USE_USES: readonly {code: string; label: string}[]
 export const MIXED_USE_FEATURES: readonly {code: keyof MixedUseScope["features"]; label: string}[]
+export type MixedUseSelections = Pick<MixedUseScope, "version" | "uses" | "features">
+export function mixedUseSelectionsError(scope: unknown): string
+export function normalizeMixedUseSelections(scope: unknown): MixedUseSelections
 export function defaultMixedUseScope(): MixedUseScope
-export function mixedUsePhaseReview(scope: MixedUseScope): {name: string; disciplines: string[]; included: boolean; reason: string; required: boolean}[]
+export function mixedUsePhaseReview(scope: MixedUseSelections): {name: string; disciplines: string[]; included: boolean; reason: string; required: boolean}[]
 export function mixedUseScopeError(scope: unknown, requireConfirmation?: boolean): string
 export function normalizeMixedUseScope(scope: unknown): MixedUseScope & {phases: string[]; notApplicable: {name: string; reason: string}[]}

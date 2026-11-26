@@ -9,20 +9,21 @@ export function inquirySize(details: Record<string, string | number>): string;
 export function inquiryCostEstimate(details: Record<string, string | number>, complexity: string): {
   minimum: number; maximum: number;
 } | null;
-export function inquiryAssessmentBasis(details: Record<string, string | number>, technical: string, arrangement: string): {
+export function inquiryAssessmentBasis(details: Record<string, string | number>, technical: string, arrangement: string, scope?: MixedUseSelections): {
   size: string; typePoints: number; sizePoints: number; floorPoints: number; technicalPoints: number; overlapPoints: number;
-  baselineComplexity: string; complexityFactor: number; overlapFactor: number; rate: number;
+  baselineComplexity: string; complexityFactor: number; overlapFactor: number; rate: number; usePoints: number; featurePoints: number;
   medium: [number, number]; extraFloorDays: number;
 };
 export function earliestInquiryCompletion(start: string, estimate: { suggestedEnd: string | null }): string | null;
 export function inquiryAssessmentReady(details: Record<string, string | number>, workflow?: {
-  assessment?: unknown; budget?: number; review?: { start: string; end: string; technical?: string; arrangement?: string };
+  assessment?: unknown; budget?: number; review?: { start: string; end: string; technical?: string; arrangement?: string; mixed_use_scope?: MixedUseSelections };
 }): boolean;
 export function assessInquiry(
   details: Record<string, string | number>,
-  start: string, end: string, technical: string, arrangement: string,
+  start: string, end: string, technical: string, arrangement: string, scope?: MixedUseSelections,
 ): {
   size: string; score: number; technical: string; arrangement: string; complexity: string;
   durationDays: number; suggestedEnd: string | null;
   planningDays?: number; durationMultiplier?: number;
 };
+import type { MixedUseSelections } from "./mixed-use-scope.js";

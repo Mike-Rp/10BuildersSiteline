@@ -5,13 +5,14 @@ import DatePicker from "./DatePicker"
 import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
+import { MIXED_USE_FEATURES, MIXED_USE_USES, mixedUseSelectionsError, type MixedUseSelections } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
 import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
 type ReviewEvent = { at: string; version: number; reason: string; changes: Record<string, { before: string | number | null; after: string | number | null }> }
 export type OfficeWorkflow = {
-  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; requires_review?: boolean; floorMeasurements?: FloorMeasurements; estimate: { size: string | null; end: string | null } }
+  review?: { version: number; start: string; end: string; technical?: string; arrangement?: string; requires_review?: boolean; mixed_use_scope?: MixedUseSelections; floorMeasurements?: FloorMeasurements; estimate: { size: string | null; end: string | null } }
   review_history?: ReviewEvent[]
   budget?: number
   budget_history?: { at: string; amount: number }[]
@@ -111,6 +112,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const [fieldError, setFieldError] = useState<{ id: string; message: string }>()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(row.details)
+  const mixedUse = row.details.project_type === "Mixed-Use"
+  const [scope, setScope] = useState<MixedUseSelections>(() => review?.mixed_use_scope ?? {
+    version: 1, uses: [], features: { podium: false, tower: false, curtainWall: false, landscaping: false },
+  })
+  const scopeError = mixedUse ? mixedUseSelectionsError(scope) : ""
   const [floorArea, setFloorArea] = useState(() => floorAreaDraft(row.details, review?.floorMeasurements))
   const [floorPage, setFloorPage] = useState(0)
   const [start, setStart] = useState(review?.start ?? String(row.details.anticipated_start ?? ""))
@@ -164,16 +170,16 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Estimated completion", review ? formatDay(review.end) : "Not provided"],
     ["Classification", row.details.classification || "Normal"],
   ]
-  const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement))
+  const preview = review && (assessment ?? assessInquiry(row.details, review.start, review.end, technical, arrangement, review.mixed_use_scope))
   const currentEstimate = page === "assessment" && review && preview &&
-    (assessment ? assessInquiry(row.details, review.start, review.end, preview.technical, preview.arrangement) : preview)
+    (assessment ? assessInquiry(row.details, review.start, review.end, preview.technical, preview.arrangement, review.mixed_use_scope) : preview)
   const assessmentBasis = currentEstimate && preview && currentEstimate.size === preview.size && currentEstimate.score === preview.score &&
     currentEstimate.complexity === preview.complexity && currentEstimate.planningDays === preview.planningDays &&
     currentEstimate.durationMultiplier === preview.durationMultiplier
-    ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement) : undefined
+    ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement, review?.mixed_use_scope) : undefined
   const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
-  const reviewing = editing || !review || review.requires_review
+  const reviewing = editing || !review || review.requires_review || mixedUse && !review.mixed_use_scope
   const compactReview = page === "review" && reviewing
   const showIntakeRecord = page !== "pending" && page !== "received" && !compactReview
   const floorCount = Number(draft.floor_count)
@@ -190,14 +196,14 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     : { mode: "individual", areas: floorInputs }, floorCount, lotArea) : null
   const measuredDraft: Details = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
   const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft)
-    ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement)
+    ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement, mixedUse ? scope : undefined)
     : undefined
   const earliestCompletion = validStart && scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
   const selectedCompletion = end || earliestCompletion || ""
   const budgetDetails = reviewing ? measuredDraft : row.details
   const budgetComplexity = reviewing ? scheduleEstimate?.complexity : review && hasSizeInputs(budgetDetails)
     ? assessInquiry(budgetDetails, review.start, review.end, review.technical ?? technicalOptions[0],
-      review.arrangement ?? arrangementOptions[0]).complexity : undefined
+      review.arrangement ?? arrangementOptions[0], review.mixed_use_scope).complexity : undefined
   const costEstimate = budgetComplexity ? inquiryCostEstimate(budgetDetails, budgetComplexity) : null
   const budgetError = costEstimate && budget && Number(budget) < costEstimate.minimum
     ? `Enter an authorized budget of at least ${wholePeso.format(costEstimate.minimum)}.` : ""
@@ -257,7 +263,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   }
   function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || !costEstimate || budgetError) return
+    if (busy || !costEstimate || budgetError || scopeError) return
     if (!reviewing) {
       if (!budgetSaved) save("budget", { amount: budget })
       return
@@ -299,6 +305,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     if (!calculatedArea) return
     save("review", { start, end: selectedCompletion, technical, arrangement, amount: budget,
       floorMeasurements: calculatedArea.measurements,
+      ...(mixedUse ? { mixed_use_scope: scope } : {}),
       ...(hasCorrections ? { correction: measuredDraft } : {}), ...(needsReason ? { reason } : {}) })
   }
   const budgetFields = <div className="office-review-budget-fields">
@@ -508,6 +515,28 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <h3 id={fieldId("measurements")}>Project measurements</h3>
             <div className="office-workflow-fields">
               {projectTypeCorrection}
+              {mixedUse && <div>
+                <fieldset className="inquiry-mixed-use-options">
+                  <legend>Building uses</legend>
+                  <p>Select at least two uses.</p>
+                  {MIXED_USE_USES.map(({ code, label }) => <label key={code} className="inquiry-check">
+                    <input type="checkbox" checked={scope.uses.includes(code)} onChange={event => {
+                      const checked = event.target.checked
+                      setScope(previous => ({ ...previous, uses: checked ? [...previous.uses, code] : previous.uses.filter(use => use !== code) }))
+                    }} />{label}
+                  </label>)}
+                </fieldset>
+                <fieldset className="inquiry-mixed-use-options">
+                  <legend>Construction features</legend>
+                  <p>Select the features included in the design.</p>
+                  {MIXED_USE_FEATURES.map(({ code, label }) => <label key={code} className="inquiry-check">
+                    <input type="checkbox" checked={scope.features[code]} onChange={event => {
+                      const checked = event.target.checked
+                      setScope(previous => ({ ...previous, features: { ...previous.features, [code]: checked } }))
+                    }} />{label}
+                  </label>)}
+                </fieldset>
+              </div>}
               {projectMeasurementFields.map(([key, label]) => editField(key, label))}
               <label>Floor sizes<select value={floorArea.mode} onChange={event => {
                 const mode = event.target.value === "individual" ? "individual" : "same"
@@ -562,6 +591,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             ["Project phase arrangement", "review-arrangement", arrangementOptions, arrangement, setArrangement],
           ] as const).map(([label, group, options, value, select]) => <fieldset key={group} className="office-review-options">
             <legend>{label}</legend>
+            {mixedUse && group === "review-technical" && <p>Choose based on specialized systems. Podium, tower, and curtain wall are scored from Construction features.</p>}
             <div>{options.map(option => <label key={option}>
               <input type="radio" name={group} value={option} checked={value === option}
                 onChange={() => { select(option); setEnd("") }} />
@@ -618,10 +648,11 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 setTechnical(assessment?.technical ?? review?.technical ?? technicalOptions[0])
                 setArrangement(assessment?.arrangement ?? review?.arrangement ?? arrangementOptions[0])
                 setBudget(String(workflow?.budget ?? ""))
+                if (review?.mixed_use_scope) setScope(review.mixed_use_scope)
                 setReason("")
                 setFieldError(undefined)
               }}>Cancel</button>}
-              <button type="submit" className="button primary" disabled={!costEstimate || Boolean(budgetError)}>Save and continue</button>
+              <button type="submit" className="button primary" disabled={!costEstimate || Boolean(budgetError) || Boolean(scopeError)}>Save and continue</button>
             </div>
           </div>
         </fieldset> : <fieldset className="office-workflow-form office-reviewed-intake" disabled={busy}>
@@ -728,6 +759,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <dt>{label}</dt><dd><meter value={points} min={0} max={3} aria-hidden="true" /><span>{points}/3</span></dd>
             </div>)}
           </dl>
+          {mixedUse && <p>Mixed-Use scope adds {assessmentBasis.usePoints} for additional building uses and {assessmentBasis.featurePoints} for podium, tower, and curtain wall features. Scores are capped at 15.</p>}
           <p>Low is 5–7 points, Moderate is 8–11, and High is 12–15.</p>
         </details> : <p>Planning score recorded when this assessment was completed.</p>}
       </Card>
@@ -748,7 +780,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           <p>The ×{assessmentBasis.complexityFactor} factor reflects {assessmentBasis.baselineComplexity.toLowerCase()} complexity before adding overlap points. The ×{assessmentBasis.overlapFactor} factor reflects the selected phase arrangement.</p>
         </details>}
         {assessment && <Notice tone="success"><strong>Assessment completed</strong><p>{hasSignedContract
-          ? "Choose construction phases to continue to Site PM staffing."
+          ? "Review construction phases to continue to Site PM staffing."
           : "Attach the signed client contract below to continue to Site PM staffing."}</p></Notice>}
       </Card>
     </div>

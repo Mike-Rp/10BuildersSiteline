@@ -500,4 +500,26 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(correctedType.workflow.review.version,oldWorkflow.review.version+1)
   assert.equal(correctedType.workflow.review.requires_review,true)
   for (const field of ["assessment","budget","staffing","signed_contract"]) assert.equal(correctedType.workflow[field],undefined)
+  const mixedRequest = await call(typeCorrection,{token,json:{...typeRequest,value:"Mixed-Use"}})
+  await call(typeCorrection,{token:admin,json:{action:"approve",id:mixedRequest.corrections.at(-1).id}})
+  const mixedReview = { start: schedule.start, end: "2028-02-01", amount: 10000000, ...assessmentInput }
+  const mixedWorkflow = `${root}/${wrongType.id}/workflow`
+  const mixedPlanning = `${root}/${wrongType.id}/planning`
+  const version = correctedType.workflow.review.version + 1
+  await call(mixedWorkflow,{token,status:422,json:{action:"review",version,...mixedReview}})
+  const scope = {version:1,uses:["hotel","residential","office"],features:{podium:true,tower:false,curtainWall:true,landscaping:false}}
+  const reviewed = await call(mixedWorkflow,{token,json:{action:"review",version,...mixedReview,mixed_use_scope:scope,reason:"Confirmed Mixed-Use scope."}})
+  const mixedAssessment = (await call(mixedWorkflow,{token,json:{action:"assessment",version:reviewed.workflow.review.version,...assessmentInput}})).workflow.assessment
+  assert.equal(mixedAssessment.score,12)
+  assert.equal(mixedAssessment.complexity,"High")
+  const mixedInput = {...details, project_type:"Mixed-Use",target_start_date:mixedReview.start,target_end_date:mixedReview.end,
+    estimated_budget:mixedReview.amount,assessment_id:mixedAssessment.id}
+  const mixedPreview = await call(mixedPlanning,{token,json:mixedInput})
+  assert.deepEqual(mixedPreview.phases,["Mobilization","Design","Foundation","Podium Structure","Structure","Envelope / Curtain Wall",
+    "MEP Rough-In","Fire & Life Safety","Office Fit-Out","Hotel Fit-Out","Residential Fit-Out","Site Works","Closeout"])
+  assert.equal(mixedPreview.phaseReview.find(phase=>phase.name==="Tower Structure").included,false)
+  const mixedContract = await upload("mixed-signed.pdf")
+  await call(mixedPlanning,{token,status:422,json:{...mixedInput,contract_file_id:mixedContract,phases:mixedPreview.phases.slice(1)}})
+  const mixedStaffing = await call(mixedPlanning,{token,json:{...mixedInput,contract_file_id:mixedContract,phases:mixedPreview.phases}})
+  assert.notEqual(mixedStaffing.candidateBlockers["Office Fit-Out"],"phase_disciplines")
 })
