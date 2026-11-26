@@ -1,0 +1,1819 @@
+{
+  "applied": true,
+  "previously_missing": 178,
+  "recognized": 160,
+  "active_eligible_before": 34,
+  "active_eligible_after": 194,
+  "recovered": [
+    {
+      "name": "Aaron Belmonte",
+      "tags": [
+        "Construction Engineering",
+        "Materials Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Aaron Velasco",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Adrian Valenzuela",
+      "tags": [
+        "Construction Engineering",
+        "Materials Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Aldrin Fajardo",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Alfred David",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Allan Aquino",
+      "tags": [
+        "Electrical Design Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Allysa Fernandez",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering",
+        "Water Resources Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Alvin Marcelino",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Alvin Ramos",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Andrea Villanueva",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering",
+        "Highway Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Angelika Dizon",
+      "tags": [
+        "Geomatics Engineering",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Angelo Vergara",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Anton Delgado",
+      "tags": [
+        "Hydraulic Engineering",
+        "Water Resources Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Arvin Cordero",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Bea Gonzales",
+      "tags": [
+        "Construction Engineering",
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Belen Francisco",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Bernadette Ruiz",
+      "tags": [
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Bianca Morales",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Sewerage Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Bianca Valera",
+      "tags": [
+        "Energy Systems Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Brenda Casimino",
+      "tags": [
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Bryan Rivera",
+      "tags": [
+        "Elevator and Escalator Engineering",
+        "HVAC Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Camille Perez",
+      "tags": [
+        "Lighting Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Carlo Mendoza",
+      "tags": [
+        "Construction Engineering",
+        "Geotechnical Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Carlos Enriquez",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Carmela Villegas",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Sewerage Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Catherine Lucero",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Cedric Fernandez",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Cedric Lozano",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Cesar Gatdula",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Charmaine Dela Peña",
+      "tags": [
+        "Electrical Protection Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Cheryl Banzon",
+      "tags": [
+        "Fire Detection and Alarm Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Christian Ocampo",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Clarissa Hilario",
+      "tags": [
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Clarisse Torrez",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Electrical Protection Engineering",
+        "Renewable Energy Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Danica Pascual",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Danilo Aranas",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Darlene Hipolito",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Denise Castillo",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Dennis Mercado",
+      "tags": [
+        "Power Distribution Engineering",
+        "Power Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Diana Campos",
+      "tags": [
+        "Electrical Protection Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Dianne Yap",
+      "tags": [
+        "Construction Engineering",
+        "Earthquake/Seismic Engineering",
+        "Materials Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Diego Palomares",
+      "tags": [
+        "HVAC Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Dorothy Galang",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Highway Engineering",
+        "Transportation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Edrian Valdez",
+      "tags": [
+        "Building Automation Engineering",
+        "Instrumentation and Controls Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Eduardo Miranda",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Edward Salazar",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Eloisa Rivera",
+      "tags": [
+        "Energy Systems Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Emerson Pineda",
+      "tags": [
+        "Building Automation Engineering",
+        "Instrumentation and Controls Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Emmanuel Sevilla",
+      "tags": [
+        "Electrical Design Engineering",
+        "Renewable Energy Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Enrico Jacinto",
+      "tags": [
+        "Sewerage Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Eric Montoya",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Erika Mallari",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Erika Salazar",
+      "tags": [
+        "Construction Engineering",
+        "Geotechnical Engineering",
+        "Transportation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ethan de Leon",
+      "tags": [
+        "Sewerage Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Faith Lacuesta",
+      "tags": [
+        "Hydraulic Engineering",
+        "Water Resources Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Faye Lazarro",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Plumbing Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Felicia Ignacio",
+      "tags": [
+        "Building Automation Engineering",
+        "Fire Detection and Alarm Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ferdinand Mercado",
+      "tags": [
+        "Electrical Design Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Fiona Sorrano",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Plumbing Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Francesca Reyes",
+      "tags": [
+        "Hydraulic Engineering",
+        "Water Resources Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Francis Lopez",
+      "tags": [
+        "Electrical Design Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Franklin Cruz",
+      "tags": [
+        "Sewerage Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gabriel Malabanan",
+      "tags": [
+        "Construction Surveying",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gemma Dimaculangan",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Plumbing Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gerald Bonifacio",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gerald Tolentino",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gian Robles",
+      "tags": [
+        "Construction Surveying",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Gilbert Torres",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Hanna Flores",
+      "tags": [
+        "Energy Systems Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Hannah Garcia",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Hazel Cabrera",
+      "tags": [
+        "Geographic Information Systems (GIS)",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Hazel Mariano",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Heidi Magno",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Herbert Rosales",
+      "tags": [
+        "Construction Surveying",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ian Calderon",
+      "tags": [
+        "Construction Surveying",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Irene Jimenez",
+      "tags": [
+        "Geomatics Engineering",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Iris Nicolas",
+      "tags": [
+        "Geomatics Engineering",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Irving Solis",
+      "tags": [
+        "HVAC Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Isaac Padilla",
+      "tags": [
+        "Construction Surveying",
+        "Geomatics Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ivan Castillo",
+      "tags": [
+        "HVAC Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Jacqueline Ramos",
+      "tags": [
+        "Energy Systems Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Janine Reyes",
+      "tags": [
+        "Sanitary Drainage Engineering",
+        "Sewerage Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Jericho Ponce",
+      "tags": [
+        "Elevator and Escalator Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Jerome Villanueva",
+      "tags": [
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Joan Alvorado",
+      "tags": [
+        "Energy Systems Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "John Bautista",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Fire Detection and Alarm Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Jomar Panganiban",
+      "tags": [
+        "Construction Surveying",
+        "Geographic Information Systems (GIS)"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Joseph Laureno",
+      "tags": [
+        "Construction Surveying",
+        "Geographic Information Systems (GIS)"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Joshua Garcia",
+      "tags": [
+        "Construction Surveying",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Joyce Montemayor",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Extra-Low Voltage (ELV) Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Julia Manalo",
+      "tags": [
+        "Geospatial Data Engineering",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Karl Bautista",
+      "tags": [
+        "Elevator and Escalator Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Karla Dizon",
+      "tags": [
+        "Geospatial Data Engineering",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Katrina Quinto",
+      "tags": [
+        "Geospatial Data Engineering",
+        "Land Surveying"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Kendrick Sevilla",
+      "tags": [
+        "Elevator and Escalator Engineering",
+        "Mechanical Building Services Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Kenneth Perez",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Kevin Tan",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Kristel Aguilar",
+      "tags": [
+        "Construction Engineering",
+        "Earthquake/Seismic Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Kristine Navarro",
+      "tags": [
+        "Foundation Engineering",
+        "Materials Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lance Soriano",
+      "tags": [
+        "Construction Surveying",
+        "Geomatics Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lara Villanueva",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "HVAC Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lawrence Bayani",
+      "tags": [
+        "Building Automation Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Leila Abad",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "HVAC Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Leon Balagtas",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lester Salcedo",
+      "tags": [
+        "Construction Surveying",
+        "Geomatics Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lianne Morales",
+      "tags": [
+        "Construction Engineering",
+        "Materials Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Liza Pangan",
+      "tags": [
+        "Power Systems Engineering",
+        "Renewable Energy Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Lowell Manansala",
+      "tags": [
+        "Construction Surveying",
+        "Geomatics Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Luis Sanchez",
+      "tags": [
+        "Construction Engineering",
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Mae Villarin",
+      "tags": [
+        "Energy Systems Engineering",
+        "Fire Protection Engineering (Mechanical Systems)"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Manuel Ferrer",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Marco Flores",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Mariel Gatchalian",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Marissa Bautista",
+      "tags": [
+        "Geographic Information Systems (GIS)",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Mark Enriquez",
+      "tags": [
+        "Construction Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Marvin Lee",
+      "tags": [
+        "Construction Surveying",
+        "Geographic Information Systems (GIS)",
+        "Geospatial Data Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Melissa Arce",
+      "tags": [
+        "Hydraulic Engineering",
+        "Water Resources Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Melissa Tadeo",
+      "tags": [
+        "Geographic Information Systems (GIS)",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Michelle Cruz",
+      "tags": [
+        "Fire Detection and Alarm Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Monica Fuentes",
+      "tags": [
+        "Geographic Information Systems (GIS)",
+        "Mapping and Cartography"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Naomi Rivera",
+      "tags": [
+        "Electrical Protection Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Nathan Bautista",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Nina Santos",
+      "tags": [
+        "Electrical Protection Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Orlando Natividad",
+      "tags": [
+        "Electrical Design Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Oscar Lim",
+      "tags": [
+        "Electrical Design Engineering",
+        "Lighting Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Pamela Angeles",
+      "tags": [
+        "Power Systems Engineering",
+        "Renewable Energy Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Paolo Garcia",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Patricio Santos",
+      "tags": [
+        "Plumbing Systems Engineering",
+        "Water Supply Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Patrick Lim",
+      "tags": [
+        "Environmental Sanitation Engineering",
+        "Wastewater Treatment Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Pauline Cruz",
+      "tags": [
+        "Power Systems Engineering",
+        "Renewable Energy Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Quentin Lopez",
+      "tags": [
+        "Power Distribution Engineering",
+        "Power Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Rachel Garcia",
+      "tags": [
+        "Electrical Design Engineering",
+        "Power Distribution Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Rafael Domingo",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ria Navarro",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Electrical Protection Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ricardo Quiambao",
+      "tags": [
+        "Power Distribution Engineering",
+        "Power Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ricardo Samson",
+      "tags": [
+        "Power Distribution Engineering",
+        "Power Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Rosalie Cruzado",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Electrical Protection Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Samuel Alonzo",
+      "tags": [
+        "Highway Engineering",
+        "Hydraulic Engineering",
+        "Transportation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Samuel Alonzo",
+      "tags": [
+        "Construction Engineering",
+        "Materials Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Sebastian Perez",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Sheryl Macapagal",
+      "tags": [
+        "Electrical Installation Engineering",
+        "Electrical Protection Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Teresita Medina",
+      "tags": [
+        "Foundation Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Theo Aquino",
+      "tags": [
+        "Fire Detection and Alarm Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Tomas Ilagan",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Trisha Ramirez",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Extra-Low Voltage (ELV) Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ulysses Rivera",
+      "tags": [
+        "Building Automation Engineering",
+        "Instrumentation and Controls Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Ursula Mariano",
+      "tags": [
+        "Fire Detection and Alarm Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Valerie Mendoza",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Extra-Low Voltage (ELV) Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Vernon Sarmiento",
+      "tags": [
+        "Building Automation Engineering",
+        "Instrumentation and Controls Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Victor Santiago",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Vincent Javier",
+      "tags": [
+        "Foundation Engineering",
+        "Geotechnical Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Wendy Rosales",
+      "tags": [
+        "Construction Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Wilfred Chua",
+      "tags": [
+        "Building Automation Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Wilma Bautista",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Extra-Low Voltage (ELV) Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Xavier Esteban",
+      "tags": [
+        "Earthquake/Seismic Engineering",
+        "Structural Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Yasmin Tan",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Yves Corpuz",
+      "tags": [
+        "Building Automation Engineering",
+        "Telecommunications Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Yvonne Santiago",
+      "tags": [
+        "HVAC Engineering",
+        "Ventilation Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Zachary Ramos",
+      "tags": [
+        "Air-Conditioning Engineering",
+        "Refrigeration Engineering"
+      ],
+      "eligible": true
+    },
+    {
+      "name": "Zoe Dimaano",
+      "tags": [
+        "Data and Network Systems Engineering",
+        "Security and Surveillance Systems Engineering"
+      ],
+      "eligible": true
+    }
+  ],
+  "remaining": [
+    {
+      "name": "Althea Noveno",
+      "id": "5e5f3e98-1e6f-408b-a9ce-ace79d88eca8"
+    },
+    {
+      "name": "Choco Basi",
+      "id": "1830f827-ecf3-46cd-86e9-e856744eee96"
+    },
+    {
+      "name": "Denise Dizon",
+      "id": "136e7b2d-8375-4d2e-a721-50582d48f4ac"
+    },
+    {
+      "name": "Elias Estrada",
+      "id": "8fa2e81b-12c4-472b-aed4-7e50f181d7f6"
+    },
+    {
+      "name": "Jasmine Jimenez",
+      "id": "fe300412-54a8-47d4-8185-52b11cb533b9"
+    },
+    {
+      "name": "Kenneth Katigbak",
+      "id": "d9731a15-907c-4a62-8c7f-b2a2be5a2d51"
+    },
+    {
+      "name": "Kevin Villaver",
+      "id": "4b16dec5-af8c-4835-a2be-5e37f682db0a"
+    },
+    {
+      "name": "kian yamzon",
+      "id": "93e4273c-f7c0-41aa-bd3c-c9ac51a01cec"
+    },
+    {
+      "name": "Mark Angelo Miculob",
+      "id": "2d0145bb-9bd2-4abc-bc8d-c68b3ac1297a"
+    },
+    {
+      "name": "Mark Angelo Miculob",
+      "id": "2f226511-ba3a-4dc6-a0dd-30549d8351c8"
+    },
+    {
+      "name": "Mark Fulloso",
+      "id": "b598e7ad-1620-40f8-992f-baa09ed2b7fb"
+    },
+    {
+      "name": "Mikhail Liudor Respicio",
+      "id": "72608931-cd47-4f97-bf1d-6a19a6ff548e"
+    },
+    {
+      "name": "Patricia Pascual",
+      "id": "f55a1b02-71bf-4b0b-9c6a-4c3e83a81e43"
+    },
+    {
+      "name": "Quentin Quizon",
+      "id": "f12b7f0b-f9b8-489b-ba78-40e0a64112bf"
+    },
+    {
+      "name": "Richard Baldovino",
+      "id": "477703b9-fbe7-4a6c-9ec8-b154447a1fea"
+    },
+    {
+      "name": "Rix Villar",
+      "id": "4b68dbf5-b954-4558-9698-1e73621f6a43"
+    },
+    {
+      "name": "Vanessa Valdez",
+      "id": "ffb2537c-6fbb-450c-a4a5-a0846afeb0d1"
+    },
+    {
+      "name": "Warren Wenceslao",
+      "id": "cd2bd947-d4e9-4cb7-802a-518848c73c9f"
+    }
+  ],
+  "phase_coverage": [
+    {
+      "type": "Residential",
+      "phase": "Mobilization",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Design",
+      "candidates": 31,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Electrical Design Engineering": 7,
+        "Plumbing Systems Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Foundation",
+      "candidates": 24,
+      "scope_counts": {
+        "Foundation Engineering": 14,
+        "Structural Engineering": 15,
+        "Geotechnical Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Structure",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Finishes",
+      "candidates": 12,
+      "scope_counts": {
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Closeout",
+      "candidates": 12,
+      "scope_counts": {
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "MEP Rough-In",
+      "candidates": 17,
+      "scope_counts": {
+        "Electrical Installation Engineering": 8,
+        "Plumbing Systems Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Envelope",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Residential",
+      "phase": "Landscape & Site Works",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Mobilization",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Design",
+      "candidates": 39,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Electrical Design Engineering": 7,
+        "Plumbing Systems Engineering": 9,
+        "Mechanical Building Services Engineering": 8
+      },
+      "complete": false,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": [
+        "Mechanical Building Services Engineering"
+      ]
+    },
+    {
+      "type": "Commercial",
+      "phase": "Foundation",
+      "candidates": 24,
+      "scope_counts": {
+        "Foundation Engineering": 14,
+        "Structural Engineering": 15,
+        "Geotechnical Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Structure",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Closeout",
+      "candidates": 12,
+      "scope_counts": {
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "MEP Rough-In",
+      "candidates": 25,
+      "scope_counts": {
+        "Electrical Installation Engineering": 8,
+        "Plumbing Systems Engineering": 9,
+        "Mechanical Building Services Engineering": 8
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Envelope / Curtain Wall",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Fire & Life Safety",
+      "candidates": 7,
+      "scope_counts": {
+        "Fire Protection Engineering (Mechanical Systems)": 1,
+        "Fire Detection and Alarm Systems Engineering": 6
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Commercial",
+      "phase": "Fit-Out / Finishes",
+      "candidates": 26,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Lighting Engineering": 10,
+        "Electrical Installation Engineering": 8
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Mobilization",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Design",
+      "candidates": 39,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Electrical Design Engineering": 7,
+        "Plumbing Systems Engineering": 9,
+        "Mechanical Building Services Engineering": 8
+      },
+      "complete": false,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": [
+        "Mechanical Building Services Engineering"
+      ]
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Foundation",
+      "candidates": 24,
+      "scope_counts": {
+        "Foundation Engineering": 14,
+        "Structural Engineering": 15,
+        "Geotechnical Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Structure",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Closeout",
+      "candidates": 12,
+      "scope_counts": {
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "MEP Rough-In",
+      "candidates": 25,
+      "scope_counts": {
+        "Electrical Installation Engineering": 8,
+        "Plumbing Systems Engineering": 9,
+        "Mechanical Building Services Engineering": 8
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Envelope",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Envelope / Curtain Wall",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Fire & Life Safety",
+      "candidates": 7,
+      "scope_counts": {
+        "Fire Protection Engineering (Mechanical Systems)": 1,
+        "Fire Detection and Alarm Systems Engineering": 6
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Landscape & Site Works",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Podium Structure",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Residential Fit-Out",
+      "candidates": 29,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Electrical Installation Engineering": 8,
+        "Plumbing Systems Engineering": 9
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Retail/Commercial Fit-Out",
+      "candidates": 26,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Lighting Engineering": 10,
+        "Electrical Installation Engineering": 8
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Tower Structure",
+      "candidates": 23,
+      "scope_counts": {
+        "Structural Engineering": 15,
+        "Construction Engineering": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Hotel Fit-Out",
+      "candidates": 42,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Lighting Engineering": 10,
+        "Electrical Installation Engineering": 8,
+        "Plumbing Systems Engineering": 9,
+        "Fire Protection Engineering (Mechanical Systems)": 1,
+        "Fire Detection and Alarm Systems Engineering": 6
+      },
+      "complete": false,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": [
+        "Fire Protection Engineering (Mechanical Systems)",
+        "Fire Detection and Alarm Systems Engineering"
+      ]
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Office Fit-Out",
+      "candidates": 26,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Lighting Engineering": 10,
+        "Electrical Installation Engineering": 8
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    },
+    {
+      "type": "Mixed-Use",
+      "phase": "Site Works",
+      "candidates": 24,
+      "scope_counts": {
+        "Construction Engineering": 12,
+        "Construction Surveying": 12
+      },
+      "complete": true,
+      "zero_candidate_scopes": [],
+      "uncovered_with_three_engineer_limit": []
+    }
+  ]
+}

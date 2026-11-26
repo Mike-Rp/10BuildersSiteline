@@ -50,17 +50,11 @@ export function phaseCoverageQuota(required) {
 
 export const MAX_ENGINEERS_PER_PHASE = 3 // Historical allocation policy.
 export const SETUP_ENGINEER_LIMIT = 3
-
-export function recommendedSitePms(size, complexity) {
-  const sizePoints = ["Small", "Medium", "Large"].indexOf(size)
-  const complexityPoints = ["Low", "Moderate", "High"].indexOf(complexity)
-  if (sizePoints < 0 || complexityPoints < 0) return null
-  return Math.min(3, Math.max(1, sizePoints + complexityPoints))
-}
+export const DEFAULT_SETUP_SPM_COUNT = 1
 
 // Prefer uncovered, explicitly requested scopes, then other uncovered work.
 // Keep the incoming eligibility ranking for ties.
-export function recommendPhaseEngineer(required, candidates, additional = [], target = 1) {
+export function recommendPhaseEngineer(required, candidates, additional = [], target = DEFAULT_SETUP_SPM_COUNT) {
   const engineers = [], covered = new Set(), selected = new Set()
   const tags = [...new Set([...additional, ...required])]
   while (engineers.length < Math.min(SETUP_ENGINEER_LIMIT,target)) {

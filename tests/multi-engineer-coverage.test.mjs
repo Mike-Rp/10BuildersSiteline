@@ -58,6 +58,17 @@ test("staffing recommendations add an engineer only for uncovered scopes", () =>
     { id: "support", tags: ["Plumbing"] },
   ])
 })
+
+test("new setup suggests one SPM even when complementary candidates could cover more scopes", () => {
+  const candidates = [
+    { id: "primary", qualifiedTags: ["Civil", "Structural"] },
+    { id: "optional", qualifiedTags: ["Plumbing"] },
+  ]
+  const suggestion = recommendPhaseEngineer(["Civil", "Structural", "Plumbing"], candidates)
+  assert.deepEqual(suggestion.engineers, [{ id: "primary", tags: ["Civil", "Structural"] }])
+  assert.deepEqual(suggestion.missing, ["Plumbing"])
+  assert.equal(suggestion.quotaMet, true)
+})
 test("revised policy reserves a whole engineer for one project while allowing succeeding phases in that project", () => {
   const state = emptyState()
   const account = {

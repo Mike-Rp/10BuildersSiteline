@@ -277,6 +277,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     await call(planning,{token,status:409,json:{...planInput,contract_file_id:await upload("stale.pdf"),phases}})
   }
   const recommended = await call(planning,{token,json:{...planInput,...documents,phases}})
+  assert.equal(recommended.recommended_site_pms, 1, "project assessment never increases automatic staffing")
   const resumed = await call(planning,{token,json:planInput})
   assert.deepEqual(resumed.staffing,{assessment_id:assessed.assessment.id,phases,contract_file_id:documents.contract_file_id})
   assert.deepEqual(recommended.team.map(item=>item.stage),phases)

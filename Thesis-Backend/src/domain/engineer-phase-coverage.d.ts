@@ -5,4 +5,4 @@ export function allocatePhaseCoverage(required:string[],candidates:{id:string;qu
 export const SETUP_ENGINEER_LIMIT: 3
 export function recommendPhaseEngineer(required:string[], candidates:{id:string;qualifiedTags:string[]}[], additional?:string[],target?:number):ReturnType<typeof allocatePhaseCoverage>
 
-export function recommendedSitePms(size?:string|null, complexity?:string|null): number|null
+export const DEFAULT_SETUP_SPM_COUNT: 1

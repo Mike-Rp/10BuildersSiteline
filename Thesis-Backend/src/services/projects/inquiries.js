@@ -7,7 +7,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { requireUser, handleError, HttpError, isUuid } from "../../common/utilities/access.utility.js";
 import { responseOk } from "../../common/utilities/response.utility.js";
 import { mirrorLegacyNotifications } from "../notifications/notification.utility.js";
-import { recommendedSitePms } from "../../domain/engineer-phase-coverage.js";
+import { DEFAULT_SETUP_SPM_COUNT } from "../../domain/engineer-phase-coverage.js";
 import { getOpm, getOpmCandidates, getSpm } from "./recommend.controller.js";
 import { normalizePhaseDates, validateStaffingLicenses } from "./staffing-license.utility.js";
 import { scheduleConflicts } from "./inquiry-staffing.js";
@@ -649,7 +649,7 @@ export function mountInquiries(router) {
     const configuration = await inquiryScopeConfiguration({ query: execute }, type, selected,
       req.body.additional_scopes ?? Object.fromEntries(selected.map(phase => [phase, stored[phase] || []])));
     const scopes = configuration.required;
-    const staffingTarget = recommendedSitePms(assessment.size, assessment.complexity);
+    const staffingTarget = DEFAULT_SETUP_SPM_COUNT;
     const team = await getSpm(type, selected, candidates, review, candidateBlockers, {
       requiredScopes: scopes, setupAdditionalScopes: configuration.additional, staffingTarget, blockedCandidates, phaseDates, licenseUnavailable,
     });

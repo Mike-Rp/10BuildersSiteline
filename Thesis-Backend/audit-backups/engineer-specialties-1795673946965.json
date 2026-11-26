@@ -1,0 +1,1959 @@
+{
+  "view": " SELECT DISTINCT l.user_id,\n    d.id AS discipline_id\n   FROM user_licenses l\n     JOIN ( VALUES ('Civil'::text,'Civil'::text,'Civil Engineer'::text), ('Structural'::text,'Structural'::text,'Civil Engineer'::text), ('Geotechnical'::text,'Geotechnical'::text,'Civil Engineer'::text), ('Mechanical'::text,'Mechanical'::text,'Mechanical Engineer'::text), ('Electrical'::text,'Electrical'::text,'Electrical Engineer'::text), ('Plumbing'::text,'Sanitary'::text,'Sanitary Engineer'::text), ('Interior/Finishes'::text,'Civil'::text,'Civil Engineer'::text), ('Landscape'::text,'Civil'::text,'Civil Engineer'::text)) mapping(requirement, specialization, profession) ON mapping.profession = l.profession\n     JOIN disciplines d ON d.code::text = mapping.requirement\n  WHERE l.superseded_at IS NULL AND l.verification_status = 'verified'::text AND l.verified_by IS NOT NULL AND l.verified_at IS NOT NULL AND l.revoked_at IS NULL AND NOT l.correction_required AND l.upload_status::text = 'uploaded'::text AND l.upload_file_ref IS NOT NULL AND l.license_number::text ~ '^[0-9]{7}$'::text AND l.license_expiry > ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila'::text)::date + 30) AND ((mapping.specialization = ANY (l.specializations)) OR l.specializations IS NULL AND (EXISTS ( SELECT 1\n           FROM engineer_specializations e\n          WHERE e.user_id = l.user_id AND e.specialization = mapping.specialization)));",
+  "disciplines": [
+    {
+      "id": 1,
+      "code": "Civil",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 2,
+      "code": "Geotechnical",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 3,
+      "code": "Structural",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 4,
+      "code": "Mechanical",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 5,
+      "code": "Electrical",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 6,
+      "code": "Plumbing",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 7,
+      "code": "Fire Protection",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 8,
+      "code": "Acoustic",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 9,
+      "code": "Facade",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 10,
+      "code": "Waterproofing",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 11,
+      "code": "Fire & Life Safety",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 12,
+      "code": "Renovation",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 13,
+      "code": "General Labor",
+      "created_by": null,
+      "created_at": "2026-10-20T10:17:11.613Z",
+      "updated_by": null,
+      "updated_at": "2026-10-20T10:17:11.613Z"
+    },
+    {
+      "id": 14,
+      "code": "Interior/Finishes",
+      "created_by": null,
+      "created_at": "2026-10-21T03:50:08.435Z",
+      "updated_by": null,
+      "updated_at": "2026-10-21T03:50:08.435Z"
+    },
+    {
+      "id": 15,
+      "code": "Landscape",
+      "created_by": null,
+      "created_at": "2026-10-21T03:50:08.435Z",
+      "updated_by": null,
+      "updated_at": "2026-10-21T03:50:08.435Z"
+    }
+  ],
+  "catalog": null,
+  "before": [
+    {
+      "id": "0fd3d0e0-b3a6-40aa-9475-d94d824cb313",
+      "full_name": "Aaron Abella",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "3cec9b73-f4fc-4483-b0e5-874ae27e68db",
+      "full_name": "Aaron Belmonte",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "72a73825-9e38-4842-8773-4821d62242f8",
+      "full_name": "Aaron Velasco",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "64c3aad2-5f0d-4b10-883d-77421dc07f50",
+      "full_name": "Adrian Valenzuela",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "7dc445a3-f3a1-442c-9b13-cc276a8d465b",
+      "full_name": "Aldrin Fajardo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cfacf85b-01a1-486c-98c7-6ecd8d95ed86",
+      "full_name": "Alfred David",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c9eb014f-38d6-466a-9dc3-edfeea1665cd",
+      "full_name": "Allan Aquino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "25f0db56-ff32-46e3-807f-267dfd971f6f",
+      "full_name": "Allysa Fernandez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "5e5f3e98-1e6f-408b-a9ce-ace79d88eca8",
+      "full_name": "Althea Noveno",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3d6d8912-7bc9-427e-8a25-ba335d3995ee",
+      "full_name": "Alvin Marcelino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "fcd0a3cc-d0c0-4563-a32c-5f23eac139a1",
+      "full_name": "Alvin Ramos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "41144b5b-9957-4641-862a-ab59515f4807",
+      "full_name": "Andrea Villanueva",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9524dea4-a3d4-4bf6-b34c-8d65d6fdd01a",
+      "full_name": "Angelika Dizon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "845d21e1-f2d2-4f55-b49a-97dec67d19ba",
+      "full_name": "Angelo Vergara",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "292cfaf6-38e8-4318-bbe4-dead870edbd9",
+      "full_name": "Anthony Ruiz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "704c5662-c549-4333-b052-a330cecf5677",
+      "full_name": "Anton Delgado",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "714cd0eb-507a-46a3-a2bc-ba6828722390",
+      "full_name": "Arvin Cordero",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "ee16bbf2-f13a-4f1b-90ac-488337406f7b",
+      "full_name": "Bea Gonzales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "abaeccda-e87a-4d45-a7d4-620d5f29df8b",
+      "full_name": "bea tabanda villar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape"
+      ]
+    },
+    {
+      "id": "b7a7eda2-afff-4292-b0bc-6b34de5adfc7",
+      "full_name": "Belen Francisco",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f03eee8b-2825-4b4b-9211-aab9fa9cc240",
+      "full_name": "Bernadette Ruiz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "6bf17972-f211-45af-80f9-c70730cae1b1",
+      "full_name": "Bianca Banaag",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "9ada0c63-501d-4938-a89b-9e45aecba805",
+      "full_name": "Bianca Morales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b1e56041-beb1-496e-a028-95dd92fe81c9",
+      "full_name": "Bianca Valera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "d98bea76-9855-48dd-9659-0e022333581c",
+      "full_name": "Brenda Casimino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e7124ff8-ee2c-41c4-80c2-bd41e31acb2b",
+      "full_name": "Bryan Rivera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "7fae9857-52df-47ce-88cc-e8b7d837a37f",
+      "full_name": "Camille Perez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "202259f9-4960-4123-bd6b-69c132cfeee4",
+      "full_name": "Carlo Cabrera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "5e855c60-b8ac-42a9-8ff5-1e1567ab424c",
+      "full_name": "Carlo Mendoza",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4daa2c5d-8cff-4310-b76e-aed55f30f826",
+      "full_name": "Carlos Enriquez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a71c9023-16b5-4048-bd08-57a4c0bd8b6c",
+      "full_name": "Carmela Villegas",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4fa46315-a3ff-4771-8aa1-95d6b4ffa42a",
+      "full_name": "Catherine Lucero",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a1fa8a63-6a2b-4c69-9a12-813be8e61143",
+      "full_name": "Cedric Fernandez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "950ee8d7-7f00-4b6f-a22a-f92d4838cb2f",
+      "full_name": "Cedric Lozano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3a1f6853-683d-4b29-ab6f-1e55719e5397",
+      "full_name": "Cesar Gatdula",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c8791b67-2b17-4238-9268-08910793d7ec",
+      "full_name": "Charmaine Dela Peña",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9c1be1d5-82ec-43ce-8b4c-bb83ca8f7194",
+      "full_name": "Cheryl Banzon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2657f0e4-88fa-49c0-bcc4-1a535801776e",
+      "full_name": "Chewie Basi",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "1830f827-ecf3-46cd-86e9-e856744eee96",
+      "full_name": "Choco Basi",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3ecfb34e-2925-4d79-b2cc-a3af16291daf",
+      "full_name": "Christian Ocampo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f31e2d15-6dae-4dc9-92db-34f8100563ae",
+      "full_name": "Clarissa Hilario",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "629a7091-7aa7-4491-99fd-6bfb33f8fa31",
+      "full_name": "Clarisse Torrez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "aa3e8632-7085-48a6-a9cf-902ffa8b4cc7",
+      "full_name": "Danica Pascual",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "00159684-ffed-45ab-850a-30cf307b2e91",
+      "full_name": "Danilo Aranas",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f89d980c-a3e9-4d26-ac83-c53856d2d0a8",
+      "full_name": "Darlene Hipolito",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "15449b36-cde5-4735-ab9d-ebd68e6a163d",
+      "full_name": "Denise Castillo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "136e7b2d-8375-4d2e-a721-50582d48f4ac",
+      "full_name": "Denise Dizon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "698dfb06-32b6-4ec2-a48d-600c2c8b2b5c",
+      "full_name": "Dennis Mercado",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "39105725-2a8f-4100-94aa-408e9fa62e92",
+      "full_name": "Diana Campos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cc7facc5-67a6-4ec6-8e23-b002cb597765",
+      "full_name": "Dianne Yap",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "856e093a-d243-4018-a0c2-cfd7c438d7d1",
+      "full_name": "Diego Palomares",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9f01f7fb-75ce-4548-824a-f25c27e9d9b5",
+      "full_name": "Dorothy Galang",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b4205bc2-7401-4138-a626-b844e9a811ed",
+      "full_name": "Edrian Valdez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "40add51c-8d02-48a3-a665-232e8a63766c",
+      "full_name": "Eduardo Miranda",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "91215d5e-2d83-4f4f-a31a-8625b8eb928c",
+      "full_name": "Edward Salazar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8fa2e81b-12c4-472b-aed4-7e50f181d7f6",
+      "full_name": "Elias Estrada",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f6a7bfc4-868d-43f4-abbf-06ddeee47884",
+      "full_name": "Eloisa Rivera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "51579a37-6e64-4f81-a39b-57d1ce6c6a3c",
+      "full_name": "Emerson Pineda",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "dd5eaee0-39f3-4c3e-814d-a230f39a73ac",
+      "full_name": "Emmanuel Sevilla",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "bb203c1c-d9e9-4ee6-a33b-a247d54e0890",
+      "full_name": "Enrico Jacinto",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "59c391aa-b7b9-4d6d-bb92-c23b43c7078b",
+      "full_name": "Eric Montoya",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "098e6492-715d-4075-bd1c-8dd450fef94d",
+      "full_name": "Erika Mallari",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "82be25e1-cb33-42d4-b84e-2a30fbd2e3af",
+      "full_name": "Erika Salazar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "95164c73-a67e-41e0-9eb9-c179fb057910",
+      "full_name": "Ethan de Leon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8e5b6c7e-0eb2-41d7-9748-d485958caa5b",
+      "full_name": "Faith Fajardo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape",
+        "Structural"
+      ]
+    },
+    {
+      "id": "6aca6d91-d42e-4cea-856c-7c51203f3a77",
+      "full_name": "Faith Lacuesta",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "5d8b30a8-04e3-4e4a-9715-347aab695350",
+      "full_name": "Faye Lazarro",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "84502398-5e6d-4086-9122-5b4840ea195b",
+      "full_name": "Felicia Ignacio",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c62fd5c7-d6fb-44a8-be99-2cb9b16a733a",
+      "full_name": "Ferdinand Mercado",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "20fb21ea-ce33-4217-bb82-bc52ed685e85",
+      "full_name": "Fiona Sorrano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cd25d646-6f72-4a9a-961b-3f3ecfd26817",
+      "full_name": "fionna alejos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "47387eed-ed20-4d7a-a733-edf8614952d1",
+      "full_name": "Francesca Reyes",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b923b0dc-6669-4440-896b-982756523813",
+      "full_name": "Francis Lopez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "87cc453c-d5ee-46d3-bf80-4296a958458f",
+      "full_name": "Franklin Cruz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e11f54ab-1980-46c2-ba60-f05cc97c25cf",
+      "full_name": "Gabriel Galang",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "e2d2239c-f7cc-4edc-8805-235c3a5ac623",
+      "full_name": "Gabriel Malabanan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "13fc688c-3dc9-4858-969f-d8432a054a80",
+      "full_name": "Gemma Dimaculangan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "385cd961-5c03-470d-9e46-5153cbbe5f23",
+      "full_name": "Gerald Bonifacio",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a4592601-dcc8-4da4-ac6e-b8f76cf1c54a",
+      "full_name": "Gerald Tolentino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3f154f46-7249-4b99-9639-da1c51af140c",
+      "full_name": "Gian Robles",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "256be7cf-fe2c-487a-b3e5-f9e9ace70d63",
+      "full_name": "Gilbert Torres",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "acb8a973-8df3-4263-ad7e-3880c7da7c37",
+      "full_name": "Hanna Flores",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "0cdbb1e2-69ee-4ada-9387-e0ece0a8b892",
+      "full_name": "Hannah Garcia",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3400c594-7ddc-4784-87c5-ce151c837e29",
+      "full_name": "Hazel Cabrera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3b37b130-241c-4c15-8a9f-d1d1ff6d5b8a",
+      "full_name": "Hazel Hernandez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "8d7e2554-1d70-4c3f-97e9-55c6f2a4a42b",
+      "full_name": "Hazel Mariano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "17ce8225-3069-48d3-8e75-abbc4d75b657",
+      "full_name": "Heidi Magno",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "32c9f998-534c-4059-aa91-a1175c707079",
+      "full_name": "Herbert Rosales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a651aafe-f286-49ea-8f20-3b5dc094c390",
+      "full_name": "Ian Calderon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "43b3c231-5463-4207-a9c2-69645ff9b07b",
+      "full_name": "Ian Ilagan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "02d24731-5df4-4d43-bf32-3c5dab14fda8",
+      "full_name": "Irene Jimenez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b10cefea-82cc-45b3-a35a-025b5eff236c",
+      "full_name": "Iris Nicolas",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4ce1998b-69b5-490a-84f6-94b012f77a4b",
+      "full_name": "Irving Solis",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "dd5ab8a4-5e8b-489d-9d43-5d784e943ce8",
+      "full_name": "Isaac Padilla",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "1bc56d98-b871-44c9-b8f0-a7a6eda31325",
+      "full_name": "Ivan Castillo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e4abd646-3be2-47db-90a6-c82491ec61c3",
+      "full_name": "Ivan Gonzales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape"
+      ]
+    },
+    {
+      "id": "b3ff4cd1-8b6c-4bc4-b330-fb4f381facf2",
+      "full_name": "Jacqueline Ramos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "87bc6594-fa68-484b-88d9-37c1e3a2b6c4",
+      "full_name": "James Ruiz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "c0248466-bb4d-4ceb-aab3-2f685fa6a079",
+      "full_name": "Janine Reyes",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f0ea7b6b-a61b-443b-a45e-539e888b7ee0",
+      "full_name": "Jasmin Peralta",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "fe300412-54a8-47d4-8185-52b11cb533b9",
+      "full_name": "Jasmine Jimenez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2cde8e9f-ac97-4358-a256-7b68fc45cec3",
+      "full_name": "Jericho Ponce",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4f344138-08ab-4233-8401-7ecce0669552",
+      "full_name": "Jerome Villanueva",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b8f865d1-3186-4460-a55c-7c7d4226a074",
+      "full_name": "Jezelle Verdara",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "0421031e-1548-4d5b-ba2b-ed3d77419f7e",
+      "full_name": "Jhian Bernarte",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Structural"
+      ]
+    },
+    {
+      "id": "ae967b21-8596-411c-933b-c86536a20747",
+      "full_name": "Joan Alvorado",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2b2f295f-e11d-412a-b616-74273d628fd0",
+      "full_name": "John Bautista",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "eef748c1-b116-4e2e-808e-e97ecc927ca9",
+      "full_name": "Jomar Panganiban",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "32f09f38-e06d-47db-a89d-06c56df5202d",
+      "full_name": "Joseph Laureno",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "658528c3-6fb5-4e38-b98c-c42ca745a666",
+      "full_name": "Joshua Garcia",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8a28c775-12c3-4718-9039-56ffe938e20c",
+      "full_name": "Joyce Montemayor",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "d75b51fd-d7f5-48e2-b09a-cdee12f4eac5",
+      "full_name": "Juan Carlos Antonio",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Interior/Finishes",
+        "Landscape"
+      ]
+    },
+    {
+      "id": "a5fd7fe9-d1e7-4c9a-9828-31ae478b044a",
+      "full_name": "Juan Dela Cruz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Electrical",
+        "Interior/Finishes",
+        "Landscape"
+      ]
+    },
+    {
+      "id": "79b7cf46-9d60-47b1-80d7-156cfe8b4e36",
+      "full_name": "Julia Manalo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "484f6dc4-82be-452e-9dc6-da803f9806c0",
+      "full_name": "Karl Bautista",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9f2bd6d4-dd4d-44bb-838b-3e86636e32e2",
+      "full_name": "Karla Dizon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a2528002-f3c3-4614-bc8d-6e43e22be579",
+      "full_name": "Katrina Quinto",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "16904c9a-9aa3-4f8e-941c-76aac137640a",
+      "full_name": "Kendrick Sevilla",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "d9731a15-907c-4a62-8c7f-b2a2be5a2d51",
+      "full_name": "Kenneth Katigbak",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "68ced03d-8b73-4a29-a249-56e0675e71a9",
+      "full_name": "Kenneth Perez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "5a25d460-c923-42f2-b43d-3e29ef1de582",
+      "full_name": "Kevin Tan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4b16dec5-af8c-4835-a2be-5e37f682db0a",
+      "full_name": "Kevin Villaver",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "93e4273c-f7c0-41aa-bd3c-c9ac51a01cec",
+      "full_name": "kian yamzon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "1d1a616c-2669-4fbf-9ae7-f011161124db",
+      "full_name": "Kristel Aguilar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e5dfc99f-c2b8-4adc-8c2d-dbef3213a1fa",
+      "full_name": "Kristine Navarro",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "878df69e-9e8b-4ca6-9910-2b2f940a2d15",
+      "full_name": "Kurt Gonzales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "9dfbf209-df87-44eb-9f57-a520635b3718",
+      "full_name": "Lance Soriano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "fa7aadc8-a503-40a5-9c7f-42da3658351f",
+      "full_name": "Lara Villanueva",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "d2ee3235-e175-4df3-b710-778fb53664e7",
+      "full_name": "Lawrence Bayani",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "aa5f62cd-6149-4e0e-9a85-3eaccd0bf8c9",
+      "full_name": "Leila Abad",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e4354741-c8ed-479a-ac38-91d8d291bb78",
+      "full_name": "Leon Balagtas",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "58798bfe-f2e8-428b-9cf8-b885e7fc857f",
+      "full_name": "Lester Salcedo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b8fa425a-0c50-4031-97bb-53a0f0929f6b",
+      "full_name": "Lianne Morales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "4376e6aa-c6e3-49f5-9758-5a9ec43f1ea0",
+      "full_name": "Liza Pangan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c5eb0f0d-8f1d-460a-a067-ab93850cf8e9",
+      "full_name": "Louise Lacson",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape",
+        "Structural"
+      ]
+    },
+    {
+      "id": "6d9ade39-b621-47b9-a375-9e40dfd83eb5",
+      "full_name": "Lowell Manansala",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b29203bd-b364-46a8-bbe9-a111eb253f7b",
+      "full_name": "Luis Sanchez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "317c2297-70e1-4d3e-a203-44cc03b4a0dc",
+      "full_name": "Mae Villarin",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b14de2bd-1732-4da5-a0df-9345898b19e3",
+      "full_name": "Manuel Ferrer",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "56f50043-6978-410a-9b02-e31ac7b84641",
+      "full_name": "Marco Flores",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c0af80a6-ec11-414c-99ff-ce6fa48b2296",
+      "full_name": "Marco Manalo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "32d4d50f-07d4-41dc-940d-c2fbe2237bef",
+      "full_name": "Mariel Gatchalian",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c4ad41d1-9335-4dd3-ab16-c8b9f4c2b6a2",
+      "full_name": "Marissa Bautista",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2d0145bb-9bd2-4abc-bc8d-c68b3ac1297a",
+      "full_name": "Mark Angelo Miculob",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2f226511-ba3a-4dc6-a0dd-30549d8351c8",
+      "full_name": "Mark Angelo Miculob",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "01fc951f-64fe-42d2-8265-7568acb5e6d0",
+      "full_name": "Mark Enriquez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "b598e7ad-1620-40f8-992f-baa09ed2b7fb",
+      "full_name": "Mark Fulloso",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "bcab86df-f9c4-49c1-8cba-acbd2ae2c852",
+      "full_name": "Marvin Lee",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8584d77f-59bc-4de3-89a6-6419f8e0f426",
+      "full_name": "Melissa Arce",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "22a7b003-083a-4eb4-b0be-853a30db7b79",
+      "full_name": "Melissa Tadeo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "12646338-7516-40d6-8b9b-be93db560a8b",
+      "full_name": "Michelle Cruz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "72608931-cd47-4f97-bf1d-6a19a6ff548e",
+      "full_name": "Mikhail Liudor Respicio",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "10c8255b-e61e-4c28-bca2-e8d87ab97c2a",
+      "full_name": "Monica Fuentes",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "697be6a0-1407-47c3-9567-567cdb0ded8c",
+      "full_name": "Mya Nan",
+      "status": "invited",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "81073f16-6f85-4d63-87ee-13327e48471a",
+      "full_name": "Naomi Rivera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3dedd47e-2978-458c-a5e1-cd92b5eb8a2d",
+      "full_name": "Nathan Bautista",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "6f7e73f4-a8aa-4a69-b1a4-502014fca90d",
+      "full_name": "Nicole Navarro",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "592a668a-9f2b-4286-b20f-dfa5eea6e92c",
+      "full_name": "Nina Santos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e31863c6-30bc-477a-8af7-0f686c272cda",
+      "full_name": "Noki Miculob",
+      "status": "invited",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f6e618c9-8f62-4f98-bb74-75e0623697a5",
+      "full_name": "Orlando Natividad",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "ca1174df-7681-4548-a0ee-7093c42f8d02",
+      "full_name": "Oscar Lim",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "55e32300-7212-4a00-81df-ae1c365afca4",
+      "full_name": "Oscar Ocampo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "9384dc30-dc08-4d42-a724-04161c2512f9",
+      "full_name": "Pamela Angeles",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "bc4103a2-1158-4601-95ae-5d4e89801643",
+      "full_name": "Paolo Garcia",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f55a1b02-71bf-4b0b-9c6a-4c3e83a81e43",
+      "full_name": "Patricia Pascual",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "a61d1f15-ff11-4b78-ac89-05362ffe4cad",
+      "full_name": "Patricio Santos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8638231a-641e-4fce-8fab-748f9c2ea87c",
+      "full_name": "Patrick Lim",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "539722bd-bac3-49ed-b29f-ea2eeeaf5885",
+      "full_name": "Pauline Cruz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9517066e-9bf1-44a2-a475-27773c5a8aff",
+      "full_name": "Quentin Lopez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f12b7f0b-f9b8-489b-ba78-40e0a64112bf",
+      "full_name": "Quentin Quizon",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "8a50cda9-49a8-4a49-889b-0cc6f3122cb1",
+      "full_name": "Rachel Garcia",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "1f57df13-631f-4a46-9cbd-917f58ffb414",
+      "full_name": "Rafael Domingo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f9d72b47-3e80-4a32-84e8-d67facdbd1ea",
+      "full_name": "Rhea Ramos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape",
+        "Structural"
+      ]
+    },
+    {
+      "id": "8bd4b632-b6db-4b12-9578-c4f147d87a7c",
+      "full_name": "Ria Bontigao",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": [
+        "Civil",
+        "Interior/Finishes",
+        "Landscape",
+        "Structural"
+      ]
+    },
+    {
+      "id": "9233e9bc-9b91-479b-ab1c-8ea4c5e74948",
+      "full_name": "Ria Navarro",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "f49271e8-91b2-47bc-be3a-1ca72655cfac",
+      "full_name": "Ricardo Quiambao",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "90d61628-b48f-4274-aff0-18258ce4df7f",
+      "full_name": "Ricardo Samson",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "477703b9-fbe7-4a6c-9ec8-b154447a1fea",
+      "full_name": "Richard Baldovino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "305c1b3e-ced7-469e-9cd8-6837c79c0a94",
+      "full_name": "Richelle Salvador",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Interior/Finishes",
+        "Landscape",
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "36e7160c-3be7-4f3c-b00d-d91295b73425",
+      "full_name": "Rio Tiong",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Electrical",
+        "Interior/Finishes",
+        "Landscape",
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "4b68dbf5-b954-4558-9698-1e73621f6a43",
+      "full_name": "Rix Villar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "9ab7eefe-b440-4d0d-b120-348529b2b450",
+      "full_name": "Rix Villar",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "ec7550f3-29a9-479c-9716-ed9b250a1cb9",
+      "full_name": "Rosalie Cruzado",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "de6f8c47-656f-4b9d-b4ee-39f1f11b241a",
+      "full_name": "Samuel Alonzo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cd28a859-cfcf-4fa6-8c74-1ed5882732a4",
+      "full_name": "Samuel Alonzo",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "5e33d58f-b468-4656-9598-1fd99a97c5f4",
+      "full_name": "Samuel Santiago",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "35a45e50-30ae-4b66-82bf-eb71f3424d86",
+      "full_name": "Sarah Alumno",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Interior/Finishes",
+        "Landscape"
+      ]
+    },
+    {
+      "id": "361ab96e-c10a-4fd6-bcee-133904193da1",
+      "full_name": "Sebastian Perez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "1a17edf7-92d3-4495-8fb9-fed1fe326fa3",
+      "full_name": "Sheryl Macapagal",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "c8512275-f6bf-400d-ba61-e30ce6a5cd90",
+      "full_name": "Teresita Medina",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "5356353b-7901-466b-bfb9-e2d3bdb44609",
+      "full_name": "Theo Aquino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "92d17004-05f6-4c9a-b24c-09e07beee3bb",
+      "full_name": "Tomas Ilagan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2c49cc63-503f-4490-bef5-aeae174b98af",
+      "full_name": "Trisha Ramirez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "247eb975-b563-48e5-be47-2c87b4fc2ffc",
+      "full_name": "Trisha Tolentino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "4b02c224-6ff0-4cdc-8a49-3f93db719d4b",
+      "full_name": "Ulysses Rivera",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "2be32e95-46b5-4f80-ae29-396d0bdcd6c4",
+      "full_name": "Ulysses Umali",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Plumbing"
+      ]
+    },
+    {
+      "id": "221422ee-2bb2-40db-811c-e4543c7c3fb5",
+      "full_name": "Ursula Mariano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "23a441e7-2c3f-4ac7-9b5b-f7ac0231812a",
+      "full_name": "Valerie Mendoza",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "ffb2537c-6fbb-450c-a4a5-a0846afeb0d1",
+      "full_name": "Vanessa Valdez",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3b525030-9a52-4d6d-beff-1465c89cb1fe",
+      "full_name": "Vernon Sarmiento",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "58d42446-20aa-4811-b1c7-24242010947f",
+      "full_name": "Victor Santiago",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cdcfbbb2-e0ea-480f-8299-963736e1adb6",
+      "full_name": "Vincent Javier",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "cd2bd947-d4e9-4cb7-802a-518848c73c9f",
+      "full_name": "Warren Wenceslao",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "3cc60e12-9425-4d4e-808c-47ada121317e",
+      "full_name": "Wendy Rosales",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "ba448b34-f229-4d3d-8bdc-9e66997c91c7",
+      "full_name": "Wilfred Chua",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "02312b41-d37d-424a-9354-d5b04d88ef31",
+      "full_name": "Wilma Bautista",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "061ab85a-a773-451a-a9dd-addaecc49172",
+      "full_name": "Xandra Yap",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Civil",
+        "Geotechnical",
+        "Interior/Finishes",
+        "Landscape",
+        "Structural"
+      ]
+    },
+    {
+      "id": "6e082543-86f7-4889-b56a-d7bced26b228",
+      "full_name": "Xavier Esteban",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "0a0cacd9-88e3-4141-a0f4-0fda0a4657f0",
+      "full_name": "Yasmin Tan",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "21aad0c7-bdf8-4a40-b527-5b1cb9cba844",
+      "full_name": "Yves Corpuz",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "eee817c7-ef6c-4d38-8dd7-f18a026a3b2e",
+      "full_name": "Yves Zamora",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Mechanical"
+      ]
+    },
+    {
+      "id": "133d1b3f-f12c-4ce0-bc50-ab14522f2c2c",
+      "full_name": "Yvonne Santiago",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "e7598241-cf45-4993-80a7-4595f0e31ede",
+      "full_name": "Zachary Ramos",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    },
+    {
+      "id": "61b57d45-c82a-47bf-b07a-c5134ff3f1e8",
+      "full_name": "Zara Aquino",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": true,
+      "tags": [
+        "Electrical"
+      ]
+    },
+    {
+      "id": "594bba8c-6c29-4e46-a2f0-54b47bf02597",
+      "full_name": "Zoe Dimaano",
+      "status": "active",
+      "is_deleted": false,
+      "eligible": false,
+      "tags": []
+    }
+  ]
+}

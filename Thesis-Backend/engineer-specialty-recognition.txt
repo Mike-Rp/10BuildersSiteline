@@ -1,0 +1,222 @@
+RECOGNIZED ENGINEER SPECIALTIES - 2026-11-26
+Applied: true; recovered: 160 of 178; active eligible Site PMs: 194
+Tags derived from existing verified credentials. Individual schedule availability was not evaluated. Phase coverage below uses new Residential, Commercial and Mixed-Use setup requirements; legacy project discipline links are unchanged. Uncovered tags refer to the three-engineer allocation limit, even when qualified candidates exist.
+
+PHASE COVERAGE FOR NEW PROJECT SETUP
+Residential | Mobilization | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+Residential | Design | 31 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Electrical Design Engineering=7; Plumbing Systems Engineering=9
+Residential | Foundation | 24 matching engineers | uncovered within three-engineer limit: none | Foundation Engineering=14; Structural Engineering=15; Geotechnical Engineering=9
+Residential | Structure | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Residential | Finishes | 12 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12
+Residential | Closeout | 12 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12
+Residential | MEP Rough-In | 17 matching engineers | uncovered within three-engineer limit: none | Electrical Installation Engineering=8; Plumbing Systems Engineering=9
+Residential | Envelope | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Residential | Landscape & Site Works | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+Commercial | Mobilization | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+Commercial | Design | 39 matching engineers | uncovered within three-engineer limit: Mechanical Building Services Engineering | Structural Engineering=15; Electrical Design Engineering=7; Plumbing Systems Engineering=9; Mechanical Building Services Engineering=8
+Commercial | Foundation | 24 matching engineers | uncovered within three-engineer limit: none | Foundation Engineering=14; Structural Engineering=15; Geotechnical Engineering=9
+Commercial | Structure | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Commercial | Closeout | 12 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12
+Commercial | MEP Rough-In | 25 matching engineers | uncovered within three-engineer limit: none | Electrical Installation Engineering=8; Plumbing Systems Engineering=9; Mechanical Building Services Engineering=8
+Commercial | Envelope / Curtain Wall | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Commercial | Fire & Life Safety | 7 matching engineers | uncovered within three-engineer limit: none | Fire Protection Engineering (Mechanical Systems)=1; Fire Detection and Alarm Systems Engineering=6
+Commercial | Fit-Out / Finishes | 26 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Lighting Engineering=10; Electrical Installation Engineering=8
+Mixed-Use | Mobilization | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+Mixed-Use | Design | 39 matching engineers | uncovered within three-engineer limit: Mechanical Building Services Engineering | Structural Engineering=15; Electrical Design Engineering=7; Plumbing Systems Engineering=9; Mechanical Building Services Engineering=8
+Mixed-Use | Foundation | 24 matching engineers | uncovered within three-engineer limit: none | Foundation Engineering=14; Structural Engineering=15; Geotechnical Engineering=9
+Mixed-Use | Structure | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Mixed-Use | Closeout | 12 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12
+Mixed-Use | MEP Rough-In | 25 matching engineers | uncovered within three-engineer limit: none | Electrical Installation Engineering=8; Plumbing Systems Engineering=9; Mechanical Building Services Engineering=8
+Mixed-Use | Envelope | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Mixed-Use | Envelope / Curtain Wall | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Mixed-Use | Fire & Life Safety | 7 matching engineers | uncovered within three-engineer limit: none | Fire Protection Engineering (Mechanical Systems)=1; Fire Detection and Alarm Systems Engineering=6
+Mixed-Use | Landscape & Site Works | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+Mixed-Use | Podium Structure | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Mixed-Use | Residential Fit-Out | 29 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Electrical Installation Engineering=8; Plumbing Systems Engineering=9
+Mixed-Use | Retail/Commercial Fit-Out | 26 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Lighting Engineering=10; Electrical Installation Engineering=8
+Mixed-Use | Tower Structure | 23 matching engineers | uncovered within three-engineer limit: none | Structural Engineering=15; Construction Engineering=12
+Mixed-Use | Hotel Fit-Out | 42 matching engineers | uncovered within three-engineer limit: Fire Protection Engineering (Mechanical Systems), Fire Detection and Alarm Systems Engineering | Construction Engineering=12; Lighting Engineering=10; Electrical Installation Engineering=8; Plumbing Systems Engineering=9; Fire Protection Engineering (Mechanical Systems)=1; Fire Detection and Alarm Systems Engineering=6
+Mixed-Use | Office Fit-Out | 26 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Lighting Engineering=10; Electrical Installation Engineering=8
+Mixed-Use | Site Works | 24 matching engineers | uncovered within three-engineer limit: none | Construction Engineering=12; Construction Surveying=12
+
+RECOVERED ENGINEERS
+Aaron Belmonte: Construction Engineering; Materials Engineering
+Aaron Velasco: Plumbing Systems Engineering; Water Supply Engineering
+Adrian Valenzuela: Construction Engineering; Materials Engineering
+Aldrin Fajardo: Electrical Installation Engineering; Lighting Engineering
+Alfred David: Plumbing Systems Engineering; Water Supply Engineering
+Allan Aquino: Electrical Design Engineering; Lighting Engineering
+Allysa Fernandez: Earthquake/Seismic Engineering; Structural Engineering; Water Resources Engineering
+Alvin Marcelino: Plumbing Systems Engineering; Water Supply Engineering
+Alvin Ramos: HVAC Engineering; Ventilation Engineering
+Andrea Villanueva: Foundation Engineering; Geotechnical Engineering; Highway Engineering
+Angelika Dizon: Geomatics Engineering; Mapping and Cartography
+Angelo Vergara: Data and Network Systems Engineering; Telecommunications Engineering
+Anton Delgado: Hydraulic Engineering; Water Resources Engineering
+Arvin Cordero: HVAC Engineering; Ventilation Engineering
+Bea Gonzales: Construction Engineering; Foundation Engineering; Geotechnical Engineering
+Belen Francisco: Sanitary Drainage Engineering; Wastewater Treatment Engineering
+Bernadette Ruiz: Foundation Engineering; Structural Engineering
+Bianca Morales: Sanitary Drainage Engineering; Sewerage Engineering
+Bianca Valera: Energy Systems Engineering; Mechanical Building Services Engineering
+Brenda Casimino: Foundation Engineering; Structural Engineering
+Bryan Rivera: Elevator and Escalator Engineering; HVAC Engineering; Mechanical Building Services Engineering
+Camille Perez: Lighting Engineering; Power Distribution Engineering
+Carlo Mendoza: Construction Engineering; Geotechnical Engineering; Structural Engineering
+Carlos Enriquez: Foundation Engineering; Geotechnical Engineering
+Carmela Villegas: Sanitary Drainage Engineering; Sewerage Engineering
+Catherine Lucero: Air-Conditioning Engineering; Refrigeration Engineering
+Cedric Fernandez: Environmental Sanitation Engineering; Wastewater Treatment Engineering
+Cedric Lozano: Electrical Installation Engineering; Lighting Engineering
+Cesar Gatdula: Environmental Sanitation Engineering; Wastewater Treatment Engineering
+Charmaine Dela Peña: Electrical Protection Engineering; Power Distribution Engineering
+Cheryl Banzon: Fire Detection and Alarm Systems Engineering; Security and Surveillance Systems Engineering
+Christian Ocampo: Foundation Engineering; Geotechnical Engineering
+Clarissa Hilario: Foundation Engineering; Structural Engineering
+Clarisse Torrez: Electrical Installation Engineering; Electrical Protection Engineering; Renewable Energy Engineering
+Danica Pascual: Sanitary Drainage Engineering; Water Supply Engineering
+Danilo Aranas: Environmental Sanitation Engineering; Wastewater Treatment Engineering
+Darlene Hipolito: Sanitary Drainage Engineering; Water Supply Engineering
+Denise Castillo: Air-Conditioning Engineering; Refrigeration Engineering
+Dennis Mercado: Power Distribution Engineering; Power Systems Engineering
+Diana Campos: Electrical Protection Engineering; Power Distribution Engineering
+Dianne Yap: Construction Engineering; Earthquake/Seismic Engineering; Materials Engineering
+Diego Palomares: HVAC Engineering; Mechanical Building Services Engineering
+Dorothy Galang: Earthquake/Seismic Engineering; Highway Engineering; Transportation Engineering
+Edrian Valdez: Building Automation Engineering; Instrumentation and Controls Engineering
+Eduardo Miranda: Foundation Engineering; Geotechnical Engineering
+Edward Salazar: Earthquake/Seismic Engineering; Structural Engineering
+Eloisa Rivera: Energy Systems Engineering; Ventilation Engineering
+Emerson Pineda: Building Automation Engineering; Instrumentation and Controls Engineering
+Emmanuel Sevilla: Electrical Design Engineering; Renewable Energy Engineering
+Enrico Jacinto: Sewerage Engineering; Wastewater Treatment Engineering
+Eric Montoya: Earthquake/Seismic Engineering; Structural Engineering
+Erika Mallari: Sanitary Drainage Engineering; Water Supply Engineering
+Erika Salazar: Construction Engineering; Geotechnical Engineering; Transportation Engineering
+Ethan de Leon: Sewerage Engineering; Wastewater Treatment Engineering
+Faith Lacuesta: Hydraulic Engineering; Water Resources Engineering
+Faye Lazarro: Environmental Sanitation Engineering; Plumbing Systems Engineering
+Felicia Ignacio: Building Automation Engineering; Fire Detection and Alarm Systems Engineering
+Ferdinand Mercado: Electrical Design Engineering; Lighting Engineering
+Fiona Sorrano: Environmental Sanitation Engineering; Plumbing Systems Engineering
+Francesca Reyes: Hydraulic Engineering; Water Resources Engineering
+Francis Lopez: Electrical Design Engineering; Lighting Engineering
+Franklin Cruz: Sewerage Engineering; Wastewater Treatment Engineering
+Gabriel Malabanan: Construction Surveying; Land Surveying
+Gemma Dimaculangan: Environmental Sanitation Engineering; Plumbing Systems Engineering
+Gerald Bonifacio: Data and Network Systems Engineering; Telecommunications Engineering
+Gerald Tolentino: HVAC Engineering; Ventilation Engineering
+Gian Robles: Construction Surveying; Land Surveying
+Gilbert Torres: HVAC Engineering; Ventilation Engineering
+Hanna Flores: Energy Systems Engineering; Ventilation Engineering
+Hannah Garcia: Air-Conditioning Engineering; Refrigeration Engineering
+Hazel Cabrera: Geographic Information Systems (GIS); Mapping and Cartography
+Hazel Mariano: Plumbing Systems Engineering; Water Supply Engineering
+Heidi Magno: Air-Conditioning Engineering; Refrigeration Engineering
+Herbert Rosales: Construction Surveying; Land Surveying
+Ian Calderon: Construction Surveying; Land Surveying
+Irene Jimenez: Geomatics Engineering; Mapping and Cartography
+Iris Nicolas: Geomatics Engineering; Mapping and Cartography
+Irving Solis: HVAC Engineering; Mechanical Building Services Engineering
+Isaac Padilla: Construction Surveying; Geomatics Engineering
+Ivan Castillo: HVAC Engineering; Mechanical Building Services Engineering
+Jacqueline Ramos: Energy Systems Engineering; Ventilation Engineering
+Janine Reyes: Sanitary Drainage Engineering; Sewerage Engineering
+Jericho Ponce: Elevator and Escalator Engineering; Mechanical Building Services Engineering
+Jerome Villanueva: Foundation Engineering; Structural Engineering
+Joan Alvorado: Energy Systems Engineering; Ventilation Engineering
+John Bautista: Data and Network Systems Engineering; Fire Detection and Alarm Systems Engineering
+Jomar Panganiban: Construction Surveying; Geographic Information Systems (GIS)
+Joseph Laureno: Construction Surveying; Geographic Information Systems (GIS)
+Joshua Garcia: Construction Surveying; Land Surveying
+Joyce Montemayor: Data and Network Systems Engineering; Extra-Low Voltage (ELV) Systems Engineering
+Julia Manalo: Geospatial Data Engineering; Land Surveying
+Karl Bautista: Elevator and Escalator Engineering; Mechanical Building Services Engineering
+Karla Dizon: Geospatial Data Engineering; Land Surveying
+Katrina Quinto: Geospatial Data Engineering; Land Surveying
+Kendrick Sevilla: Elevator and Escalator Engineering; Mechanical Building Services Engineering
+Kenneth Perez: Data and Network Systems Engineering; Telecommunications Engineering
+Kevin Tan: Plumbing Systems Engineering; Water Supply Engineering
+Kristel Aguilar: Construction Engineering; Earthquake/Seismic Engineering
+Kristine Navarro: Foundation Engineering; Materials Engineering
+Lance Soriano: Construction Surveying; Geomatics Engineering
+Lara Villanueva: Air-Conditioning Engineering; HVAC Engineering
+Lawrence Bayani: Building Automation Engineering; Telecommunications Engineering
+Leila Abad: Air-Conditioning Engineering; HVAC Engineering
+Leon Balagtas: Earthquake/Seismic Engineering; Structural Engineering
+Lester Salcedo: Construction Surveying; Geomatics Engineering
+Lianne Morales: Construction Engineering; Materials Engineering
+Liza Pangan: Power Systems Engineering; Renewable Energy Engineering
+Lowell Manansala: Construction Surveying; Geomatics Engineering
+Luis Sanchez: Construction Engineering; Foundation Engineering; Structural Engineering
+Mae Villarin: Energy Systems Engineering; Fire Protection Engineering (Mechanical Systems)
+Manuel Ferrer: Electrical Installation Engineering; Lighting Engineering
+Marco Flores: Electrical Installation Engineering; Lighting Engineering
+Mariel Gatchalian: Data and Network Systems Engineering; Security and Surveillance Systems Engineering
+Marissa Bautista: Geographic Information Systems (GIS); Mapping and Cartography
+Mark Enriquez: Construction Engineering; Structural Engineering
+Marvin Lee: Construction Surveying; Geographic Information Systems (GIS); Geospatial Data Engineering
+Melissa Arce: Hydraulic Engineering; Water Resources Engineering
+Melissa Tadeo: Geographic Information Systems (GIS); Mapping and Cartography
+Michelle Cruz: Fire Detection and Alarm Systems Engineering; Security and Surveillance Systems Engineering
+Monica Fuentes: Geographic Information Systems (GIS); Mapping and Cartography
+Naomi Rivera: Electrical Protection Engineering; Power Distribution Engineering
+Nathan Bautista: Foundation Engineering; Geotechnical Engineering
+Nina Santos: Electrical Protection Engineering; Power Distribution Engineering
+Orlando Natividad: Electrical Design Engineering; Lighting Engineering
+Oscar Lim: Electrical Design Engineering; Lighting Engineering
+Pamela Angeles: Power Systems Engineering; Renewable Energy Engineering
+Paolo Garcia: HVAC Engineering; Ventilation Engineering
+Patricio Santos: Plumbing Systems Engineering; Water Supply Engineering
+Patrick Lim: Environmental Sanitation Engineering; Wastewater Treatment Engineering
+Pauline Cruz: Power Systems Engineering; Renewable Energy Engineering
+Quentin Lopez: Power Distribution Engineering; Power Systems Engineering
+Rachel Garcia: Electrical Design Engineering; Power Distribution Engineering
+Rafael Domingo: Earthquake/Seismic Engineering; Structural Engineering
+Ria Navarro: Electrical Installation Engineering; Electrical Protection Engineering
+Ricardo Quiambao: Power Distribution Engineering; Power Systems Engineering
+Ricardo Samson: Power Distribution Engineering; Power Systems Engineering
+Rosalie Cruzado: Electrical Installation Engineering; Electrical Protection Engineering
+Samuel Alonzo: Highway Engineering; Hydraulic Engineering; Transportation Engineering
+Samuel Alonzo: Construction Engineering; Materials Engineering; Structural Engineering
+Sebastian Perez: Data and Network Systems Engineering; Telecommunications Engineering
+Sheryl Macapagal: Electrical Installation Engineering; Electrical Protection Engineering
+Teresita Medina: Foundation Engineering; Structural Engineering
+Theo Aquino: Fire Detection and Alarm Systems Engineering; Security and Surveillance Systems Engineering
+Tomas Ilagan: Data and Network Systems Engineering; Telecommunications Engineering
+Trisha Ramirez: Data and Network Systems Engineering; Extra-Low Voltage (ELV) Systems Engineering
+Ulysses Rivera: Building Automation Engineering; Instrumentation and Controls Engineering
+Ursula Mariano: Fire Detection and Alarm Systems Engineering; Security and Surveillance Systems Engineering
+Valerie Mendoza: Data and Network Systems Engineering; Extra-Low Voltage (ELV) Systems Engineering
+Vernon Sarmiento: Building Automation Engineering; Instrumentation and Controls Engineering
+Victor Santiago: Air-Conditioning Engineering; Refrigeration Engineering; Ventilation Engineering
+Vincent Javier: Foundation Engineering; Geotechnical Engineering
+Wendy Rosales: Construction Engineering
+Wilfred Chua: Building Automation Engineering; Telecommunications Engineering
+Wilma Bautista: Data and Network Systems Engineering; Extra-Low Voltage (ELV) Systems Engineering
+Xavier Esteban: Earthquake/Seismic Engineering; Structural Engineering
+Yasmin Tan: Data and Network Systems Engineering; Security and Surveillance Systems Engineering
+Yves Corpuz: Building Automation Engineering; Telecommunications Engineering
+Yvonne Santiago: HVAC Engineering; Ventilation Engineering
+Zachary Ramos: Air-Conditioning Engineering; Refrigeration Engineering
+Zoe Dimaano: Data and Network Systems Engineering; Security and Surveillance Systems Engineering
+
+STILL REQUIRING CREDENTIAL/SPECIALTY REVIEW
+Althea Noveno (5e5f3e98-1e6f-408b-a9ce-ace79d88eca8)
+Choco Basi (1830f827-ecf3-46cd-86e9-e856744eee96)
+Denise Dizon (136e7b2d-8375-4d2e-a721-50582d48f4ac)
+Elias Estrada (8fa2e81b-12c4-472b-aed4-7e50f181d7f6)
+Jasmine Jimenez (fe300412-54a8-47d4-8185-52b11cb533b9)
+Kenneth Katigbak (d9731a15-907c-4a62-8c7f-b2a2be5a2d51)
+Kevin Villaver (4b16dec5-af8c-4835-a2be-5e37f682db0a)
+kian yamzon (93e4273c-f7c0-41aa-bd3c-c9ac51a01cec)
+Mark Angelo Miculob (2d0145bb-9bd2-4abc-bc8d-c68b3ac1297a)
+Mark Angelo Miculob (2f226511-ba3a-4dc6-a0dd-30549d8351c8)
+Mark Fulloso (b598e7ad-1620-40f8-992f-baa09ed2b7fb)
+Mikhail Liudor Respicio (72608931-cd47-4f97-bf1d-6a19a6ff548e)
+Patricia Pascual (f55a1b02-71bf-4b0b-9c6a-4c3e83a81e43)
+Quentin Quizon (f12b7f0b-f9b8-489b-ba78-40e0a64112bf)
+Richard Baldovino (477703b9-fbe7-4a6c-9ec8-b154447a1fea)
+Rix Villar (4b68dbf5-b954-4558-9698-1e73621f6a43)
+Vanessa Valdez (ffb2537c-6fbb-450c-a4a5-a0846afeb0d1)
+Warren Wenceslao (cd2bd947-d4e9-4cb7-802a-518848c73c9f)

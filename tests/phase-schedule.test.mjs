@@ -28,3 +28,16 @@ test("previews a delayed zone release and preserves unrelated overlapping work",
   assert.equal(forecast.Closeout.start, "2027-04-12")
   assert.equal(dates.Envelope.start, "2027-03-15")
 })
+
+for (const arrangement of ["Sequential phases", "Partially overlapping phases", "Highly concurrent phases"]) {
+  test(`Mobilization precedes Design with ${arrangement}`, () => {
+    const schedule = suggestPhaseSchedule({ ...input, phases: ["Design", ...input.phases], arrangement })
+    assert.equal(schedule.Mobilization.start, input.start)
+    assert.ok(schedule.Design.start > schedule.Mobilization.end)
+    assert.ok(schedule.Foundation.start > schedule.Design.end)
+    const delayed = suggestPhaseSchedule({ ...input, phases: ["Design", ...input.phases], arrangement,
+      dates: { Mobilization: { start: input.start, end: "2027-02-05" } } })
+    assert.equal(delayed.Design.start, "2027-02-08")
+    assert.ok(delayed.Foundation.start > delayed.Design.end)
+  })
+}

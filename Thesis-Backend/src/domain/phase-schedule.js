@@ -54,7 +54,8 @@ export function forecastPhaseDelay(dates, phase, release, rules = {}) {
 export function suggestPhaseSchedule({ phases, type, complexity, arrangement, start, area, dates = {} }) {
   if (!start || !profiles[type]) return {};
   const profile = profiles[type];
-  const order = [...phases].sort((a, b) => Number(b === "Design") - Number(a === "Design"));
+  const priority = phase => phase === "Mobilization" ? 0 : phase === "Design" ? 1 : 2;
+  const order = [...phases].sort((a, b) => priority(a) - priority(b));
   const result = {};
   const daysByPhase = {};
   const concurrent = arrangement === "Highly concurrent phases";

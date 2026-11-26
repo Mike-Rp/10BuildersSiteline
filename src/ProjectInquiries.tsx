@@ -14,7 +14,7 @@ import { withPage } from "./listing"
 import { IntakePipelinePanel, IntakeTabs } from "./IntakeGuidance"
 import type { IntakeView } from "./intake-guidance"
 import StaffingPeak from "./StaffingPeak"
-import { recommendedSitePms, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
+import { DEFAULT_SETUP_SPM_COUNT, SETUP_ENGINEER_LIMIT } from "../Thesis-Backend/src/domain/engineer-phase-coverage.js"
 import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import { inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
@@ -567,8 +567,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const projectRange = start && end ? { start, end } : undefined
   const budget = row?.workflow?.budget
   const technical = row?.workflow?.assessment?.technical ?? row?.workflow?.review?.technical
-  const assessment = row?.workflow?.assessment
-  const recommendation = recommendedSitePms(assessment?.size, assessment?.complexity)
   const arrangement = row?.workflow?.assessment?.arrangement ?? row?.workflow?.review?.arrangement
   const phaseScheduleInput = {
     type: String(row?.details.project_type ?? ""), complexity: row?.workflow?.assessment?.complexity,
@@ -774,7 +772,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       const selected = current.find(prior => prior.stage === phase.stage)
       if (selected) return selected
       if (!phase.engineers?.length) return phase
-      const engineers = phase.engineers.slice(0,result.recommended_site_pms ?? recommendation ?? 1)
+      const engineers = phase.engineers.slice(0, DEFAULT_SETUP_SPM_COUNT)
       return { ...phase, ...engineers[0], engineers }
     }))
     setStaffingPhase(phases.includes(staffingPhase) ? staffingPhase : phases[0] || "")
@@ -1512,6 +1510,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               <summary>Planned phase dates</summary>
               <p><strong>{arrangement}</strong> · {Object.keys(phaseDates).length ? "Review dates" : "System suggested"}</p>
               <p className="inquiry-muted">Review the suggested dates before staffing. Estimates use a Monday–Friday construction calendar.</p>
+              <p className="inquiry-coverage-warning" role="note"><strong>Scheduling reminder:</strong> Mobilization must start first, on or after the reviewed project start date. Design and subsequent phases must follow their required predecessors, even when phases overlap.</p>
               {phaseCompletion && <p>Scheduled completion · {phaseCompletion}</p>}
               {phaseCompletion && end && phaseCompletion > end && <p className="error">
                 The phase schedule exceeds the reviewed completion date of {end}.
@@ -1522,12 +1521,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 setPlanning({ ...planning, candidates: undefined })
               }}>Reset to suggested dates</button>
               {phaseScheduleIssue && <p className="error" role="status">
-                Review {phaseScheduleIssue}. Use working dates within the project window and start no earlier than {dependencies[phaseScheduleIssue]?.start ?? start}.
+                Warning: Review {phaseScheduleIssue}. Use working dates within the project window and start no earlier than {dependencies[phaseScheduleIssue]?.start ?? start}. Mobilization must come first. Correct the dates or reset to suggested dates before continuing to Staffing.
               </p>}
               {phases.map(stage => <fieldset className="inquiry-phase-dates" key={stage}>
                 <legend>{stage}</legend>
                 {(["start", "end"] as const).map(field => <label key={field}>{field === "start" ? "Phase start" : "Phase end"}
-                  <input type="date" min={start} max={end} value={scheduledDates[stage]?.[field] ?? ""}
+                  <input type="date" min={field === "start" ? dependencies[stage]?.start ?? start : scheduledDates[stage]?.start ?? start} max={end}
+                    aria-invalid={phaseScheduleIssue === stage || undefined} value={scheduledDates[stage]?.[field] ?? ""}
                     onChange={event => {
                       const value = event.target.value
                       setPhaseDates(previous => ({ ...previous, [stage]: { ...(scheduledDates[stage] ?? { start: "", end: "" }), [field]: value } }))
@@ -1548,7 +1548,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {technical && <p>Technical requirements · {technical}</p>}
             {arrangement && <p>Phase arrangement · {arrangement}</p>}
           </div>
-          {recommendation && <p><strong>Recommended per phase: up to {recommendation} Site PM{recommendation === 1 ? "" : "s"}</strong>. Review the scope coverage for each phase.</p>}
+          <p><strong>One suggested Site PM per phase.</strong> Review the selection and add optional engineers manually when needed.</p>
           <div id="inquiry-staffing-phases" className="inquiry-phase-nav" role="group" aria-label="Staffing phase">
             {phases.map(stage => {
               const reason = staffingIssueByPhase.get(stage)

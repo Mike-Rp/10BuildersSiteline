@@ -1,0 +1,1130 @@
+ENGINEER AND PHASE COVERAGE AUDIT - 2026-11-26
+Connected database; read-only audit. Eligibility uses current application rules.
+Availability is only an existing-assignment flag; no project-specific dates or simultaneous allocation were evaluated.
+
+{
+  "spm": {
+    "total": 215,
+    "active": 213,
+    "eligible": 34,
+    "no_scopes": 178,
+    "detailed_but_no_scopes": 156
+  },
+  "opm": {
+    "total": 49,
+    "active": 45,
+    "eligible": 44,
+    "no_scopes": 33,
+    "detailed_but_no_scopes": 26
+  }
+}
+
+PHASES (counts overlap; the same engineer can match several phases)
+Commercial | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Commercial | Design | candidates: 34 | no existing assignment: 12 | missing coverage: Acoustic | scopes: Acoustic=0, Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Commercial | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Commercial | Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Commercial | Envelope / Curtain Wall | candidates: 12 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Structural=5
+Commercial | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0, Mechanical=10, Plumbing=7
+Commercial | Fire & Life Safety | candidates: 9 | no existing assignment: 4 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0
+Commercial | Fit-Out / Finishes | candidates: 18 | no existing assignment: 4 | missing coverage: Acoustic | scopes: Acoustic=0, Electrical=9, Interior/Finishes=11
+Commercial | Closeout | candidates: 11 | no existing assignment: 0 | missing coverage: Fire Protection | scopes: Civil=11, Fire Protection=0, Interior/Finishes=11
+Industrial | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Industrial | Design | candidates: 34 | no existing assignment: 12 | missing coverage: none | scopes: Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Industrial | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Industrial | Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Industrial | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0, Mechanical=10, Plumbing=7
+Industrial | Finishes | candidates: 10 | no existing assignment: 5 | missing coverage: none | scopes: Mechanical=10
+Industrial | Closeout | candidates: 34 | no existing assignment: 12 | missing coverage: Acoustic, Fire Protection | scopes: Acoustic=0, Civil=11, Electrical=9, Fire Protection=0, Geotechnical=6, Mechanical=10, Plumbing=7, Structural=5
+Infrastructure | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Infrastructure | Design | candidates: 34 | no existing assignment: 12 | missing coverage: none | scopes: Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Infrastructure | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Infrastructure | Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Infrastructure | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0, Mechanical=10, Plumbing=7
+Infrastructure | Finishes | candidates: 10 | no existing assignment: 5 | missing coverage: none | scopes: Mechanical=10
+Infrastructure | Closeout | candidates: 34 | no existing assignment: 12 | missing coverage: Acoustic, Fire Protection | scopes: Acoustic=0, Civil=11, Electrical=9, Fire Protection=0, Geotechnical=6, Mechanical=10, Plumbing=7, Structural=5
+Mixed-Use | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Mixed-Use | Design | candidates: 34 | no existing assignment: 12 | missing coverage: Acoustic | scopes: Acoustic=0, Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Mixed-Use | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Mixed-Use | Podium Structure | candidates: 12 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Structural=5
+Mixed-Use | Tower Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Mixed-Use | Envelope / Curtain Wall | candidates: 12 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Structural=5
+Mixed-Use | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0, Mechanical=10, Plumbing=7
+Mixed-Use | Fire & Life Safety | candidates: 9 | no existing assignment: 4 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0
+Mixed-Use | Retail/Commercial Fit-Out | candidates: 18 | no existing assignment: 4 | missing coverage: Acoustic | scopes: Acoustic=0, Electrical=9, Interior/Finishes=11
+Mixed-Use | Residential Fit-Out | candidates: 25 | no existing assignment: 7 | missing coverage: none | scopes: Electrical=9, Interior/Finishes=11, Plumbing=7
+Mixed-Use | Landscape & Site Works | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Landscape=11
+Mixed-Use | Closeout | candidates: 11 | no existing assignment: 0 | missing coverage: Fire Protection | scopes: Civil=11, Fire Protection=0, Interior/Finishes=11
+Renovation | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Renovation | Design | candidates: 34 | no existing assignment: 12 | missing coverage: none | scopes: Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Renovation | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Renovation | Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Renovation | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: Fire Protection | scopes: Electrical=9, Fire Protection=0, Mechanical=10, Plumbing=7
+Renovation | Finishes | candidates: 10 | no existing assignment: 5 | missing coverage: none | scopes: Mechanical=10
+Renovation | Closeout | candidates: 34 | no existing assignment: 12 | missing coverage: Acoustic, Fire Protection | scopes: Acoustic=0, Civil=11, Electrical=9, Fire Protection=0, Geotechnical=6, Mechanical=10, Plumbing=7, Structural=5
+Residential | Mobilization | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Geotechnical=6
+Residential | Design | candidates: 34 | no existing assignment: 12 | missing coverage: none | scopes: Civil=11, Electrical=9, Mechanical=10, Plumbing=7, Structural=5
+Residential | Foundation | candidates: 7 | no existing assignment: 0 | missing coverage: none | scopes: Geotechnical=6, Structural=5
+Residential | Structure | candidates: 5 | no existing assignment: 0 | missing coverage: none | scopes: Structural=5
+Residential | Envelope | candidates: 12 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Structural=5
+Residential | MEP Rough-In | candidates: 25 | no existing assignment: 12 | missing coverage: none | scopes: Electrical=9, Mechanical=10, Plumbing=7
+Residential | Finishes | candidates: 25 | no existing assignment: 7 | missing coverage: none | scopes: Electrical=9, Interior/Finishes=11, Plumbing=7
+Residential | Landscape & Site Works | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Landscape=11
+Residential | Closeout | candidates: 11 | no existing assignment: 0 | missing coverage: none | scopes: Civil=11, Interior/Finishes=11
+
+ALL ENGINEERS
+Abigail Pascual | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Adrian Bautista | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Adrian Santos | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Althea Belarmino | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Angela Cruz | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Benedict Soriano | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bernadette Castillo | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bruno Nars | OPM | invited | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Carol Hipolito | OPM | invited | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Cedric De Leon | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Christian Peyez | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Christine Mercado | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Daniela Evangelista | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Dominic Villareal | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Elaine Fuentes | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Emmanuel Flores | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Felicia Guevarra | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+France Cruzada | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gabriel Manalo | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gabriel Salvador | OPM | invited | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Gerald Honrado | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Hanna Belarmino | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Hannah Inocencio | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Isabel Robles | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Isaiah Jacinto | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jasmine Navarro | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Joanna Luna | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Joshua Flores | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Julian Cabrera | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Karen Padilla | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Keith Andrew Halili | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Civil, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Kent Vincent Mellarpis | OPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+ligaya queding | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Lorenzo Esperitu | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Maria Reyes | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Marianne Chua | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Miguel Castillo | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Nicole Ramos | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Noel De Guzman | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Olivia Ventura | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Patrick Tan | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Philip Serano | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Princess Ruiz | OPM | invited | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Regina Pineda | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ria Ann Kate Basi Bontigao | OPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ryan Aquino | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Sophia Torres | OPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Timothy Martinez | OPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Interior/Finishes, Landscape, Mechanical
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: MEP Rough-In; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: MEP Rough-In; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: MEP Rough-In; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Wayne Carzon | OPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Aaron Abella | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Aaron Belmonte | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Aaron Velasco | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Adrian Valenzuela | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Aldrin Fajardo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Alfred David | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Allan Aquino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Allysa Fernandez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Althea Noveno | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Alvin Marcelino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Alvin Ramos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Andrea Villanueva | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Angelika Dizon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Angelo Vergara | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Anthony Ruiz | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Anton Delgado | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Arvin Cordero | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bea Gonzales | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+bea tabanda villar | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Belen Francisco | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bernadette Ruiz | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bianca Banaag | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Bianca Morales | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bianca Valera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Brenda Casimino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Bryan Rivera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Camille Perez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Carlo Cabrera | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Carlo Mendoza | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Carlos Enriquez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Carmela Villegas | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Catherine Lucero | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Cedric Fernandez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Cedric Lozano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Cesar Gatdula | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Charmaine Dela Peña | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Cheryl Banzon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Chewie Basi | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Choco Basi | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Christian Ocampo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Clarissa Hilario | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Clarisse Torrez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Danica Pascual | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Danilo Aranas | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Darlene Hipolito | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Denise Castillo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Denise Dizon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Dennis Mercado | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Diana Campos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Dianne Yap | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Diego Palomares | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Dorothy Galang | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Edrian Valdez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Eduardo Miranda | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Edward Salazar | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Elias Estrada | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Eloisa Rivera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Emerson Pineda | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Emmanuel Sevilla | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Enrico Jacinto | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Eric Montoya | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Erika Mallari | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Erika Salazar | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ethan de Leon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Faith Fajardo | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Faith Lacuesta | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Faye Lazarro | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Felicia Ignacio | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ferdinand Mercado | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Fiona Sorrano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+fionna alejos | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Francesca Reyes | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Francis Lopez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Franklin Cruz | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gabriel Galang | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Gabriel Malabanan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gemma Dimaculangan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gerald Bonifacio | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gerald Tolentino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gian Robles | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Gilbert Torres | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Hanna Flores | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Hannah Garcia | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Hazel Cabrera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Hazel Hernandez | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Hazel Mariano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Heidi Magno | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Herbert Rosales | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ian Calderon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ian Ilagan | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Irene Jimenez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Iris Nicolas | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Irving Solis | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Isaac Padilla | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ivan Castillo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ivan Gonzales | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Jacqueline Ramos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+James Ruiz | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Janine Reyes | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jasmin Peralta | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Jasmine Jimenez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jericho Ponce | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jerome Villanueva | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jezelle Verdara | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Jhian Bernarte | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Structural
+Matching phase requirements (qualification only): Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope
+
+Joan Alvorado | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+John Bautista | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Jomar Panganiban | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Joseph Laureno | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Joshua Garcia | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Joyce Montemayor | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Juan Carlos Antonio | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Juan Dela Cruz | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Electrical, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: MEP Rough-In; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Julia Manalo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Karl Bautista | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Karla Dizon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Katrina Quinto | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kendrick Sevilla | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kenneth Katigbak | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kenneth Perez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kevin Tan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kevin Villaver | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+kian yamzon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kristel Aguilar | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kristine Navarro | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Kurt Gonzales | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Lance Soriano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Lara Villanueva | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Lawrence Bayani | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Leila Abad | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Leon Balagtas | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Lester Salcedo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Lianne Morales | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Liza Pangan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Louise Lacson | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Lowell Manansala | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Luis Sanchez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mae Villarin | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Manuel Ferrer | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Marco Flores | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Marco Manalo | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Mariel Gatchalian | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Marissa Bautista | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mark Angelo Miculob | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mark Angelo Miculob | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mark Enriquez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mark Fulloso | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Marvin Lee | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Melissa Arce | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Melissa Tadeo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Michelle Cruz | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mikhail Liudor Respicio | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Monica Fuentes | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Mya Nan | SPM | invited | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Naomi Rivera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Nathan Bautista | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Nicole Navarro | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Nina Santos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Noki Miculob | SPM | invited | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Orlando Natividad | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Oscar Lim | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Oscar Ocampo | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Pamela Angeles | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Paolo Garcia | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Patricia Pascual | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Patricio Santos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Patrick Lim | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Pauline Cruz | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Quentin Lopez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Quentin Quizon | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Rachel Garcia | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Rafael Domingo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Rhea Ramos | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Ria Bontigao | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: Civil, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Ria Navarro | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ricardo Quiambao | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ricardo Samson | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Richard Baldovino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Richelle Salvador | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Interior/Finishes, Landscape, Mechanical
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: MEP Rough-In; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: MEP Rough-In; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: MEP Rough-In; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Rio Tiong | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Electrical, Interior/Finishes, Landscape, Mechanical
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: MEP Rough-In; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Rix Villar | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Rix Villar | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Rosalie Cruzado | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Samuel Alonzo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Samuel Alonzo | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Samuel Santiago | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Sarah Alumno | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Interior/Finishes, Landscape
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Podium Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Sebastian Perez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Sheryl Macapagal | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Teresita Medina | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Theo Aquino | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Tomas Ilagan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Trisha Ramirez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Trisha Tolentino | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Ulysses Rivera | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Ulysses Umali | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Plumbing
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Ursula Mariano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Valerie Mendoza | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Vanessa Valdez | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Vernon Sarmiento | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Victor Santiago | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Vincent Javier | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Warren Wenceslao | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Wendy Rosales | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Wilfred Chua | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Wilma Bautista | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Xandra Yap | SPM | active | assignment eligible: true | existing assignment: true
+Recognized scopes: Civil, Geotechnical, Interior/Finishes, Landscape, Structural
+Matching phase requirements (qualification only): Commercial: Mobilization; Commercial: Design; Commercial: Foundation; Commercial: Structure; Commercial: Envelope / Curtain Wall; Commercial: Fit-Out / Finishes; Commercial: Closeout; Industrial: Mobilization; Industrial: Design; Industrial: Foundation; Industrial: Structure; Industrial: Closeout; Infrastructure: Mobilization; Infrastructure: Design; Infrastructure: Foundation; Infrastructure: Structure; Infrastructure: Closeout; Mixed-Use: Mobilization; Mixed-Use: Design; Mixed-Use: Foundation; Mixed-Use: Podium Structure; Mixed-Use: Tower Structure; Mixed-Use: Envelope / Curtain Wall; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Mixed-Use: Landscape & Site Works; Mixed-Use: Closeout; Renovation: Mobilization; Renovation: Design; Renovation: Foundation; Renovation: Structure; Renovation: Closeout; Residential: Mobilization; Residential: Design; Residential: Foundation; Residential: Structure; Residential: Envelope; Residential: Finishes; Residential: Landscape & Site Works; Residential: Closeout
+
+Xavier Esteban | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Yasmin Tan | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Yves Corpuz | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Yves Zamora | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Mechanical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Industrial: Design; Industrial: MEP Rough-In; Industrial: Finishes; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Finishes; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Renovation: Design; Renovation: MEP Rough-In; Renovation: Finishes; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In
+
+Yvonne Santiago | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Zachary Ramos | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
+
+Zara Aquino | SPM | active | assignment eligible: true | existing assignment: false
+Recognized scopes: Electrical
+Matching phase requirements (qualification only): Commercial: Design; Commercial: MEP Rough-In; Commercial: Fire & Life Safety; Commercial: Fit-Out / Finishes; Industrial: Design; Industrial: MEP Rough-In; Industrial: Closeout; Infrastructure: Design; Infrastructure: MEP Rough-In; Infrastructure: Closeout; Mixed-Use: Design; Mixed-Use: MEP Rough-In; Mixed-Use: Fire & Life Safety; Mixed-Use: Retail/Commercial Fit-Out; Mixed-Use: Residential Fit-Out; Renovation: Design; Renovation: MEP Rough-In; Renovation: Closeout; Residential: Design; Residential: MEP Rough-In; Residential: Finishes
+
+Zoe Dimaano | SPM | active | assignment eligible: false | existing assignment: false
+Recognized scopes: none
+Matching phase requirements (qualification only): none
