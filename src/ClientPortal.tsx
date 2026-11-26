@@ -727,7 +727,7 @@ export default function ClientPortal({
                 aria-controls="client-notifications"
                 onClick={() => setBell(open => !open)}
               />
-              {unread > 0 && <span className="notification-dot" />}
+              {unread > 0 && <span className="notification-count" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}
               {bell && (
                 <div id="client-notifications" className="notification-popover">
                   <div className="popover-heading">

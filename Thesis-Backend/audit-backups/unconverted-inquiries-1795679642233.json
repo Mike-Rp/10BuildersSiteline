@@ -1,0 +1,363 @@
+{
+  "saved_at": "2026-11-26T07:54:02.233Z",
+  "purpose": "Recovery copy before user-requested deletion of unconverted inquiries",
+  "projects_before": {
+    "count": 12,
+    "checksum": "ca581474970f692d21f60257d7e9dfd2"
+  },
+  "inquiries": [
+    {
+      "id": "221963bd-99c7-4a70-a674-f32df2795661",
+      "details": {
+        "name": "naay",
+        "email": "nafuoefh@gmial.com",
+        "phone": "+639987654345",
+        "address": "niao",
+        "lot_area": 249,
+        "opm_match": {
+          "project_type": "Mixed-Use",
+          "experience_years": 4.08333333333333
+        },
+        "client_name": "naay",
+        "client_type": "company",
+        "designation": "miao",
+        "floor_count": 7,
+        "company_name": "naay",
+        "consultation": 30,
+        "project_type": "Mixed-Use",
+        "client_record": "new",
+        "classification": "Urgent",
+        "floor_area_sqm": 249,
+        "primary_contact": "miao",
+        "routing_history": [
+          {
+            "at": "2026-11-26T01:41:28.605Z",
+            "opm": "Marianne Chua",
+            "kind": "offered",
+            "opm_id": "e8fdff6b-5e1c-457e-aa85-bdc73eb9bbcf"
+          },
+          {
+            "at": "2026-11-26T02:46:27.414Z",
+            "opm": "Marianne Chua",
+            "kind": "accepted",
+            "opm_id": "e8fdff6b-5e1c-457e-aa85-bdc73eb9bbcf"
+          }
+        ],
+        "client_decision_date": "2026-11-26",
+        "immediate_consultation": "yes"
+      },
+      "status": "approved",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "e8fdff6b-5e1c-457e-aa85-bdc73eb9bbcf",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-26T01:37:37.331Z",
+      "updated_at": "2026-11-26T03:15:39.697Z"
+    },
+    {
+      "id": "22d97527-131e-4207-99e5-2e070730a534",
+      "details": {
+        "name": "mkuy",
+        "email": "asufofqoifq@gmail.com",
+        "phone": "+639098765456",
+        "address": "aifnqnf",
+        "lot_area": 123,
+        "opm_match": {
+          "project_type": "Mixed-Use",
+          "experience_years": 4.33333333333333
+        },
+        "client_name": "naay",
+        "floor_count": 2,
+        "consultation": 30,
+        "project_type": "Mixed-Use",
+        "classification": "Urgent",
+        "floor_area_sqm": 123,
+        "routing_history": [
+          {
+            "at": "2026-11-25T10:59:28.927Z",
+            "opm": "Isabel Robles",
+            "kind": "offered",
+            "opm_id": "3b9f549f-b2c3-4497-b359-8d738ac42b64"
+          },
+          {
+            "at": "2026-11-25T13:02:16.562Z",
+            "opm": "Isabel Robles",
+            "kind": "accepted",
+            "opm_id": "3b9f549f-b2c3-4497-b359-8d738ac42b64"
+          }
+        ],
+        "client_decision_date": "2026-11-25",
+        "immediate_consultation": "yes"
+      },
+      "status": "approved",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "3b9f549f-b2c3-4497-b359-8d738ac42b64",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-25T10:59:28.853Z",
+      "updated_at": "2026-11-25T13:02:47.920Z"
+    },
+    {
+      "id": "67206f7a-3507-48a2-921a-6051a08a2d21",
+      "details": {
+        "name": "FHDKSAF",
+        "email": "DOJNF@GMAIL.COM",
+        "phone": "+639034982174",
+        "address": "OJSGDAHFLN",
+        "lot_area": 123,
+        "opm_match": {
+          "project_type": "Residential",
+          "experience_years": 7
+        },
+        "client_name": "ougfbsadj",
+        "client_type": "company",
+        "designation": "fdliksahjgbf m",
+        "floor_count": 324,
+        "company_name": "ougfbsadj",
+        "consultation": 30,
+        "project_type": "Residential",
+        "client_record": "new",
+        "classification": "Normal",
+        "floor_area_sqm": 32145,
+        "primary_contact": "fl;dkjsabf",
+        "response_due_at": "2026-11-27T05:45:33.221Z",
+        "routing_history": [
+          {
+            "at": "2026-11-26T05:45:33.273Z",
+            "opm": "Keith Andrew Halili",
+            "kind": "offered",
+            "opm_id": "06b53850-d3bf-450e-9ded-33a16beb35d6"
+          }
+        ],
+        "response_time_policy": "office_day",
+        "immediate_consultation": "yes"
+      },
+      "status": "offered",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "06b53850-d3bf-450e-9ded-33a16beb35d6",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-26T05:45:33.218Z",
+      "updated_at": "2026-11-26T05:45:33.218Z"
+    },
+    {
+      "id": "6d6ad0e0-6bf5-4588-94bb-10e129417fd4",
+      "details": {
+        "name": "Ria houese",
+        "email": "ria@gmail.com",
+        "phone": "+639987687656",
+        "address": "Santa Rosa",
+        "lot_area": 250,
+        "opm_match": {
+          "project_type": "Residential",
+          "experience_years": 10
+        },
+        "client_name": "Bontigao, Ria",
+        "floor_count": 3,
+        "consultation": 30,
+        "project_type": "Residential",
+        "classification": "Normal",
+        "floor_area_sqm": 180,
+        "routing_history": [
+          {
+            "at": "2026-11-25T12:34:29.592Z",
+            "opm": "Hanna Belarmino",
+            "kind": "offered",
+            "opm_id": "9242c86f-f15c-4cab-af89-16feafc43ec6"
+          },
+          {
+            "at": "2026-11-25T12:35:42.378Z",
+            "opm": "Hanna Belarmino",
+            "kind": "accepted",
+            "opm_id": "9242c86f-f15c-4cab-af89-16feafc43ec6"
+          }
+        ],
+        "client_decision_date": "2026-11-25",
+        "immediate_consultation": "yes"
+      },
+      "status": "approved",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "9242c86f-f15c-4cab-af89-16feafc43ec6",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-25T12:34:29.554Z",
+      "updated_at": "2026-11-25T12:35:54.243Z"
+    },
+    {
+      "id": "798a11bf-f695-4213-8618-d173940781d0",
+      "details": {
+        "name": "aipfhih",
+        "email": "afuouh@gmial.com",
+        "phone": "+639765434567",
+        "address": "apiefpih",
+        "lot_area": 984,
+        "opm_match": {
+          "project_type": "Commercial",
+          "experience_years": 6
+        },
+        "client_name": "ailwf",
+        "client_type": "individual",
+        "floor_count": 1,
+        "consultation": 30,
+        "project_type": "Commercial",
+        "client_record": "new",
+        "classification": "Urgent",
+        "floor_area_sqm": 12,
+        "routing_history": [
+          {
+            "at": "2026-11-26T02:05:19.009Z",
+            "opm": "Adrian Santos",
+            "kind": "offered",
+            "opm_id": "01026d46-b35c-46e0-951e-a27d10f8d513"
+          }
+        ],
+        "immediate_consultation": "yes"
+      },
+      "status": "offered",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "01026d46-b35c-46e0-951e-a27d10f8d513",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-26T02:05:18.930Z",
+      "updated_at": "2026-11-26T02:05:18.930Z"
+    },
+    {
+      "id": "9c35e498-ceff-48e8-a57c-2063be8012e1",
+      "details": {
+        "name": "France's Cruzada",
+        "email": "france@gmail.com",
+        "phone": "+639987654323",
+        "address": "Santa Rosa City",
+        "lot_area": 250,
+        "opm_match": {
+          "project_type": "Mixed-Use",
+          "experience_years": 5
+        },
+        "client_name": "Cruzada France",
+        "floor_count": 3,
+        "consultation": 30,
+        "opm_workflow": {
+          "budget": 5000000,
+          "review": {
+            "end": "2027-05-06",
+            "start": "2026-11-25",
+            "version": 1,
+            "estimate": {
+              "end": "2027-05-06",
+              "size": "Medium"
+            },
+            "technical": "Standard construction",
+            "arrangement": "Sequential phases",
+            "floorMeasurements": {
+              "mode": "individual",
+              "areas": [
+                60,
+                80,
+                60
+              ]
+            }
+          },
+          "staffing": {
+            "phases": [
+              "Mobilization",
+              "Foundation",
+              "Structure",
+              "Envelope",
+              "MEP Rough-In",
+              "Finishes",
+              "Landscape & Site Works",
+              "Closeout"
+            ],
+            "phase_dates": {},
+            "assessment_id": "ae6ec596-0340-4a1d-8105-0dede9bd819a",
+            "contract_file_id": "d9fe01d3-04fe-4fcd-8b7e-e7f6ff4f663a"
+          },
+          "assessment": {
+            "id": "ae6ec596-0340-4a1d-8105-0dede9bd819a",
+            "size": "Medium",
+            "score": 6,
+            "technical": "Standard construction",
+            "complexity": "Low",
+            "arrangement": "Sequential phases",
+            "completed_at": "2026-11-25T06:06:22.921Z",
+            "durationDays": 162,
+            "planningDays": 162,
+            "suggestedEnd": "2027-05-06",
+            "durationMultiplier": 0.85
+          },
+          "budget_history": [
+            {
+              "at": "2026-11-25T06:03:09.303Z",
+              "by": "df170b26-f2d2-4356-a5f5-4b5a352307be",
+              "amount": 5000000
+            }
+          ],
+          "review_history": [
+            {
+              "at": "2026-11-25T06:03:09.303Z",
+              "by": "df170b26-f2d2-4356-a5f5-4b5a352307be",
+              "reason": "Wala lang",
+              "changes": {
+                "end": {
+                  "after": "2027-05-06",
+                  "before": null
+                },
+                "start": {
+                  "after": "2026-11-25",
+                  "before": null
+                },
+                "technical": {
+                  "after": "Standard construction",
+                  "before": null
+                },
+                "arrangement": {
+                  "after": "Sequential phases",
+                  "before": null
+                },
+                "project_type": {
+                  "after": "Residential",
+                  "before": "Mixed-Use"
+                },
+                "floor_area_sqm": {
+                  "after": 200,
+                  "before": 180
+                }
+              },
+              "version": 1
+            }
+          ],
+          "signed_contract": {
+            "id": "d9fe01d3-04fe-4fcd-8b7e-e7f6ff4f663a",
+            "name": "project-monitoring-use-case-fixed.drawio.png"
+          }
+        },
+        "project_type": "Residential",
+        "classification": "Urgent",
+        "floor_area_sqm": 200,
+        "routing_history": [
+          {
+            "at": "2026-11-25T05:34:43.618Z",
+            "opm": "Kent Vincent Mellarpis",
+            "kind": "offered",
+            "opm_id": "df170b26-f2d2-4356-a5f5-4b5a352307be"
+          },
+          {
+            "at": "2026-11-25T05:39:53.982Z",
+            "opm": "Kent Vincent Mellarpis",
+            "kind": "accepted",
+            "opm_id": "df170b26-f2d2-4356-a5f5-4b5a352307be"
+          }
+        ],
+        "client_decision_date": "2026-11-25",
+        "immediate_consultation": "yes"
+      },
+      "status": "approved",
+      "admin_id": "81c028c4-9086-439b-ab57-d5d0c476a196",
+      "opm_id": "df170b26-f2d2-4356-a5f5-4b5a352307be",
+      "project_id": null,
+      "reason": null,
+      "created_at": "2026-11-25T05:34:43.586Z",
+      "updated_at": "2026-11-25T08:34:45.844Z"
+    }
+  ]
+}

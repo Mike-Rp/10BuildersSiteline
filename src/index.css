@@ -98,11 +98,14 @@ progress::-moz-progress-bar { background: var(--surface-subtle); border-radius: 
 .topbar { height: 73px; background: var(--color-surface); border-bottom: 1px solid var(--color-line); padding: 0 35px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 20; }
 .breadcrumb { display: flex; align-items: center; gap: 13px; font-size: 14px; color: var(--color-muted); }
 .breadcrumb strong { font-weight: 500; color: var(--color-muted); }
-.topbar-actions { display: flex; align-items: center; gap: 16px; }
+.topbar-actions { display: flex; align-items: center; gap: 20px; flex-shrink: 0; padding-block: 6px; }
 .global-search-trigger { display: flex; gap: 9px; align-items: center; background: none; border: 0; color: var(--color-muted); font-size: 14px; }
 kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--color-line); border-radius: 3px; margin-left: 20px; color: var(--color-muted); }
 .topbar-divider { height: 23px; width: 1px; background: var(--surface-subtle); margin-left: 4px; }
-.topbar-avatar { border-color: var(--color-line); }
+.topbar-avatar.avatar, .topbar-actions > .avatar { width: 48px; height: 48px; padding: 0; font-size: 16px; font-weight: 700; border-color: var(--color-line); flex-shrink: 0; }
+.topbar .notification-container > .button { width: 48px; height: 48px; min-width: 48px; padding: 12px; border-radius: 12px; }
+.topbar .notification-container > .button svg { width: 24px; height: 24px; }
+.topbar .notification-container:has(.notification-count) > .button { background: #e8f1fc; border-color: #8fb5e1; }
 .dashboard-welcome { margin: 0 0 16px; color: var(--color-primary); font-size: 18px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
 .notification-detail-message { margin-top: 16px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.75; }
 .photo-gallery-record { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--color-line); }
@@ -138,9 +141,9 @@ kbd { font: inherit; font-size: 14px; padding: 2px 5px; border: 1px solid var(--
 .evidence-download:hover, .evidence-download:focus-visible { background: #315A85; color: #fff; }
 @media (max-width: 760px) { .site-photo-review { grid-template-columns: minmax(0, 1fr); } .site-photo-review-image img, .site-photo-review-image object { height: min(42vh, 420px); } }
 @media (max-width: 560px) { .site-photo-review-actions { justify-content: stretch; } .site-photo-review-decisions { width: 100%; margin: 0; } .site-photo-review-decisions .button, .site-photo-review-actions > .button { flex: 1; } }
-.notification-container { position: relative; }
-.notification-dot { position: absolute; top: 6px; right: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--surface-subtle); border: 1px solid white; pointer-events: none; }
-.notification-popover { position: absolute; top: 48px; right: -45px; width: 410px; border: 1px solid var(--color-line); background: white; box-shadow: 0 12px 35px #172B4D1a; border-radius: 9px; overflow: hidden; }
+.notification-container { position: relative; flex-shrink: 0; margin-right: 4px; }
+.notification-count { position: absolute; top: -5px; right: -5px; display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 23px; padding: 0 5px; border-radius: 999px; background: #c92d3c; color: #fff; border: 2px solid var(--color-surface, white); font-size: 12px; font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; box-shadow: 0 2px 5px #172b4d20; pointer-events: none; }
+.notification-popover { position: absolute; top: calc(100% + 12px); right: -45px; width: 410px; border: 1px solid var(--color-line); background: white; box-shadow: 0 12px 35px #172B4D1a; border-radius: 9px; overflow: hidden; }
 .notification-popover > .button { border-width: 1px 0 0; border-radius: 0; padding: 14px; }
 .popover-heading { display: flex; align-items: center; justify-content: space-between; padding: 17px; border-bottom: 1px solid var(--color-line); }
 .popover-heading h3 span { color: var(--color-muted); font-size: 14px; }

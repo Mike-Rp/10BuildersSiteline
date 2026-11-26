@@ -4212,7 +4212,7 @@ export default function RoleWorkspace({
                 aria-controls="staff-notifications"
                 onClick={() => setBell(open => !open)}
               />
-              {unread > 0 && <i className="notification-dot" />}
+              {unread > 0 && <span className="notification-count" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}
               {bell && (
                 <div id="staff-notifications" className="notification-popover">
                   <div className="popover-heading">

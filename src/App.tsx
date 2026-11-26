@@ -3045,7 +3045,7 @@ function AppInner() {
                 aria-controls="admin-notifications"
                 onClick={() => setNotifications(open => !open)}
               />
-              {unread > 0 && <span className="notification-dot" />}
+              {unread > 0 && <span className="notification-count" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}
               {notifications && (
                 <div id="admin-notifications" className="notification-popover">
                   <div className="popover-heading">
