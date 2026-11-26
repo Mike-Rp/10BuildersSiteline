@@ -386,16 +386,18 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     {error && <p className="office-workflow-error" role="alert">{error}</p>}
     {busy && <p role="status">Saving or loading inquiry…</p>}
 
-    {page === "pending" && <div className="office-workflow-grid">
+    {page === "pending" && <div className="inquiry-card office-pending-record">
       <Card title="Consultation request" icon="users">
-        <Facts values={[
-          ["Inquiry urgency", row.details.classification || "Normal"],
-          ["Preferred consultation timing", consultation],
-          ...(responseDeadline ? [["Response due", responseDeadline] as [string, string]] : []),
-        ]} />
-        <div className="office-workflow-actions">
-          <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>
-          <button type="button" className="button primary" disabled={busy} onClick={() => decide("confirm")}>Accept inquiry</button>
+        <div className="office-pending-request">
+          <Facts values={[
+            ["Inquiry urgency", row.details.classification || "Normal"],
+            ["Preferred consultation timing", consultation],
+            ...(responseDeadline ? [["Response due", responseDeadline] as [string, string]] : []),
+          ]} />
+          <div className="office-workflow-actions">
+            <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>
+            <button type="button" className="button primary" disabled={busy} onClick={() => decide("confirm")}>Accept inquiry</button>
+          </div>
         </div>
       </Card>
       <Card title="Inquiry summary" icon="building">

@@ -171,6 +171,13 @@
 .office-workflow-card h2 { font-size: 1.14rem; }
 .office-workflow-card .inquiry-list-icon { flex: 0 0 36px; }
 .office-workflow-card .inquiry-pill { justify-self: start; }
+.office-pending-record { padding: clamp(14px, 2vw, 24px); }
+.office-pending-record > .office-workflow-card { padding: 0; border: 0; box-shadow: none; background: transparent; gap: 10px; }
+.office-pending-record > .office-workflow-card + .office-workflow-card { border-top: 1px solid var(--color-line); border-radius: 0; margin-top: 14px; padding-top: 14px; }
+.office-pending-record .inquiry-section-heading { border-bottom: 0; padding-bottom: 0; }
+.office-pending-request { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 24px; }
+.office-pending-request > .office-workflow-facts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); flex: 1 1 390px; margin: 0; }
+.office-pending-request > .office-workflow-actions { margin: 0; }
 .office-workflow-facts, .office-workflow-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr)); gap: 14px; min-width: 0; }
 .office-workflow-facts dt { margin-bottom: 3px; font-size: .82rem; }
 .office-workflow-facts dd { font-size: .92rem; }
@@ -444,6 +451,12 @@
 .admin-inquiry-submission :is(label, legend) { color: var(--color-ink); font-size: .9rem; font-weight: 600; }
 .admin-inquiry-submission :is(input, select) { font-weight: 400; }
 .inquiry-input-notice { color: var(--color-danger); font-weight: 500; }
+.inquiry-correction-options { min-width: 0; margin: 0; padding: 0; border: 0; }
+.inquiry-correction-options legend { margin-bottom: 8px; font-weight: 600; }
+.inquiry-correction-options > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.inquiry-correction-options > div > label { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: 8px; cursor: pointer; }
+.inquiry-correction-options input[type="radio"] { width: auto; margin: 0; }
+.inquiry-correction-options label:has(input:checked) { background: var(--surface-subtle); }
 .inquiry-input-notice:empty { margin-block-start: -6px; }
 .inquiry-required { color: var(--color-danger); }
 .admin-inquiry-preference { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }

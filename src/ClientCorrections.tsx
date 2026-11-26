@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { api } from "./api/client"
-import { Icon } from "./ui"
+import { Icon, Modal } from "./ui"
 type Correction = { id: string; field: string; before: string; after: string; reason: string; status: string }
 export default function ClientCorrections({ id, details, admin, reload, projectType = false, contractLocked = false }: {
   id: string; details: Record<string, unknown>; admin: boolean; reload: () => void; projectType?: boolean; contractLocked?: boolean
@@ -19,6 +19,9 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
   }
   const labels: Record<string, string> = projectType ? { project_type: "Project type" }
     : { client_name: "Client name", email: "Email address", phone: "Mobile number", ...(details.client_type === "company" ? { company_name: "Company name", primary_contact: "Representative", designation: "Designation" } : {}) }
+  const options = projectType
+    ? ["Residential", "Commercial", "Mixed-Use"].filter(type => type !== details.project_type).map(type => [type, type])
+    : Object.entries(labels)
   const relevant = history.filter(item => (item.field === "project_type") === projectType)
   if (admin && projectType && !relevant.length) return null
   return <section className={projectType && !admin ? "inquiry-project-type-correction" : "inquiry-card"}>
@@ -34,21 +37,37 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
       <h3>{projectType ? "Project type corrections" : "Client information corrections"}</h3>
       {!projectType && <p>Client details are read-only for the OPM. Approved corrections retain the previous value in history. Existing signed documents remain unchanged.</p>}
     </>}
-    {!admin && !contractLocked && !history.some(item => item.status === "pending") && <button type="button" className="button" onClick={() => setOpen(!open)}>Request correction</button>}
-    {open && !contractLocked && <div className="inquiry-form-stack">
-      {projectType ? <label>Corrected project type<select value={value} onChange={e => setValue(e.target.value)}>
-        <option value="">Select a project type</option>
-        {["Residential", "Commercial", "Mixed-Use"].filter(type => type !== details.project_type).map(type => <option key={type}>{type}</option>)}
-      </select></label> : <>
-        <label>Field to update<select value={field} onChange={e => { setField(e.target.value); setValue("") }}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        <label>Current value<input readOnly value={String(details[field] ?? "")} /></label>
-        <label>Suggested replacement<input value={value} maxLength={150} onChange={e => setValue(e.target.value)} /></label>
-      </>}
-      <label>Reason for correction<textarea value={reason} maxLength={1000} onChange={e => setReason(e.target.value)} /></label>
-      <button type="button" className="button primary" disabled={busy || !value.trim() || !reason.trim()} onClick={() => void send("request")}>Submit request</button>
-      <button type="button" className="button" onClick={() => setOpen(false)}>Cancel</button>
-    </div>}
+    {!admin && !contractLocked && !history.some(item => item.status === "pending") && <button type="button" className={projectType ? "button" : "button primary"} aria-haspopup="dialog"
+      onClick={() => { setMessage(""); setOpen(true) }}>{projectType ? "Request correction" : "Request client correction"}</button>}
+    {open && !contractLocked && <Modal title={projectType ? "Request project type correction" : "Request client information correction"}
+      subtitle="An administrator will review your request."
+      onClose={() => { if (!busy) setOpen(false) }} footer={<>
+        <button type="button" className="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
+        <button type="button" className="button primary" disabled={busy || !value.trim() || !reason.trim()} onClick={() => void send("request")}>Submit request</button>
+      </>}>
+      <fieldset disabled={busy} className="inquiry-form-stack">
+        <fieldset className="inquiry-correction-options">
+          <legend>{projectType ? "Corrected project type" : "Field to update"}</legend>
+          <div>
+            {options.map(([key, label]) => <label key={key}>
+              <input type="radio" name={`inquiry-correction-${id}-${projectType ? "type" : "field"}`}
+                value={key} checked={key === (projectType ? value : field)} onChange={() => {
+                  if (projectType) setValue(key)
+                  else { setField(key); setValue("") }
+                }} />
+              {label}
+            </label>)}
+          </div>
+        </fieldset>
+        {!projectType && <>
+          <label>Current value<input readOnly value={String(details[field] ?? "")} /></label>
+          <label>Suggested replacement<input value={value} maxLength={150} onChange={e => setValue(e.target.value)} /></label>
+        </>}
+        <label>Reason for correction<textarea value={reason} maxLength={1000} onChange={e => setReason(e.target.value)} /></label>
+        {message && <p role="alert">{message}</p>}
+      </fieldset>
+    </Modal>}
     {relevant.map(item => <article key={item.id}><strong>{labels[item.field] ?? item.field} · {item.status}</strong><p>Before: {item.before} → Proposed: {item.after}</p><p>Reason: {item.reason}</p>{admin && item.status === "pending" && <div className="inquiry-actions"><button type="button" className="button primary" disabled={busy} onClick={() => void send("approve", item.id)}>Approve correction</button><button type="button" className="button" disabled={busy} onClick={() => void send("return", item.id)}>Return request</button></div>}</article>)}
-    {message && <p role="status">{message}</p>}
+    {!open && message && <p role="status">{message}</p>}
   </section>
 }
