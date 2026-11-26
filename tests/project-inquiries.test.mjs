@@ -81,6 +81,8 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
     address:"Quezon City",project_type:"Residential",lot_area:240,floor_area_sqm:180,floor_count:2,consultation:30}
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_count:3213211} })
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_area_sqm:1e30} })
+  await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:234} })
+  await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:3999.99} })
   const create = () => call(root,{token:admin,json:details})
   const decision = (row,token,action,other={}) => call(`${root}/${row.id}/decision`,{token,json:{action,...other}})
   async function offer(row) {

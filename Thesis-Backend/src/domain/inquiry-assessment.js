@@ -4,6 +4,8 @@ export const MIN_INQUIRY_DURATION_DAYS = 45;
 // Supported intake range, not a statutory building-height restriction.
 export const MAX_INQUIRY_FLOORS = 200;
 export const MAX_INQUIRY_AREA = 1_000_000_000;
+// Product data-entry policy, not a building regulation.
+export const MIN_AVERAGE_FLOOR_AREA = 20;
 
 const positiveArea = value => (typeof value === "number" || typeof value === "string") &&
   Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_INQUIRY_AREA;
@@ -23,7 +25,7 @@ export function normalizeFloorMeasurements(input, floorCount, lotArea) {
     (measurements.mode === "same" ? measurements.areaPerFloor > Number(lotArea)
       : measurements.areas.some(area => area > Number(lotArea))))) return null;
   // Avoid carrying floating-point noise from decimal area inputs into classification and duration.
-  return Number.isFinite(total) && total > 0 && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
+  return Number.isFinite(total) && total >= floorCount * MIN_AVERAGE_FLOOR_AREA && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
 }
 
 export function intakeSize(floorArea, floors) {

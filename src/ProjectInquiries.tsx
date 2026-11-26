@@ -19,7 +19,7 @@ import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import AssignedScopeMatch from "./AssignedScopeMatch"
 import FloorAreaReview from "./FloorAreaReview"
-import { inquiryAssessmentReady, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { inquiryAssessmentReady, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
@@ -957,6 +957,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const candidates = matching?.candidates
     const lotArea = Number(details.lot_area)
     const floorCount = Number(details.floor_count)
+    const minFloorArea = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
+      ? floorCount * MIN_AVERAGE_FLOOR_AREA : MIN_AVERAGE_FLOOR_AREA
     const maxFloorArea = lotArea * floorCount
     const floorLimit = lotArea >= 0.01 && Number.isInteger(floorCount) && floorCount > 0 &&
       lotArea <= MAX_INQUIRY_AREA && floorCount <= MAX_INQUIRY_FLOORS && Number.isFinite(maxFloorArea) ? Math.min(maxFloorArea, MAX_INQUIRY_AREA) : undefined
@@ -973,17 +975,19 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
         const total = key === "floor_area_sqm"
-        const outsideRange = value !== "" && (Number(value) < 0.01 || Number(value) > MAX_INQUIRY_AREA ||
-          (floorLimit !== undefined && Number(value) > floorLimit))
+        const outsideRange = value !== "" && (Number(value) < (total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA) || Number(value) > MAX_INQUIRY_AREA ||
+          (total && floorLimit !== undefined && Number(value) > floorLimit))
         return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-          <GroupedNumberInput required={required} min={0.01} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
+          <GroupedNumberInput required={required} min={total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
             aria-describedby={total ? "inquiry-floor-area-range" : undefined} aria-invalid={outsideRange || undefined}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
           {total && <small id="inquiry-floor-area-range" className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">
             Add the area of every floor. {floorLimit === undefined
               ? "Enter the lot area and number of floors to see the allowed range."
-              : `Allowed range is 0.01 to ${formatArea(floorLimit)} m². Maximum = ${formatArea(lotArea)} m² × ${floorCount} ${floorCount === 1 ? "floor" : "floors"}.`}
+              : floorLimit < minFloorArea ? `The lot area is too small for the supported minimum of ${MIN_AVERAGE_FLOOR_AREA} m² per floor.`
+              : `Allowed range is ${formatArea(minFloorArea)} to ${formatArea(floorLimit)} m². Minimum average = ${MIN_AVERAGE_FLOOR_AREA} m² per floor. Maximum = ${formatArea(lotArea)} m² × ${floorCount} ${floorCount === 1 ? "floor" : "floors"}.`}
           </small>}
+          {!total && <small className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"}>Minimum lot area: {MIN_AVERAGE_FLOOR_AREA} m².</small>}
         </label>
       }
       const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined

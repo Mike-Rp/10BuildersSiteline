@@ -10,3 +10,11 @@ test('floor measurements respect lot area in both modes without limiting combine
   assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[234,234]},2,234).total,468);
   assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[60,'']},2,234),null);
 });
+
+test('average floor area must meet the supported minimum in either measurement mode', () => {
+  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:1.17},200,7432),null);
+  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:19.99},200,7432),null);
+  assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:20},200,7432).total,4000);
+  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[19,20]},2,100),null);
+  assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[20,20]},2,100).total,40);
+});

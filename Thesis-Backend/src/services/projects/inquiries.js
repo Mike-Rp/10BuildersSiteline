@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
 import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
-import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -55,6 +55,10 @@ export function inquiryDetails(input) {
   }
   if (details.floor_area_sqm / details.floor_count > details.lot_area)
     throw new HttpError(422, "Total floor area must not exceed the lot area multiplied by the number of floors.");
+  if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
+    throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
+  if (details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
+    throw new HttpError(422, `Total floor area must be at least ${(details.floor_count * MIN_AVERAGE_FLOOR_AREA).toLocaleString("en-PH")} m² for ${details.floor_count} floors (minimum average ${MIN_AVERAGE_FLOOR_AREA} m² per floor).`);
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
   if (input.classification != null) {
@@ -532,7 +536,7 @@ export function mountInquiries(router) {
         }
         const areas = input.floorMeasurements === undefined ? undefined :
           normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
-        if (areas === null) throw new HttpError(422, "Enter a positive area for every floor. Each floor must not exceed the lot area.");
+        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. Each floor must not exceed the lot area.`);
         if (areas) corrected.floor_area_sqm = areas.total;
         const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);

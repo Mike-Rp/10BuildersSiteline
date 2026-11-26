@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import React from "react"
 
-test("small average floor area requires review and changing measurements resets confirmation", async () => {
+test("small average floor area shows a blocking measurement error without an override", async () => {
   const dom = new JSDOM('<div id="root"></div>')
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -18,14 +18,14 @@ test("small average floor area requires review and changing measurements resets 
     const { default: Review } = await server.ssrLoadModule("/src/FloorAreaReview.tsx")
     const render = (area, floors, lot) => React.act(() => root.render(React.createElement("form", {}, React.createElement(Review, { area, floors, lot }))))
     await render(3, 100)
-    assert.match(document.body.textContent, /Average floor area: 0.03 m² per floor/)
-    assert.match(document.body.textContent, /too small for 100 floors/)
-    assert.equal(document.querySelector("form").checkValidity(), false)
-    await React.act(() => document.querySelector("input").click())
-    assert.equal(document.querySelector("form").checkValidity(), true)
-    await render(4, 100)
-    assert.equal(document.querySelector("input").checked, false)
-    assert.equal(document.querySelector("form").checkValidity(), false)
+    assert.match(document.querySelector('[role="alert"]').textContent, /at least 2,000 m² for 100 floors/)
+    assert.equal(document.querySelector('input[type="checkbox"]'), null)
+    await render(234, 200, 7432)
+    assert.match(document.querySelector('[role="alert"]').textContent, /at least 4,000 m² for 200 floors/)
+    assert.doesNotMatch(document.body.textContent, /Average floor area/)
+    await render(4000, 200, 7432)
+    assert.equal(document.querySelector('[role="alert"]'), null)
+    assert.match(document.body.textContent, /Average floor area: 20 m² per floor/)
     await render(180, 2)
     assert.match(document.body.textContent, /Average floor area: 90 m² per floor/)
     assert.equal(document.querySelector("input"), null)
