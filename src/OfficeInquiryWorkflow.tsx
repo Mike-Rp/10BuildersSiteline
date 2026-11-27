@@ -133,6 +133,18 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const heading = useRef<HTMLHeadingElement>(null)
   const workflowNavigation = useRef<HTMLElement>(null)
   const [showApproval, setShowApproval] = useState(justApproved)
+  const [approvalToastTop, setApprovalToastTop] = useState(88)
+  useEffect(() => {
+    if (!showApproval) return
+    const position = () => {
+      const navigation = document.querySelector(".role-workspace .topbar")?.getBoundingClientRect()
+      setApprovalToastTop(navigation ? Math.max(12, navigation.bottom + 12) : 88)
+    }
+    position()
+    const timer = window.setTimeout(() => setShowApproval(false), 4000)
+    window.addEventListener("resize", position)
+    return () => { window.clearTimeout(timer); window.removeEventListener("resize", position) }
+  }, [showApproval])
   const [fieldError, setFieldError] = useState<{ id: string; message: string }>()
   const reviewForm = useRef<HTMLFormElement>(null)
   const [reviewIssue, setReviewIssue] = useState<{ id: string; message: string }>()
@@ -465,7 +477,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       {row.details.overview && <p>{row.details.overview}</p>}
     </Card>
   </div>
-  const backToInquiries = <button type="button" className="button office-workflow-back" disabled={busy} onClick={back}>{"\u2190 Back"}</button>
+  const backToInquiries = <button type="button" className="button office-workflow-back" disabled={busy} onClick={back}>{"\u2190 "}{page === "pending" ? "Back to inquiry queue" : "Back"}</button>
   const projectInformationAction = <div className="office-workflow-actions office-record-actions">
     <button type="button" className="button primary" disabled={busy} onClick={() => navigate(accepted ? "review" : "proposal")}>
       {accepted ? "Review project information" : "Open client proposal"} <Icon name="arrow" size={17} />
@@ -487,13 +499,42 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     })}
   </nav>
 
+  if (page === "pending") {
+    const dates = row as OfficeRecord & { target_start_date?: string; target_end_date?: string }
+    const startDate = review?.start || dates.target_start_date || String(row.details.anticipated_start || "")
+    const endDate = review?.end || dates.target_end_date
+    const available = (value?: string) => Boolean(value && Number.isFinite(Date.parse(value)))
+    const area = (value: string | number) => value ? `${Number(value).toLocaleString("en-PH")} m²` : "Not provided"
+    return <div className="office-workflow office-pending-compact">
+      {backToInquiries}
+      {error && <p className="office-workflow-error" role="alert">{error}</p>}
+      {busy && <p role="status">Saving or loading inquiry…</p>}
+      <article className="office-pending-container">
+        <header className="office-pending-title"><div><p>{reference}</p><h1 ref={heading} tabIndex={-1}>{name}</h1><p>{[row.details.address, row.details.project_type].filter(Boolean).join(" · ")}</p></div><span className="inquiry-pill pending">Pending inquiry</span></header>
+        <div className="office-pending-meta"><span className="inquiry-priority" data-classification={String(row.details.classification || "Normal").toLowerCase()}>{row.details.classification || "Normal"}</span><Facts values={[["Preferred consultation timing", consultation], ...(responseDeadline ? [["Response due", responseDeadline] as [string, string]] : [])]} /></div>
+        <div className="office-pending-details">
+          <section><h2>Client details</h2><Facts values={clientFacts.map(([label, value]) => [label === "Contact number" ? "Mobile number" : label, value])} /></section>
+          <section><h2>Project details</h2><Facts values={[
+            ["Lot area", area(row.details.lot_area)], ["Total floor area", area(row.details.floor_area_sqm)], ["Number of floors", amount(row.details.floor_count)],
+            ...(available(startDate) ? [["Estimated start", formatDay(startDate)] as [string, string]] : []),
+            ...(available(endDate) ? [["Estimated completion", formatDay(endDate!)] as [string, string]] : []),
+          ]} />{!available(startDate) && !available(endDate) && <p className="inquiry-muted">Schedule not yet determined.</p>}
+          {row.details.overview && <p className="inquiry-overview">{row.details.overview}</p>}</section>
+        </div>
+        <div className="office-workflow-actions office-pending-decisions">
+          <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}><Icon name="close" size={17} />Reject inquiry</button>
+          <button type="button" className="button primary" disabled={busy} onClick={() => decide("confirm")}><Icon name="check" size={17} />Accept inquiry</button>
+        </div>
+      </article>
+    </div>
+  }
   return <div className={`office-workflow${compactReview ? " office-review-compact" : ""}`}>
     {showIntakeRecord && backToInquiries}
     {!showIntakeRecord && <div className="office-review-top">
       {backToInquiries}
-      {compactReview && showApproval && <div className="office-review-toast">
-        <Icon name="check" />
-        <div role="status"><strong>Proposal approved</strong><p>{descriptions.review}</p></div>
+      {compactReview && showApproval && <div className="office-review-toast office-proposal-success-toast" style={{ top: approvalToastTop }}>
+        <span className="office-proposal-success-icon"><Icon name="check" size={16} /></span>
+        <span role="status">Proposal approved successfully.</span>
         <button className="button icon-button" type="button" aria-label="Dismiss approval notice" onClick={() => setShowApproval(false)}><Icon name="close" /></button>
       </div>}
     </div>}
@@ -524,26 +565,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </header>}
     {error && <p className="office-workflow-error" role="alert">{error}</p>}
     {busy && <p role="status">Saving or loading inquiry…</p>}
-
-    {page === "pending" && <div className="inquiry-card office-pending-record">
-      <Card title="Consultation request" icon="users">
-        <div className="office-pending-request">
-          <Facts values={[
-            ["Inquiry urgency", row.details.classification || "Normal"],
-            ["Preferred consultation timing", consultation],
-            ...(responseDeadline ? [["Response due", responseDeadline] as [string, string]] : []),
-          ]} />
-          <div className="office-workflow-actions">
-            <button type="button" className="button danger-ghost" disabled={busy} onClick={() => decide("cancel")}>Reject inquiry</button>
-            <button type="button" className="button primary" disabled={busy} onClick={() => decide("confirm")}>Accept inquiry</button>
-          </div>
-        </div>
-      </Card>
-      <Card title="Inquiry summary" icon="building">
-        <h3>{name}</h3><Facts values={[...clientFacts, ...projectFacts]} />
-        {row.details.overview && <p>{row.details.overview}</p>}
-      </Card>
-    </div>}
 
     {page === "received" && <div className="inquiry-card office-workflow-received">
       <span className="inquiry-list-icon"><Icon name="check" /></span>
@@ -653,6 +674,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
             <div><span className="inquiry-muted">Step 2 of 3</span><h1 ref={heading} tabIndex={-1}>{title}</h1></div>
             <span className="inquiry-pill">Live estimate</span>
           </header>
+          <p className="office-review-field-helper">{descriptions.review}</p>
           <div className="office-project-details-heading" data-editing={detailsEditing}>
             <div><h2>Project details {detailsEditing ? <span className="office-editing-badge" role="status">Editing</span>
               : detailsStaged && <span className="office-details-staged" role="status">Edits ready</span>}</h2>
@@ -683,7 +705,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 <label htmlFor={fieldId("project_type")}>Project type</label>
                 <input id={fieldId("project_type")} readOnly disabled tabIndex={-1} value={String(row.details.project_type ?? "")} />
               </div>
-              {mixedUse && <div className="office-project-type-field">
+              {mixedUse && <div className="office-project-type-field office-mixed-use-sections">
                 <fieldset className="inquiry-mixed-use-options">
                   <legend>Building uses</legend>
                   <p>Select at least two uses.</p>
