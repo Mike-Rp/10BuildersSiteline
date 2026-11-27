@@ -237,10 +237,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
   const lotArea = Number(draft.lot_area)
-  const areaRange = floorAreaRange(lotArea, floorCount)
+  const areaRange = floorAreaRange(lotArea, floorCount, 0.9)
   const submittedAverage = floorArea.submittedAverage
   const averageOutsideCorrectedLot = submittedAverage !== null && lotArea > 0 &&
-    lotArea !== Number(row.details.lot_area) && !!averageFloorAreaError(lotArea, submittedAverage * floorCount, floorCount)
+    lotArea !== Number(row.details.lot_area) && !!averageFloorAreaError(lotArea, submittedAverage * floorCount, floorCount, 0.9)
   const perFloor = floorArea.perFloor ?? (averageOutsideCorrectedLot ? "" : String(submittedAverage ?? ""))
   const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
@@ -373,9 +373,9 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   function currentReviewIssue(form: HTMLFormElement) {
     if (scopeError) return { id: fieldId("project_type"), message: scopeError }
     if (validFloorCount && !calculatedArea) {
-      const invalidFloor = floorInputs.findIndex(value => !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > MAX_INQUIRY_AREA)
+      const invalidFloor = floorInputs.findIndex((value, index) => !Number.isFinite(Number(value)) || Number(value) < lotArea * (index === 0 ? 0.9 : 0.7) || Number(value) > lotArea * 1.7)
       const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
-      return { id, message: `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.` }
+      return { id, message: "Floor 1 and same-area floors require at least 90% of the lot area; subsequent individual floors require at least 70%. Each floor must not exceed 170% of the lot area." }
     }
     if (!technical) return { id: fieldId("technical"), message: "Select the technical requirements." }
     if (!arrangement) return { id: fieldId("arrangement"), message: "Select the project phase arrangement." }
@@ -735,7 +735,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 const changed = areaWasEdited(value)
                 return <div key={id} className={`office-floor-area-field${changed ? " office-review-field-changed" : ""}`}>
                   <label htmlFor={id}>Floor {index + 1} area (m²)</label>
-                  <GroupedNumberInput {...describedField(id)} required min={0} max={MAX_INQUIRY_AREA} value={value} onValueChange={nextArea => {
+                  <GroupedNumberInput {...describedField(id)} required min={lotArea * (index === 0 ? 0.9 : 0.7)} max={areaRange?.maximumAverage} value={value} onValueChange={nextArea => {
                     const areas = [...floorArea.areas]
                     areas[index] = nextArea
                     updateFloorArea({ ...floorArea, areas })
@@ -749,7 +749,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
               <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
             </div>}
-            <p className="office-review-field-helper">Total floor area is the sum of all floors. The average must be at least 20 m² per floor and may exceed the lot area by up to 70%.</p>
+            <p className="office-review-field-helper">Total floor area is the sum of all floors. Floor 1 and same-area floors must be at least 90% of the lot area; subsequent individual floors must be at least 70%. Each floor may be up to 170% of the lot area.</p>
             </div>
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <span className="office-system-label"><Icon name="lock" size={13} />System generated</span>

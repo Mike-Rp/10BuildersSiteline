@@ -29,7 +29,7 @@ function validateInquiryContact(details, previous) {
     throw new HttpError(422, PH_MOBILE_ERROR);
 }
 
-export function inquiryDetails(input, { validateAverage = true } = {}) {
+export function inquiryDetails(input, { validateAverage = true, minimumRatio = 1 } = {}) {
   const details = inquiryClientIdentity(input);
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
     const value = key === "client_name" && details.client_type === "company" ? details.company_name : input?.[key];
@@ -53,12 +53,10 @@ export function inquiryDetails(input, { validateAverage = true } = {}) {
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
   }
-  const areaIssue = validateAverage ? averageFloorAreaError(details.lot_area, details.floor_area_sqm, details.floor_count) : "";
+  const areaIssue = validateAverage ? averageFloorAreaError(details.lot_area, details.floor_area_sqm, details.floor_count, minimumRatio) : "";
   if (areaIssue) throw new HttpError(422, areaIssue);
   if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
     throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
-  if (validateAverage && details.floor_area_sqm < details.floor_count * MIN_AVERAGE_FLOOR_AREA)
-    throw new HttpError(422, `Total floor area must be at least ${(details.floor_count * MIN_AVERAGE_FLOOR_AREA).toLocaleString("en-PH")} m² for ${details.floor_count} floors (minimum average ${MIN_AVERAGE_FLOOR_AREA} m² per floor).`);
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
   if (input.classification != null) {
@@ -174,8 +172,8 @@ export function staffingAssessment(row, input) {
   const assessment = workflow?.assessment;
   if (!assessment || !assessment.id || input?.assessment_id !== assessment.id)
     throw new HttpError(409, "Complete the current project assessment before opening staffing.");
-  const original = inquiryDetails(row.details);
-  const submitted = inquiryDetails(input);
+  const original = inquiryDetails(row.details, { minimumRatio: 0.7 });
+  const submitted = inquiryDetails(input, { minimumRatio: 0.7 });
   if (Object.keys(original).length !== Object.keys(submitted).length ||
       Object.entries(original).some(([key, value]) => submitted[key] !== value) ||
       input.target_start_date !== workflow.review.start || input.target_end_date !== workflow.review.end ||
@@ -434,7 +432,7 @@ export function mountInquiries(router) {
         typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 1000) throw new HttpError(422, "Enter a valid field, replacement and reason.");
       const proposed = { ...details, [input.field]: input.value.trim() };
       if (input.field === "company_name") proposed.client_name = proposed.company_name;
-      inquiryDetails(proposed); validateInquiryContact(proposed, details);
+      inquiryDetails(proposed, { minimumRatio: 0.7 }); validateInquiryContact(proposed, details);
       if (String(details[input.field] ?? "") === input.value.trim()) throw new HttpError(422, "Enter a different replacement.");
       history.push({ id: randomUUID(), field: input.field, before: details[input.field] ?? "", after: input.value.trim(), reason: input.reason.trim(), status: "pending", by: actor.id, at: new Date().toISOString() });
       await notifyInquiry(db, actor.id, row.admin_id, input.field === "project_type" ? "Project type correction requested" : "Client correction requested", details.name);
@@ -452,7 +450,7 @@ export function mountInquiries(router) {
           throw new HttpError(409, "Project type is locked under the finalized signed contract.");
         details[item.field] = item.after;
         if (item.field === "company_name") details.client_name = item.after;
-        inquiryDetails(details); validateInquiryContact(details, row.details);
+        inquiryDetails(details, { minimumRatio: 0.7 }); validateInquiryContact(details, row.details);
         if (item.field === "project_type" && details.opm_workflow) {
           const workflow = { ...details.opm_workflow };
           if (workflow.review) {
@@ -551,11 +549,10 @@ export function mountInquiries(router) {
           if (before[key] === undefined) delete corrected[key];
           else corrected[key] = before[key];
         }
-        const areas = input.floorMeasurements === undefined ? undefined :
-          normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), Number(corrected.lot_area));
+        const areas = normalizeFloorMeasurements(input.floorMeasurements ?? { mode: "same", areaPerFloor: Number(corrected.floor_area_sqm) / Number(corrected.floor_count) }, Number(corrected.floor_count), Number(corrected.lot_area));
         if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.`);
         if (areas) corrected.floor_area_sqm = areas.total;
-        const after = inquiryDetails(corrected);
+        const after = inquiryDetails(corrected, { minimumRatio: 0.7 });
         if (input.correction) validateInquiryContact(after, before);
         const localToday = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
         const earliestStartDate = new Date(localToday + "T00:00:00Z");
@@ -586,7 +583,7 @@ export function mountInquiries(router) {
         const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
           after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
         if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
-          throw new HttpError(422, "The average floor area must not exceed 170% of the lot area. Update the floor measurements.");
+          throw new HttpError(422, "Floor measurements must meet the 90% first/same-floor, 70% subsequent-floor minimums and 170% maximum of the lot area.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
           ...(mixedUseScope ? { mixed_use_scope: mixedUseScope } : {}),
           ...(floorMeasurements ? { floorMeasurements } : {}) };

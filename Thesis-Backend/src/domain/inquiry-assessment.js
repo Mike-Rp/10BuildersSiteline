@@ -10,22 +10,22 @@ export const MIN_AVERAGE_FLOOR_AREA = 20;
 const positiveArea = value => (typeof value === "number" || typeof value === "string") &&
   Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_INQUIRY_AREA;
 
-export function floorAreaRange(lot, floors) {
+export function floorAreaRange(lot, floors, minimumRatio = 1) {
   if (!positiveArea(lot) || !Number.isInteger(floors) || floors < 1 || floors > MAX_INQUIRY_FLOORS) return null;
-  const minimumAverage = MIN_AVERAGE_FLOOR_AREA;
+  const minimumAverage = Number((Number(lot) * minimumRatio).toPrecision(15));
   const maximumAverage = Number((Number(lot) * 1.7).toPrecision(15));
   return { minimumAverage, maximumAverage,
     minimum: Number((minimumAverage * floors).toPrecision(15)),
     maximum: Math.min(MAX_INQUIRY_AREA, Number((maximumAverage * floors).toPrecision(15))) };
 }
 
-export function averageFloorAreaError(lot, total, floors) {
-  const range = floorAreaRange(lot, floors);
+export function averageFloorAreaError(lot, total, floors, minimumRatio = 1) {
+  const range = floorAreaRange(lot, floors, minimumRatio);
   if (!range || !Number.isFinite(Number(total)) || Number(total) <= 0) return "";
   const area = Number(Number(total).toPrecision(15));
   if (area >= range.minimum && area <= range.maximum) return "";
   const format = value => value.toLocaleString("en-PH", { maximumSignificantDigits: 15 });
-  return `Average floor area must be at least 20 m² and no more than 170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
+  return `Average floor area must be at least ${minimumRatio * 100}% and no more than 170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
 }
 
 export function normalizeFloorMeasurements(input, floorCount, lotArea) {
@@ -39,9 +39,18 @@ export function normalizeFloorMeasurements(input, floorCount, lotArea) {
     measurements = { mode: "individual", areas: input.areas.map(Number) };
     total = measurements.areas.reduce((sum, area) => sum + area, 0);
   }
-  if (lotArea !== undefined && (!positiveArea(lotArea) || !measurements || averageFloorAreaError(lotArea, total, floorCount))) return null;
+  if (lotArea !== undefined) {
+    if (!positiveArea(lotArea) || !measurements) return null;
+    const values = measurements.mode === "same" ? Array(floorCount).fill(measurements.areaPerFloor) : measurements.areas;
+    if (values.some((area, index) => {
+      const ratio = measurements.mode === "same" || index === 0 ? 0.9 : 0.7;
+      const minimum = Number((lotArea * ratio).toPrecision(15));
+      const maximum = Number((lotArea * 1.7).toPrecision(15));
+      return area < minimum || area > maximum;
+    })) return null;
+  }
   // Avoid carrying floating-point noise from decimal area inputs into classification and duration.
-  return Number.isFinite(total) && total >= floorCount * MIN_AVERAGE_FLOOR_AREA && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
+  return Number.isFinite(total) && total > 0 && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
 }
 
 export function intakeSize(floorArea, floors) {

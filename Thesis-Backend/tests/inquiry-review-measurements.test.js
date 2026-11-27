@@ -15,11 +15,11 @@ test("review validates corrected floor count and measurements after reading the 
   const areas = normalizeFloorMeasurements({ mode: "same", areaPerFloor: 220 }, corrected.floor_count, corrected.lot_area);
   assert.equal(areas?.total, 2200);
   corrected.floor_area_sqm = areas.total;
-  const after = inquiryDetails(corrected);
+  const after = inquiryDetails(corrected, { minimumRatio: 0.7 });
   assert.equal(after.floor_count, 10);
   assert.equal(after.floor_area_sqm, 2200);
 });
 
 test("submitted measurements still require the minimum average floor area", () => {
-  assert.throws(() => inquiryDetails(submitted), /at least 2,000|at least 20/);
+  assert.throws(() => inquiryDetails(submitted), /at least 100%/);
 });
