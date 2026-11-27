@@ -825,8 +825,7 @@ export default function RoleWorkspace({
     const floorArea = Number(p.area)
     const areaLabel = p.area && Number.isFinite(floorArea) ? floorArea.toLocaleString("en-PH") : p.area
     const clientName = p.recordedClientName || projectClientNames(p, state.accounts).join(", ") || "Not recorded"
-    const openAssignmentStatus = parallelIntake && assignments.length
-      ? () => setInquiryAssignmentProjectId(p.id) : openSiteResponses
+    const openAssignmentStatus = () => setInquiryAssignmentProjectId(p.id)
     return (
       <section
         key={p.id}
@@ -959,9 +958,10 @@ export default function RoleWorkspace({
                     ? "View project documents"
                     : parallelIntake ? "Upload required documents" : "Open required documents"}
                 </Button>
-                <Button onClick={openAssignmentStatus}>
-                  {parallelIntake && assignments.length ? "View assignment status" : guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
-                </Button>
+                {parallelIntake && <Button onClick={openAssignmentStatus}>View Site PM Assignments</Button>}
+                {(!parallelIntake || (declined && p.status !== "completed")) && <Button onClick={openSiteResponses}>
+                  {declined || guidance?.action === "reassign" ? "Review phase assignments" : "Track Site PM responses"}
+                </Button>}
               </div>
             </>
           )}
@@ -3070,9 +3070,9 @@ export default function RoleWorkspace({
       subtitle={`${project.name} · ${accepted} of ${assignments.length} assignments accepted`}
       wide onClose={close} footer={<Button onClick={close}>Close</Button>}>
       {assignments.length ? <div className="inquiry-lineup-table inquiry-assignment-status">
-        <table className="[&_:is(th,td,.badge,.button)]:whitespace-normal! [&_:is(th,td,.badge,.button)]:break-words!" role="table" aria-label="Assigned Site PMs">
+        <table className="[&_:is(th,td,.badge)]:whitespace-normal! [&_:is(th,td,.badge)]:break-words!" role="table" aria-label="Assigned Site PMs">
           <thead><tr><th scope="col">Assigned phase</th><th scope="col">Site PM</th><th scope="col">Assigned tags</th>
-            <th scope="col">Designation</th><th scope="col">Response</th><th scope="col">Next action</th></tr></thead>
+            <th scope="col">Designation</th><th scope="col">Response</th></tr></thead>
           <tbody role="rowgroup">{assignments.map(person => {
             const declined = person.status === "declined"
             const reason = declined ? responses.find(response => response.accountId === person.accountId &&
@@ -3085,9 +3085,6 @@ export default function RoleWorkspace({
               <td role="cell" data-label="Response"><Badge tone={declined ? "red" : person.status === "confirmed" ? "green" : "amber"}>
                 {declined ? "Declined" : person.status === "confirmed" ? "Accepted" : "Pending"}
               </Badge>{reason && <p>{reason}</p>}</td>
-              <td role="cell" data-label="Next action">{declined && project.status !== "completed" && <Button onClick={() => setSuggestedReassignment({
-                projectId: project.id, accountId: person.accountId, phase: person.phase,
-              })}>Review reassignment</Button>}</td>
             </tr>
           })}</tbody>
         </table>

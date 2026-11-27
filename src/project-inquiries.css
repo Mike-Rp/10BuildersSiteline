@@ -899,14 +899,12 @@
 .inquiry-lineup-table td { padding: 9px 12px; border-top: 1px solid var(--color-line); }
 .inquiry-lineup-table th { padding: 9px 12px; }
 #root .inquiry-assignment-status :is(th, td) { vertical-align: top; }
-#root .inquiry-assignment-status :is(.badge, .button) { max-width: 100%; }
-.inquiry-assignment-status thead th:nth-child(3) { width: 30%; }
-.inquiry-assignment-status thead th:last-child { width: 17%; }
+#root .inquiry-assignment-status .badge { max-width: 100%; }
+.inquiry-assignment-status thead th:nth-child(3) { width: 36%; }
 @media (max-width: 800px) {
   #root .inquiry-assignment-status td { min-width: 0; border: 0; }
   #root .inquiry-assignment-status :is(th, td) { overflow-wrap: anywhere; }
-  .inquiry-assignment-status tbody :is(th, td[data-label="Assigned tags"], td[data-label="Next action"]) { grid-column: 1 / -1; }
-  .inquiry-assignment-status td[data-label="Next action"]:empty { display: none; }
+  .inquiry-assignment-status tbody :is(th, td[data-label="Assigned tags"]) { grid-column: 1 / -1; }
 }
 
 .inquiry-lineup-lead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--surface-subtle); }
