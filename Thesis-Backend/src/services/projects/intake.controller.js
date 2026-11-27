@@ -55,7 +55,7 @@ export const createIntake = async (req, res) => {
       new Set(phase_team.map(p => p?.stage)).size !== phase_team.length) {
       return responseError(res, 'Missing or invalid project details.', 400);
     }
-    let tier = intakeSize(Number(floor_area_sqm), Number(floor_count));
+    let tier = inquiryId ? undefined : intakeSize(Number(floor_area_sqm), Number(floor_count));
     let phaseScope;
     if (req.body.phase_scope !== undefined) {
       if (project_type !== 'Mixed-Use') return responseError(res,'Project scope review is supported for Mixed-Use only.',422);

@@ -1,24 +1,33 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {floorAreaRange, normalizeFloorMeasurements} from '../src/domain/inquiry-assessment.js';
-import {inquiryDetails} from '../src/services/projects/inquiries.js';
-const input={client_name:'Sample',email:'client@example.com',phone:'+639321321321',name:'Sample',address:'Sample',project_type:'Residential',lot_area:250,floor_count:2,floor_area_sqm:500,consultation:30};
-test('admin minimum is lot area times floor count',()=>{
- assert.equal(floorAreaRange(250,2).minimum,500);
- assert.equal(inquiryDetails(input).floor_area_sqm,500);
- assert.throws(()=>inquiryDetails({...input,floor_area_sqm:499.99}));
- assert.throws(()=>inquiryDetails({...input,floor_area_sqm:40}));
- assert.throws(()=>inquiryDetails({...input,floor_area_sqm:850.01}));
-});
-test('OPM same-area floors enforce 90% inclusive and 170% maximum',()=>{
- assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:225},2,250).total,450);
- assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:224.99},2,250),null);
- assert.ok(normalizeFloorMeasurements({mode:'same',areaPerFloor:425},2,250));
- assert.equal(normalizeFloorMeasurements({mode:'same',areaPerFloor:425.01},2,250),null);
-});
-test('OPM individual floors enforce first 90%, subsequent 70% without average masking',()=>{
- assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[225,175]},2,250).total,400);
- for(const areas of [[224.99,300],[300,174.99],[426,175],[225,426]]) assert.equal(normalizeFloorMeasurements({mode:'individual',areas},2,250),null);
- assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[225]},2,250),null);
- assert.equal(normalizeFloorMeasurements({mode:'individual',areas:[225,175,175]},3,250).total,575);
-});
+import test from "node:test";
+import assert from "node:assert/strict";
+import { inquiryDetails, staffingAssessment } from "../src/services/projects/inquiries.js";
+
+const input = {
+  client_name: "Sample", email: "client@example.com", phone: "+639321321321",
+  name: "Sample", address: "Sample", lot_area: 800, consultation: 30,
+};
+
+for (const project_type of ["Residential", "Commercial", "Mixed-Use"]) {
+  test(`${project_type} inquiry intake validates the available total`, () => {
+    const project = { ...input, project_type, floor_count: 1 };
+    assert.throws(() => inquiryDetails({ ...project, floor_area_sqm: 1000 }), /must not exceed/);
+    assert.equal(inquiryDetails({ ...project, floor_area_sqm: 800 }).floor_area_sqm, 800);
+    assert.equal(inquiryDetails({ ...project, floor_count: 5, floor_area_sqm: 3000 }).floor_area_sqm, 3000);
+    for (const floor_area_sqm of [0, -1, "", undefined, "invalid", true])
+      assert.throws(() => inquiryDetails({ ...project, floor_area_sqm }), /positive/);
+  });
+
+  test(`${project_type} staffing rejects stale assessments with invalid or missing breakdowns`, () => {
+    const assessment = { id: "saved" };
+    const review = { start: "2027-01-01", end: "2028-01-01" };
+    const project = { ...input, project_type, floor_count: 2, floor_area_sqm: 1200 };
+    const request = { ...project, assessment_id: "saved", estimated_budget: 1,
+      target_start_date: review.start, target_end_date: review.end };
+    const row = floorMeasurements => ({
+      details: { ...project, opm_workflow: { assessment, budget: 1, review: { ...review, floorMeasurements } } },
+    });
+    assert.throws(() => staffingAssessment(row(undefined), request), /valid lot and individual floor areas/);
+    assert.throws(() => staffingAssessment(row({ mode: "individual", areas: [200, 1000] }), request), /valid lot and individual floor areas/);
+    assert.equal(staffingAssessment(row({ mode: "individual", areas: [500, 700] }), request), assessment);
+  });
+}

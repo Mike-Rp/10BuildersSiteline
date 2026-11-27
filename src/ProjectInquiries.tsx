@@ -17,7 +17,7 @@ import { isStale, startPolling } from "./refresh-interval"
 import { matchingInquiryTags, selectInquiryLead } from "../Thesis-Backend/src/domain/inquiry-lead.js"
 import AssignedScopeMatch from "./AssignedScopeMatch"
 import FloorAreaReview from "./FloorAreaReview"
-import { floorAreaRange, inquiryAssessmentReady, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { floorAreaRange, averageFloorAreaError, inquiryLotAreaError, inquiryAssessmentReady, MAX_INQUIRY_FLOORS } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 import OfficeInquiryWorkflow, { type OfficePage, type OfficeRecord } from "./OfficeInquiryWorkflow"
 import { type ClientActivationStatus } from "./client-activation"
 import MobileNumberInput from "./MobileNumberInput"
@@ -597,7 +597,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const phaseScheduleInput = {
     type: String(row?.details.project_type ?? ""), arrangement, start, end,
   }
-  const dependencies = suggestPhaseSchedule({ ...phaseScheduleInput, phases, dates: phaseDates })
+  const dependencies = intakeLocked ? suggestPhaseSchedule({ ...phaseScheduleInput, phases, dates: phaseDates }) : {}
   const scheduledDates = { ...dependencies, ...phaseDates }
   const phaseCompletion = phases.map(stage => scheduledDates[stage]?.end).filter(Boolean).sort().at(-1)
   function phaseDateError(stage: string, field: "start" | "end") {
@@ -816,7 +816,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     else setDialog("details")
   }
   async function startStaffing() {
-    if (!row?.workflow?.assessment || !contractFileId || pendingContract)
+    if (!intakeLocked || !row?.workflow?.assessment || !contractFileId || pendingContract)
       throw new Error("Complete the assessment and upload the signed client contract before continuing.")
     if (!planning) {
       const result = await post<Planning>(`${root}/${selected}/planning`, staffingInput)
@@ -834,6 +834,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     }))
   }
   async function allocate() {
+    if (!intakeLocked) throw new Error("Confirm valid project dimensions before staffing.")
     if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const additional = planning?.staffing?.additional_scopes
     const result = await post<Planning>(`${root}/${selected}/planning`, { ...staffingInput, phases, phase_dates: selectedPhaseDates(), confirm_schedule: true, contract_file_id: contractFileId,
@@ -853,7 +854,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   }
   async function refreshStaffingPhase() {
     const phase = staffingPhase
-    if (!phase || !planning || !contractFileId) return
+    if (!intakeLocked || !phase || !planning || !contractFileId) return
     const result = await post<Planning>(`${root}/${selected}/planning`, {
       ...staffingInput, phases, phase_dates: selectedPhaseDates(), contract_file_id: contractFileId,
       refresh_phase: phase, additional_scopes: planning.staffing?.additional_scopes ?? {},
@@ -883,6 +884,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     showActionResult(`${pendingContract.file.name} was uploaded and saved to this inquiry.`, false, "Signed contract uploaded")
   }
   async function submit() {
+    if (!intakeLocked) throw new Error("Confirm valid project dimensions before staffing.")
     if (!contractFileId) throw new Error("Attach the signed client contract agreement before staffing.")
     const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: contractFileId,
@@ -896,7 +898,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     try { await Promise.all([refresh(), onReload()]) }
     catch { setFinalizedClient(current => current && { ...current, refreshFailed: true }) }
   }
-  const canAllocate = !!contractFileId && !!row?.workflow?.assessment && phases.length > 0 && !phaseScheduleIssue
+  const canAllocate = intakeLocked && !!contractFileId && !!row?.workflow?.assessment && phases.length > 0 && !phaseScheduleIssue
   const staffingLead = step >= 3 ? proposedStaffingLead(phases, team, planning?.candidates ?? {}) : null
   const staffingIssues = step >= 3 ? phases.flatMap(stage => {
     const entry = team.find(item => item.stage === stage)
@@ -1001,8 +1003,9 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const lotArea = Number(details.lot_area)
     const floorCount = Number(details.floor_count)
     const areaRange = floorAreaRange(lotArea, floorCount)
-    const rangeReady = Boolean(areaRange && lotArea >= MIN_AVERAGE_FLOOR_AREA && lotArea <= MAX_INQUIRY_AREA)
-    const minFloorArea = areaRange?.minimum ?? MIN_AVERAGE_FLOOR_AREA
+    const lotIssue = inquiryLotAreaError(details.lot_area)
+    const areaIssue = averageFloorAreaError(details.lot_area, details.floor_area_sqm, floorCount)
+    const rangeReady = Boolean(areaRange && !lotIssue)
     const floorLimit = areaRange?.maximum
     const formatArea = (area: number) => area.toLocaleString("en-PH", { maximumSignificantDigits: 15 })
     const input = (key: string, label: string, type = "text", required = true, maxLength?: number) => {
@@ -1017,28 +1020,20 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
         const total = key === "floor_area_sqm"
-        const outsideRange = value !== "" && (!Number.isFinite(Number(value)) || Number(value) < (total && rangeReady ? minFloorArea : MIN_AVERAGE_FLOOR_AREA) || Number(value) > MAX_INQUIRY_AREA ||
-          (total && rangeReady && floorLimit !== undefined && Number(value) > floorLimit))
-        const notice = required && projectTouched[key] && value === "" ? `Enter ${label.toLowerCase()}.`
-          : value && !Number.isFinite(Number(value)) ? "Enter a valid area."
-            : value && Number(value) > MAX_INQUIRY_AREA ? `Enter no more than ${formatArea(MAX_INQUIRY_AREA)} m².`
-              : outsideRange ? total && rangeReady
-                ? Number(value) < minFloorArea ? `Minimum total floor area is ${formatArea(minFloorArea)} m².`
-                  : `Maximum total floor area is ${formatArea(floorLimit!)} m².`
-                : `Enter at least ${MIN_AVERAGE_FLOOR_AREA} m².` : ""
+        const notice = value !== "" || projectTouched[key] ? total ? areaIssue : lotIssue : ""
         return <div className="inquiry-measurement-field"><div className="inquiry-measurement-heading">
           <label htmlFor={`inquiry-${key}`}>{label}{required && <span className="inquiry-required"> *</span>}</label>
           {total && <InfoPopover title="Floor area calculation" label="How total floor area is calculated">
-            <p>Total floor area is the combined area of all floors. The minimum average is 100% of the lot area per floor; the maximum average is 170% of the lot area.</p>
+            <p>Total floor area is the combined area of all floors. Each floor must fit within the lot area. Individual floor sizes are verified during project assessment.</p>
             <p>The allowable total uses the lot area, number of floors, and existing supported area limit.</p>
-            {rangeReady && <p>Allowed range: {formatArea(minFloorArea)}–{formatArea(floorLimit!)} m².</p>}
+            {rangeReady && <p>Maximum total: {formatArea(floorLimit!)} m².</p>}
           </InfoPopover>}
         </div>
-          <GroupedNumberInput id={`inquiry-${key}`} name={key} normalizeLeadingZeros required={required} min={total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
+          <GroupedNumberInput id={`inquiry-${key}`} name={key} preserveInvalidInput normalizeLeadingZeros required={required} validateValue={() => total ? areaIssue : lotIssue} value={value}
             aria-describedby={notice ? `inquiry-${key}-error` : total && rangeReady ? "inquiry-floor-area-range" : `inquiry-${key}-helper`} aria-invalid={Boolean(notice) || undefined}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
           {notice ? <small id={`inquiry-${key}-error`} className="inquiry-input-notice" aria-live="polite">{notice}</small>
-            : total && rangeReady ? <small id="inquiry-floor-area-range" className="inquiry-muted" aria-live="polite">Allowed range: {formatArea(minFloorArea)}–{formatArea(floorLimit!)} m².</small>
+            : total && rangeReady ? <small id="inquiry-floor-area-range" className="inquiry-muted" aria-live="polite">Maximum total: {formatArea(floorLimit!)} m².</small>
               : <small id={`inquiry-${key}-helper`} className="inquiry-muted">{total ? "Combined area of all floors." : "Minimum: 20 m²."}</small>}
         </div>
 
@@ -1082,6 +1077,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         setError(details.client_record === "existing" ? "Select an existing client." : "Choose the client record and client type."); return
       }
       if (adminFormStep === 1 && !isPhilippineMobile(String(details.phone ?? ""))) { setError(PH_MOBILE_ERROR); return }
+      if (adminFormStep === 2 && (lotIssue || areaIssue)) {
+        const key = lotIssue ? "lot_area" : "floor_area_sqm"
+        setProjectTouched(previous => ({ ...previous, [key]: true }))
+        document.getElementById(`inquiry-${key}`)?.focus()
+        return
+      }
       setError(""); setAdminFormStep(value => Math.min(value + 1, 3))
     }
     async function saveDraft() {
@@ -1122,7 +1123,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         if (adminFormStep < 3) { next(); return }
         const submitter = (event.nativeEvent as SubmitEvent).submitter
         if (!submitter?.classList.contains("admin-inquiry-submit")) return
-        if (!candidates) return
+        if (!candidates || !rangeReady || areaIssue) return
         void run(async () => {
           let result: Inquiry
           try {
@@ -1172,7 +1173,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
-              {rangeReady && Number(details.floor_area_sqm) >= minFloorArea && Number(details.floor_area_sqm) <= floorLimit! && <FloorAreaReview summary area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />}
+              {rangeReady && !areaIssue && <FloorAreaReview summary area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />}
             </div>
           </section>
           <section className="inquiry-project-section"><h3>OPM consultation request</h3>
@@ -1605,7 +1606,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
 
-    {dialog === "intake" && row?.status === "approved" && <Modal title={PROJECT_SETUP_LABEL} subtitle={<>
+    {dialog === "intake" && intakeLocked && row?.status === "approved" && <Modal title={PROJECT_SETUP_LABEL} subtitle={<>
       <span className="inquiry-setup-project-name">{String(row.details.name)}</span>
       <span className="inquiry-intake-progress">Step {step} of 4</span>
     </>} wide onClose={closeDialog} footer={<>

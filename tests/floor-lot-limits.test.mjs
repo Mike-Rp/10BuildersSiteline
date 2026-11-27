@@ -1,31 +1,38 @@
-import test from "node:test"
 import assert from "node:assert/strict"
-import { averageFloorAreaError, floorAreaRange, normalizeFloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import test from "node:test"
+import { averageFloorAreaError, floorAreaRange, normalizeFloorMeasurements, inquiryAssessmentReady } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
-test("average floor area can be below the lot with a 170% upper limit", () => {
-  assert.deepEqual(floorAreaRange(200, 2), { minimumAverage: 20, maximumAverage: 340, minimum: 40, maximum: 680 })
-  for (const total of [40, 200, 400, 599.99, 600, 640, 680]) assert.equal(averageFloorAreaError(200, total, 2), "")
-  for (const total of [39.99, 680.01]) assert.match(averageFloorAreaError(200, total, 2), /170%/)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 300}, 2, 200).total, 600)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 340}, 2, 200).total, 680)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 20}, 2, 200).total, 40)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 340.01}, 2, 200), null)
+test("Admin can validate the total against the lot and floor count", () => {
+  assert.deepEqual(floorAreaRange(800, 5), { maximum: 4000 })
+  for (const [total, floors] of [[800, 1], [3000, 5], [1200, 2], [0.01, 2]]) {
+    assert.equal(averageFloorAreaError(800, total, floors), "")
+  }
+  assert.match(averageFloorAreaError(800, 1000, 1), /must not exceed 800/)
+  for (const total of [0, -1, "", undefined, "invalid"]) assert.ok(averageFloorAreaError(800, total, 1))
 })
 
-test("individual floors use the combined average rather than a separate lot cap", () => {
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 440]}, 2, 200).total, 640)
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 399.99]}, 2, 200).total, 599.99)
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [200, 480.01]}, 2, 200), null)
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [0, 640]}, 2, 200), null)
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [320, ""]}, 2, 200), null)
-  assert.equal(normalizeFloorMeasurements({mode: "individual", areas: [320]}, 2, 200), null)
-})
+for (const project_type of ["Residential", "Commercial", "Mixed-Use"]) {
+  test(`${project_type} requires valid measurements even with a saved assessment`, () => {
+    const ready = (floorMeasurements, floor_count, floor_area_sqm) => inquiryAssessmentReady(
+      { project_type, lot_area: 800, floor_count, floor_area_sqm },
+      { assessment: { id: "stale" }, review: { floorMeasurements, mixed_use_scope: {} } },
+    )
+    const same = areaPerFloor => ({ mode: "same", areaPerFloor })
+    const individual = (...areas) => ({ mode: "individual", areas })
+    for (const [input, floors, total] of [[same(800), 1, 800], [same(600), 5, 3000], [individual(500, 700), 2, 1200]]) {
+      assert.equal(normalizeFloorMeasurements(input, floors, 800).total, total)
+      assert.equal(ready(input, floors, total), true)
+    }
+    for (const value of [1000, 0, -1, "", undefined, "invalid"]) {
+      assert.equal(ready(same(value), 1, 800), false)
+      assert.equal(ready(individual(100, value), 2, 800), false)
+    }
+    assert.equal(ready(undefined, 2, 1200), false)
+    assert.equal(ready(individual(700), 2, 1200), false)
+    assert.equal(ready(individual(500, 700), 2, 1100), false)
+  })
+}
 
-test("decimal boundaries and existing input limits remain consistent", () => {
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 30.15}, 2, 20.1).total, 60.3)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 34.17}, 2, 20.1).total, 68.34)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 20}, 2).total, 40)
-  assert.equal(normalizeFloorMeasurements({mode: "same", areaPerFloor: 19.99}, 2), null)
-  assert.equal(floorAreaRange(0, 2), null)
-  assert.equal(floorAreaRange(200, 201), null)
+test("decimal floor totals retain the existing precision", () => {
+  assert.equal(normalizeFloorMeasurements({ mode: "individual", areas: [0.1, 0.2] }, 2, 800).total, 0.3)
 })

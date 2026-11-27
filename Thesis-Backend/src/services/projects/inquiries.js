@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { isPhilippineMobile, PH_MOBILE_ERROR } from "../../domain/mobile-number.js";
 import { clientLoginEmail } from "./client-onboarding.js";
 import { findInquiryClients, inquiryClientIdentity, inquiryDraftDetails, resolveInquiryClient } from "./inquiry-clients.utility.js";
-import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, averageFloorAreaError, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA, MIN_AVERAGE_FLOOR_AREA } from "../../domain/inquiry-assessment.js";
+import { assessInquiry, earliestInquiryCompletion, inquiryAssessmentReady, inquiryCostEstimate, averageFloorAreaError, inquiryLotAreaError, reviewedInquiryDimensionsValid, normalizeFloorMeasurements, technicalOptions, arrangementOptions, MAX_INQUIRY_FLOORS, MAX_INQUIRY_AREA } from "../../domain/inquiry-assessment.js";
 
 export const inquiryTypes = ["Residential", "Commercial", "Mixed-Use"];
 const classifications = ["Normal", "Priority", "Urgent"];
@@ -29,7 +29,7 @@ function validateInquiryContact(details, previous) {
     throw new HttpError(422, PH_MOBILE_ERROR);
 }
 
-export function inquiryDetails(input, { validateAverage = true, minimumRatio = 1 } = {}) {
+export function inquiryDetails(input, { validateDimensions = true } = {}) {
   const details = inquiryClientIdentity(input);
   for (const key of ["client_name", "email", "phone", "name", "address"]) {
     const value = key === "client_name" && details.client_type === "company" ? details.company_name : input?.[key];
@@ -45,18 +45,23 @@ export function inquiryDetails(input, { validateAverage = true, minimumRatio = 1
   for (const key of ["lot_area", "floor_area_sqm", "floor_count"]) {
     const source = key === "lot_area" && (input.lot_area == null || input.lot_area === "") ? input.land_area : input[key];
     const value = Number(source);
+    if (!validateDimensions) {
+      details[key] = ["number", "string"].includes(typeof source) && Number.isFinite(value) ? value : source;
+      continue;
+    }
     if (key === "floor_count" && value > MAX_INQUIRY_FLOORS)
       throw new HttpError(422, `Enter no more than ${MAX_INQUIRY_FLOORS} floors. This exceeds the supported application range.`);
     if (key !== "floor_count" && value > MAX_INQUIRY_AREA)
       throw new HttpError(422, "The area exceeds the supported input range. Please review your measurements.");
-    if (!Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > MAX_INQUIRY_FLOORS)))
+    if (!["number", "string"].includes(typeof source) || !Number.isFinite(value) || value <= 0 || (key === "floor_count" && (!Number.isInteger(value) || value > MAX_INQUIRY_FLOORS)))
       throw new HttpError(422, `Enter a positive ${key.replaceAll("_", " ")}.`);
     details[key] = value;
   }
-  const areaIssue = validateAverage ? averageFloorAreaError(details.lot_area, details.floor_area_sqm, details.floor_count, minimumRatio) : "";
-  if (areaIssue) throw new HttpError(422, areaIssue);
-  if (details.lot_area < MIN_AVERAGE_FLOOR_AREA)
-    throw new HttpError(422, `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m².`);
+  if (validateDimensions) {
+    const areaIssue = inquiryLotAreaError(details.lot_area) ||
+      averageFloorAreaError(details.lot_area, details.floor_area_sqm, details.floor_count);
+    if (areaIssue) throw new HttpError(422, areaIssue);
+  }
   if (![30, 60, 1440].includes(input.consultation)) throw new HttpError(422, "Select a consultation timing.");
   details.consultation = input.consultation;
   if (input.classification != null) {
@@ -159,12 +164,25 @@ function recordRoutingEvent(details, event) {
   details.routing_history = [...(details.routing_history ?? []), { ...event, at: new Date().toISOString() }];
 }
 
+function clearInvalidInquiryAssessment(workflow) {
+  if (workflow.review) workflow.review = { ...workflow.review, estimate: { size: null, end: null } };
+  if (!workflow.signed_contract && workflow.staffing?.contract_file_id)
+    workflow.signed_contract = { id: workflow.staffing.contract_file_id, name: "Signed Client Contract Agreement" };
+  delete workflow.assessment;
+  delete workflow.staffing;
+}
+
 function inquiryResponse(row, includeHistory = false) {
   const { routing_history, opm_workflow, opm_match, land_area, ...details } = row.details;
   if (!details.lot_area && land_area) details.lot_area = land_area;
+  let workflow = opm_workflow;
+  if (workflow && !reviewedInquiryDimensionsValid(details, workflow.review)) {
+    workflow = { ...workflow };
+    clearInvalidInquiryAssessment(workflow);
+  }
   return { ...row, details, ...(includeHistory
     ? { routing_history }
-    : { workflow: opm_workflow }) };
+    : { workflow }) };
 }
 
 export function staffingAssessment(row, input) {
@@ -172,8 +190,10 @@ export function staffingAssessment(row, input) {
   const assessment = workflow?.assessment;
   if (!assessment || !assessment.id || input?.assessment_id !== assessment.id)
     throw new HttpError(409, "Complete the current project assessment before opening staffing.");
-  const original = inquiryDetails(row.details, { minimumRatio: 0.7 });
-  const submitted = inquiryDetails(input, { minimumRatio: 0.7 });
+  if (!reviewedInquiryDimensionsValid({ ...row.details, lot_area: row.details.lot_area ?? row.details.land_area }, workflow.review))
+    throw new HttpError(422, "Confirm valid lot and individual floor areas before opening staffing.");
+  const original = inquiryDetails(row.details);
+  const submitted = inquiryDetails(input);
   if (Object.keys(original).length !== Object.keys(submitted).length ||
       Object.entries(original).some(([key, value]) => submitted[key] !== value) ||
       input.target_start_date !== workflow.review.start || input.target_end_date !== workflow.review.end ||
@@ -432,7 +452,7 @@ export function mountInquiries(router) {
         typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 1000) throw new HttpError(422, "Enter a valid field, replacement and reason.");
       const proposed = { ...details, [input.field]: input.value.trim() };
       if (input.field === "company_name") proposed.client_name = proposed.company_name;
-      inquiryDetails(proposed, { minimumRatio: 0.7 }); validateInquiryContact(proposed, details);
+      inquiryDetails(proposed); validateInquiryContact(proposed, details);
       if (String(details[input.field] ?? "") === input.value.trim()) throw new HttpError(422, "Enter a different replacement.");
       history.push({ id: randomUUID(), field: input.field, before: details[input.field] ?? "", after: input.value.trim(), reason: input.reason.trim(), status: "pending", by: actor.id, at: new Date().toISOString() });
       await notifyInquiry(db, actor.id, row.admin_id, input.field === "project_type" ? "Project type correction requested" : "Client correction requested", details.name);
@@ -450,7 +470,7 @@ export function mountInquiries(router) {
           throw new HttpError(409, "Project type is locked under the finalized signed contract.");
         details[item.field] = item.after;
         if (item.field === "company_name") details.client_name = item.after;
-        inquiryDetails(details, { minimumRatio: 0.7 }); validateInquiryContact(details, row.details);
+        inquiryDetails(details); validateInquiryContact(details, row.details);
         if (item.field === "project_type" && details.opm_workflow) {
           const workflow = { ...details.opm_workflow };
           if (workflow.review) {
@@ -487,6 +507,9 @@ export function mountInquiries(router) {
     const workflow = { ...details.opm_workflow };
     if ((workflow.review?.version ?? 0) !== input.version)
       throw new HttpError(409, "The project record changed. Reopen the inquiry to load the latest version.");
+    if (!details.lot_area && details.land_area) details.lot_area = details.land_area;
+    const dimensionsValid = reviewedInquiryDimensionsValid(details, workflow.review);
+    if (!dimensionsValid && !row.project_id) clearInvalidInquiryAssessment(workflow);
     const intakeLocked = inquiryAssessmentReady(details, workflow);
     const contractLocked = inquiryContractLocked(details, workflow);
     if (contractLocked && !workflow.signed_contract && workflow.staffing?.contract_file_id)
@@ -535,7 +558,7 @@ export function mountInquiries(router) {
         const arrangement = input.arrangement ?? workflow.review?.arrangement;
         if (!technicalOptions.includes(technical) || !arrangementOptions.includes(arrangement))
           throw new HttpError(422, "Select the technical requirements and phase arrangement.");
-        const before = inquiryDetails(details, { validateAverage: false });
+        const before = inquiryDetails(details, { validateDimensions: false });
         if (input.correction?.project_type !== undefined && input.correction.project_type !== before.project_type)
           throw new HttpError(403, "Project type is read-only.");
         for (const key of ["client_name", "email", "phone", "client_type", "company_name", "primary_contact", "designation"]) {
@@ -549,10 +572,12 @@ export function mountInquiries(router) {
           if (before[key] === undefined) delete corrected[key];
           else corrected[key] = before[key];
         }
-        const areas = normalizeFloorMeasurements(input.floorMeasurements ?? { mode: "same", areaPerFloor: Number(corrected.floor_area_sqm) / Number(corrected.floor_count) }, Number(corrected.floor_count), Number(corrected.lot_area));
-        if (areas === null) throw new HttpError(422, `Enter a positive area for every floor, with an average of at least ${MIN_AVERAGE_FLOOR_AREA} m² per floor. The average floor area must not exceed 170% of the lot area.`);
-        if (areas) corrected.floor_area_sqm = areas.total;
-        const after = inquiryDetails(corrected, { minimumRatio: 0.7 });
+        const lotIssue = inquiryLotAreaError(corrected.lot_area);
+        if (lotIssue) throw new HttpError(422, lotIssue);
+        const areas = normalizeFloorMeasurements(input.floorMeasurements, Number(corrected.floor_count), corrected.lot_area);
+        if (!areas) throw new HttpError(422, "Enter each floor area greater than zero and no greater than the lot area. Check the floor count and supported total area.");
+        corrected.floor_area_sqm = areas.total;
+        const after = inquiryDetails(corrected);
         if (input.correction) validateInquiryContact(after, before);
         const localToday = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
         const earliestStartDate = new Date(localToday + "T00:00:00Z");
@@ -579,14 +604,9 @@ export function mountInquiries(router) {
         for (const key of Object.keys(before)) delete details[key];
         Object.assign(details, after);
         const version = (workflow.review?.version ?? 0) + 1;
-        // Old callers can still save a total. Clear an old breakdown if it no longer matches those measurements.
-        const floorMeasurements = areas?.measurements ?? (after.floor_count === before.floor_count &&
-          after.floor_area_sqm === before.floor_area_sqm ? workflow.review?.floorMeasurements : undefined);
-        if (floorMeasurements && !normalizeFloorMeasurements(floorMeasurements, after.floor_count, after.lot_area))
-          throw new HttpError(422, "Floor measurements must meet the 90% first/same-floor, 70% subsequent-floor minimums and 170% maximum of the lot area.");
         workflow.review = { ...schedule, version, estimate: { size: suggestion.size, end: suggestion.suggestedEnd },
           ...(mixedUseScope ? { mixed_use_scope: mixedUseScope } : {}),
-          ...(floorMeasurements ? { floorMeasurements } : {}) };
+          floorMeasurements: areas.measurements };
         workflow.review_history = [...(workflow.review_history ?? []), { ...audit, version, changes, reason }];
         delete workflow.assessment;
         const budget = input.amount === undefined ? workflow.budget : input.amount;
@@ -594,7 +614,7 @@ export function mountInquiries(router) {
         break;
       }
       case "budget": {
-        if (!workflow.review || workflow.review.requires_review || details.project_type === "Mixed-Use" && !workflow.review.mixed_use_scope)
+        if (!dimensionsValid || !workflow.review || workflow.review.requires_review || details.project_type === "Mixed-Use" && !workflow.review.mixed_use_scope)
           throw new HttpError(409, "Confirm the project information before saving the budget.");
         const { start, end, technical = technicalOptions[0], arrangement = arrangementOptions[0] } = workflow.review;
         const { complexity } = assessInquiry(details, start, end, technical, arrangement, workflow.review.mixed_use_scope);
@@ -602,6 +622,7 @@ export function mountInquiries(router) {
         break;
       }
       case "assessment": {
+        if (!dimensionsValid) throw new HttpError(422, "Confirm valid lot and individual floor areas before assessment.");
         if (!workflow.review || !workflow.budget || !intakeLocked)
           throw new HttpError(409, "Confirm the project schedule and save the approved budget first.");
         if (!technicalOptions.includes(input.technical) || !arrangementOptions.includes(input.arrangement))

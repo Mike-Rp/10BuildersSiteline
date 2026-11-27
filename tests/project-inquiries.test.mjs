@@ -78,12 +78,10 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const admin = await login("patricia.domingo@10builders.com","admin")
   const root = "/projects/inquiries"
   const details = {client_name:"Ana Reyes",email:`ana-${crypto.randomUUID()}@example.com`,phone:"09123456789",name:"Maple Grove Residence",
-    address:"Quezon City",project_type:"Residential",lot_area:60,floor_area_sqm:180,floor_count:2,consultation:30}
+    address:"Quezon City",project_type:"Residential",lot_area:120,floor_area_sqm:180,floor_count:2,consultation:30}
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_count:3213211} })
   await call("/projects/inquiries", { token:admin, status:422, json:{...details,floor_area_sqm:1e30} })
-  await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:234} })
-  await call(root, { token:admin, status:422, json:{...details,lot_area:7432,floor_count:200,floor_area_sqm:3999.99} })
-  for (const floor_area_sqm of [39.99, 204.01]) {
+  for (const floor_area_sqm of [0, -1, "", "invalid", 240.01]) {
     await call(root, {token:admin, status:422, json:{...details, floor_area_sqm}})
   }
   const create = () => call(root,{token:admin,json:details})
@@ -145,7 +143,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   const delayed = await call(root,{token:admin,json:{...regular,expected_opm_id:candidates[0].id}})
   assert.equal(delayed.status,"offered")
   assert.equal(delayed.details.land_area, undefined)
-  assert.equal(delayed.details.lot_area, 60)
+  assert.equal(delayed.details.lot_area, 120)
   assert.equal(delayed.opm_id,candidates[0].id)
   assert.equal(delayed.opm_name,candidates[0].name)
   assert.equal(delayed.details.phone,"+639123456789")
@@ -219,27 +217,32 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(planning,{token,status:409,json:intake})
   await save("budget",0,{amount:4500000},409)
   const schedule = {start:intake.target_start_date,end:intake.target_end_date}
-  // A pre-existing record outside the new range can still be corrected during review.
-  await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{lot_area}','240'::jsonb) WHERE id=$1", [row.id])
+  // A legacy record with an oversized average can still be corrected during review.
+  await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{lot_area}','60'::jsonb) WHERE id=$1", [row.id])
   const assessmentInput = {technical:"Several specialized systems",arrangement:"Partially overlapping phases"}
-  await save("review",0,{...schedule,end:"2027-02-25",...assessmentInput},422)
-  await save("review",0,{...schedule,end:"2027-05-10",...assessmentInput},422)
-  await save("review",0,{...schedule,end:"2027-05-11",amount:1,...assessmentInput},422)
-  await save("review",0,{...schedule,end:"2027-05-11",amount:4500000.001,...assessmentInput},422)
-  const initialReview = (await save("review",0,{...schedule,end:"2027-05-11",...assessmentInput,correction:{lot_area:60},reason:"Correct the legacy lot measurement."})).workflow.review
+  await save("review",0,{...schedule,...assessmentInput,correction:{lot_area:120}},422)
+  const initialMeasurements = { mode: "same", areaPerFloor: 90 }
+  const initialInput = { ...assessmentInput, correction: { lot_area: 120 }, floorMeasurements: initialMeasurements,
+    reason: "Correct the legacy lot measurement." }
+  await save("review",0,{...schedule,end:"2027-02-25",...initialInput},422)
+  await save("review",0,{...schedule,end:"2027-05-10",...initialInput},422)
+  await save("review",0,{...schedule,end:"2027-05-11",amount:1,...initialInput},422)
+  await save("review",0,{...schedule,end:"2027-05-11",amount:4500000.001,...initialInput},422)
+  const initialReview = (await save("review",0,{...schedule,end:"2027-05-11",...initialInput})).workflow.review
   assert.equal(initialReview.technical,assessmentInput.technical)
   assert.equal(initialReview.arrangement,assessmentInput.arrangement)
   assert.equal(initialReview.end,"2027-05-11")
   assert.equal(initialReview.estimate.end,initialReview.end)
   await save("assessment",1,assessmentInput,409)
   await save("budget",1,{amount:4500000.001},422)
-  const correction = {...schedule,correction:{floor_area_sqm:999},floorMeasurements:{mode:"individual",areas:[110,90]}}
+  const correction = {...schedule,correction:{floor_area_sqm:999},floorMeasurements:{mode:"individual",areas:[90,110]}}
   await save("review",1,{...correction,floorMeasurements:{mode:"individual",areas:[110]},reason:"Incomplete breakdown"},422)
+  await save("review",1,{...correction,floorMeasurements:{mode:"individual",areas:[79,121]},reason:"Oversized upper floor"},422)
   await save("review",1,correction,422)
   const review = (await save("review",1,{...correction,reason:"Client confirmed the revised floor area."})).workflow
   assert.equal(review.assessment,undefined)
   assert.deepEqual(review.review_history.at(-1).changes.floor_area_sqm,{before:180,after:200})
-  assert.deepEqual(review.review.floorMeasurements,{mode:"individual",areas:[110,90]})
+  assert.deepEqual(review.review.floorMeasurements,{mode:"individual",areas:[90,110]})
   await save("assessment",1,assessmentInput,409)
   await save("budget",2,{amount:0},422)
   await save("budget",2,{amount:1},422)
@@ -253,6 +256,13 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   assert.equal(assessed.assessment.planningDays,131)
   assert.equal(assessed.assessment.suggestedEnd,"2027-05-23")
   assert.equal(assessed.budget_history[0].amount,updatedBudget)
+  await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{lot_area}','80'::jsonb) WHERE id=$1", [row.id])
+  const stale = (await call(root,{token})).find(inquiry=>inquiry.id===row.id)
+  assert.equal(stale.workflow.assessment,undefined)
+  assert.equal(stale.workflow.review.estimate.end,null)
+  await save("assessment",2,assessmentInput,422)
+  await call(planning,{token,status:422,json:{...intake,assessment_id:assessed.assessment.id}})
+  await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{lot_area}','120'::jsonb) WHERE id=$1", [row.id])
   await save("review",2,{...schedule,reason:"Attempt an edit after assessment."},409)
   await save("budget",2,{amount:4500000},409)
   await save("assessment",2,assessmentInput,409)
@@ -503,7 +513,7 @@ for (const multiEngineer of [false,true]) test(`Admin inquiry becomes an OPM-own
   await call(`${root}/${wrongType.id}/workflow`,{token,status:409,json:{action:"contract",version:oldWorkflow.review.version,
     contract_file_id:replacement,expected_contract_file_id:oldWorkflow.signed_contract.id}})
   const lockedPlan = {...planInput,floor_area_sqm:details.floor_area_sqm,contract_file_id:replacement,phases}
-  await call(`${root}/${wrongType.id}/planning`,{token,status:409,json:lockedPlan})
+  await call(`${root}/${wrongType.id}/planning`,{token,status:422,json:lockedPlan})
   const {signed_contract,contract_locked,staffing,...beforeContract} = oldWorkflow
   await db.query("UPDATE project_inquiries SET details=jsonb_set(details,'{opm_workflow}',$2::jsonb) WHERE id=$1",
     [wrongType.id,JSON.stringify(beforeContract)])

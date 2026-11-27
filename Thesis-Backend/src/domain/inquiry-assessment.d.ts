@@ -4,8 +4,11 @@ export const MIN_INQUIRY_DURATION_DAYS: number;
 export const MAX_INQUIRY_FLOORS: number;
 export const MAX_INQUIRY_AREA: number;
 export const MIN_AVERAGE_FLOOR_AREA: number;
-export function floorAreaRange(lot: unknown, floors: number, minimumRatio?: number): { minimumAverage: number; maximumAverage: number; minimum: number; maximum: number } | null;
-export function averageFloorAreaError(lot: unknown, total: unknown, floors: number, minimumRatio?: number): string;
+export function floorAreaRange(lot: unknown, floors: number): { maximum: number } | null;
+export function averageFloorAreaError(lot: unknown, total: unknown, floors: number): string;
+export function inquiryLotAreaError(lot: unknown): string;
+export function floorAreaError(lot: unknown, area: unknown): string;
+export function reviewedInquiryDimensionsValid(details: Record<string, string | number>, review?: { floorMeasurements?: FloorMeasurements }): boolean;
 export type FloorMeasurements = { mode: "same"; areaPerFloor: number } | { mode: "individual"; areas: number[] };
 export function normalizeFloorMeasurements(input: unknown, floorCount: number, lotArea?: number): { measurements: FloorMeasurements; total: number } | null;
 export function intakeSize(floorArea: number, floors: number): string;
@@ -20,7 +23,7 @@ export function inquiryAssessmentBasis(details: Record<string, string | number>,
 };
 export function earliestInquiryCompletion(start: string, estimate: { suggestedEnd: string | null }): string | null;
 export function inquiryAssessmentReady(details: Record<string, string | number>, workflow?: {
-  assessment?: unknown; budget?: number; review?: { start: string; end: string; technical?: string; arrangement?: string; mixed_use_scope?: MixedUseSelections };
+  assessment?: unknown; budget?: number; review?: { start: string; end: string; technical?: string; arrangement?: string; requires_review?: boolean; floorMeasurements?: FloorMeasurements; mixed_use_scope?: MixedUseSelections };
 }): boolean;
 export function assessInquiry(
   details: Record<string, string | number>,

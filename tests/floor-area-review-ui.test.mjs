@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom"
 import { createServer } from "vite"
 import React from "react"
 
-test("small average floor area shows a blocking measurement error without an override", async () => {
+test("preliminary validation checks the available total and lot area", async () => {
   const dom = new JSDOM('<div id="root"></div>')
   const previous = new Map()
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -18,14 +18,13 @@ test("small average floor area shows a blocking measurement error without an ove
     const { default: Review } = await server.ssrLoadModule("/src/FloorAreaReview.tsx")
     const render = (area, floors, lot) => React.act(() => root.render(React.createElement("form", {}, React.createElement(Review, { area, floors, lot }))))
     await render(3, 100)
-    assert.match(document.querySelector('[role="alert"]').textContent, /at least 2,000 m² for 100 floors/)
+    assert.match(document.body.textContent, /Average floor area: 0.03/)
     assert.equal(document.querySelector('input[type="checkbox"]'), null)
     await render(234, 200, 7432)
-    assert.match(document.querySelector('[role="alert"]').textContent, /170%/)
-    assert.doesNotMatch(document.body.textContent, /Average floor area:/)
-    await render(2400, 2, 743.2)
     assert.equal(document.querySelector('[role="alert"]'), null)
-    assert.match(document.body.textContent, /Average floor area: 1,200/)
+    await render(1200, 2, 743.2)
+    assert.equal(document.querySelector('[role="alert"]'), null)
+    assert.match(document.body.textContent, /Average floor area: 600/)
     await render(180, 2)
     assert.match(document.body.textContent, /Average floor area: 90 m² per floor/)
     assert.equal(document.querySelector("input"), null)
@@ -37,10 +36,10 @@ test("small average floor area shows a blocking measurement error without an ove
     assert.match(document.querySelector('[role="alert"]').textContent, /no more than 200 floors/)
     assert.doesNotMatch(document.body.textContent, /Average floor area:/)
     await render(54571, 100, 321)
-    assert.match(document.querySelector('[role="alert"]').textContent, /170%/)
+    assert.match(document.querySelector('[role="alert"]').textContent, /must not exceed/)
     assert.doesNotMatch(document.body.textContent, /Average floor area:/)
-    await render(640, 2, 200)
-    assert.match(document.body.textContent, /Average floor area: 320/)
+    await render(400, 2, 200)
+    assert.match(document.body.textContent, /Average floor area: 200/)
   } finally {
     await React.act(() => root.unmount())
     await server.close()

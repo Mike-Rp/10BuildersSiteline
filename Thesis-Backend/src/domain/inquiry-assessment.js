@@ -4,53 +4,57 @@ export const MIN_INQUIRY_DURATION_DAYS = 45;
 // Supported intake range, not a statutory building-height restriction.
 export const MAX_INQUIRY_FLOORS = 200;
 export const MAX_INQUIRY_AREA = 1_000_000_000;
-// Product data-entry policy, not a building regulation.
+// Existing minimum lot area.
 export const MIN_AVERAGE_FLOOR_AREA = 20;
 
 const positiveArea = value => (typeof value === "number" || typeof value === "string") &&
   Number.isFinite(Number(value)) && Number(value) > 0 && Number(value) <= MAX_INQUIRY_AREA;
 
-export function floorAreaRange(lot, floors, minimumRatio = 1) {
+export function floorAreaRange(lot, floors) {
   if (!positiveArea(lot) || !Number.isInteger(floors) || floors < 1 || floors > MAX_INQUIRY_FLOORS) return null;
-  const minimumAverage = Number((Number(lot) * minimumRatio).toPrecision(15));
-  const maximumAverage = Number((Number(lot) * 1.7).toPrecision(15));
-  return { minimumAverage, maximumAverage,
-    minimum: Number((minimumAverage * floors).toPrecision(15)),
-    maximum: Math.min(MAX_INQUIRY_AREA, Number((maximumAverage * floors).toPrecision(15))) };
+  return { maximum: Math.min(MAX_INQUIRY_AREA, Number((Number(lot) * floors).toPrecision(15))) };
 }
 
-export function averageFloorAreaError(lot, total, floors, minimumRatio = 1) {
-  const range = floorAreaRange(lot, floors, minimumRatio);
-  if (!range || !Number.isFinite(Number(total)) || Number(total) <= 0) return "";
-  const area = Number(Number(total).toPrecision(15));
-  if (area >= range.minimum && area <= range.maximum) return "";
-  const format = value => value.toLocaleString("en-PH", { maximumSignificantDigits: 15 });
-  return `Average floor area must be at least ${minimumRatio * 100}% and no more than 170% of the lot area (${format(range.minimumAverage)}–${format(range.maximumAverage)} m² per floor). Total floor area must be ${format(range.minimum)}–${format(range.maximum)} m² for ${floors} floors.`;
+export function averageFloorAreaError(lot, total, floors) {
+  if (!positiveArea(total)) return "Enter a positive total floor area within the supported range.";
+  const range = floorAreaRange(lot, floors);
+  if (!range || Number(total) <= range.maximum) return "";
+  return `Total floor area must not exceed ${range.maximum.toLocaleString("en-PH", { maximumSignificantDigits: 15 })} m² for the lot area and floor count.`;
+}
+
+export function inquiryLotAreaError(lot) {
+  return positiveArea(lot) && Number(lot) >= MIN_AVERAGE_FLOOR_AREA
+    ? "" : `Enter a lot area of at least ${MIN_AVERAGE_FLOOR_AREA} m² within the supported range.`;
+}
+
+export function floorAreaError(lot, area) {
+  if (!positiveArea(area)) return "Enter a positive floor area within the supported range.";
+  if (positiveArea(lot) && Number(area) > Number(lot)) return "Each floor area must not exceed the lot area.";
+  return "";
 }
 
 export function normalizeFloorMeasurements(input, floorCount, lotArea) {
-  if (!input || !Number.isInteger(floorCount) || floorCount < 1 || floorCount > MAX_INQUIRY_FLOORS) return null;
+  if (!input || !Number.isInteger(floorCount) || floorCount < 1 || floorCount > MAX_INQUIRY_FLOORS ||
+    (lotArea !== undefined && inquiryLotAreaError(lotArea))) return null;
+  const validFloor = area => !floorAreaError(lotArea, area);
   let measurements, total;
-  if (input.mode === "same" && positiveArea(input.areaPerFloor)) {
+  if (input.mode === "same" && validFloor(input.areaPerFloor)) {
     measurements = { mode: "same", areaPerFloor: Number(input.areaPerFloor) };
     total = measurements.areaPerFloor * floorCount;
   } else if (input.mode === "individual" && Array.isArray(input.areas) && input.areas.length === floorCount &&
-    Array.from(input.areas).every(positiveArea)) {
+    Array.from(input.areas).every(validFloor)) {
     measurements = { mode: "individual", areas: input.areas.map(Number) };
     total = measurements.areas.reduce((sum, area) => sum + area, 0);
   }
-  if (lotArea !== undefined) {
-    if (!positiveArea(lotArea) || !measurements) return null;
-    const values = measurements.mode === "same" ? Array(floorCount).fill(measurements.areaPerFloor) : measurements.areas;
-    if (values.some((area, index) => {
-      const ratio = measurements.mode === "same" || index === 0 ? 0.9 : 0.7;
-      const minimum = Number((lotArea * ratio).toPrecision(15));
-      const maximum = Number((lotArea * 1.7).toPrecision(15));
-      return area < minimum || area > maximum;
-    })) return null;
-  }
   // Avoid carrying floating-point noise from decimal area inputs into classification and duration.
   return Number.isFinite(total) && total > 0 && total <= MAX_INQUIRY_AREA ? { measurements, total: Number(total.toPrecision(15)) } : null;
+}
+
+export function reviewedInquiryDimensionsValid(details, review) {
+  if (inquiryLotAreaError(details.lot_area) || !["number", "string"].includes(typeof details.floor_count)) return false;
+  const measurements = normalizeFloorMeasurements(review?.floorMeasurements, Number(details.floor_count), details.lot_area);
+  return !!measurements &&
+    positiveArea(details.floor_area_sqm) && measurements.total === Number(details.floor_area_sqm);
 }
 
 export function intakeSize(floorArea, floors) {
@@ -139,7 +143,8 @@ export function earliestInquiryCompletion(start, estimate) {
 }
 
 export function inquiryAssessmentReady(details, workflow) {
-  if (details.project_type === "Mixed-Use" && !workflow?.review?.mixed_use_scope) return false;
+  if (!reviewedInquiryDimensionsValid(details, workflow?.review) || workflow.review.requires_review) return false;
+  if (details.project_type === "Mixed-Use" && !workflow.review.mixed_use_scope) return false;
   if (workflow?.assessment) return true;
   const review = workflow?.review;
   if (!review || !workflow.budget) return false;

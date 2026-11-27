@@ -6,7 +6,7 @@ import MobileNumberInput from "./MobileNumberInput"
 import GroupedNumberInput from "./GroupedNumberInput"
 import { PH_MOBILE_ERROR } from "../Thesis-Backend/src/domain/mobile-number.js"
 import { MIXED_USE_FEATURES, MIXED_USE_USES, mixedUseSelectionsError, type MixedUseSelections } from "../Thesis-Backend/src/domain/mixed-use-scope.js"
-import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, floorAreaRange, averageFloorAreaError, MAX_INQUIRY_AREA, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, MIN_AVERAGE_FLOOR_AREA, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
+import { arrangementOptions, assessInquiry, earliestInquiryCompletion, inquiryAssessmentBasis, inquiryAssessmentReady, inquiryCostEstimate, inquirySize, floorAreaError, inquiryLotAreaError, averageFloorAreaError, reviewedInquiryDimensionsValid, normalizeFloorMeasurements, technicalOptions, MAX_INQUIRY_FLOORS, MIN_INQUIRY_DURATION_DAYS, type FloorMeasurements } from "../Thesis-Backend/src/domain/inquiry-assessment.js"
 
 export type OfficePage = "pending" | "received" | "accepted" | "proposal" | "review" | "assessment"
 type Details = Record<string, string | number>
@@ -116,18 +116,19 @@ function Notice({ tone = "", children }: { tone?: string; children: ReactNode })
   </div>
 }
 
-type ReviewItemState = "input" | "review" | "complete"
+type ReviewItemState = "input" | "review" | "complete" | "invalid"
 function ReviewItemStatus({ state }: { state: ReviewItemState }) {
   return <span className="office-item-status" data-state={state} role="status">
     <Icon name={state === "complete" ? "check" : state === "review" ? "clock" : "edit"} size={14} />
-    {state === "complete" ? "Complete" : state === "review" ? "Needs review" : "Needs your input"}
+    {state === "complete" ? "Complete" : state === "review" ? "Needs review" : state === "invalid" ? "Invalid" : "Needs your input"}
   </span>
 }
 
 export default function OfficeInquiryWorkflow({ row, page, reference, consultation, busy, error, pendingCount, justApproved, navigate, back, startStaffing, signedContract, hasSignedContract, decide, save }: Props) {
   const workflow = row.workflow
   const review = workflow?.review
-  const assessment = workflow?.assessment
+  const dimensionsValid = reviewedInquiryDimensionsValid(row.details, review)
+  const assessment = dimensionsValid ? workflow?.assessment : undefined
   const recordLocked = Boolean(assessment || workflow?.staffing || row.project_id)
   const [assessmentConfirmation, setAssessmentConfirmation] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -208,7 +209,6 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
 
   const name = String(row.details.name || "Project inquiry")
   const accepted = row.status === "approved"
-  const assessmentAvailable = accepted && inquiryAssessmentReady(row.details, workflow)
   const title = {
     pending: "Pending inquiry", received: pendingCount ? "Inquiry accepted" : "No pending inquiries", accepted: name,
     proposal: "Client proposal", review: "Edit project information", assessment: "Project assessment",
@@ -234,7 +234,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ["Estimated completion", review ? formatDay(review.end) : "Not provided"],
     ["Classification", row.details.classification || "Normal"],
   ]
-  const preview = review && (assessment || assessInquiry(row.details, review.start, review.end, review.technical ?? technicalOptions[0], review.arrangement ?? arrangementOptions[0], review.mixed_use_scope))
+  const preview = dimensionsValid && review && (assessment || assessInquiry(row.details, review.start, review.end, review.technical ?? technicalOptions[0], review.arrangement ?? arrangementOptions[0], review.mixed_use_scope))
   const currentEstimate = page === "assessment" && review && preview &&
     (assessment ? assessInquiry(row.details, review.start, review.end, preview.technical, preview.arrangement, review.mixed_use_scope) : preview)
   const assessmentBasis = currentEstimate && preview && currentEstimate.size === preview.size && currentEstimate.score === preview.score &&
@@ -243,22 +243,20 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     ? inquiryAssessmentBasis(row.details, preview.technical, preview.arrangement, review?.mixed_use_scope) : undefined
   const minimumReviewedEnd = review && preview ? earliestInquiryCompletion(review.start, preview) : null
   const assessmentNeedsDates = !assessment && !!review && (!minimumReviewedEnd || review.end < minimumReviewedEnd)
-  const reviewing = !recordLocked && (editing || !review || review.requires_review || mixedUse && !review.mixed_use_scope)
+  const reviewing = !recordLocked && (editing || !dimensionsValid || !review || review.requires_review || mixedUse && !review.mixed_use_scope)
   const compactReview = page === "review" && reviewing
   const showIntakeRecord = page !== "pending" && page !== "received" && !compactReview
   const floorCount = Number(draft.floor_count)
   const validFloorCount = Number.isInteger(floorCount) && floorCount > 0 && floorCount <= MAX_INQUIRY_FLOORS
-  const lotArea = Number(draft.lot_area)
-  const areaRange = floorAreaRange(lotArea, floorCount, 0.9)
-  const submittedAverage = floorArea.submittedAverage
-  const averageOutsideCorrectedLot = submittedAverage !== null && lotArea > 0 &&
-    lotArea !== Number(row.details.lot_area) && !!averageFloorAreaError(lotArea, submittedAverage * floorCount, floorCount, 0.9)
-  const perFloor = floorArea.perFloor ?? (averageOutsideCorrectedLot ? "" : String(submittedAverage ?? ""))
+  const perFloor = floorArea.perFloor ?? String(floorArea.submittedAverage ?? "")
   const floorInputs = compactReview && validFloorCount && floorArea.mode === "individual"
     ? Array.from({ length: floorCount }, (_, index) => floorArea.areas[index] ?? "") : []
   const calculatedArea = compactReview ? normalizeFloorMeasurements(floorArea.mode === "same"
     ? { mode: "same", areaPerFloor: perFloor }
-    : { mode: "individual", areas: floorInputs }, floorCount, lotArea) : null
+    : { mode: "individual", areas: floorInputs }, floorCount, Number(draft.lot_area)) : null
+  const assessmentAvailable = accepted && (!compactReview || !!calculatedArea) && inquiryAssessmentReady(row.details, workflow)
+  const lotIssue = inquiryLotAreaError(draft.lot_area)
+  const floorError = (value: string) => floorAreaError(draft.lot_area, value)
   const measuredDraft: Details = { ...draft, floor_area_sqm: calculatedArea?.total ?? "" }
   const scheduleEstimate = compactReview && calculatedArea && hasSizeInputs(measuredDraft) && technical && arrangement
     ? assessInquiry(measuredDraft, validStart ? start : "", end, technical, arrangement, mixedUse ? scope : undefined)
@@ -266,7 +264,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const earliestCompletion = validStart && scheduleEstimate ? earliestInquiryCompletion(start, scheduleEstimate) ?? undefined : undefined
   const selectedCompletion = end || earliestCompletion || ""
   const budgetDetails = reviewing ? measuredDraft : row.details
-  const budgetComplexity = reviewing ? scheduleEstimate?.complexity : review && hasSizeInputs(budgetDetails)
+  const budgetComplexity = reviewing ? scheduleEstimate?.complexity : dimensionsValid && review && hasSizeInputs(budgetDetails)
     ? assessInquiry(budgetDetails, review.start, review.end, review.technical ?? technicalOptions[0],
       review.arrangement ?? arrangementOptions[0], review.mixed_use_scope).complexity : undefined
   const costEstimate = budgetComplexity ? inquiryCostEstimate(budgetDetails, budgetComplexity) : null
@@ -286,14 +284,15 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   const hasCorrections = correctionFields.some(([key]) => fieldValue(key, measuredDraft[key]) !== fieldValue(key, row.details[key]))
   const needsReason = hasCorrections || !!review && (start !== review.start || selectedCompletion !== review.end ||
     technical !== (review.technical ?? "") || arrangement !== (review.arrangement ?? ""))
-  const floorState: ReviewItemState = !calculatedArea ? "input" : reviewedItems.floors ? "complete" : "review"
+  const floorState: ReviewItemState = !calculatedArea ? "invalid" : reviewedItems.floors ? "complete" : "review"
   const datesValid = validStart && !!earliestCompletion && selectedCompletion >= earliestCompletion
   const dateState: ReviewItemState = !datesValid ? "input" : reviewedItems.dates ? "complete" : "review"
   const budgetValid = !!costEstimate && /^\d+(?:\.\d{0,2})?$/.test(budget) && Number(budget) >= costEstimate.minimum && Number(budget) <= 999999999999.99
   const budgetState: ReviewItemState = budgetValid ? "complete" : "input"
   function markReviewed(key: string) { setReviewedItems(previous => ({ ...previous, [key]: true })) }
   const size = compactReview && hasSizeInputs(measuredDraft) ? inquirySize(measuredDraft) : undefined
-  const originalSize = size && hasSizeInputs(original) ? inquirySize(original) : undefined
+  const originalSize = size && hasSizeInputs(original) && !inquiryLotAreaError(original.lot_area) &&
+    !averageFloorAreaError(original.lot_area, original.floor_area_sqm, Number(original.floor_count)) ? inquirySize(original) : undefined
   function startEditing() {
     if (recordLocked) return
     setDraft(row.details)
@@ -322,13 +321,13 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
   function saveDetailsEditing() {
     const checks = [
       ["name", "Enter a project name."], ["address", "Enter a project address or location."],
-      ["lot_area", "Enter a lot area greater than zero."],
+      ["lot_area", inquiryLotAreaError(draft.lot_area)],
       ["floor_count", `Enter a whole number of floors from 1 to ${MAX_INQUIRY_FLOORS}.`],
     ] as const
     const invalid = checks.find(([key]) => {
       const value = String(draft[key] ?? "").trim()
       if (!value) return true
-      if (key === "lot_area") return !Number.isFinite(Number(value)) || Number(value) <= 0
+      if (key === "lot_area") return !!inquiryLotAreaError(value)
       if (key === "floor_count") return !Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > MAX_INQUIRY_FLOORS
       return false
     })
@@ -357,13 +356,23 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     setEnd("")
     setFieldError(undefined)
   }
+  const fieldIssue = (id: string) => {
+    if (id === fieldId("lot_area")) return lotIssue
+    if (id === fieldId("floor_count") && !validFloorCount) return `Enter between 1 and ${MAX_INQUIRY_FLOORS} whole floors.`
+    if (id === fieldId("area-per-floor") && floorError(perFloor)) return floorError(perFloor)
+    const floor = /^inquiry-review-floor-level-(\d+)$/.exec(id)
+    const measurementError = floor ? floorError(floorInputs[Number(floor[1]) - 1] ?? "") : ""
+    return measurementError || (fieldError?.id === id ? fieldError.message : "")
+  }
   const describedField = (id: string, description?: string) => ({
     id,
-    "aria-invalid": fieldError?.id === id || undefined,
-    "aria-describedby": [description, fieldError?.id === id ? `${id}-error` : undefined].filter(Boolean).join(" ") || undefined,
+    "aria-invalid": Boolean(fieldIssue(id)) || undefined,
+    "aria-describedby": [description, fieldIssue(id) ? `${id}-error` : undefined].filter(Boolean).join(" ") || undefined,
   })
-  const inlineError = (id: string) => fieldError?.id === id &&
-    <p className="office-review-field-error" id={`${id}-error`} role="alert">{fieldError.message}</p>
+  const inlineError = (id: string) => {
+    const message = fieldIssue(id)
+    return message && <p className="office-review-field-error" id={`${id}-error`} role="alert">{message}</p>
+  }
   const editField = (key: string, label: string) => {
     const numeric = numericField(key)
     const changed = changedFromAdmin(key)
@@ -373,7 +382,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     return <div key={key} className={`office-admin-working-field${changed ? " office-review-field-changed" : ""}`} data-admin-field={key}>
       <label htmlFor={id}>{label}</label>{key === "phone" ? <MobileNumberInput {...describedField(id)} required readOnly={locked} disabled={locked} tabIndex={locked ? -1 : undefined} value={String(draft[key] ?? "")}
           onValueChange={changeValue} />
-      : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required readOnly={locked} disabled={locked} tabIndex={locked ? -1 : undefined} min={0}
+      : key === "lot_area" ? <GroupedNumberInput {...describedField(id)} required preserveInvalidInput readOnly={locked} disabled={locked} tabIndex={locked ? -1 : undefined} validateValue={inquiryLotAreaError}
         value={String(draft[key] ?? "")} onValueChange={changeValue} />
       : <input {...describedField(id)} type={numeric ? "number" : key === "email" ? "email" : "text"}
           min={numeric ? key === "floor_count" ? 1 : 0 : undefined} step={numeric ? key === "floor_count" ? 1 : "any" : undefined}
@@ -383,12 +392,17 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
     </div>
   }
   function currentReviewIssue(form: HTMLFormElement) {
-    if (scopeError) return { id: fieldId("project_type"), message: scopeError }
-    if (validFloorCount && !calculatedArea) {
-      const invalidFloor = floorInputs.findIndex((value, index) => !Number.isFinite(Number(value)) || Number(value) < lotArea * (index === 0 ? 0.9 : 0.7) || Number(value) > lotArea * 1.7)
-      const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
-      return { id, message: "Floor 1 and same-area floors require at least 90% of the lot area; subsequent individual floors require at least 70%. Each floor must not exceed 170% of the lot area." }
+    for (const key of ["lot_area", "floor_count"]) {
+      const id = fieldId(key)
+      const message = fieldIssue(id)
+      if (message) return { id, message }
     }
+    if (!calculatedArea) {
+      const invalidFloor = floorInputs.findIndex(value => Boolean(floorError(value)))
+      const id = floorArea.mode === "same" ? fieldId("area-per-floor") : fieldId(`floor-level-${Math.max(0, invalidFloor) + 1}`)
+      return { id, message: fieldIssue(id) || "The total floor area exceeds the supported range." }
+    }
+    if (scopeError) return { id: fieldId("project_type"), message: scopeError }
     if (!technical) return { id: fieldId("technical"), message: "Select the technical requirements." }
     if (!arrangement) return { id: fieldId("arrangement"), message: "Select the project phase arrangement." }
     const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea")
@@ -742,12 +756,10 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               }}><option value="same">All floors have the same area</option><option value="individual">Enter each floor separately</option></select></label>
               {floorArea.mode === "same" ? <div className={`office-floor-area-field${editedAreaPerFloor ? " office-review-field-changed" : ""}`}>
                 <label htmlFor={fieldId("area-per-floor")}>Area per floor (m²)</label>
-                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required min={areaRange?.minimumAverage ?? MIN_AVERAGE_FLOOR_AREA} max={areaRange?.maximumAverage} value={perFloor}
+                <GroupedNumberInput {...describedField(fieldId("area-per-floor"), floorArea.perFloor === null ? fieldId("area-per-floor-hint") : undefined)} required preserveInvalidInput validateValue={floorError} value={perFloor}
                   onValueChange={value => updateFloorArea({ ...floorArea, perFloor: value })} />
                 {floorArea.perFloor === null && <div className="office-review-field-helper" id={fieldId("area-per-floor-hint")}>
-                  {averageOutsideCorrectedLot
-                    ? "The submitted average is outside the supported range for the corrected lot area. Enter the actual area per floor."
-                    : perFloor ? "Prefilled with the submitted average. Update it if the floor area has changed."
+                  {perFloor ? "Prefilled with the submitted average. Update it if the floor area has changed."
                     : "Enter the actual area per floor."}
                 </div>}
                 {inlineError(fieldId("area-per-floor"))}
@@ -757,7 +769,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
                 const changed = areaWasEdited(value)
                 return <div key={id} className={`office-floor-area-field${changed ? " office-review-field-changed" : ""}`}>
                   <label htmlFor={id}>Floor {index + 1} area (m²)</label>
-                  <GroupedNumberInput {...describedField(id)} required min={lotArea * (index === 0 ? 0.9 : 0.7)} max={areaRange?.maximumAverage} value={value} onValueChange={nextArea => {
+                  <GroupedNumberInput {...describedField(id)} required preserveInvalidInput validateValue={floorError} value={value} onValueChange={nextArea => {
                     const areas = [...floorArea.areas]
                     areas[index] = nextArea
                     updateFloorArea({ ...floorArea, areas })
@@ -771,7 +783,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
               <span>Floors {floorPage * floorPageSize + 1}–{Math.min((floorPage + 1) * floorPageSize, floorCount)} of {floorCount}</span>
               <button className="button" type="button" disabled={(floorPage + 1) * floorPageSize >= floorCount} onClick={() => setFloorPage(floorPage + 1)}>Next floors</button>
             </div>}
-            <p className="office-review-field-helper">Total floor area is the sum of all floors. Floor 1 and same-area floors must be at least 90% of the lot area; subsequent individual floors must be at least 70%. Each floor may be up to 170% of the lot area.</p>
+            <p className="office-review-field-helper">Total floor area is the sum of all floors. Each floor area must be greater than zero and no greater than the lot area.</p>
             </div>
             <div className="office-workflow-fields office-floor-estimate" aria-live="polite">
               <span className="office-system-label"><Icon name="lock" size={13} />System generated</span>
@@ -785,7 +797,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
           {([
             ["Technical requirements", "review-technical", technicalOptions, technical, setTechnical],
             ["Project phase arrangement", "review-arrangement", arrangementOptions, arrangement, setArrangement],
-          ] as const).map(([label, group, options, value, select]) => <fieldset key={group} className="office-review-options office-review-item" data-review-state={!value ? "input" : reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"}>
+          ] as const).map(([label, group, options, value, select]) => <fieldset key={group} disabled={!calculatedArea} className="office-review-options office-review-item" data-review-state={!value ? "input" : reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"}>
             <legend>{label} <ReviewItemStatus state={!value ? "input" : reviewedItems[group === "review-technical" ? "technical" : "arrangement"] ? "complete" : "review"} /></legend>
             {!value && <p className="office-review-field-helper">Select one option to continue.</p>}
             {mixedUse && group === "review-technical" && <p>Choose based on specialized systems. Podium, tower, and curtain wall are scored from Construction features.</p>}
@@ -936,6 +948,7 @@ export default function OfficeInquiryWorkflow({ row, page, reference, consultati
       </details>}
     </>}
 
+    {review && (page === "assessment" || page === "review" && !compactReview) && !dimensionsValid && <Notice tone="warning"><strong>Invalid</strong> · Confirm valid lot and floor areas in project information.</Notice>}
     {page === "assessment" && preview && review && <>
     <header className="office-intake-section-heading">
       <div><h2>{title}</h2></div>
