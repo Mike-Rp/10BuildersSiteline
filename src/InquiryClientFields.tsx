@@ -142,7 +142,7 @@ export default function InquiryClientFields({ details, onChange, page, disabled,
             <small className="inquiry-mobile-counter">{mobileDigits.length}/10</small></span>
           <span id="inquiry-phone-hint" className="sr-only">Philippine mobile number: enter ten digits beginning with 9 after +63.</span>
         </label>
-        {field("email", "Email address", true, "email")}
+        {field("email", "Contact email address", true, "email")}
       </div>
       {existing && <label className="inquiry-client-verification"><input type="checkbox" required checked={details.existing_client_verified === "yes"}
         onChange={event => patch("existing_client_verified", event.target.checked ? "yes" : "no")} />I verified this client's identity and contact details.</label>}

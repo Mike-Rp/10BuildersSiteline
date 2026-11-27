@@ -652,6 +652,9 @@ export function mountInquiries(router) {
     if (!["application/pdf", "image/png", "image/jpeg"].includes(contract.content_type))
       throw new HttpError(422, "Choose a PDF, PNG, or JPEG signed contract.");
     const selected = confirmedPhases(phases, req.body.phases, type);
+    const refreshPhase = req.body.refresh_phase;
+    if (refreshPhase !== undefined && (typeof refreshPhase !== "string" || !selected.includes(refreshPhase)))
+      throw new HttpError(422, "Select a confirmed phase to refresh.");
     const storedDates = row.details.opm_workflow.staffing?.phase_dates;
     const phaseDates = normalizePhaseDates(req.body.phase_dates ?? Object.fromEntries(
       selected.filter(phase => storedDates?.[phase]).map(phase => [phase, storedDates[phase]])), selected, review);
@@ -674,9 +677,12 @@ export function mountInquiries(router) {
       req.body.additional_scopes ?? Object.fromEntries(selected.map(phase => [phase, stored[phase] || []])));
     const scopes = configuration.required;
     const staffingTarget = DEFAULT_SETUP_SPM_COUNT;
-    const team = await getSpm(type, selected, candidates, review, candidateBlockers, {
+    const lookupPhases = refreshPhase ? [refreshPhase] : selected;
+    const team = await getSpm(type, lookupPhases, candidates, review, candidateBlockers, {
       requiredScopes: scopes, setupAdditionalScopes: configuration.additional, staffingTarget, blockedCandidates, phaseDates, licenseUnavailable,
     });
+    // Refresh eligibility for one phase without saving or replacing any allocations.
+    if (refreshPhase) return { phases: lookupPhases, team, candidates, candidateBlockers, blockedCandidates, licenseUnavailable };
     for (const phase of selected) {
       if (!Object.hasOwn(candidates, phase)) {
         candidates[phase] = [];

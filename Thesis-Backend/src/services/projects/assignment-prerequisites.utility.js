@@ -28,14 +28,12 @@ export async function assertLeadResponded(db, project, user) {
   const lead = await leadAssignment(db, project.id);
   if (project.inquiry_intake && !lead?.is_lead)
     throw new HttpError(409, "A saved Lead Site PM assignment is required.", "LEAD_ASSIGNMENT_REQUIRED");
-  if (lead && lead.spm_user_id !== user.id && lead.status !== "confirmed")
-    throw new HttpError(409, "The Lead Site PM must accept first.", "LEAD_ACCEPTANCE_REQUIRED");
 }
 
 /**
  * Server-side gate for accepting a phase assignment or an engineer responsibility.
  * Mirrors the workspace sequence: the assigned Office PM has accepted (the project is in
- * SPM review or active), and the Lead Site PM accepts before any other Site PM.
+ * SPM review or active). Site PMs respond independently of the Lead and phase order.
  * Legacy intakes also require the registered documents before acceptance.
  * Callers check that the actor owns a pending row.
  */

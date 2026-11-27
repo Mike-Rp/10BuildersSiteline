@@ -800,9 +800,6 @@ router.post("/projects/:id/workspace-command", endpoint(["admin", "opm", "spm"],
                 await linkDocument(db, user, p, "subcontractor_agreement", c.doc?.id);
             else if (!meta.clientSubcon || usesTradeAllocation(p, meta))
                 throw new HttpError(409, "Upload the signed subcontractor agreement to activate this project.");
-            const client = await db.query("select u.id from user_client_project_links l join users u on u.id=l.user_id join roles r on r.id=u.role_id where l.project_id=$1 and r.code='client' and u.status in ('active','invited') and not coalesce(u.is_deleted,false)", [p.id]);
-            if (client.rowCount !== 1)
-                throw new HttpError(409, "The assigned Office PM or Admin must create or link the client account in Project monitoring > Client account before project activation. Admin must review suspended client accounts.");
             // Assignment and activation happen only after the database validates prerequisites.
             const required = await db.query("select count(*)::int as n from project_documents d join document_types t on t.id=d.document_type_id where d.project_id=$1 and d.status='uploaded' and t.code=any($2::text[])", [p.id, codes.slice(0, 6)]);
             const team = await db.query("select 1 from project_phase_team where project_id=$1 and status<>'confirmed'", [p.id]);

@@ -462,18 +462,6 @@ export function activationChecks(state: State, p: Project) {
             passed: agreement,
           },
         ]),
-    {
-      id: "client",
-      label: own
-        ? "Client account ready for activation"
-        : p.status === "active"
-          ? "Client active and project access linked"
-          : "Client account on file (client activates at first sign-in)",
-      passed:
-        // The client activates their own account at first sign-in, and activating
-        // the project links their access, so nothing here waits on Admin.
-        ["active", "completed"].includes(p.status) || (!!client && clientReady),
-    },
   ]
 }
 export function assignmentDocumentsMissing(p: Project) {
@@ -485,8 +473,6 @@ export function assignmentBlock(p: Project, actorId: string) {
   if (!p.opmAccepted) return "Waiting for the assigned Office PM to accept."
   if (!p.inquiryOrigin && !registeredComplete(p))
     return `Waiting for Office PM documents: ${registeredCount(p)} of 6 uploaded.`
-  if (actorId !== leadId(p) && !leadConfirmed(p))
-    return "The Lead Site PM must accept first."
   if (
     ["changes_requested", "declined", "completed", "expired"].includes(p.status)
   )
@@ -1570,7 +1556,6 @@ export function applyWorkflow(
       const client = next.accounts.find(
         (a) => a.id === p.clientId && a.role === "client",
       )
-      assert(client, "The assigned client record is missing.")
       p.status = "active"
       p.phase = "Mobilization"
       p.progress = 0
@@ -1581,8 +1566,7 @@ export function applyWorkflow(
       work.progressStart = 0
       work.progressAnchor = 0
       work.activation = { byId: actor.id, by: actor.name, at: date }
-      client.status = "active"
-      if (!client.scope.includes(p.id)) client.scope.push(p.id)
+      // Client account creation/linking is a separate action after activation.
       assert(
         activationChecks(next, p).every((check) => check.passed),
         "Project activation prerequisites are incomplete. No activation was applied.",
@@ -1620,11 +1604,6 @@ export function applyWorkflow(
       const client = next.accounts.find(
         (a) => a.id === p.clientId && a.role === "client",
       )
-      assert(
-        client &&
-          ["active", "invited", "pending-setup"].includes(client.status),
-        "The assigned client record is missing or suspended. Ask Admin to resolve it before activation.",
-      )
       const doc = {
         ...command.doc,
         label: DOC_LABELS[6],
@@ -1642,8 +1621,7 @@ export function applyWorkflow(
       work.progressBase = 0
       work.progressStart = 0
       work.progressAnchor = 0
-      client.status = "active"
-      if (!client.scope.includes(p.id)) client.scope.push(p.id)
+      // Client account creation/linking follows project activation.
       assert(
         activationChecks(next, p).every((check) => check.passed),
         "Project activation prerequisites are incomplete. No activation was applied.",

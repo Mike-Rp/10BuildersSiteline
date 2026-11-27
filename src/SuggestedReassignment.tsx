@@ -20,15 +20,24 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
   const [done, setDone] = useState(false)
   const [error, setError] = useState("")
   const [reload, setReload] = useState(0)
+  const [loading, setLoading] = useState(true)
   const lock = useRef(false)
   const canChooseReplacement = !!data?.canReassign && data.candidates.length > 0
   useEffect(() => {
     let live = true
+    const controller = new AbortController()
+    setLoading(true)
     setData(undefined); setSelected(""); setError("")
-    api<Options>(`/projects/${project.id}/reassignment-options?phase=${encodeURIComponent(phase)}&userId=${encodeURIComponent(userId)}`)
-      .then(next => { if (live) setData(next) })
+    // Strict Mode immediately cleans up its first development effect. Wait one
+    // microtask so that discarded effect never starts a duplicate server lookup.
+    Promise.resolve().then(() => {
+      if (!live) return undefined
+      return api<Options>(`/projects/${project.id}/reassignment-options?phase=${encodeURIComponent(phase)}&userId=${encodeURIComponent(userId)}`, { signal: controller.signal })
+    })
+      .then(next => { if (live && next) setData(next) })
       .catch(reason => { if (live) setError(reason.message) })
-    return () => { live = false }
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false; controller.abort() }
   }, [project.id, phase, userId, reload])
   const date = (value: string) => new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })
   const declined = data?.status === "declined"
@@ -80,7 +89,7 @@ export default function SuggestedReassignment({ project, phase, userId, onClose,
       {done && <p role="status">Replacement offer saved; awaiting the new Site PM’s acceptance.</p>}
       <div className="modal-actions">
         <Button disabled={busy} onClick={onClose}>{!done && canChooseReplacement ? "Cancel" : "Close"}</Button>
-        {!done && <Button disabled={busy} onClick={() => setReload(previous => previous + 1)}>Refresh Suggestions</Button>}
+        {!done && <Button disabled={busy || loading} onClick={() => setReload(previous => previous + 1)}>{loading ? "Checking replacements…" : "Refresh Suggestions"}</Button>}
         {!done && canChooseReplacement && <Button type="submit" variant="primary" disabled={busy || !selected}>{busy ? "Sending…" : "Send replacement offer"}</Button>}
       </div>
     </form>

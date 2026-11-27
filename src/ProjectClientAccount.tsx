@@ -6,6 +6,8 @@ import "./project-client-account.css"
 
 type Client = { id: string; full_name: string; email: string; status?: string; activation_status?: ClientActivationStatus }
 type AccountData = {
+  mode?: "client_owned"
+  contact_email?: string
   clients: Client[]
   status?: string
   next_action?: string
@@ -15,7 +17,7 @@ type AccountData = {
   can_issue_activation_code: boolean
   defaults: { email: string }
 }
-type ActivationCode = { email: string; code: string; expires_at: string }
+type ActivationCode = { email?: string; contact_email?: string; code: string; expires_at: string }
 const expiry = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })
 
 export default function ProjectClientAccount({ projectId, onSaved }: {
@@ -71,11 +73,12 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
     <h3>Client account</h3>
     {!data && !error && <p role="status">Loading client account…</p>}
     {data?.clients.map(client => <div className="project-client-account-record" key={client.id}>
-      <strong>{client.full_name}</strong><span>{client.email}</span>
+      <strong>{client.full_name}</strong>{data.mode !== "client_owned" && <span>{client.email}</span>}
       <span className={`project-client-account-status ${client.activation_status === "active" || !client.activation_status && client.status === "active" ? "active" : "pending"}`}>{client.activation_status ? clientActivationLabel(client.activation_status)
         : client.status === "active" ? "Active" : client.status === "invited" ? "Awaiting first sign-in" : "Account needs attention"}</span>
     </div>)}
-    {data && !data.clients.length && <p>{data.next_action === "request_email_correction"
+    {data?.mode === "client_owned" && <p>Contact email address: {data.contact_email || "Not provided"}</p>}
+    {data && !data.clients.length && <p>{data.status === "project_not_active" ? "Client account creation is available in Active sites after the project is activated." : data.mode === "client_owned" ? "The client registers with their own email and password using a project invitation." : data.next_action === "request_email_correction"
       ? "Request a corrected client email. An Administrator must verify ownership before restoring access."
       : "Ask an Administrator to verify the client?s identity and registered email."}</p>}
     {data?.can_recover && !data.existing && <form onSubmit={event => {
@@ -98,11 +101,12 @@ export default function ProjectClientAccount({ projectId, onSaved }: {
     </form>}
     {data?.can_issue_activation_code && <div className="project-client-activation-action">
       <p>Verify the client’s identity, then share the code privately so they can set their password.</p>
-      {!activation && <Button disabled={busy} onClick={() => void run(async () => {
-        setActivation(await api<ActivationCode>(`${path}/activation-code`, { method: "POST", json: {} }))
+      {data.mode === "client_owned" && !activation && <label><input type="checkbox" checked={ownershipVerified} disabled={busy} onChange={event => setOwnershipVerified(event.target.checked)} /> I verified the intended client's identity for this project.</label>}
+      {!activation && <Button disabled={busy || data.mode === "client_owned" && !ownershipVerified} onClick={() => void run(async () => {
+        setActivation(await api<ActivationCode>(`${path}/activation-code`, { method: "POST", json: { recipient_verified: ownershipVerified } }))
       })}>{busy ? "Issuing code…" : "Issue activation code"}</Button>}
       {activation && <div className="notice" role="status">
-        <div><p><strong>One-time activation code</strong> · {activation.email}</p>
+        <div><p><strong>One-time activation code</strong></p>
           <Field label="Activation code"><input readOnly value={activation.code} onFocus={event => event.target.select()} /></Field>
           <p>Expires {expiry.format(new Date(activation.expires_at))}. Issuing a new code replaces the previous one.</p>
           <Button onClick={() => setActivation(undefined)}>Hide code</Button>

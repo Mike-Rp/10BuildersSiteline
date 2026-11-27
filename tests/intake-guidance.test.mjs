@@ -61,14 +61,14 @@ test("Office PM next step follows acceptance, documents, then reassignment; no a
   assert.equal(intakeGuidance(state,p,actor("opm","other")),null)
 })
 
-test("Site PM guidance preserves independent responses and project-specific Lead gates", () => {
+test("Site PM guidance allows independent responses before the Lead accepts", () => {
   const p=project({}),state=workspace(p),lead=actor("spm","lead"),spm=actor("spm")
   assert.equal(intakeGuidance(state,p,lead).action,"view")
   p.opmAccepted=true
   assert.equal(intakeGuidance(state,p,lead).stage,"Required documents")
   p.docs=docs()
   assert.equal(intakeGuidance(state,p,lead).action,"assignment")
-  assert.equal(intakeGuidance(state,p,spm).kind,"waiting")
+  assert.equal(intakeGuidance(state,p,spm).kind,"action")
   p.team[0].status="confirmed"
   p.team.push({phase:"Structure",accountId:"spm",status:"pending"})
   const own=intakeGuidance(state,p,spm)
@@ -85,7 +85,7 @@ test("inquiry Site PMs can accept while Office PM documents are pending", () => 
   p.team[0].isLead = true
   assert.equal(intakeGuidance(state, p, actor("opm")).action, "documents")
   assert.equal(intakeGuidance(state, p, actor("spm", "lead")).action, "assignment")
-  assert.equal(intakeGuidance(state, p, actor("spm")).stage, "Lead Site PM acceptance")
+  assert.equal(intakeGuidance(state, p, actor("spm")).stage, "Site PM confirmations")
   p.team[0].status = "confirmed"
   assert.equal(intakeGuidance(state, p, actor("spm")).action, "assignment")
 })
@@ -98,8 +98,8 @@ test("Activation guidance uses existing agreement, client and subcontractor chec
   p.workflow.selections=[{companyId:"company",status:"accepted"}]
   assert.equal(intakeGuidance(state,p,lead).stage,"Signed agreement")
   state.accounts.find(a=>a.id==="client").status="suspended"
-  assert.equal(intakeGuidance(state,p,lead).action,"view")
-  assert.equal(intakeGuidance(state,p,lead).stage,"Client account prerequisite")
+  assert.equal(intakeGuidance(state,p,lead).action,"coordinate")
+  assert.equal(intakeGuidance(state,p,lead).stage,"Signed agreement")
   state.accounts.find(a=>a.id==="client").status="active"
   p.clientSubcon="Client company"
   p.clientSubconReview={issues:[{status:"open"}],acknowledgedAt:"2026-10-01"}

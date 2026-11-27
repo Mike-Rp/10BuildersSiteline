@@ -888,7 +888,7 @@ export default function RoleWorkspace({
                 <Icon name="chevron" size={17} />
               </button>
               {!documentsComplete && assignments.some(person => person.status === "pending") && (
-                <small>Site PMs can accept their assignments while documents are being uploaded. The Lead Site PM responds first.</small>
+                <small>All Site PMs can respond independently while documents are being uploaded.</small>
               )}
             </div>
           ) : timeline(p)}
@@ -1408,7 +1408,7 @@ export default function RoleWorkspace({
                     await act(
                       { type: "accept_assignment", projectId: p.id },
                       actor.id === leadId(p)
-                        ? "Lead Site PM accepted. Remaining Site PMs may now respond."
+                        ? "Lead Site PM assignment accepted."
                         : "All your pending phase assignments are confirmed.",
                     )
                   }
@@ -3681,7 +3681,7 @@ export default function RoleWorkspace({
             <div className="role-actions">
               <Button variant="primary" icon="check" disabled={saving || !!block} title={block || undefined}
                 onClick={async () => await act({ type: "accept_assignment", projectId: p.id },
-                  actor.id === leadId(p) ? "Lead Site PM accepted. Remaining Site PMs may now respond." : "All your pending phase assignments are confirmed.")}>
+                  actor.id === leadId(p) ? "Lead Site PM assignment accepted." : "All your pending phase assignments are confirmed.")}>
                 {actor.id === leadId(p) ? "Accept Lead Site PM assignment" : "Accept my phase assignments"}
               </Button>
               <Button disabled={saving || !!block} onClick={() => { setDeclineReason(""); setDialog({ kind: "decline", projectId: p.id, phase: ownPending[0].phase }) }}>

@@ -19,6 +19,7 @@ test("client activation and existing login use the API contract at mobile and de
       res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" })
       res.end(JSON.stringify(body))
     }
+    if (route === "/api/v1/auth/client/activation-config") return json({ data: { client_owned: false, local_capture: false } })
     if (route === "/api/v1/auth/client/activate") {
       activationRequests++
       const result = outcome

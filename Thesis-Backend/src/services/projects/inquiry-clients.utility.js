@@ -54,7 +54,7 @@ export async function findInquiryClients(db, query) {
       FROM project_inquiries i WHERE coalesce(i.details->>'intake_draft','')<>'yes'
       UNION ALL
       SELECT 'account',u.id,u.updated_at,jsonb_build_object('client_type','individual','client_name',u.full_name)
-        ||coalesce(m.metadata->'clientProfile','{}'::jsonb)||jsonb_build_object('email',u.email,'phone',u.phone)
+        ||coalesce(m.metadata->'clientProfile','{}'::jsonb)||jsonb_build_object('email',coalesce(m.metadata->>'clientContactEmail',u.email::text),'phone',u.phone)
       FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN workspace_account_metadata m ON m.user_id=u.id
       WHERE r.code='client' AND u.status IN ('active','invited') AND NOT coalesce(u.is_deleted,false)
     ) clients WHERE position(lower($1) in lower(coalesce(details->>'client_name','')||' '||coalesce(details->>'company_name','')||' '||coalesce(details->>'primary_contact','')||' '||coalesce(details->>'email','')||' '||coalesce(details->>'phone',''))) > 0
@@ -75,7 +75,7 @@ export async function resolveInquiryClient(db, input) {
   let details;
   if (input.existing_client_source === "account") {
     const { rows } = await db.query(`SELECT jsonb_build_object('client_type','individual','client_name',u.full_name)
-      ||coalesce(m.metadata->'clientProfile','{}'::jsonb)||jsonb_build_object('email',u.email,'phone',u.phone) AS details
+      ||coalesce(m.metadata->'clientProfile','{}'::jsonb)||jsonb_build_object('email',coalesce(m.metadata->>'clientContactEmail',u.email::text),'phone',u.phone) AS details
       FROM users u JOIN roles r ON r.id=u.role_id LEFT JOIN workspace_account_metadata m ON m.user_id=u.id
       WHERE u.id=$1 AND r.code='client' AND u.status IN ('active','invited') AND NOT coalesce(u.is_deleted,false) FOR SHARE OF u`, [input.existing_client_id]);
     details = rows[0]?.details;

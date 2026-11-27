@@ -19,7 +19,7 @@ import { requireUser, handleError, isUuid } from '../../common/utilities/access.
 import { uploadAttachment } from "../../common/utilities/upload.utility.js";
 import { responseOk, responseError } from "../../common/utilities/response.utility.js";
 import { recordArchiveEvent } from "../archive/audit.utility.js";
-import { provisionInquiryClient } from "./client-onboarding.js";
+import { clientOwnedEnabled } from "./client-owned-activation.js";
 
 // Lifecycle states an intake may be corrected and resubmitted from. Active and archived projects are closed to intake edits.
 const RESUBMITTABLE = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
@@ -151,7 +151,7 @@ export const createIntake = async (req, res) => {
         [suggested_opm_id, req.body.draft_project_id ?? null, inquiryId ?? null])).rows[0];
       if (Number(load.total) >= 2) throw new HttpError(409, "The Office PM has reached the two-commitment limit.");
       let company=client_name ?? draft?.client_name;
-      if(selectedClient) {
+      if(selectedClient && !inquiry) {
         if(!isUuid(selectedClient)) throw Object.assign(new Error("Invalid client_user_id."),{status:400});
         const user=await client.query("SELECT u.full_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=$1 AND r.code='client' AND u.status IN ('active','invited') AND COALESCE(u.is_deleted,false)=false",[selectedClient]);
         if(!user.rowCount) throw Object.assign(new Error("Invalid client account."),{status:422});
@@ -252,11 +252,10 @@ export const createIntake = async (req, res) => {
         await client.query("INSERT INTO user_client_project_links (user_id,project_id,created_by,updated_by) VALUES ($1,$2,$3,$3) ON CONFLICT (user_id,project_id) DO NOTHING",[selectedClient,project.id,actor.id]);
       }
       if (inquiry) {
-        const client_account_status = await provisionInquiryClient(client, project.id, intake, actor.id);
         await client.query("UPDATE project_inquiries SET status='converted',project_id=$2,updated_at=now() WHERE id=$1",[inquiry.id,project.id]);
         const recipients = new Set(phase_team.flatMap(row => [row.user_id, ...(row.engineers || []).map(person => person.user_id)]));
         for (const recipient of recipients) await notifyInquiry(client,actor.id,recipient,"Site PM assignment offer",name,project.id);
-        return {project, client_account_status, signed_contract: await signedContract(client, project.id)};
+        return {project, signed_contract: await signedContract(client, project.id)};
       }
       // A resubmission supersedes every open Office PM confirmation, in the same transaction as the
       // fresh pending one, so the previous OPM can no longer accept and the replacement can. Declined

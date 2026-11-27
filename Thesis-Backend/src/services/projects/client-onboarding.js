@@ -5,6 +5,7 @@ import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { clientEmailError } from "../../domain/client-email.js";
 import { employeeIdFromWorkEmail } from "../../domain/work-email.js";
 import { isPhilippineMobile } from "../../domain/mobile-number.js";
+import { clientOwnedEnabled, createClientInvitation, issueOwnedCode } from "./client-owned-activation.js";
 
 export const CLIENT_ACTIVATION_PASSWORD_MARKER = "!client-activation-required";
 const codeHash = code => createHash("sha256").update(code).digest("hex");
@@ -16,6 +17,11 @@ export function clientLoginEmail(value) {
 }
 
 export async function provisionInquiryClient(db, projectId, details, actorId) {
+  if (clientOwnedEnabled()) {
+    // Existing linked accounts are preserved; no automatic account conversion.
+    if ((await db.query("SELECT 1 FROM user_client_project_links WHERE project_id=$1", [projectId])).rowCount) return "active";
+    return createClientInvitation(db, projectId, details, actorId);
+  }
   const email = clientLoginEmail(details.email);
   if (!email) return "verification_required";
   await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`client-email:${email}`]);
@@ -50,10 +56,12 @@ export const issueClientActivationCode = async (req, res) => {
     if (!actor) return;
     if (!isUuid(req.params.id)) throw new HttpError(404, "Project not found.");
     const data = await withTransaction(async db => {
+      if (clientOwnedEnabled() && (await db.query("SELECT 1 FROM client_portal_invitations WHERE project_id=$1", [req.params.id])).rowCount)
+        return issueOwnedCode(db, req.params.id, actor, req.body?.recipient_verified);
       const { rows: [account] } = await db.query(`SELECT u.id,u.email
         FROM projects p JOIN user_client_project_links l ON l.project_id=p.id
         JOIN users u ON u.id=l.user_id JOIN roles r ON r.id=u.role_id
-        WHERE p.id=$1 AND p.suggested_opm_id=$2 AND NOT COALESCE(p.is_deleted,false)
+        WHERE p.id=$1 AND p.suggested_opm_id=$2 AND p.lifecycle_status='active' AND NOT COALESCE(p.is_deleted,false)
           AND (SELECT count(*) FROM user_client_project_links WHERE project_id=p.id)=1
           AND r.code='client' AND u.status='invited' AND u.password_hash=$3
           AND NOT COALESCE(u.is_deleted,false) FOR UPDATE OF u`, [req.params.id, actor.id, CLIENT_ACTIVATION_PASSWORD_MARKER]);

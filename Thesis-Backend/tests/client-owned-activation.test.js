@@ -1,0 +1,105 @@
+import assert from "node:assert/strict";
+import { mock, test } from "node:test";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import bcrypt from "bcryptjs";
+const access = await import("../src/common/utilities/access.utility.js");
+let database;
+mock.module("../src/common/utilities/access.utility.js", { namedExports: { ...access, requireUser(req, res, roles) {
+  if (roles.includes(req.actor?.role)) return req.actor;
+  access.sendError(res, "Forbidden.", 403); return null;
+} } });
+mock.module("../src/common/utilities/transaction.utility.js", { namedExports: { withTransaction: fn => database.transaction(fn) } });
+const { createClientInvitation, issueOwnedCode, beginOwnedActivation, completeOwnedActivation } = await import("../src/services/projects/client-owned-activation.js");
+const { getProjectClientAccount, recoverProjectClient, selectIntakeClient } = await import("../src/services/projects/intake-client.controller.js");
+async function call(fn, body, actor) {
+  const res = { code: 200, set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; }, send(body) { return this.json(body); } };
+  await fn({ body, actor }, res); return res;
+}
+test("client-owned registration verifies recipient and login email, rejects replay, preserves existing accounts", async t => {
+  database = new PGlite(); t.after(() => database.close());
+  const oldEnv = process.env.CLIENT_OWNED_ACTIVATION;
+  process.env.CLIENT_OWNED_ACTIVATION = "true";
+  t.after(() => { if (oldEnv === undefined) delete process.env.CLIENT_OWNED_ACTIVATION; else process.env.CLIENT_OWNED_ACTIVATION = oldEnv; });
+  await database.exec(`CREATE TABLE roles(id smallint PRIMARY KEY,code text); INSERT INTO roles VALUES(5,'client');
+    CREATE TABLE users(id uuid PRIMARY KEY,full_name text,email text UNIQUE,password_hash text,role_id smallint,status text,temp_password_issued boolean,is_deleted boolean DEFAULT false,created_by uuid,updated_by uuid,updated_at timestamptz);
+    CREATE TABLE projects(id uuid PRIMARY KEY,suggested_opm_id uuid,client_name text DEFAULT 'Test client',inquiry_intake jsonb DEFAULT '{"email":"contact@example.org"}',lifecycle_status text DEFAULT 'spm_review',is_deleted boolean DEFAULT false);
+    CREATE TABLE workspace_account_metadata(user_id uuid PRIMARY KEY,metadata jsonb);
+    CREATE TABLE user_client_project_links(user_id uuid REFERENCES users(id),project_id uuid REFERENCES projects(id),created_by uuid,updated_by uuid,UNIQUE(user_id,project_id));`);
+  await database.exec(await readFile(new URL("../migrations/044-client-owned-activation.sql", import.meta.url), "utf8"));
+  const opm = { id: randomUUID(), role: "opm" };
+  await database.query("INSERT INTO users(id,email,status) VALUES($1,'opm@10builders.com','active')", [opm.id]);
+  const captured = [];
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    const { messages } = JSON.parse(options.body); captured.push(...messages);
+    return Response.json({ accepted: messages.length });
+  });
+  const provision = async () => {
+    const project = randomUUID();
+    await database.query("INSERT INTO projects(id,suggested_opm_id) VALUES($1,$2)", [project, opm.id]);
+    await database.transaction(db => createClientInvitation(db, project, { email: "contact@example.org", client_name: "Test client" }, opm.id));
+    return project;
+  };
+  const project = await provision();
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM users WHERE role_id=5")).rows[0].n, 0, "inquiry contact does not create a login");
+  await assert.rejects(database.transaction(db => issueOwnedCode(db, project, opm, false)), /Verify the intended/);
+  await assert.rejects(database.transaction(db => issueOwnedCode(db, project, { id: randomUUID(), role: "opm" }, true)), /assigned Office PM/);
+  const invite = await database.transaction(db => issueOwnedCode(db, project, opm, true));
+  const body = { code: invite.code, email: "personal@example.org", password: "Client password 123", confirmation: "Client password 123" };
+  assert.equal((await call(beginOwnedActivation, { ...body, confirmation: "wrong" })).code, 422);
+  assert.equal((await call(beginOwnedActivation, { ...body, code: "invalid" })).code, 401);
+  const started = await call(beginOwnedActivation, body);
+  assert.equal(started.code, 200);
+  assert.equal(captured.length, 2);
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM user_client_project_links")).rows[0].n, 0);
+  const codeFor = address => captured.find(message => message.to === address).text.match(/code: ([A-Za-z0-9_-]{24})/)[1];
+  const verify = { code: invite.code, verification_id: started.body.data.verification_id,
+    recipient_code: codeFor("contact@example.org"), email_code: codeFor("personal@example.org") };
+  assert.equal((await call(completeOwnedActivation, { ...verify, recipient_code: "x".repeat(24) })).code, 401);
+  assert.equal((await database.query("SELECT attempts FROM client_portal_verifications WHERE id=$1", [verify.verification_id])).rows[0].attempts, 1);
+  assert.equal((await call(completeOwnedActivation, verify)).body.data.status, "active");
+  const account = (await database.query("SELECT * FROM users WHERE email='personal@example.org'")).rows[0];
+  assert.equal(await bcrypt.compare(body.password, account.password_hash), true);
+  assert.equal((await call(completeOwnedActivation, verify)).code, 409, "cannot replay redemption");
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM user_client_project_links WHERE user_id=$1", [account.id])).rows[0].n, 1);
+  const second = await provision();
+  const next = await database.transaction(db => issueOwnedCode(db, second, opm, true));
+  assert.equal((await call(beginOwnedActivation, { ...body, code: next.code })).code, 409, "existing accounts must sign in");
+  const actor = { id: account.id, role: "client" };
+  captured.length = 0;
+  const existing = await call(beginOwnedActivation, { code: next.code, existing_account: true }, actor);
+  const secondVerify = { code: next.code, verification_id: existing.body.data.verification_id,
+    recipient_code: codeFor("contact@example.org"), email_code: codeFor("personal@example.org"), existing_account: true };
+  assert.equal((await call(completeOwnedActivation, secondVerify)).code, 403);
+  assert.equal((await call(completeOwnedActivation, secondVerify, actor)).body.data.status, "linked");
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM user_client_project_links WHERE user_id=$1", [account.id])).rows[0].n, 2);
+  assert.equal((await database.query("SELECT password_hash FROM users WHERE id=$1", [account.id])).rows[0].password_hash, account.password_hash);
+  const staffResponse = { code: 200, set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+  await getProjectClientAccount({ actor: opm, params: { id: project } }, staffResponse);
+  assert.equal(staffResponse.body.data.mode, "client_owned");
+  assert.equal(staffResponse.body.data.contact_email, "contact@example.org");
+  assert.equal(JSON.stringify(staffResponse.body).includes("personal@example.org"), false, "ordinary staff response hides private login email");
+  const thirdStaffResponse = { ...staffResponse, body: undefined };
+  await selectIntakeClient({ actor: { id: opm.id, role: "admin" }, params: { id: project }, body: { client_user_id: account.id, ownership_verified: true } }, thirdStaffResponse);
+  assert.equal(thirdStaffResponse.code, 409, "staff cannot bypass invitation verification");
+  const third = await provision();
+  const expired = await database.transaction(db => issueOwnedCode(db, third, opm, true));
+  await database.query("UPDATE client_portal_invitations SET expires_at=now()-interval '1 minute' WHERE project_id=$1", [third]);
+  assert.equal((await call(beginOwnedActivation, { ...body, code: expired.code })).body.error.code, "ACTIVATION_CODE_EXPIRED");
+  const fourth = await provision();
+  const fresh = await database.transaction(db => issueOwnedCode(db, fourth, opm, true));
+  captured.length = 0;
+  const attempt = await call(beginOwnedActivation, { ...body, email: "new@example.org", code: fresh.code });
+  const payload = { code: fresh.code, verification_id: attempt.body.data.verification_id,
+    recipient_code: codeFor("contact@example.org"), email_code: codeFor("new@example.org") };
+  assert.equal((await call(completeOwnedActivation, { ...payload, code: next.code })).code, 409, "a used invitation cannot authorize a different challenge");
+  for (let i = 0; i < 5; i++) assert.equal((await call(completeOwnedActivation, { ...payload, email_code: "a".repeat(24) })).code, 401);
+  assert.equal((await call(completeOwnedActivation, payload)).code, 403, "five failed attempts lock verification");
+  const replacement = await database.transaction(db => issueOwnedCode(db, fourth, opm, true));
+  assert.equal((await call(beginOwnedActivation, { ...body, code: fresh.code, email: "other@example.org" })).code, 401, "reissuing invalidates earlier codes");
+  const before = (await database.query("SELECT count(*)::int AS n FROM client_portal_verifications")).rows[0].n;
+  t.mock.method(globalThis, "fetch", async () => Response.json({ accepted: 0 }, { status: 503 }));
+  assert.equal((await call(beginOwnedActivation, { ...body, code: replacement.code, email: "other@example.org" })).code, 503);
+  assert.equal((await database.query("SELECT count(*)::int AS n FROM client_portal_verifications")).rows[0].n, before, "failed delivery rolls back pending verification");
+});

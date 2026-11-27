@@ -4,6 +4,7 @@ import { activationErrors } from "./client-activation"
 import { loginPath } from "./login-portal"
 import { Button, Field, Icon } from "./ui"
 import "./login-page.css"
+import ClientOwnedActivation from "./ClientOwnedActivation"
 
 const empty = { email: "", code: "", password: "", confirmation: "" }
 const fields = [
@@ -14,6 +15,21 @@ const fields = [
 ] as const
 
 export default function ClientActivationPage() {
+  const [configuration, setConfiguration] = useState<{ client_owned: boolean }>()
+  const [failure, setFailure] = useState(false)
+  const [legacy, setLegacy] = useState(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    api<{ client_owned: boolean }>("/auth/client/activation-config", { signal: controller.signal }).then(setConfiguration).catch(() => { if (!controller.signal.aborted) setFailure(true) })
+    return () => controller.abort()
+  }, [])
+  if (!legacy) return <ClientOwnedActivation serviceAvailable={configuration?.client_owned === true}
+    availabilityMessage={failure ? "Registration is temporarily unavailable. Please try again later." : !configuration ? "Checking registration availability…" : "New account registration is not enabled yet. Existing activation codes can still be used below."}
+    onLegacy={() => setLegacy(true)} />
+  return <LegacyClientActivation />
+}
+
+function LegacyClientActivation() {
   const [draft, setDraft] = useState(empty)
   const [showValidation, setShowValidation] = useState(false)
   const [serverError, setServerError] = useState("")

@@ -851,6 +851,20 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setAddingEngineer(false)
     setStep(3)
   }
+  async function refreshStaffingPhase() {
+    const phase = staffingPhase
+    if (!phase || !planning || !contractFileId) return
+    const result = await post<Planning>(`${root}/${selected}/planning`, {
+      ...staffingInput, phases, phase_dates: selectedPhaseDates(), contract_file_id: contractFileId,
+      refresh_phase: phase, additional_scopes: planning.staffing?.additional_scopes ?? {},
+    })
+    setPlanning(current => current && ({ ...current,
+      candidates: { ...current.candidates, [phase]: result.candidates?.[phase] ?? [] },
+      candidateBlockers: { ...current.candidateBlockers, [phase]: result.candidateBlockers?.[phase] },
+      blockedCandidates: { ...current.blockedCandidates, [phase]: result.blockedCandidates?.[phase] ?? [] },
+      licenseUnavailable: { ...current.licenseUnavailable, [phase]: result.licenseUnavailable?.[phase] ?? [] },
+    }))
+  }
   async function confirmContract() {
     if (!pendingContract) return
     const id = pendingContract.id
@@ -1213,7 +1227,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 ["Client record", details.client_record === "existing" ? "Existing client" : "New client"],
                 ["Client type", details.client_type === "company" ? "Company / organization" : "Individual"],
                 ...(details.client_type === "company" ? [["Company", details.company_name || details.client_name], ["Representative", details.primary_contact], ...(details.designation ? [["Position / designation", details.designation]] : [])] : [["Client name", details.client_name]]),
-                ["Mobile number", details.phone], ["Email address", details.email],
+                ["Mobile number", details.phone], ["Contact email address", details.email],
               ].map(([label, value]) => <div key={String(label)}><dt>{label}</dt><dd>{value || "—"}</dd></div>)}</dl>
             </section>
             <section><header><h4>Project details</h4><button type="button" className="button" onClick={() => { setError(""); setAdminFormStep(2) }}>Edit project details</button></header><InquiryDetails details={details} /></section>
@@ -1253,7 +1267,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           <div className="tracking-assignment">{facts([["Assigned Office PM", row.opm_name || "Pending matching"]])}<div><span>Inquiry classification</span><span className="inquiry-priority" data-classification={String(details.classification || "Normal").toLowerCase()}>{details.classification || "Normal"}</span></div></div>
           <section className="tracking-client-details"><h2>Client details</h2>{facts([
             ["Client name", details.client_name], ["Client type", details.client_type === "company" ? "Company / organization" : details.client_type === "individual" ? "Individual" : "Not provided"],
-            ["Mobile number", details.phone], ["Email address", details.email],
+            ["Mobile number", details.phone], ["Contact email address", details.email],
             ...(details.client_type === "company" ? [["Company", details.company_name || details.client_name], ["Representative", details.primary_contact], ...(details.designation ? [["Position / designation", details.designation]] : [])] : []),
           ])}<p className="tracking-lock"><Icon name="lock" size={15} />Client information is final after inquiry submission.</p></section>
           <section className="tracking-project-details"><h2>Project details</h2>{facts([["Lot area", area(details.lot_area)], ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count],
@@ -1586,7 +1600,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       footer={<button type="button" className="button primary" onClick={() => setFinalizedClient(undefined)}>Done</button>}>
       <div className="project-finalized-content">
         <div className="project-finalized-success"><Icon name="check" size={18} /><span>Assignment offers sent.</span></div>
-        <ProjectClientAccount projectId={finalizedClient.projectId} onSaved={onReload} />
+        <p>Complete project activation first. Client account creation is available afterward in Active sites.</p>
       </div>
       {finalizedClient.refreshFailed && <p>Refresh the inquiry list to see the finalized project.</p>}
     </Modal>}
@@ -1736,7 +1750,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             phaseRange={planning.staffing?.phase_dates?.[staffingPhase]} leadRange={projectRange}
             leadId={staffingLead?.stage === staffingPhase ? staffingLead.id : undefined}
             unavailable={planning.licenseUnavailable?.[staffingPhase]}
-            blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate())}
+            blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(refreshStaffingPhase)}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
         </fieldset>}
         {step === 4 && planning?.candidates && <div className="inquiry-form-stack">

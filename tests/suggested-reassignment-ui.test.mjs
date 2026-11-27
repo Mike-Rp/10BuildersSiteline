@@ -38,10 +38,11 @@ test("Suggested reassignment requires OPM confirmation and preserves failed edit
     const project = { id: 'p1', name: 'STI Santa Rosa', workflow: { responses: [
       { status: 'declined', phase: 'Design', accountId: 'old', note: 'Unavailable during the Design schedule.' },
     ] } }
-    const render=async key=>act(async()=>{root.render(React.createElement(Popup,{key,project,phase:'Design',userId:'old',onClose:()=>{closed++},onSaved:async()=>{saved++}}));await tick()})
+    const render=async key=>act(async()=>{root.render(React.createElement(React.StrictMode,null,React.createElement(Popup,{key,project,phase:'Design',userId:'old',onClose:()=>{closed++},onSaved:async()=>{saved++}})));await tick()})
     const button=text=>[...document.querySelectorAll('button')].find(element=>element.textContent===text)
     const sendOffer = () => button('Send replacement offer')
     mode='declined';await render('declined')
+    assert.equal(requests.filter(request=>request.method==='GET').length,1,'Strict Mode should start only one replacement lookup')
     assert.match(document.querySelector('.reassignment-current').textContent,/Unavailable during the Design schedule/)
     assert.match(document.querySelector('.reassignment-scope').textContent,/Design.*Civil · Structural/)
     assert.equal(document.querySelector('input[type="radio"]:checked'),null)

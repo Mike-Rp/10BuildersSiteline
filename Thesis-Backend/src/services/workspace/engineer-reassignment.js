@@ -36,6 +36,14 @@ async function authorize(db, user, p) {
 }
 export function registerEngineerReassignmentRoutes(router, { endpoint, project, event }) {
   router.get("/projects/:id/reassignment-options", endpoint(["admin", "opm"], async (db, user, req) => {
+    // This lookup only reads. Reuse repeated eligibility reads within this request.
+    const source = db;
+    const reads = new Map();
+    db = { query(sql, args = []) {
+      const key = JSON.stringify([sql, args]);
+      if (!reads.has(key)) reads.set(key, source.query(sql, args));
+      return reads.get(key);
+    } };
     const p = await project(db, user, req.params.id)
     await authorize(db, user, p)
     if (!(await installed(db))) return { available: false, message: "Apply database migration 023 to enable suggested reassignment." }
@@ -46,10 +54,15 @@ export function registerEngineerReassignmentRoutes(router, { endpoint, project, 
     const canReassign = actionable && tags.length > 0 && tags.length <= 3 && row.completion_status !== "approved" && replaceable(row, now)
     const candidates = []
     if (canReassign) {
-      const people = (await db.query(`select u.id,u.full_name as name from users u join roles role on role.id=u.role_id where role.code='spm' and u.status='active' and not coalesce(u.is_deleted,false) and ${LICENSE_ELIGIBILITY_SQL} order by u.full_name`)).rows
+      const people = (await db.query(`select u.id,u.full_name as name from users u join roles role on role.id=u.role_id
+        where role.code='spm' and u.status='active' and not coalesce(u.is_deleted,false) and ${LICENSE_ELIGIBILITY_SQL}
+        and u.id<>$3
+        and not exists(select 1 from project_phase_responsibilities r where r.project_id=$1 and r.project_stage_id=$2 and r.user_id=u.id)
+        and not exists(select 1 from unnest($4::text[]) required(tag) where not exists(
+          select 1 from engineer_qualified_scopes q join disciplines d on d.id=q.discipline_id where q.user_id=u.id and d.code=required.tag))
+        order by u.full_name`, [p.id, row.project_stage_id, row.user_id, tags])).rows
       const commitments = await engineerCommitments(db, people.map(person => person.id))
       for (const person of people) {
-        if (person.id === row.user_id || (await db.query("select 1 from project_phase_responsibilities where project_id=$1 and project_stage_id=$2 and user_id=$3", [p.id, row.project_stage_id, person.id])).rowCount) continue
         try {
           await prepareEngineerAssignments(db, p.project_type_id, [{ stage: row.phase, user_id: person.id, assigned_disciplines: tags }], { projectId: p.id, lock: false, existingCommitments: commitments })
           candidates.push({ ...person, tags })

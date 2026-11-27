@@ -29,3 +29,4 @@ logs/
 *.dump
 *.dump.enc
 backup.env
+/Thesis-Backend/.local-mail/

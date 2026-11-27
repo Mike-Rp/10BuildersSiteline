@@ -1,6 +1,7 @@
 import { withTransaction } from "../../common/utilities/transaction.utility.js";
 import { HttpError, requireUser, sendOk, sendError, handleError, isUuid } from "../../common/utilities/access.utility.js";
 import { provisionInquiryClient, clientLoginEmail, CLIENT_ACTIVATION_PASSWORD_MARKER } from "./client-onboarding.js";
+import { clientOwnedEnabled } from "./client-owned-activation.js";
 
 const allowed = ["draft","suggested_allocation","confirmed","sent_to_opm","spm_review"];
 async function intakeProject(db,id,editable=true) {
@@ -36,6 +37,20 @@ export const getProjectClientAccount = async (req,res) => {
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,req.params.id,false);
       if (actor.role!=="admin"&&p.suggested_opm_id!==actor.id) throw new HttpError(403,"Only Admin or the assigned Office PM can manage this project's client account.");
+      if (!['active','archived','completed'].includes(p.lifecycle_status)) return {
+        clients: [], managed: true, status: 'project_not_active', next_action: 'activate_project',
+        can_recover: false, can_issue_activation_code: false, defaults: { email: '' },
+      };
+      if (clientOwnedEnabled()) {
+        const invitation = (await db.query("SELECT redeemed_at FROM client_portal_invitations WHERE project_id=$1", [p.id])).rows[0];
+        if (invitation || p.lifecycle_status === 'active') {
+          const clients = (await db.query(`SELECT u.id,u.full_name,u.status,'active' AS activation_status
+            FROM user_client_project_links l JOIN users u ON u.id=l.user_id WHERE l.project_id=$1 AND NOT coalesce(u.is_deleted,false)`, [p.id])).rows;
+          return { clients, managed: true, mode: "client_owned", contact_email: p.inquiry_details?.email || "",
+            status: clients.length ? "active" : "pending_activation", can_recover: false,
+            can_issue_activation_code: actor.role === "opm" && !clients.length && !invitation?.redeemed_at, defaults: { email: "" } };
+        }
+      }
       const clients=(await db.query(`SELECT u.id,u.full_name,u.email,u.phone,u.status,
         CASE WHEN u.status='invited' AND u.password_hash=$2 THEN 'pending_activation'
           WHEN u.status='active' AND u.password_hash<>$2 THEN 'active' ELSE NULL END AS activation_status FROM user_client_project_links l
@@ -71,6 +86,8 @@ export const recoverProjectClient = async (req,res) => {
       throw new HttpError(422,"Verify the client's ownership of a valid email before recovery.");
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,req.params.id);
+      if (clientOwnedEnabled() && (await db.query("SELECT 1 FROM client_portal_invitations WHERE project_id=$1", [p.id])).rowCount)
+        throw new HttpError(409,"The client must redeem and verify this project invitation. Staff cannot link it by email.");
       if ((await db.query("SELECT 1 FROM user_client_project_links WHERE project_id=$1",[p.id])).rowCount)
         throw new HttpError(409,"A client link already exists. Review the linked account with Admin.");
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))",["client-email:"+email]);
@@ -104,6 +121,8 @@ export const selectIntakeClient = async (req,res) => {
     if(!isUuid(req.body?.client_user_id)) return sendError(res,"client_user_id is required.",400);
     const data=await withTransaction(async db=>{
       const p=await intakeProject(db,req.params.id);
+      if (clientOwnedEnabled() && (await db.query("SELECT 1 FROM client_portal_invitations WHERE project_id=$1", [p.id])).rowCount)
+        throw new HttpError(409,"The client must redeem and verify this project invitation. Staff cannot link it by email.");
       if (!p.inquiry_details && p.lifecycle_status === "spm_review") throw new HttpError(409,"Use verified client account recovery for this intake.");
       const found=await db.query(
         `SELECT u.id,u.full_name,u.email,u.status FROM users u JOIN roles r ON r.id=u.role_id

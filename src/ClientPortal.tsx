@@ -1,4 +1,6 @@
 import WorkspaceGuide from "./WorkspaceGuide"
+import ClientOwnedActivation from "./ClientOwnedActivation"
+import { api } from "./api/client"
 import TopbarDate from "./TopbarDate"
 import { useActionMessage } from "./ActionFeedback"
 import useSwipeNavigation from "./useSwipeNavigation"
@@ -114,6 +116,13 @@ export default function ClientPortal({
   const extensionDemo = useExtensionDemo()
   const { page, navigate: setPage, projectId: routeProjectId } = useWorkspacePage("client", !extensionDemo)
   const [siteDetails, setSiteDetails] = useState(false)
+  const [linkProject, setLinkProject] = useState(false)
+  const [ownedActivationAvailable, setOwnedActivationAvailable] = useState(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    api<{ client_owned: boolean }>("/auth/client/activation-config", { signal: controller.signal }).then(result => setOwnedActivationAvailable(result.client_owned)).catch(() => {})
+    return () => controller.abort()
+  }, [])
   const [projectId, setProjectId] = useState(routeProjectId || projects[0]?.id || "")
   useEffect(() => { if (routeProjectId) setProjectId(routeProjectId) }, [routeProjectId])
   const navigation = useSidebarNavigation(!paused)
@@ -527,6 +536,8 @@ export default function ClientPortal({
     if (page === "Preferences")
       return (
         <>
+          {ownedActivationAvailable && <Button onClick={() => setLinkProject(true)}>Link another project</Button>}
+          {linkProject && <Modal title="Project invitation" onClose={() => setLinkProject(false)}><ClientOwnedActivation embedded onLinked={() => window.location.reload()} /></Modal>}
           <Panel
             title="Your notification preferences"
             subtitle="Personal settings only. No access to staff queues or organization rules."

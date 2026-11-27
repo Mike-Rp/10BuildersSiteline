@@ -34,7 +34,7 @@ type Props = {
   save: (action: string, input: Record<string, unknown>) => void;
 }
 
-const clientFields = [["client_name", "Client name"], ["phone", "Contact number"], ["email", "Email address"]] as const
+const clientFields = [["client_name", "Client name"], ["phone", "Contact number"], ["email", "Contact email address"]] as const
 const projectIdentityFields = [
   ["name", "Project name"], ["address", "Project address / location"], ["project_type", "Project type"],
 ] as const

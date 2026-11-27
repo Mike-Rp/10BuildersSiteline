@@ -18,7 +18,7 @@ export default function ClientCorrections({ id, details, admin, reload, projectT
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to save correction.") } finally { setBusy(false) }
   }
   const labels: Record<string, string> = projectType ? { project_type: "Project type" }
-    : { client_name: "Client name", email: "Email address", phone: "Mobile number", ...(details.client_type === "company" ? { company_name: "Company name", primary_contact: "Representative", designation: "Designation" } : {}) }
+    : { client_name: "Client name", email: "Contact email address", phone: "Mobile number", ...(details.client_type === "company" ? { company_name: "Company name", primary_contact: "Representative", designation: "Designation" } : {}) }
   const options = ["Residential", "Commercial", "Mixed-Use"].filter(type => type !== details.project_type)
   const relevant = history.filter(item => (item.field === "project_type") === projectType)
   if (admin && projectType && !relevant.length) return null
