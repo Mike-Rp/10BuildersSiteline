@@ -16,6 +16,11 @@ export function Icon({ name, size = 20 }: {
   size?: number
 }) {
   const paths: Record<string, ReactNode> = {
+    calculator: <><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M8 6h8M8 10h1m3 0h1m3 0h.01M8 14h1m3 0h1m3 0h.01M8 18h1m3 0h1m3-4v4" /></>,
+    "panel-left-close": <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18m7-12-3 3 3 3" /></>,
+    "panel-left-open": <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M13 9l3 3-3 3" /></>,
+    clipboard: <><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><rect x="9" y="2" width="6" height="4" rx="1" /><path d="M8 11h8M8 15h8M8 19h5" /></>,
+    book: <><path d="M12 5v16M12 5C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z" /></>,
     lock: (<><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>),
     grid: (
       <>

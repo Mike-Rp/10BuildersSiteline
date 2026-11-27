@@ -5,7 +5,7 @@ export type DirectoryTab = "engineers" | "subcontractors"
 export const ADMIN_NAV = [
   { label: "Dashboard", icon: "grid", group: "WORKSPACE" },
   { label: "Active sites", icon: "building" },
-  { label: "Project inquiries", icon: "plus" },
+  { label: "Project inquiries", icon: "clipboard" },
   { label: "Documents", icon: "folder", group: "RESOURCES" },
   { label: "Directory", icon: "users" },
   { label: "Archive", icon: "archive" },

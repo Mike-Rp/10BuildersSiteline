@@ -5,8 +5,8 @@ import type { NavigationAttention } from "./navigation-attention"
 import "./sidebar-categories.css"
 
 type Item = { label: string; icon: string; group?: string }
-export default function CollapsibleSidebarNav({ items, page, counts, onNavigate }: {
-  items: Item[]; page: string; counts: NavigationAttention; onNavigate: (page: string) => void
+export default function CollapsibleSidebarNav({ items, page, counts, onNavigate, collapsed = false, onExpand }: {
+  items: Item[]; page: string; counts: NavigationAttention; onNavigate: (page: string) => void; collapsed?: boolean; onExpand?: () => void
 }) {
   const groups: { name: string; items: Item[] }[] = []
   for (const item of items) {
@@ -21,23 +21,26 @@ export default function CollapsibleSidebarNav({ items, page, counts, onNavigate 
   return <nav className="sidebar-categories" aria-label="Main navigation">
     {groups.map((group, index) => {
       const fixed = group.name === "WORKSPACE"
-      const open = fixed || expanded === group.name
+      const open = fixed || (!collapsed && expanded === group.name)
       const count = group.items.reduce((sum, item) => sum + (counts[item.label]?.count || 0), 0)
       const title = group.name[0] + group.name.slice(1).toLowerCase()
       const id = `${prefix}-category-${index}`
       return <section className="sidebar-category" key={group.name}>
         {fixed ? <div className="sidebar-category-heading">
           <Icon name={icons[group.name] || "folder"} size={19} /><span>{title}</span>
-        </div> : <button type="button" className="sidebar-category-toggle" aria-expanded={open} aria-controls={id} onClick={() => setExpanded(open ? undefined : group.name)}>
+        </div> : <button type="button" className={`sidebar-category-toggle${collapsed && current === group.name ? " active" : ""}`} aria-label={title} data-sidebar-tooltip={title} aria-expanded={open} aria-controls={id} onClick={() => {
+          if (collapsed) { onExpand?.(); setExpanded(group.name) }
+          else setExpanded(open ? undefined : group.name)
+        }}>
           <Icon name={icons[group.name] || "folder"} size={19} /><span>{title}</span>
-          {!open && <NavigationCount item={{ count, description: "attention items across this category's modules" }} />}
+          {!open && <NavigationCount compact={collapsed} item={{ count, description: "attention items across this category's modules" }} />}
           <span className="category-chevron" aria-hidden="true">{open ? "⌄" : "›"}</span>
         </button>}
         <div id={id} hidden={!open} className="sidebar-category-items">
-          {group.items.map(item => <button type="button" key={item.label} aria-label={item.label} aria-current={page === item.label ? "page" : undefined}
+          {group.items.map(item => <button type="button" key={item.label} aria-label={item.label} data-sidebar-tooltip={item.label} aria-current={page === item.label ? "page" : undefined}
             aria-description={counts[item.label]?.count ? `${counts[item.label].count} ${counts[item.label].description}` : undefined}
             className={`nav-item ${page === item.label ? "active" : ""}`} onClick={() => onNavigate(item.label)}>
-            <Icon name={item.icon} size={19} /><span>{item.label}</span><NavigationCount item={counts[item.label]} />
+            <Icon name={item.icon} size={20} /><span>{item.label}</span><NavigationCount compact={collapsed} item={counts[item.label]} />
             {item.label === "Dashboard" && page === item.label && <i />}
           </button>)}
         </div>

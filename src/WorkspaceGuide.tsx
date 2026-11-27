@@ -65,8 +65,8 @@ export function guideTopics(role: Role): Topic[] {
   return [topic("Quick workspace overview", "Find your projects and published updates", [sites, step("View your project overview", "Select a project to see the information published for you. Internal submissions awaiting review may not appear here.", "Project Overview"), records, settings]), topic("View progress and photos", "Find released project updates", [step("View progress history", "Select your project and review the published progress entries.", "Progress History"), step("View site photographs", "Browse the site photos released for your project.", "Site Photographs")]), topic("Find shared documents", "Open available project records", [step("Open project documents", "Select your project and open a shared document to preview or download it.", "Project Documents")])]
 }
 
-export default function WorkspaceGuide({ actor, onNavigate, enabled = true }: {
-  actor: { id: string; name: string; role: Role }; onNavigate: (page: string) => void; enabled?: boolean
+export default function WorkspaceGuide({ actor, onNavigate, enabled = true, triggerIcon = "doc" }: {
+  actor: { id: string; name: string; role: Role }; onNavigate: (page: string) => void; enabled?: boolean; triggerIcon?: string
 }) {
   const key = `10buildline:workspace-guide:v1:${actor.id}:${actor.role}`
   const [view, setView] = useState<"welcome" | "topics" | "tour" | null>(null)
@@ -105,7 +105,7 @@ export default function WorkspaceGuide({ actor, onNavigate, enabled = true }: {
   function start(which: number) { remember(); setTopicIndex(which); setIndex(0); setView("tour") }
   if (enabled && view === "tour") return <ContextualTour steps={topic.steps} index={index} title={topic.title} onIndex={setIndex} onClose={close} onTopics={() => setView("topics")} onNavigate={onNavigate} />
   return <>
-    <button type="button" className="workspace-guide-trigger" disabled={!enabled} onClick={() => { remember(); setView("topics") }}><Icon name="doc" size={18} />Workspace guide<Icon name="arrow" size={15} /></button>
+    <button type="button" className="workspace-guide-trigger" aria-label="Workspace guide" data-sidebar-tooltip="Workspace guide" disabled={!enabled} onClick={() => { remember(); setView("topics") }}><Icon name={triggerIcon} size={triggerIcon === "book" ? 20 : 18} /><span>Workspace guide</span><Icon name="arrow" size={15} /></button>
     {enabled && view && createPortal(<Modal title={view === "welcome" ? `Welcome to your workspace, ${actor.name.split(" ")[0]}` : view === "topics" ? "Workspace guide" : topic.title} subtitle={view === "welcome" ? `First visit · ${labels[actor.role]}` : labels[actor.role]} onClose={close}>
       <div className="workspace-guide-content">
         {view === "welcome" && <>

@@ -548,6 +548,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [showOfficeApproval, setShowOfficeApproval] = useState(false)
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminFormStep, setAdminFormStep] = useState(0)
+  const [projectTouched, setProjectTouched] = useState<Record<string, boolean>>({})
   const [draftId, setDraftId] = useState("")
   const [draftToDelete, setDraftToDelete] = useState<Inquiry>()
   const [draftBaseline, setDraftBaseline] = useState(JSON.stringify(adminInquiryDraft))
@@ -670,7 +671,27 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     if (adminPage !== "list") recordHeading.current?.focus()
   }, [adminPage])
   useEffect(() => {
-    if (adminPage === "new") formRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
+    if (adminPage === "new") {
+      formRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
+      if (adminFormStep === 2) formRef.current?.scrollTo?.(0, 0)
+    }
+  }, [adminPage, adminFormStep])
+  useLayoutEffect(() => {
+    if (adminPage !== "new" || adminFormStep !== 2) return
+    const modal = formRef.current?.closest<HTMLElement>(".modal")
+    if (!modal) return
+    // Retain this step's natural opening size; new feedback scrolls within it.
+    // Re-measure at each viewport size instead of imposing a fixed design height.
+    const fit = () => {
+      modal.style.removeProperty("--inquiry-project-height")
+      modal.style.setProperty("--inquiry-project-height", `${modal.getBoundingClientRect().height}px`)
+    }
+    fit()
+    window.addEventListener("resize", fit)
+    return () => {
+      window.removeEventListener("resize", fit)
+      modal.style.removeProperty("--inquiry-project-height")
+    }
   }, [adminPage, adminFormStep])
   useEffect(() => {
     if (dialog === "intake") stepperRef.current?.closest(".modal-body")?.scrollTo?.(0, 0)
@@ -722,7 +743,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   function open(item?: Inquiry) {
     if (role === "admin" && item?.details.intake_draft === "yes") {
       setSelected(item.id); setDetails({ ...item.details }); setDraftId(item.id)
-      setDraftBaseline(JSON.stringify(item.details)); setAdminFormStep(0); setLeaveInquiry(false); setError(""); setAdminPage("new")
+      setDraftBaseline(JSON.stringify(item.details)); setProjectTouched({}); setAdminFormStep(0); setLeaveInquiry(false); setError(""); setAdminPage("new")
       return
     }
     setSelected(item?.id || "")
@@ -983,6 +1004,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const lotArea = Number(details.lot_area)
     const floorCount = Number(details.floor_count)
     const areaRange = floorAreaRange(lotArea, floorCount)
+    const rangeReady = Boolean(areaRange && lotArea >= MIN_AVERAGE_FLOOR_AREA && lotArea <= MAX_INQUIRY_AREA)
     const minFloorArea = areaRange?.minimum ?? MIN_AVERAGE_FLOOR_AREA
     const floorLimit = areaRange?.maximum
     const formatArea = (area: number) => area.toLocaleString("en-PH", { maximumSignificantDigits: 15 })
@@ -998,35 +1020,51 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       }
       if (key === "lot_area" || key === "floor_area_sqm") {
         const total = key === "floor_area_sqm"
-        const outsideRange = value !== "" && (Number(value) < (total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA) || Number(value) > MAX_INQUIRY_AREA ||
-          (total && floorLimit !== undefined && Number(value) > floorLimit))
-        return <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-          <GroupedNumberInput required={required} min={total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
-            aria-describedby={total ? "inquiry-floor-area-range" : undefined} aria-invalid={outsideRange || undefined}
+        const outsideRange = value !== "" && (!Number.isFinite(Number(value)) || Number(value) < (total && rangeReady ? minFloorArea : MIN_AVERAGE_FLOOR_AREA) || Number(value) > MAX_INQUIRY_AREA ||
+          (total && rangeReady && floorLimit !== undefined && Number(value) > floorLimit))
+        const notice = required && projectTouched[key] && value === "" ? `Enter ${label.toLowerCase()}.`
+          : value && !Number.isFinite(Number(value)) ? "Enter a valid area."
+            : value && Number(value) > MAX_INQUIRY_AREA ? `Enter no more than ${formatArea(MAX_INQUIRY_AREA)} m².`
+              : outsideRange ? total && rangeReady
+                ? Number(value) < minFloorArea ? `Minimum total floor area is ${formatArea(minFloorArea)} m².`
+                  : `Maximum total floor area is ${formatArea(floorLimit!)} m².`
+                : `Enter at least ${MIN_AVERAGE_FLOOR_AREA} m².` : ""
+        return <div className="inquiry-measurement-field"><div className="inquiry-measurement-heading">
+          <label htmlFor={`inquiry-${key}`}>{label}{required && <span className="inquiry-required"> *</span>}</label>
+          {total && <InfoPopover title="Floor area calculation" label="How total floor area is calculated">
+            <p>Total floor area is the combined area of all floors. The minimum average is {MIN_AVERAGE_FLOOR_AREA} m² per floor; the maximum average is 170% of the lot area.</p>
+            <p>The allowable total uses the lot area, number of floors, and existing supported area limit.</p>
+            {rangeReady && <p>Allowed range: {formatArea(minFloorArea)}–{formatArea(floorLimit!)} m².</p>}
+          </InfoPopover>}
+        </div>
+          <GroupedNumberInput id={`inquiry-${key}`} name={key} normalizeLeadingZeros required={required} min={total ? minFloorArea : MIN_AVERAGE_FLOOR_AREA} max={total ? floorLimit ?? MAX_INQUIRY_AREA : MAX_INQUIRY_AREA} value={value}
+            aria-describedby={notice ? `inquiry-${key}-error` : total && rangeReady ? "inquiry-floor-area-range" : `inquiry-${key}-helper`} aria-invalid={Boolean(notice) || undefined}
             placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} />
-          {total && <small id="inquiry-floor-area-range" className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">
-            Add the area of every floor. {floorLimit === undefined
-              ? "Enter the lot area and number of floors to see the allowed range."
-              : floorLimit < minFloorArea ? "The lot area and number of floors exceed the supported total floor area range."
-              : `Allowed range is ${formatArea(minFloorArea)} to ${formatArea(floorLimit)} m². Minimum average: 20 m² per floor. The average may exceed the lot area by up to 70%.`}
-          </small>}
-          {!total && <small className={outsideRange ? "inquiry-input-notice" : "inquiry-muted"}>Minimum lot area: {MIN_AVERAGE_FLOOR_AREA} m².</small>}
-        </label>
+          {notice ? <small id={`inquiry-${key}-error`} className="inquiry-input-notice" aria-live="polite">{notice}</small>
+            : total && rangeReady ? <small id="inquiry-floor-area-range" className="inquiry-muted" aria-live="polite">Allowed range: {formatArea(minFloorArea)}–{formatArea(floorLimit!)} m².</small>
+              : <small id={`inquiry-${key}-helper`} className="inquiry-muted">{total ? "Combined area of all floors." : "Minimum: 20 m²."}</small>}
+        </div>
       }
       const pattern = key === "email" ? "[^\\s@]+@[^\\s@]+\\.[^\\s@]+" : undefined
       const hint = "Enter a valid personal or business email address."
-      const invalid = Boolean(value && pattern && !new RegExp(`^(?:${pattern})$`).test(value))
+      const invalidFloors = key === "floor_count" && value !== "" && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > MAX_INQUIRY_FLOORS)
+      const requiredError = required && projectTouched[key] && value === "" ? `Enter ${label.toLowerCase()}.` : ""
+      const invalid = Boolean(requiredError || invalidFloors || (value && pattern && !new RegExp(`^(?:${pattern})$`).test(value)))
+      const fieldError = requiredError || (invalidFloors ? "Enter 1–200 whole floors." : "")
       const noticeId = `inquiry-${key}-notice`
       return (
       <label><span>{label}{required && <span className="inquiry-required"> *</span>}</span>
-        <input type={type} value={value} required={required} maxLength={maxLength}
+        {key === "floor_count" ? <GroupedNumberInput name={key} inputMode="numeric" normalizeLeadingZeros decimalPlaces={0} min={1} max={MAX_INQUIRY_FLOORS} required={required} value={value}
+          aria-invalid={invalid || undefined} aria-describedby={fieldError ? noticeId : "inquiry-floors-helper"}
+          placeholder={inquiryPlaceholders[key]} onValueChange={next => change(key, next)} /> : <input name={key} type={type} value={value} required={required} maxLength={maxLength}
           pattern={pattern} title={pattern ? hint : undefined}
-          aria-invalid={invalid || undefined} aria-describedby={invalid ? noticeId : undefined}
+          aria-invalid={invalid || undefined} aria-describedby={[key === "floor_count" ? "inquiry-floors-helper" : "", invalid ? noticeId : ""].filter(Boolean).join(" ") || undefined}
           min={type === "number" ? key === "floor_count" ? 1 : 0.01 : undefined}
           max={key === "floor_count" ? MAX_INQUIRY_FLOORS : undefined}
           step={type === "number" ? key === "floor_count" ? 1 : "any" : undefined}
-          placeholder={inquiryPlaceholders[key]} onChange={event => change(key, event.target.value)} />
-        {key === "floor_count" && <small className={value && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > MAX_INQUIRY_FLOORS) ? "inquiry-input-notice" : "inquiry-muted"} aria-live="polite">Enter 1–{MAX_INQUIRY_FLOORS} whole floors. This is the supported application range.</small>}
+          placeholder={inquiryPlaceholders[key]} onChange={event => change(key, event.target.value)} />}
+        {key === "floor_count" && !fieldError && <small id="inquiry-floors-helper" className="inquiry-muted">1–200 whole floors.</small>}
+        {fieldError && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{fieldError}</small>}
         {pattern && <small id={noticeId} className="inquiry-input-notice" aria-live="polite">{invalid ? hint : ""}</small>}
       </label>
       )
@@ -1038,7 +1076,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       setAdminPage("list")
     }
     function next() {
-      if (!formRef.current?.reportValidity()) return
+      if (!formRef.current?.reportValidity()) {
+        formRef.current?.querySelector<HTMLElement>("input:invalid, select:invalid, textarea:invalid")?.focus()
+        return
+      }
       if (adminFormStep === 0 && (details.client_record === "existing" ? !details.existing_client_id : !details.client_type)) {
         setError(details.client_record === "existing" ? "Select an existing client." : "Choose the client record and client type."); return
       }
@@ -1057,13 +1098,27 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const stepLabels = ["Client path", "Client details", "Project details", "Review"]
     return <>
     <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
-      <button type="button" className="button" disabled={busy} onClick={close}>Back to inquiries</button>
-      {adminFormStep > 0 && <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminFormStep(value => value - 1) }}>Previous step</button>}
-      {adminFormStep < 3 ? <button type="button" className="button primary" disabled={busy || (adminFormStep === 0 && !clientValid)} onClick={next}>Next: {stepLabels[adminFormStep + 1]}</button>
+      {(adminFormStep === 0 || adminFormStep === 3) && <button type="button" className={`button${adminFormStep === 0 ? " inquiry-client-cancel" : ""}`} disabled={busy} onClick={close}>{adminFormStep === 0 ? "Cancel" : "Back to inquiries"}</button>}
+      {adminFormStep > 0 && <button type="button" className={`button${adminFormStep < 3 ? " inquiry-client-previous" : ""}`} disabled={busy} onClick={() => { setError(""); setAdminFormStep(value => value - 1) }}>{adminFormStep < 3 && <span className="inquiry-back-arrow"><Icon name="arrow" size={16} /></span>}{adminFormStep < 3 ? "Previous" : "Previous step"}</button>}
+      {adminFormStep < 3 ? <button type="button" className="button primary" disabled={busy || (adminFormStep === 0 && !clientValid)} onClick={next}>Next: {stepLabels[adminFormStep + 1]}<Icon name="arrow" size={16} /></button>
         : <button type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit Project Inquiry</button>}
     </>}>
-      <ol className="admin-inquiry-wizard" aria-label="Inquiry form progress">{stepLabels.map((label, index) => <li key={label} aria-current={index === adminFormStep ? "step" : undefined}>{index + 1}. {label}</li>)}</ol>
-      <form ref={formRef} id="admin-inquiry-form" className="admin-inquiry-submission" onSubmit={event => {
+      <ol className="admin-inquiry-wizard" aria-label="Inquiry form progress">{stepLabels.map((label, index) => <li key={label} data-complete={index < adminFormStep} aria-current={index === adminFormStep ? "step" : undefined}><span className="inquiry-wizard-marker" aria-hidden="true">{index < adminFormStep ? <Icon name="check" size={14} /> : index + 1}</span><span>{label}</span></li>)}</ol>
+      <form ref={formRef} id="admin-inquiry-form" className={`admin-inquiry-submission${adminFormStep < 2 ? " inquiry-client-step" : ""}${adminFormStep === 0 ? " inquiry-client-path-step" : adminFormStep === 1 ? " inquiry-client-details-step" : adminFormStep === 2 ? " inquiry-project-details-step" : ""}`}
+        onBlurCapture={event => {
+          const field = event.target as HTMLElement
+          const name = field.getAttribute("name")
+          if (adminFormStep === 2 && field.tagName === "INPUT" && name) {
+            setProjectTouched(previous => ({ ...previous, [name]: true }))
+          }
+        }} onInvalidCapture={event => {
+          const field = event.target as HTMLElement
+          const name = field.getAttribute("name")
+          if (adminFormStep === 2 && field.tagName === "INPUT" && name) {
+            event.preventDefault()
+            setProjectTouched(previous => ({ ...previous, [name]: true }))
+          }
+        }} onSubmit={event => {
         event.preventDefault()
         if (busy) return
         if (adminFormStep < 3) { next(); return }
@@ -1090,16 +1145,16 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         })
       }}>
         <fieldset disabled={busy} className="inquiry-form-stack">
-          {adminFormStep < 2 && <FormSection title={adminFormStep === 0 ? "Client path" : "Client information"} icon="users" description={adminFormStep === 0 ? "Choose a new or existing client, then the appropriate client type." : "Verify that all client information is accurate and that all required fields are complete before proceeding."}>
-            <InquiryClientFields page={adminFormStep === 0 ? "path" : "details"} details={details} onChange={setDetails} disabled={busy} />
-          </FormSection>}
+          {adminFormStep === 0 && <InquiryClientFields page="path" details={details} onChange={setDetails} disabled={busy}
+            selectionError={error === "Select an existing client." ? error : undefined} />}
+          {adminFormStep === 1 && <InquiryClientFields page="details" details={details} onChange={setDetails} disabled={busy} />}
           {adminFormStep === 2 && <>
-          <FormSection title="Project information" icon="building" description="Measurements use square meters (m²).">
+          <section className="inquiry-project-section"><h3>Project details</h3>
             <div className="admin-inquiry-project-identity">
               {input("name", "Project name", "text", true, 150)}
               {input("address", "Location", "text", true, 500)}
             </div>
-            <fieldset className="admin-inquiry-project-types">
+            <fieldset className="admin-inquiry-project-types" aria-invalid={Boolean(projectTouched["inquiry-project-type"] && !details.project_type) || undefined}>
               <legend>Project type <span className="inquiry-required">*</span></legend>
               <div className="project-type-options">
                 {projectTypes.map(([type, icon, description]) => <label key={type}
@@ -1107,22 +1162,23 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   <input className="sr-only" type="radio" name="inquiry-project-type" value={type} required
                     checked={details.project_type === type} onChange={() => change("project_type", type)} />
                   <span className="project-type-icon"><Icon name={icon} size={24} /></span>
-                  <span className="project-type-copy"><strong>{type}</strong><span>{description}</span></span>
+                  <span className="project-type-copy"><strong>{type}</strong><span>{type === "Residential" ? "Homes and residences" : type === "Commercial" ? "Business establishments" : "Residential and commercial"}</span></span>
                   {details.project_type === type && <span className="project-type-check" aria-hidden="true"><Icon name="check" size={15} /></span>}
                 </label>)}
               </div>
+              {projectTouched["inquiry-project-type"] && !details.project_type && <small className="inquiry-input-notice">Choose a project type.</small>}
             </fieldset>
             <div className="admin-inquiry-form-grid admin-inquiry-measurements">
               {input("lot_area", "Lot area (m²)", "number")}
               {input("floor_count", "Number of floors", "number")}
               {input("floor_area_sqm", "Total floor area (m²)", "number")}
-              <FloorAreaReview area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />
+              {rangeReady && Number(details.floor_area_sqm) >= minFloorArea && Number(details.floor_area_sqm) <= floorLimit! && <FloorAreaReview summary area={Number(details.floor_area_sqm)} floors={floorCount} lot={lotArea} />}
             </div>
-          </FormSection>
-          <FormSection title="OPM consultation request" icon="users" description="Classify the inquiry and record whether the client wants immediate contact.">
+          </section>
+          <section className="inquiry-project-section"><h3>OPM consultation request</h3>
             <div className="admin-inquiry-consultation">
               <fieldset className="admin-inquiry-preference">
-                <legend>Does the client wish to speak with an OPM right away? <span className="inquiry-required">*</span></legend>
+                <legend>Immediate OPM consultation? <span className="inquiry-required">*</span></legend>
                 {(["yes", "no"] as const).map(value => <label key={value}>
                   <input type="radio" name="immediate-consultation" required checked={details.immediate_consultation === value} onChange={() => {
                     setDetails(previous => ({ ...previous, immediate_consultation: value, consultation: value === "no" ? 1440 : 30,
@@ -1135,13 +1191,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                 <legend>Inquiry classification <span className="inquiry-required">*</span></legend>
                 <div className="admin-inquiry-classification-options">
                   {classifications.map(value => (
-                    <label key={value}>
+                    <label key={value} data-classification={value.toLowerCase()}>
                       <input className="sr-only" type="radio" name="inquiry-classification" value={value} required
                         checked={details.classification === value} onChange={() => change("classification", value)} />
                       <span>{value}</span>
-                      {details.classification === value && <span className="inquiry-classification-check" aria-hidden="true">
+                      <span className="inquiry-classification-check" aria-hidden="true" style={{ visibility: details.classification === value ? "visible" : "hidden" }}>
                         <Icon name="check" size={13} />
-                      </span>}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -1163,7 +1219,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
                   {index === 0 && <span className="inquiry-pill ready">Best match</span>}
                 </li>)}</ul></>}
             </section>
-          </FormSection>
+          </section>
           </>}
           {adminFormStep === 3 && <FormSection title="Review inquiry" icon="building" description="Confirm the client and project details before submission.">
             <InquiryDetails details={details} includeClient />
@@ -1171,7 +1227,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             {matching?.error && <div role="alert"><p>{matching.error}</p><button type="button" className="button" onClick={() => setOpmPreviewVersion(version => version + 1)}>Retry Office PM match</button></div>}
           </FormSection>}
         </fieldset>
-        {feedback}
+        {!(adminFormStep === 0 && details.client_record === "existing" && !details.existing_client_id && error === "Select an existing client.") && feedback}
       </form>
     </Modal>
     {leaveInquiry && <Modal title="Save this inquiry as a draft?" onClose={() => setLeaveInquiry(false)} footer={<>
@@ -1275,7 +1331,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         <p>Review saved inquiries or start a new project request.</p>
       </div>
       <button className="button" disabled={busy} onClick={() => void run(refresh)}>Refresh</button>
-      <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setDraftId(""); setDraftBaseline(JSON.stringify(adminInquiryDraft)); setAdminFormStep(0); setLeaveInquiry(false); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
+      <button className="button primary" disabled={busy} onClick={() => { open(); setDetails(adminInquiryDraft); setDraftId(""); setDraftBaseline(JSON.stringify(adminInquiryDraft)); setProjectTouched({}); setAdminFormStep(0); setLeaveInquiry(false); setAdminPage("new") }}><Icon name="plus" size={17} />New project inquiry</button>
     </header>}
     {!admin && <section className="opm-inquiry-queue" aria-label="Project inquiry queue">
       <div className="opm-inquiry-controls">

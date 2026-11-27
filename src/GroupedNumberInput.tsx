@@ -7,9 +7,10 @@ type Props = Omit<ComponentProps<"input">, "type" | "inputMode" | "value" | "onC
   max?: number
   decimalPlaces?: number
   normalizeLeadingZeros?: boolean
+  inputMode?: "decimal" | "numeric"
 }
 
-export default function GroupedNumberInput({ value, onValueChange, min, max, decimalPlaces, normalizeLeadingZeros = false, ...props }: Props) {
+export default function GroupedNumberInput({ value, onValueChange, min, max, decimalPlaces, normalizeLeadingZeros = false, inputMode = "decimal", ...props }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const caret = useRef<number | undefined>(undefined)
   const display = value.replace(/^[0-9]+/, whole => whole.replace(/\B(?=(\d{3})+(?!\d))/g, ","))
@@ -34,7 +35,7 @@ export default function GroupedNumberInput({ value, onValueChange, min, max, dec
     caret.current = undefined
   }, [value, display, min, max, decimalPlaces])
 
-  return <input {...props} ref={input} type="text" inputMode="decimal" value={display} onKeyDown={event => {
+  return <input {...props} ref={input} type="text" inputMode={inputMode} value={display} onKeyDown={event => {
     props.onKeyDown?.(event)
     const field = event.currentTarget
     const start = field.selectionStart
