@@ -185,18 +185,18 @@ function AdminInquiryHistory({ row }: { row: Inquiry }) {
     no_match: () => "No eligible OPM found",
   }
   return <section className="inquiry-card admin-inquiry-history">
-    <h2>Automated assignment history</h2>
+    <h2>Assignment history</h2>
     <ol>
-      <li><span className="admin-history-icon"><Icon name="check" size={17} /></span><div><strong>Inquiry submitted</strong>
+      <li><span className="admin-history-icon" data-state="completed"><Icon name="check" size={17} /></span><div><strong>Inquiry submitted</strong>
         {row.created_at && <time dateTime={row.created_at}>{inquiryDate.format(new Date(row.created_at))}</time>}
       </div></li>
       {history.map((event, index) => <li key={index}>
-        <span className={`admin-history-icon ${event.kind === "accepted" ? "" : "pending"}`}><Icon name={event.kind === "accepted" ? "check" : "clock"} size={17} /></span>
+        <span className={`admin-history-icon ${event.kind === "accepted" ? "" : "pending"}`} data-state={event.kind === "accepted" ? "completed" : event.kind === "offered" ? "sent" : "failed"}><Icon name={event.kind === "accepted" ? "check" : event.kind === "declined" ? "close" : event.kind === "no_match" ? "alert" : "arrow"} size={17} /></span>
         <div><strong>{labels[event.kind](event.opm)}</strong>
           {event.at && <time dateTime={event.at}>{inquiryDate.format(new Date(event.at))}</time>}
         </div>
       </li>)}
-      {!history.length && row.opm_name && <li><span className="admin-history-icon pending"><Icon name="clock" size={17} /></span>
+      {!history.length && row.opm_name && <li><span className="admin-history-icon pending" data-state={row.status === "offered" ? "pending" : "record"}><Icon name={row.status === "offered" ? "clock" : "doc"} size={17} /></span>
         <div><strong>{row.opm_name}</strong><p>{adminInquiryStatus(row)}</p></div>
       </li>}
     </ol>
@@ -531,6 +531,12 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [officePage, setOfficePage] = useState<OfficePage>()
   const [finalizedClient, setFinalizedClient] = useState<{ projectId: string; name: string; refreshFailed?: boolean }>()
   const [showOfficeApproval, setShowOfficeApproval] = useState(false)
+  const [inquiryAcceptedNotice, setInquiryAcceptedNotice] = useState(false)
+  useEffect(() => {
+    if (!inquiryAcceptedNotice) return
+    const timer = window.setTimeout(() => setInquiryAcceptedNotice(false), 4500)
+    return () => window.clearTimeout(timer)
+  }, [inquiryAcceptedNotice])
   const [adminPage, setAdminPage] = useState<"list" | "new" | "submitted" | "tracking">("list")
   const [adminFormStep, setAdminFormStep] = useState(0)
   const [projectTouched, setProjectTouched] = useState<Record<string, boolean>>({})
@@ -780,7 +786,10 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       navigateOffice()
     } else {
       updateInquiry(updated)
-      if (action === "confirm") navigateOffice("received")
+      if (action === "confirm") {
+        navigateOffice("accepted")
+        setInquiryAcceptedNotice(true)
+      }
       if (action === "approve") navigateOffice("review", true)
       if (action === "withdraw") {
         navigateOffice()
@@ -1073,13 +1082,13 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const stepLabels = ["Client path", "Client details", "Project details", "Review"]
     return <>
     <Modal title="Submit a project inquiry" wide onClose={close} footer={<>
-      {(adminFormStep === 0 || adminFormStep === 3) && <button type="button" className={`button${adminFormStep === 0 ? " inquiry-client-cancel" : ""}`} disabled={busy} onClick={close}>{adminFormStep === 0 ? "Cancel" : "Back to inquiries"}</button>}
-      {adminFormStep > 0 && <button type="button" className={`button${adminFormStep < 3 ? " inquiry-client-previous" : ""}`} disabled={busy} onClick={() => { setError(""); setAdminFormStep(value => value - 1) }}>{adminFormStep < 3 && <span className="inquiry-back-arrow"><Icon name="arrow" size={16} /></span>}{adminFormStep < 3 ? "Previous" : "Previous step"}</button>}
-      {adminFormStep < 3 ? <button type="button" className="button primary" disabled={busy || (adminFormStep === 0 && !clientValid)} onClick={next}>Next: {stepLabels[adminFormStep + 1]}<Icon name="arrow" size={16} /></button>
-        : <button type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit Project Inquiry</button>}
+      {adminFormStep === 0 && <button type="button" className="button inquiry-client-cancel" disabled={busy} onClick={close}>Cancel</button>}
+      {adminFormStep > 0 && <button type="button" className="button inquiry-client-previous" disabled={busy} onClick={() => { setError(""); setAdminFormStep(value => value - 1) }}><span className="inquiry-back-arrow"><Icon name="arrow" size={16} /></span>Previous</button>}
+      {adminFormStep < 3 ? <button key="inquiry-next" type="button" className="button primary" disabled={busy || (adminFormStep === 0 && !clientValid)} onClick={next}>Next: {stepLabels[adminFormStep + 1]}<Icon name="arrow" size={16} /></button>
+        : <button key="inquiry-submit" type="submit" form="admin-inquiry-form" className="button primary admin-inquiry-submit" disabled={busy || !candidates}>Submit inquiry</button>}
     </>}>
       <ol className="admin-inquiry-wizard" aria-label="Inquiry form progress">{stepLabels.map((label, index) => <li key={label} data-complete={index < adminFormStep} aria-current={index === adminFormStep ? "step" : undefined}><span className="inquiry-wizard-marker" aria-hidden="true">{index < adminFormStep ? <Icon name="check" size={14} /> : index + 1}</span><span>{label}</span></li>)}</ol>
-      <form ref={formRef} id="admin-inquiry-form" className={`admin-inquiry-submission${adminFormStep < 2 ? " inquiry-client-step" : ""}${adminFormStep === 0 ? " inquiry-client-path-step" : adminFormStep === 1 ? " inquiry-client-details-step" : adminFormStep === 2 ? " inquiry-project-details-step" : ""}`}
+      <form ref={formRef} id="admin-inquiry-form" className={`admin-inquiry-submission${adminFormStep < 2 ? " inquiry-client-step" : ""}${adminFormStep === 0 ? " inquiry-client-path-step" : adminFormStep === 1 ? " inquiry-client-details-step" : adminFormStep === 2 ? " inquiry-project-details-step" : " inquiry-review-step"}`}
         onBlurCapture={event => {
           const field = event.target as HTMLElement
           const name = field.getAttribute("name")
@@ -1097,6 +1106,8 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
         event.preventDefault()
         if (busy) return
         if (adminFormStep < 3) { next(); return }
+        const submitter = (event.nativeEvent as SubmitEvent).submitter
+        if (!submitter?.classList.contains("admin-inquiry-submit")) return
         if (!candidates) return
         void run(async () => {
           let result: Inquiry
@@ -1115,7 +1126,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
           setLeaveInquiry(false)
           setDraftId("")
           setDraftBaseline(JSON.stringify(details))
-          setAdminPage("submitted")
+          setAdminPage("tracking")
           void onReload()
         })
       }}>
@@ -1196,11 +1207,23 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             </section>
           </section>
           </>}
-          {adminFormStep === 3 && <FormSection title="Review inquiry" icon="building" description="Confirm the client and project details before submission.">
-            <InquiryDetails details={details} includeClient />
+          {adminFormStep === 3 && <section className="inquiry-review-content"><h3>Review inquiry</h3>
+            <section><header><h4>Client details</h4><button type="button" className="button" onClick={() => { setError(""); setAdminFormStep(1) }}>Edit client details</button></header>
+              <dl className="inquiry-fields">{[
+                ["Client record", details.client_record === "existing" ? "Existing client" : "New client"],
+                ["Client type", details.client_type === "company" ? "Company / organization" : "Individual"],
+                ...(details.client_type === "company" ? [["Company", details.company_name || details.client_name], ["Representative", details.primary_contact], ...(details.designation ? [["Position / designation", details.designation]] : [])] : [["Client name", details.client_name]]),
+                ["Mobile number", details.phone], ["Email address", details.email],
+              ].map(([label, value]) => <div key={String(label)}><dt>{label}</dt><dd>{value || "—"}</dd></div>)}</dl>
+            </section>
+            <section><header><h4>Project details</h4><button type="button" className="button" onClick={() => { setError(""); setAdminFormStep(2) }}>Edit project details</button></header><InquiryDetails details={details} /></section>
+            <section><header><h4>OPM consultation request</h4><button type="button" className="button" onClick={() => { setError(""); setAdminFormStep(2) }}>Edit consultation</button></header>
+              <dl className="inquiry-fields"><div><dt>Immediate consultation</dt><dd>{regular ? "No" : "Yes"}</dd></div><div><dt>Inquiry classification</dt><dd>{details.classification}</dd></div><div><dt>Response window</dt><dd>{timing.find(([minutes]) => minutes === Number(details.consultation))?.[1] || details.consultation}</dd></div></dl>
+            </section>
+            <p className="inquiry-muted">Client information cannot be edited after submission.</p>
             <p>{regular ? "The inquiry will be saved for routing after submission." : candidates ? candidates.length ? `The inquiry will be sent to ${candidates[0].name}.` : "No eligible Office PM is available; the inquiry will be saved for matching later." : "Checking available Office PMs…"}</p>
             {matching?.error && <div role="alert"><p>{matching.error}</p><button type="button" className="button" onClick={() => setOpmPreviewVersion(version => version + 1)}>Retry Office PM match</button></div>}
-          </FormSection>}
+          </section>}
         </fieldset>
         {!(adminFormStep === 0 && details.client_record === "existing" && !details.existing_client_id && error === "Select an existing client.") && feedback}
       </form>
@@ -1215,6 +1238,43 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   if (admin && row && (adminPage === "submitted" || adminPage === "tracking")) {
     const submitted = adminPage === "submitted"
     const status = adminInquiryStatus(row)
+    if (!submitted) {
+      const details = row.details
+      const area = (value: string | number) => value ? `${Number(value).toLocaleString("en-PH")} m²` : "Not provided"
+      const date = (value?: string | number) => typeof value === "string" && Number.isFinite(Date.parse(value)) ? inquiryDate.format(new Date(value)) : undefined
+      const startDate = date(row.target_start_date || details.anticipated_start)
+      const endDate = date(row.target_end_date)
+      const facts = (values: (string | number | undefined)[][]) => <dl className="tracking-facts">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "—"}</dd></div>)}</dl>
+      const corrections = Array.isArray(details.client_corrections) ? details.client_corrections : []
+      return <section className="project-inquiries admin-inquiries inquiry-tracking-page">
+        <button type="button" className="button tracking-back" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}><span className="inquiry-back-arrow"><Icon name="arrow" size={16} /></span>Back to inquiries</button>
+        <article className="tracking-container">
+          <header className="tracking-heading"><div><p>{inquiryReference(row)}</p><h1 ref={recordHeading} tabIndex={-1}>{details.name}</h1><p>{[details.address, details.project_type].filter(Boolean).join(" · ")}</p></div><span className="inquiry-pill">{status}</span></header>
+          <div className="tracking-assignment">{facts([["Assigned Office PM", row.opm_name || "Pending matching"]])}<div><span>Inquiry classification</span><span className="inquiry-priority" data-classification={String(details.classification || "Normal").toLowerCase()}>{details.classification || "Normal"}</span></div></div>
+          <section className="tracking-client-details"><h2>Client details</h2>{facts([
+            ["Client name", details.client_name], ["Client type", details.client_type === "company" ? "Company / organization" : details.client_type === "individual" ? "Individual" : "Not provided"],
+            ["Mobile number", details.phone], ["Email address", details.email],
+            ...(details.client_type === "company" ? [["Company", details.company_name || details.client_name], ["Representative", details.primary_contact], ...(details.designation ? [["Position / designation", details.designation]] : [])] : []),
+          ])}<p className="tracking-lock"><Icon name="lock" size={15} />Client information is final after inquiry submission.</p></section>
+          <section className="tracking-project-details"><h2>Project details</h2>{facts([["Lot area", area(details.lot_area)], ["Total floor area", area(details.floor_area_sqm)], ["Number of floors", details.floor_count],
+            ...(startDate || endDate ? [["Estimated start", startDate || "Pending OPM review"], ["Potential completion", endDate || "Pending OPM review"]] : []),
+          ])}{!startDate && !endDate && <p className="inquiry-muted">Schedule pending OPM review.</p>}
+            {details.response_due_at && <p>Response due: {new Date(String(details.response_due_at)).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} (Philippine time)</p>}
+            {row.reason && <p>Withdrawal reason: {row.reason}</p>}
+            {details.client_decision_date && <p>Client decision confirmed on {details.client_decision_date}</p>}
+            {details.client_decision_note && <p className="inquiry-overview">Internal decision note: {details.client_decision_note}</p>}
+            {details.overview && <p className="inquiry-overview">{details.overview}</p>}
+          </section>
+          <AdminInquiryHistory row={row} />
+          {row.project_id && <ProjectClientAccount projectId={row.project_id} onSaved={onReload} />}
+          {corrections.some(item => item.field !== "project_type") && <details><summary>Previous client corrections</summary><ClientCorrections key={row.id} id={row.id} details={details} admin reload={reloadCorrections} /></details>}
+          {corrections.some(item => item.field === "project_type") && <ClientCorrections key={`type:${row.id}`} id={row.id} details={details} admin projectType reload={reloadCorrections} />}
+          {["draft", "returned"].includes(row.status) && <div><button type="button" className="button primary" disabled={busy} onClick={() => void run(async () => { const updated = await post<Inquiry>(`${root}/${row.id}/match`, {}); setRows(previous => [{ ...row, ...updated }, ...(previous ?? []).filter(item => item.id !== row.id)]); void onReload() })}>{status === "Saved for later" ? "Start automatic matching" : "Retry automatic matching"}</button></div>}
+          {row.status === "withdrawn" && <button type="button" className="button" disabled={busy} onClick={() => void run(() => decision("drop"))}>Mark inquiry dropped</button>}
+          {feedback}
+        </article>
+      </section>
+    }
     return <section className="project-inquiries admin-inquiries admin-inquiry-page">
       <div>
         <button type="button" className="button" disabled={busy} onClick={() => { setError(""); setAdminPage("list") }}>
@@ -1267,6 +1327,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     </section>
   }
   return <section ref={officeWorkflowContainer} className={`project-inquiries ${admin ? "admin-inquiries" : "opm-inquiries"}`}>
+    {inquiryAcceptedNotice && <div className="office-review-toast" role="status"><Icon name="check" size={18} /><span>Inquiry accepted successfully.</span><button type="button" className="button icon-button" aria-label="Dismiss acceptance notice" onClick={() => setInquiryAcceptedNotice(false)}><Icon name="close" size={16} /></button></div>}
     {displayedOfficePage && row && !admin
       ? <OfficeInquiryWorkflow key={`${row.id}:${displayedOfficePage}:${row.details.project_type}`} row={row} page={displayedOfficePage} reference={inquiryReference(row)}
           consultation={consultationLabel(row.details)} busy={busy} error={dialog ? "" : error}

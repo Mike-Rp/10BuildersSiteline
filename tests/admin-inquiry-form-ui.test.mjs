@@ -7,19 +7,26 @@ test("admin inquiry log and form show grouped controls, phone formats, and the r
   const { window } = new JSDOM('<div id="root"></div>', { url: "http://localhost", pretendToBeVisual: true })
   const globals = new Map()
   let clientSearch = "match"
+  let submissionCalls = 0
   const clients = [
     { id: "company-1", source: "account", client_type: "company", client_name: "Example Construction Company", company_name: "Example Construction Company", primary_contact: "Maria Santos", designation: "Manager", email: "company@example.com", phone: "+639987328173" },
     { id: "person-2", source: "inquiry", client_type: "individual", client_name: "Juan Cruz", company_name: "", primary_contact: "", designation: "", email: "juan@example.com", phone: "09123456789" },
   ]
   for (const [key, value] of Object.entries({
     window, document: window.document, HTMLElement: window.HTMLElement, Node: window.Node, IS_REACT_ACT_ENVIRONMENT: true,
-    fetch: async url => String(url).includes("/inquiries/clients?")
+    fetch: async (url, init) => {
+      if (init?.method === "POST" && String(url).endsWith("/projects/inquiries")) {
+        submissionCalls++
+        await new Promise(resolve => setTimeout(resolve, 20))
+        return Response.json({ message: "Review submission test failure" }, { status: 503 })
+      }
+      return String(url).includes("/inquiries/clients?")
       ? clientSearch === "error" ? Response.json({ message: "Search unavailable" }, { status: 503 }) : Response.json({ data: clientSearch === "empty" ? [] : clients })
       : Response.json({ data: String(url).includes("opm-candidates?project_type=Residential")
       ? [{ id: "preferred", name: "Avery Reyes", experience_years: 10 },
         { id: "second", name: "Jordan Santos", experience_years: 8 },
         { id: "third", name: "Sam Cruz", experience_years: 6 },
-        { id: "fourth", name: "Alex Ramos", experience_years: 4 }] : [] }),
+        { id: "fourth", name: "Alex Ramos", experience_years: 4 }] : [] }) },
   })) {
     globals.set(key, Object.getOwnPropertyDescriptor(globalThis, key))
     Object.defineProperty(globalThis, key, { value, configurable: true, writable: true })
@@ -173,8 +180,15 @@ test("admin inquiry log and form show grouped controls, phone formats, and the r
     await enterMeasurement(document.querySelector(selector), value)
   }
   await act(() => button("Next: Review").click())
+  assert.equal(submissionCalls, 0, "Next opens Review without submitting or assigning an OPM")
+  assert.equal(submissionCalls, 0, "Next opens review without posting")
+  assert.ok(document.querySelector('.inquiry-review-step'))
+  await act(async () => { button("Submit inquiry").click(); button("Submit inquiry").click(); await new Promise(resolve => setTimeout(resolve, 40)) })
+  assert.equal(submissionCalls, 1, "rapid submission cannot post twice")
+  assert.ok(document.querySelector('.inquiry-review-step'), "failure retains review")
+  assert.match(document.querySelector('.inquiry-review-step').textContent, /Review submission test failure/)
   assert.match(document.querySelector(".inquiry-fields").textContent, /\+639123456789/, "review retains the complete international number")
-  await act(() => button("Previous step").click())
+  await act(() => button("Previous").click())
   await act(() => button("Previous").click())
   assert.equal(document.querySelector('input[type="tel"]').value, "9123456789", "Previous preserves the number")
   await act(() => document.querySelector('[aria-label="Close dialog"]').click())
