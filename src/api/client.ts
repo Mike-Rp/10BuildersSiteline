@@ -108,7 +108,7 @@ async function request<T>(
       const result = await consume(response)
       if (interactive && response.ok && token === getToken()) showActionResult(init.body instanceof FormData ? "Your file was received by the server." : "Your request was completed successfully.")
       return result
-    }, { signal: init.signal, timeoutMs: init.body instanceof FormData ? 120_000 : 30_000 })
+    }, { signal: init.signal, timeoutMs: init.body instanceof FormData || /^\/projects\/inquiries\/[^/]+\/planning$/.test(path) ? 120_000 : 30_000 })
   } catch (error) {
     if (interactive && !init.signal?.aborted && token === getToken()) showActionResult(error instanceof Error ? error.message : "The request could not be completed. Please try again.", true)
     if (error instanceof ApiError) throw error

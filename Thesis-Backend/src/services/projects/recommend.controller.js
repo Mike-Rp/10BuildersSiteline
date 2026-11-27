@@ -234,6 +234,17 @@ export const getOpm = async (projectType, excludedId, db) =>
 export const getSpm = async (project_type, phases, candidateMap, schedule, candidateBlockers, {
   requiredScopes, setupAdditionalScopes, staffingTarget, blockedCandidates, phaseDates, licenseUnavailable, db = { query: execute },
 } = {}) => {
+  // Recommendation checks are read-only. Reuse identical reads within this request,
+  // never across requests, so eligibility remains fresh when staffing is reopened.
+  const sourceDb = db;
+  const reads = new Map();
+  db = { query: (sql, params = []) => {
+    if (typeof sql !== "string" || !/^\s*(select\b|with\s+search_params\s+as\b)/i.test(sql) || /for\s+(update|share)|pg_advisory/i.test(sql))
+      return sourceDb.query(sql, params);
+    const key = JSON.stringify([sql, params]);
+    if (!reads.has(key)) reads.set(key, Promise.resolve(sourceDb.query(sql, params)));
+    return reads.get(key);
+  } };
   const scoped=await commitmentsInstalled(db);
   const multi=await responsibilitiesInstalled(db);
   const typeId=(await db.query('select id from project_types where code=$1',[project_type])).rows[0]?.id;
@@ -337,10 +348,17 @@ export const getSpm = async (project_type, phases, candidateMap, schedule, candi
     }
     if(scoped && details.length) {
       const available=[];
-      for(const candidate of details) {
-        const team=[{stage:row.code,user_id:candidate.id}];
-        try { await prepareEngineerAssignments(db,typeId,team,{lock:false,existingCommitments,requiredScopes}); available.push({...candidate,assigned_disciplines:team[0].assigned_disciplines}); }
-        catch(error) { if(error.status!==409) throw error; blocked.push({person:candidate,reason:"commitments"}); }
+      // Bound concurrent checks to the normal database pool size, retaining rank order.
+      for(let offset=0; offset<details.length; offset+=4) {
+        const checked = await Promise.all(details.slice(offset,offset+4).map(async candidate => {
+          const team=[{stage:row.code,user_id:candidate.id}];
+          try { await prepareEngineerAssignments(db,typeId,team,{lock:false,existingCommitments,requiredScopes}); return {candidate:{...candidate,assigned_disciplines:team[0].assigned_disciplines}}; }
+          catch(error) { if(error.status!==409) throw error; return {blocked:candidate}; }
+        }));
+        for(const result of checked) {
+          if(result.candidate) available.push(result.candidate);
+          else blocked.push({person:result.blocked,reason:"commitments"});
+        }
       }
       details=available;
       if (!details.length) blocker = "commitments";
