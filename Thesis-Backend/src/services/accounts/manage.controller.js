@@ -268,7 +268,7 @@ export const createAccount = async (req,res) => {
   try {
     const actor = await requireUser(req,res,["admin"]);
     if (!actor) return;
-    if (req.body?.role === "client") return sendError(res,"Client accounts are created when the assigned Office PM finalizes an inquiry.",409);
+    if (req.body?.role === "client") return sendError(res,"Client accounts cannot be created in Teams. Complete project activation, then use Client account in Active sites.",409);
     const data = await withTransaction(client=>createAccountRecord(client,actor,req.body || {}));
     return sendOk(res,"Account created.",1,data,201);
   } catch(error) { return fail(res,error); }

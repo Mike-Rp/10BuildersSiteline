@@ -792,7 +792,7 @@ export function AccountForm({
                 })
               }
             >
-              {Object.entries(ROLE_NAMES).filter(([key]) => key !== "admin").map(([key, name]) => (
+              {Object.entries(ROLE_NAMES).filter(([key]) => key === "opm" || key === "spm").map(([key, name]) => (
                 <option key={key} value={key}>
                   {name}
                 </option>
