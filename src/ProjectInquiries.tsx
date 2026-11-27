@@ -44,7 +44,6 @@ type RoutingEvent = { kind: "offered" | "declined" | "accepted" | "no_match"; op
 type Inquiry = OfficeRecord & { id: string; project_id?: string | null; routing_history?: RoutingEvent[]; created_at?: string; updated_at?: string; opm_id?: string; reason?: string; project_status?: string; target_start_date?: string; target_end_date?: string; client_account_status?: ClientActivationStatus; can_delete_draft?: boolean }
 type Candidate = { id: string; name: string; qualifiedTags: string[]; experienceYears?: number; licenseByScope?: Record<string, { expiry: string; cutoff: string }> }
 type PhaseDates = Record<string, { start: string; end: string }>
-type PlanningBackups = Record<string, string>
 type Engineer = { user_id: string; assigned_disciplines: string[] }
 type Phase = { stage: string; user_id: string | null; assigned_disciplines?: string[]; engineers?: Engineer[]; required_specializations?: string[]; missing_specializations?: string[] }
 type CandidateBlocker = "qualifications" | "schedule" | "commitments" | "phase_disciplines" | "availability" | "license"
@@ -327,7 +326,7 @@ function StaffingLineup({ phases, team, candidates }: { phases: string[]; team: 
 }
 
 function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setAdding, onChange, onRecheck,
-  phaseRange, leadRange, leadId, unavailable, backup, onBackup }: {
+  phaseRange, leadRange, leadId, unavailable }: {
   stage: string
   entry?: Phase
   suggested?: Phase
@@ -341,8 +340,6 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   leadRange?: PhaseDates[string]
   leadId?: string
   unavailable?: NonNullable<Planning["licenseUnavailable"]>[string]
-  backup?: string
-  onBackup: (id: string) => void
 }) {
   const [editingEngineer, setEditingEngineer] = useState<{ originalId: string; draft: Engineer }>()
   const [removingEngineer, setRemovingEngineer] = useState<{ id: string; name: string }>()
@@ -361,11 +358,6 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
   const withoutEligibleMatch = new Set(missing.filter(area => !choices.some(candidate => candidate.qualifiedTags.includes(area))))
   const quota = 1
   const coverage = required.length - missing.length
-  const primary = engineers.find(person => person.user_id === leadId) ?? engineers[0]
-  const backupRange = leadId ? leadRange : phaseRange
-  const backupChoices = backupRange && primary ? choices.filter(candidate =>
-    !engineers.some(person => person.user_id === candidate.id) &&
-    (licenseForAssignment(candidate, primary.assigned_disciplines)?.cutoff ?? "") > backupRange.end) : []
   const update = (next: Engineer[]) => onChange({
     ...entry, stage, user_id: next[0]?.user_id || null,
     assigned_disciplines: next[0]?.assigned_disciplines,
@@ -504,13 +496,6 @@ function StaffingCards({ stage, entry, suggested, choices, blocker, adding, setA
         <button className="button" type="button" onClick={() => setAdding(false)}>Cancel</button>
       </article>}
     </div>
-    {(backupChoices.length > 0 || backup) && <label>Planning backup for the phase coordinator
-      <select value={backup ?? ""} onChange={event => onBackup(event.target.value)}>
-        <option value="">No backup selected</option>
-        {backup && !backupChoices.some(option => option.id === backup) && <option value={backup} disabled>Backup needs review</option>}
-        {backupChoices.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-      </select><small>Planning only. No assignment offer is sent to the backup for this phase.</small>
-    </label>}
     </div>
     </div>
     {removingEngineer && <Modal title="Remove engineer?" onClose={() => setRemovingEngineer(undefined)} footer={<>
@@ -569,7 +554,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
   const [phases, setPhases] = useState<string[]>([])
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({})
   const [showPhaseExplanation, setShowPhaseExplanation] = useState(false)
-  const [planningBackups, setPlanningBackups] = useState<PlanningBackups>({})
   const [team, setTeam] = useState<Phase[]>([])
   const [pendingContract, setPendingContract] = useState<{ file: File; id: string; uploaded?: boolean }>()
   const contractInput = useRef<HTMLInputElement>(null)
@@ -775,7 +759,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     setTeam([])
     setPhases([])
     setPhaseDates({})
-    setPlanningBackups({})
     setStaffingPhase("")
     setAddingEngineer(false)
     setStep(2)
@@ -831,7 +814,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       setPlanning(result)
       setPhases(result.phases)
       setPhaseDates(result.staffing?.phase_dates ?? {})
-      setPlanningBackups({})
     }
     setStep(2)
     setDialog("intake")
@@ -882,7 +864,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
     const result = await post<{ project: { id: string; name: string }; client_account_status?: ClientActivationStatus }>("/projects/intake", {
       ...staffingInput, inquiry_id: selected, suggested_opm_id: row?.opm_id, contract_file_id: contractFileId,
       phases, phase_team: phases.map(stage => team.find(item => item.stage === stage)),
-      phase_dates: selectedPhaseDates(), planning_backups: Object.fromEntries(phases.filter(stage => planningBackups[stage]).map(stage => [stage, planningBackups[stage]])),
+      phase_dates: selectedPhaseDates(), planning_backups: {},
       ...(planning?.staffing?.additional_scopes ? { additional_scopes: planning.staffing.additional_scopes } : {}),
     })
     setFinalizedClient({ projectId: result.project.id, name: result.project.name })
@@ -912,14 +894,6 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
       return range && candidate?.licenseByScope && (!license || license.cutoff <= range.start)
     })
     if (unavailable) return [{ stage, reason: "A selected engineer’s license cannot cover the planned start. Choose another engineer or recheck after renewal." }]
-    if (planningBackups[stage]) {
-      const primary = assigned.find(person => person.user_id === lead?.id) ?? assigned[0]
-      const range = lead ? projectRange : scheduledDates[stage]
-      const backup = choices.find(candidate => candidate.id === planningBackups[stage])
-      if (!range || !backup || assigned.some(person => person.user_id === backup.id) ||
-          (licenseForAssignment(backup, primary?.assigned_disciplines)?.cutoff ?? "") <= range.end)
-        return [{ stage, reason: "Review or remove the planning backup before sending offers." }]
-    }
     return missingExtra.length ? [{ stage, reason: `Assign verified coverage for ${missingExtra.join(", ")}.` }] : []
   }) : []
   const staffingIssueByPhase = new Map(staffingIssues.map(({ stage, reason }) => [stage, reason]))
@@ -1700,8 +1674,7 @@ export default function ProjectInquiries({ role, onReload, projects = [], onOpen
             choices={planning.candidates[staffingPhase] || []} adding={addingEngineer} setAdding={setAddingEngineer}
             phaseRange={planning.staffing?.phase_dates?.[staffingPhase]} leadRange={projectRange}
             leadId={staffingLead?.stage === staffingPhase ? staffingLead.id : undefined}
-            unavailable={planning.licenseUnavailable?.[staffingPhase]} backup={planningBackups[staffingPhase]}
-            onBackup={id => setPlanningBackups(previous => ({ ...previous, [staffingPhase]: id }))}
+            unavailable={planning.licenseUnavailable?.[staffingPhase]}
             blocker={planning.candidateBlockers?.[staffingPhase]} onRecheck={() => void run(() => allocate())}
             onChange={entry => setTeam(previous => [...previous.filter(item => item.stage !== entry.stage), entry])} />
         </fieldset>}
