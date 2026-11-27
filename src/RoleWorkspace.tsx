@@ -3069,23 +3069,23 @@ export default function RoleWorkspace({
     return <Modal title="Site PM assignment status"
       subtitle={`${project.name} · ${accepted} of ${assignments.length} assignments accepted`}
       wide onClose={close} footer={<Button onClick={close}>Close</Button>}>
-      {assignments.length ? <div className="inquiry-lineup-table">
-        <table aria-label="Assigned Site PMs">
+      {assignments.length ? <div className="inquiry-lineup-table inquiry-assignment-status">
+        <table className="[&_:is(th,td,.badge,.button)]:whitespace-normal! [&_:is(th,td,.badge,.button)]:break-words!" role="table" aria-label="Assigned Site PMs">
           <thead><tr><th scope="col">Assigned phase</th><th scope="col">Site PM</th><th scope="col">Assigned tags</th>
             <th scope="col">Designation</th><th scope="col">Response</th><th scope="col">Next action</th></tr></thead>
-          <tbody>{assignments.map(person => {
+          <tbody role="rowgroup">{assignments.map(person => {
             const declined = person.status === "declined"
             const reason = declined ? responses.find(response => response.accountId === person.accountId &&
               response.phase === person.phase && response.status === "declined")?.note : undefined
-            return <tr key={`${person.phase}:${person.accountId}`} data-declined={declined}>
-              <th scope="row">{person.phase}</th>
-              <td>{actorName(person.accountId)}</td>
-              <td>{person.assignedDisciplines.join(", ") || "No tags recorded"}</td>
-              <td>{person.lead ? "Lead Site PM" : "Phase Site PM"}</td>
-              <td><Badge tone={declined ? "red" : person.status === "confirmed" ? "green" : "amber"}>
+            return <tr role="row" key={`${person.phase}:${person.accountId}`} data-declined={declined}>
+              <th role="rowheader" scope="row">{person.phase}</th>
+              <td role="cell" data-label="Site PM">{actorName(person.accountId)}</td>
+              <td role="cell" data-label="Assigned tags">{person.assignedDisciplines.join(", ") || "No tags recorded"}</td>
+              <td role="cell" data-label="Designation">{person.lead ? "Lead Site PM" : "Phase Site PM"}</td>
+              <td role="cell" data-label="Response"><Badge tone={declined ? "red" : person.status === "confirmed" ? "green" : "amber"}>
                 {declined ? "Declined" : person.status === "confirmed" ? "Accepted" : "Pending"}
               </Badge>{reason && <p>{reason}</p>}</td>
-              <td>{declined && project.status !== "completed" && <Button onClick={() => setSuggestedReassignment({
+              <td role="cell" data-label="Next action">{declined && project.status !== "completed" && <Button onClick={() => setSuggestedReassignment({
                 projectId: project.id, accountId: person.accountId, phase: person.phase,
               })}>Review reassignment</Button>}</td>
             </tr>
