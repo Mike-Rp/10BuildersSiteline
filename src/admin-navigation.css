@@ -1,4 +1,26 @@
 /* Admin-only navigation controls; the toggle stays available at every width. */
+.sidebar-rail-tooltip { position: fixed; z-index: 200; transform: translateY(-50%); pointer-events: none; max-width: 220px; padding: 6px 10px; border-radius: 6px; background: #193b59; color: #fff; font: 13px/1.4 Inter, sans-serif; }
+@media (min-width: 1001px) {
+  #root .admin-workspace.sidebar-collapsed { --sidebar-width: 92px; }
+  #root .app-shell.admin-workspace > .sidebar { transition: width .18s ease-out; }
+  #root .app-shell.admin-workspace:is(.sidebar-expanded, .sidebar-collapsed) > .main-shell { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); padding-left: 0; transition: margin-left .18s ease-out, width .18s ease-out; }
+  #root .app-shell.admin-workspace.sidebar-collapsed > .sidebar { width: 68px; padding-inline: 8px; transform: none; visibility: visible; pointer-events: auto; }
+  #root .app-shell.admin-workspace .brand > .admin-nav-close { min-width: 36px; width: 36px; min-height: 36px; height: 36px; padding: 7px; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .brand { flex-direction: column; justify-content: center; padding: 12px 0; gap: 8px; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .brand > .admin-nav-close { margin: 0; }
+  #root .app-shell.admin-workspace.sidebar-collapsed :is(.brand > div, .sidebar-category-heading, .sidebar-category-toggle > span, .nav-item > span, .nav-item > i, .sidebar-person > span:not(.avatar), .workspace-guide-trigger > span, .workspace-guide-trigger > svg:last-child) { display: none; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .sidebar-category-items { padding: 0; }
+  #root .app-shell.admin-workspace.sidebar-collapsed :is(.nav-item, .sidebar-category-toggle, .workspace-guide-trigger) { position: relative; display: flex; align-items: center; justify-content: center; padding: 10px; gap: 0; width: 100%; min-height: 44px; border-radius: 8px; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .sidebar-category-toggle.active { background: #193b59; color: #fff; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .sidebar-person { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .sidebar-person .avatar { width: 36px; height: 36px; min-width: 36px; }
+  #root .app-shell.admin-workspace.sidebar-collapsed .nav-count { position: absolute; top: -2px; right: 0; min-width: 14px; min-height: 14px; height: 14px; max-width: 24px; padding: 1px 3px; font-size: 8px; line-height: 12px; border-radius: 8px; }
+  #root .app-shell.admin-workspace .sidebar :is(.nav-item, .sidebar-category-toggle) > svg { width: 20px; height: 20px; flex-shrink: 0; }
+  #root .app-shell.admin-workspace .sidebar-toggle { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-shell.admin-workspace > :is(.sidebar, .main-shell) { transition: none; }
+}
 #root .admin-workspace .sidebar-toggle { display: inline-flex; flex: none; min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
 #root .admin-workspace > .sidebar { transition: transform .18s ease-out; }
 #root .admin-workspace.sidebar-expanded > .sidebar { transform: translateX(0); visibility: visible; }

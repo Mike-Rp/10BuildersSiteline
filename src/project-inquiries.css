@@ -1075,8 +1075,122 @@
   .inquiry-phase-dates { grid-template-columns: minmax(0, 1fr); }
   .inquiry-phase-dates h4, .inquiry-phase-duration, .inquiry-phase-dates > p { grid-column: 1; }
 }
-.admin-inquiry-wizard { display: flex; flex-wrap: wrap; gap: 10px 20px; list-style: none; margin: 0 0 18px; padding: 0 0 14px; border-bottom: 1px solid var(--color-line); color: var(--color-muted); }
+.admin-inquiry-wizard { display: flex; align-items: start; list-style: none; margin: 0 0 20px; padding: 0; color: var(--color-muted); }
+.admin-inquiry-wizard li { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; }
+.admin-inquiry-wizard li:not(:last-child) { flex: 1; }
+.admin-inquiry-wizard li:not(:last-child)::after { content: ""; flex: 1; min-width: 8px; height: 1px; margin-inline: 8px; background: var(--color-line); }
+.inquiry-wizard-marker { display: grid; place-items: center; flex: 0 0 26px; height: 26px; border: 1px solid var(--color-line); border-radius: 50%; font-size: 12px; }
+.admin-inquiry-wizard [data-complete=true] .inquiry-wizard-marker { color: var(--color-primary); border-color: var(--color-primary); }
+.admin-inquiry-wizard [aria-current=step] .inquiry-wizard-marker { color: white; background: var(--color-primary); border-color: var(--color-primary); }
 .admin-inquiry-wizard [aria-current=step] { color: var(--color-primary); font-weight: 600; }
+#root .project-inquiries .modal.wide-modal:has(.inquiry-client-step, .inquiry-project-details-step) { width: 830px; border-radius: 12px; max-height: calc(100dvh - 32px); }
+#root .project-inquiries .modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-body { background: var(--color-surface); }
+.modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-header { padding: 20px 24px 16px; }
+.modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-body { padding: 20px 24px; min-height: 0; }
+.modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-footer { padding: 12px 24px; gap: 10px; flex-shrink: 0; border-top: 1px solid var(--color-line); }
+.modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-footer .button { min-height: 42px; }
+.modal:has(.inquiry-client-step, .inquiry-project-details-step) :is(.inquiry-client-previous, .inquiry-client-cancel) { margin-inline-end: auto; }
+.inquiry-back-arrow { display: inline-flex; transform: rotate(180deg); }
+.inquiry-project-details-step > fieldset { padding: 0; margin: 0; border: 0; }
+.inquiry-project-details-step .inquiry-project-section { display: grid; gap: 14px; min-width: 0; }
+.inquiry-project-details-step .inquiry-project-section + .inquiry-project-section { margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--color-line); }
+.inquiry-project-details-step h3 { margin: 0; font-size: 18px; color: var(--color-ink); }
+.inquiry-project-details-step :is(label, legend) { font-size: 14px; }
+.inquiry-project-details-step label { display: grid; gap: 6px; min-width: 0; }
+.inquiry-project-details-step .admin-inquiry-project-identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.inquiry-project-details-step .admin-inquiry-measurements { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.inquiry-project-details-step .inquiry-measurement-field { display: grid; gap: 6px; min-width: 0; }
+.inquiry-project-details-step .admin-inquiry-measurements > :is(label, .inquiry-measurement-field) > :first-child { min-height: 28px; }
+.inquiry-project-details-step .inquiry-measurement-heading { display: flex; align-items: center; gap: 4px; min-height: 24px; }
+#root #admin-inquiry-form.inquiry-project-details-step .inquiry-measurement-heading .intake-info-trigger { min-width: 24px; width: 24px; height: 24px; padding: 0; }
+.inquiry-project-details-step .admin-inquiry-measurements > label > span:first-child { display: flex; align-items: center; gap: 3px; }
+.inquiry-project-details-step .inquiry-measurement-heading label { display: block; }
+.inquiry-project-details-step .inquiry-measurement-heading .intake-info-trigger { width: 26px; height: 26px; min-height: 26px; padding: 4px; }
+.modal:has(.inquiry-project-details-step) > .modal-body { display: flex; flex-direction: column; overflow: hidden; }
+.modal:has(.inquiry-project-details-step) { height: var(--inquiry-project-height, auto); }
+.modal:has(.inquiry-project-details-step) .admin-inquiry-wizard { flex-shrink: 0; }
+.inquiry-project-details-step { min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 3px; margin: -3px; }
+#root #admin-inquiry-form.inquiry-project-details-step input:not([type=radio]) { min-height: 44px; height: 44px; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 15px; }
+#root #admin-inquiry-form.inquiry-project-details-step input[aria-invalid=true] { border-color: var(--color-danger); }
+.inquiry-project-details-step :is(.inquiry-muted, .inquiry-input-notice) { font-size: 12px; font-weight: 400; line-height: 1.45; }
+.inquiry-project-details-step .admin-inquiry-project-types { padding: 0; margin: 0; border: 0; }
+.inquiry-project-details-step .admin-inquiry-project-types legend { margin-bottom: 8px; }
+#root #admin-inquiry-form.inquiry-project-details-step .project-type-card { display: flex; justify-content: flex-start; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); box-shadow: none; }
+#root #admin-inquiry-form.inquiry-project-details-step .project-type-card:has(input:checked) { border-color: #527ca7; background: #edf4fc; }
+#root #admin-inquiry-form.inquiry-project-details-step .admin-inquiry-project-types[aria-invalid=true] .project-type-card { border-color: var(--color-danger); }
+.inquiry-project-details-step .project-type-options { gap: 10px; }
+.inquiry-project-details-step .project-type-icon { flex: 0 0 24px; width: 24px; height: 24px; margin: 0; background: transparent; }
+.inquiry-project-details-step .project-type-icon svg { width: 20px; height: 20px; }
+.inquiry-project-details-step .project-type-copy { gap: 3px; min-width: 0; }
+.inquiry-project-details-step .project-type-copy strong { font-size: 14px; }
+.inquiry-project-details-step .project-type-copy > span { font-size: 12px; line-height: 1.4; }
+.inquiry-project-details-step .project-type-check { position: static; flex-shrink: 0; width: 18px; height: 18px; margin-inline-start: auto; }
+.inquiry-project-details-step .floor-area-review { padding: 0; border: 0; background: transparent; font-size: 12px; color: var(--color-muted); }
+.inquiry-project-details-step .inquiry-average-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 8px; background: #f1f6fb; color: var(--color-ink); font-size: 14px; }
+.inquiry-project-details-step .inquiry-average-summary > span { flex: 1; }
+.inquiry-project-details-step .inquiry-average-summary > svg { flex-shrink: 0; }
+.inquiry-project-details-step .inquiry-average-summary strong { display: flex; align-items: baseline; gap: 5px; margin-inline-start: auto; font-size: 16px; font-weight: 600; }
+.inquiry-project-details-step .inquiry-average-summary small { display: inline; margin: 0; font-size: 12px; font-weight: 400; }
+.inquiry-project-details-step .inquiry-consultation-required { white-space: nowrap; }
+#root #admin-inquiry-form.inquiry-project-details-step .project-type-card { padding-inline-end: 32px; }
+#root #admin-inquiry-form.inquiry-project-details-step .project-type-copy { padding-inline-end: 0; }
+.inquiry-project-details-step .project-type-check { position: absolute; inset-inline-end: 10px; top: 50%; margin: 0; transform: translateY(-50%); }
+.inquiry-project-details-step .admin-inquiry-consultation { gap: 14px 20px; }
+#root #admin-inquiry-form.inquiry-project-details-step input:not([type=radio]):not([type=checkbox]):focus { outline: 2px solid #172b4d; outline-offset: -4px; box-shadow: none; }
+.inquiry-project-details-step :is(.admin-inquiry-project-identity, .admin-inquiry-measurements) { align-items: start; }
+.inquiry-project-details-step :is(.admin-inquiry-project-identity, .admin-inquiry-measurements) > label { align-content: start; }
+.inquiry-project-details-step .admin-inquiry-consultation legend { min-height: 24px; margin-bottom: 8px; }
+.inquiry-project-details-step .admin-inquiry-preference .inquiry-required { white-space: nowrap; }
+#root #admin-inquiry-form.inquiry-project-details-step :is(.admin-inquiry-preference, .admin-inquiry-classification-options) label { height: 42px; min-height: 42px; }
+.inquiry-project-details-step .admin-inquiry-consultation > p { grid-column: 1 / -1; margin: 0; }
+.inquiry-project-details-step .admin-inquiry-preference { gap: 8px; align-content: start; }
+.inquiry-project-details-step .admin-inquiry-preference label { min-width: 65px; min-height: 42px; padding: 8px 10px; }
+#root #admin-inquiry-form.inquiry-project-details-step .admin-inquiry-preference input { min-height: 16px; height: 16px; width: 16px; padding: 0; }
+.inquiry-project-details-step .admin-inquiry-classification legend { margin-bottom: 8px; }
+.inquiry-project-details-step .admin-inquiry-classification-options { flex-wrap: nowrap; gap: 6px; }
+.inquiry-project-details-step .admin-inquiry-classification-options label { flex: 1 1 0; min-width: 0; min-height: 42px; padding: 8px; gap: 5px; border-radius: 8px; }
+.inquiry-project-details-step .admin-inquiry-classification-options label:has(input:checked) { background: #e9f1f8; color: #315575; border-color: #315575; box-shadow: none; }
+.inquiry-project-details-step .admin-inquiry-classification-options [data-classification=priority]:has(input:checked) { background: #fff0ce; color: #705318; border-color: #705318; }
+.inquiry-project-details-step .admin-inquiry-classification-options [data-classification=urgent]:has(input:checked) { background: #fce5e5; color: #942e31; border-color: #942e31; }
+.inquiry-project-details-step .inquiry-classification-check { width: 15px; height: 15px; background: transparent; color: inherit; }
+.inquiry-project-details-step .admin-inquiry-opm-preview { border-top-color: var(--color-line); }
+.modal:has(.inquiry-project-details-step) .admin-inquiry-wizard { position: sticky; top: -18px; z-index: 2; padding-block: 12px; margin-top: -12px; background: var(--color-surface); }
+@media (max-width: 760px) {
+  .inquiry-project-details-step .project-type-options { grid-template-columns: 1fr; }
+  .inquiry-project-details-step .project-type-card .project-type-copy { padding-inline-end: 0; }
+}
+@media (max-width: 600px) {
+  .inquiry-project-details-step :is(.admin-inquiry-project-identity, .admin-inquiry-measurements, .admin-inquiry-consultation) { grid-template-columns: minmax(0, 1fr); }
+  #root #admin-inquiry-form.inquiry-project-details-step input:not([type=radio]) { font-size: 16px; }
+  .modal:has(.inquiry-project-details-step) .admin-inquiry-wizard { top: -14px; }
+}
+.inquiry-client-details-heading h3 { margin: 0; color: var(--color-ink); font-size: 18px; }
+.inquiry-client-details-heading p { margin: 4px 0 0; color: var(--color-muted); font-size: 14px; }
+.inquiry-client-step .inquiry-client-fields { gap: 16px; }
+.inquiry-client-step > fieldset { padding: 0; margin: 0; border: 0; }
+.inquiry-client-details-step .inquiry-client-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px 16px; }
+.inquiry-client-details-grid > label:first-child { grid-column: 1 / -1; }
+.inquiry-client-details-step label { display: grid; gap: 6px; min-width: 0; font-size: 14px; }
+.inquiry-client-details-step input:not([type=checkbox]) { min-width: 0; width: 100%; height: 44px; font-size: 15px; border: 1px solid var(--color-line); }
+.inquiry-client-details-step input[readonly] { background: var(--surface-subtle); }
+.inquiry-client-details-step input[aria-invalid=true] { border-color: var(--color-danger, #b42318); }
+.inquiry-client-details-step .inquiry-input-notice { margin: 0; min-height: 0; color: var(--color-danger, #b42318); font-size: 12px; font-weight: 400; }
+.inquiry-mobile-feedback { display: flex; align-items: start; gap: 8px; justify-content: space-between; }
+.inquiry-mobile-counter { margin-inline-start: auto; flex-shrink: 0; color: var(--color-muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .admin-inquiry-wizard li { flex-direction: column; position: relative; flex: 1; gap: 5px; font-size: 12px; text-align: center; }
+  .admin-inquiry-wizard li > span:last-child { max-width: 70px; }
+  .admin-inquiry-wizard li:not(:last-child)::after { position: absolute; top: 13px; left: calc(50% + 17px); width: calc(100% - 34px); min-width: 0; margin: 0; }
+  .inquiry-wizard-marker { flex-basis: 26px; width: 26px; }
+  .inquiry-client-details-step .inquiry-client-details-grid { grid-template-columns: minmax(0, 1fr); }
+  .modal:has(.inquiry-client-step, .inquiry-project-details-step) > :is(.modal-header, .modal-body) { padding: 16px; }
+  .modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-footer { padding: 12px 16px; }
+  .inquiry-client-details-step input:not([type=checkbox]) { font-size: 16px; }
+}
+@media (max-width: 380px) {
+  .modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-footer { flex-wrap: wrap; }
+  .modal:has(.inquiry-client-step, .inquiry-project-details-step) > .modal-footer .button { width: 100%; justify-content: center; }
+}
 .inquiry-client-fields { display: grid; gap: 18px; }
 .inquiry-client-choice { border: 0; padding: 0; margin: 0; min-width: 0; }
 .inquiry-client-choice legend { font-weight: 600; margin-bottom: 10px; }
@@ -1091,6 +1205,43 @@
 .inquiry-company-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .inquiry-client-verification { display: flex !important; align-items: flex-start; gap: 10px; }
 .inquiry-client-verification input { width: 18px; height: 18px; margin-top: 3px; flex-shrink: 0; }
+.inquiry-client-path-step .inquiry-client-choice legend { font-size: 14px; margin-bottom: 8px; }
+.inquiry-client-path-step .inquiry-client-choice label.button { min-height: 52px; padding: 10px 12px; gap: 10px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); font-size: 14px; }
+#root #admin-inquiry-form.inquiry-client-path-step .inquiry-client-choice label.button { border-color: var(--color-line); background: var(--color-surface); }
+#root #admin-inquiry-form.inquiry-client-path-step .inquiry-client-choice label.button:has(input:checked) { border-color: #527ca7; background: #edf4fc; }
+#root #admin-inquiry-form.inquiry-client-path-step .inquiry-client-choice label.button:not(:has(input:checked)):hover { border-color: #a8b8c8; background: #f5f7fa; }
+.inquiry-client-path-step .inquiry-client-choice label:has(input:focus-visible) { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.inquiry-client-path-step .inquiry-client-choice input[type=radio] { width: 17px; height: 17px; min-height: 17px; margin: 0; padding: 0; }
+.inquiry-client-path-step .inquiry-client-choice label > svg { flex-shrink: 0; color: var(--color-primary); }
+.inquiry-client-path-step .inquiry-client-choice label > span { min-width: 0; overflow-wrap: anywhere; }
+.inquiry-client-path-step .inquiry-client-choice strong { font-size: 14px; font-weight: 600; }
+.inquiry-client-path-step .inquiry-client-choice small { margin-top: 3px; font-size: 13px; }
+.inquiry-client-path-step .inquiry-existing-client { gap: 8px; }
+.inquiry-client-path-step .inquiry-existing-client > label { font-size: 14px; font-weight: 600; }
+.inquiry-client-search { position: relative; display: flex; align-items: center; min-width: 0; }
+.inquiry-client-search > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--color-muted); }
+.inquiry-client-path-step .inquiry-client-search input { height: 44px; padding: 10px 42px 10px 38px; border: 1px solid var(--color-line); font-size: 15px; }
+#root .inquiry-client-path-step .inquiry-client-search input { padding-inline: 38px 42px; }
+.inquiry-client-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.inquiry-search-clear { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 6px; color: var(--color-muted); background: transparent; cursor: pointer; }
+.inquiry-client-path-step .inquiry-client-results { max-height: min(260px, 40dvh); overflow-y: auto; overscroll-behavior: contain; gap: 8px; padding: 3px; margin: -3px; }
+.inquiry-client-path-step .inquiry-client-results li { display: block; padding: 0; border: 0; border-radius: 0; }
+.inquiry-client-result { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; text-align: left; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); color: var(--color-ink); cursor: pointer; }
+.inquiry-client-result[aria-pressed=true] { border-color: #527ca7; background: #edf4fc; }
+.inquiry-client-result > svg { flex-shrink: 0; color: var(--color-primary); }
+.inquiry-client-result-copy { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; color: var(--color-muted); }
+.inquiry-client-result-copy strong { font-size: 14px; font-weight: 600; color: var(--color-ink); }
+.inquiry-client-result-indicator { display: grid; place-items: center; flex: 0 0 20px; height: 20px; margin-inline-start: auto; border: 1px solid var(--color-line); border-radius: 50%; color: white; }
+.inquiry-client-result[aria-pressed=true] .inquiry-client-result-indicator { border-color: var(--color-primary); background: var(--color-primary); }
+#inquiry-client-search-status { font-size: 13px; color: var(--color-muted); }
+#inquiry-client-search-status:empty { display: none; }
+#inquiry-client-search-status p, .inquiry-path-error { margin: 0; }
+.inquiry-path-error { font-size: 13px; }
+.inquiry-client-searching { display: flex; align-items: center; gap: 8px; }
+.inquiry-search-spinner { width: 14px; height: 14px; flex-shrink: 0; border: 2px solid var(--color-line); border-top-color: var(--color-primary); border-radius: 50%; animation: inquiry-search-spin .8s linear infinite; }
+@keyframes inquiry-search-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .inquiry-search-spinner { animation: none; } }
+@media (max-width: 600px) { .inquiry-client-path-step .inquiry-client-search input { font-size: 16px; } }
 .project-inquiries .modal[aria-label="Save this inquiry as a draft?"],
 .project-inquiries .modal[aria-label="Save this inquiry as a draft?"] > :is(.modal-header, .modal-body, .modal-footer) { background: var(--color-surface); }
 @media (max-width: 640px) { .inquiry-client-choice > div, .inquiry-company-fields { grid-template-columns: 1fr; } }

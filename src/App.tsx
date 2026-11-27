@@ -18,6 +18,7 @@ import InfoPopover from "./InfoPopover"
 import useIdleWarning from "./useIdleWarning"
 import {engineerAvailabilityLabel} from './model'
 import CollapsibleSidebarNav from "./CollapsibleSidebarNav";
+import SidebarRailTooltip from "./SidebarRailTooltip"
 import EngineerCredentials from "./EngineerCredentials";
 import RestrictedRenewalPage from "./RestrictedRenewalPage";
 import ProjectMonitoringOverview from "./ProjectMonitoringOverview";
@@ -393,7 +394,7 @@ function AppInner() {
   useEffect(() => {
     document.title = loginPortal === "admin" ? "10BuildLine Admin | 10 Builders" : loginPortal === "staff" ? "10BuildLine Staff | 10 Builders" : "10BuildLine | 10 Builders"
   }, [loginPortal])
-  const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin")
+  const navigation = useSidebarNavigation(!signedOut && !isLandingPath(routePath) && actor.role === "admin", true)
   useEffect(() => {
     if (signedOut) return
     const portal = loginPortalForRole(actor.role)
@@ -2954,7 +2955,7 @@ function AppInner() {
   const navigationCounts = navigationAttention(state, actor)
   return (
     <div className={`app-shell admin-workspace ${navigation.expanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
-      <aside id="admin-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Administrator navigation" aria-hidden={!navigation.expanded} inert={!navigation.expanded}>
+      <aside id="admin-navigation" ref={navigation.sidebarRef} className="sidebar" aria-label="Administrator navigation" aria-hidden={navigation.compact && !navigation.expanded} inert={navigation.compact && !navigation.expanded}>
         <div className="workspace-switch">
           <span className="workspace-avatar">10</span>
           <span>
@@ -2967,12 +2968,17 @@ function AppInner() {
           <div>
             10BuildLine<small>10 BUILDERS</small>
           </div>
-          <Button className="sidebar-close admin-nav-close" variant="icon-button" icon="close" aria-label="Close navigation" onClick={navigation.close} />
+          <Button ref={navigation.desktopToggleRef} className="sidebar-close admin-nav-close" variant="icon-button"
+            icon={navigation.compact ? "close" : navigation.expanded ? "panel-left-close" : "panel-left-open"}
+            aria-label={navigation.compact ? "Close navigation" : navigation.expanded ? "Collapse sidebar" : "Expand sidebar"}
+            title={navigation.compact ? "Close navigation" : navigation.expanded ? "Collapse sidebar" : undefined}
+            data-sidebar-tooltip={navigation.expanded ? "Collapse sidebar" : "Expand sidebar"}
+            aria-expanded={navigation.expanded} aria-controls="admin-navigation" onClick={navigation.toggle} />
         </div>
-        <CollapsibleSidebarNav items={NAV} page={page} counts={navigationCounts} onNavigate={navigate} />
+        <CollapsibleSidebarNav items={NAV} page={page} counts={navigationCounts} onNavigate={navigate} collapsed={!navigation.compact && !navigation.expanded} onExpand={navigation.expand} />
 
         <div className="sidebar-bottom">
-          <WorkspaceGuide key={actor.id} actor={actor} enabled={!signedOut} onNavigate={next => { navigation.closeMobile(); navigate(next) }} />
+          <WorkspaceGuide key={actor.id} actor={actor} triggerIcon="book" enabled={!signedOut} onNavigate={next => { navigation.closeMobile(); navigate(next) }} />
           <div className="sidebar-person">
             <span className="avatar">{initials(admin.name)}</span>
             <span>
@@ -2982,7 +2988,7 @@ function AppInner() {
             <Button
               icon="logout"
               variant="icon-button"
-              aria-label="Sign out"
+              aria-label="Sign out" data-sidebar-tooltip="Logout"
               onClick={() => {
                 navigation.closeMobile()
                 signOut.request()
@@ -2991,6 +2997,7 @@ function AppInner() {
           </div>
         </div>
       </aside>
+      <SidebarRailTooltip sidebar={navigation.sidebarRef} enabled={!navigation.compact && !navigation.expanded} page={page} />
       {navigation.compact && navigation.expanded && (
         <button
           className="mobile-nav-backdrop admin-nav-backdrop"
@@ -3005,7 +3012,7 @@ function AppInner() {
             <Button
               ref={navigation.toggleRef}
               className="sidebar-toggle"
-              hidden={navigation.expanded}
+              hidden={!navigation.compact || navigation.expanded}
               variant="icon-button"
               icon="menu"
               aria-label={navigation.expanded ? navigation.compact ? "Close navigation" : "Collapse navigation" : navigation.compact ? "Open navigation" : "Expand navigation"}
