@@ -6,14 +6,17 @@ import { projectScheduleStatus } from "./domain/schedule-status"
 export default function PlannedTimeline({
   project,
   compact = false,
+  summary = false,
 }: {
   project: Pick<Project, "start" | "end" | "progress" | "status">
   compact?: boolean
+  summary?: boolean
 }) {
   const today = useScheduleToday()
   const schedule = projectScheduleStatus(project, today)
   const days = plannedDays(project.start, project.end)
   if (!schedule.targetEndDate || !days || days <= 0) {
+    if (summary) return <div className="monitor-schedule-summary"><p>Calendar duration and planned time elapsed unavailable until valid target dates are recorded.</p><p>Recorded progress: {project.progress}%</p></div>
     return (
       <div className="planned-timeline">
         <span className="timeline-range">
@@ -26,6 +29,12 @@ export default function PlannedTimeline({
   }
   const elapsedPct = Math.min(100, Math.max(0, Math.round((plannedDays(project.start, today) || 0) / days * 100)))
   const remaining = plannedDays(today, schedule.targetEndDate)!
+  if (summary) return <div className="monitor-schedule-summary"><dl>
+    <div><dt>Calendar duration</dt><dd>{days.toLocaleString()} days</dd></div>
+    <div><dt>Planned time elapsed</dt><dd>{elapsedPct}%</dd></div>
+    <div><dt>Recorded progress</dt><dd>{project.progress}%</dd></div>
+    <div><dt>{schedule.status === "Completed" ? "Project record" : remaining >= 0 ? "Days to target end" : "Days past target end"}</dt><dd>{schedule.status === "Completed" ? "Completed" : Math.abs(remaining).toLocaleString()}</dd></div>
+  </dl></div>
   return (
     <div className={`planned-timeline ${compact ? "compact" : ""}`}>
       <span className="timeline-range">

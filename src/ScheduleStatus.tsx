@@ -37,11 +37,11 @@ export default function ScheduleStatusBadge({ project, today }: { project: Sched
   </span>
 }
 
-export function ProjectScheduleDetails({ project, today }: { project: ScheduleProject; today?: string }) {
+export function ProjectScheduleDetails({ project, today, hideTargetCompletion = false }: { project: ScheduleProject; today?: string; hideTargetCompletion?: boolean }) {
   const result = projectScheduleStatus(project, today)
   return <div className="project-schedule-details" aria-label="Project schedule">
     <ScheduleStatusBadge project={project} today={today} />
-    <span>Target completion: {result.targetEndDate ? <time dateTime={result.targetEndDate}>{dateLabel(result.targetEndDate)}</time> : "No target date"}</span>
+    {!hideTargetCompletion && <span>Target completion: {result.targetEndDate ? <time dateTime={result.targetEndDate}>{dateLabel(result.targetEndDate)}</time> : "No target date"}</span>}
     {result.status === "Delayed" && <strong>{result.daysOverdue} {result.daysOverdue === 1 ? "day" : "days"} overdue</strong>}
   </div>
 }

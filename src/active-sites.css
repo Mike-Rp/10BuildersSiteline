@@ -96,3 +96,15 @@
   #root .as-list thead th:first-child { background: var(--surface-subtle); }
   #root .as-list tbody th { background: var(--color-surface); }
 }
+#root .active-sites-view-tabs.active-project-filter-tabs { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; width: fit-content; max-width: 100%; gap: 6px; padding: 0; margin-block: 0 12px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+#root .active-project-filter-tabs [role=tab] { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 7px 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); color: var(--color-ink); font-size: 14px; font-weight: 500; }
+#root .active-project-filter-tabs [role=tab][aria-selected=true] { background: #193b59; color: #fff; border-color: #193b59; }
+#root .active-project-filter-tabs [role=tab]:hover:not([aria-selected=true]) { background: #edf5fc; border-color: #8aa8c1; }
+#root .active-project-filter-tabs [role=tab] > span { flex: 0 0 auto; width: auto; min-width: 0; padding: 1px 6px; border-radius: 6px; background: #edf5fc; color: #193b59; line-height: 1.4; font-variant-numeric: tabular-nums; }
+#root .active-project-filter-tabs [aria-selected=true] > span { background: #ffffff26; color: #fff; }
+#root .as-layout-segments { display: inline-flex; flex: none; align-items: center; gap: 0; padding: 3px; border: 1px solid var(--color-line); border-radius: 8px; background: #edf3f8; }
+#root .as-layout .as-layout-segments .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 5px 10px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--color-muted); font-size: 14px; font-weight: 500; box-shadow: none; }
+#root .as-layout .as-layout-segments .button[aria-pressed=true] { background: #193b59; border-color: #193b59; color: #fff; }
+#root .as-layout .as-layout-segments .button:hover:not([aria-pressed=true]) { background: #dfeaf3; color: var(--color-ink); }
+#root .as-layout-segments .button svg { width: 18px; height: 18px; flex-shrink: 0; }
+#root :is(.active-project-filter-tabs [role=tab], .as-layout-segments .button):focus-visible { outline: 2px solid #315a85; outline-offset: 2px; }

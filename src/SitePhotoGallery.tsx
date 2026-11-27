@@ -4,8 +4,9 @@ import { dateLabel } from "./model"
 import { downloadApiFile } from "./api/client"
 import { Badge, Button, Field, Icon, Modal } from "./ui"
 
-export default function SitePhotoGallery({ photos, onApprove, onReject }: {
+export default function SitePhotoGallery({ photos, onApprove, onReject, compact = false }: {
   photos: Doc[]
+  compact?: boolean
   onApprove?: (photoId: string) => Promise<unknown>
   onReject?: (photoId: string, note: string) => Promise<unknown>
 }) {
@@ -60,10 +61,10 @@ export default function SitePhotoGallery({ photos, onApprove, onReject }: {
   }
 
   return <>
-    <p>{canReview
+    <p>{compact ? (canReview ? "Preview photos to approve for the Client Portal or return with a reason. QA/QC evidence stays internal." : "Client Portal photos require approval. QA/QC evidence stays internal.") : canReview
       ? "Preview each Site PM gallery photo, then approve it for the Client Portal or return it with a reason. QA/QC evidence remains internal."
       : "Site gallery photos stay internal until the assigned Office PM or an Administrator approves them for the Client Portal."}</p>
-    {!photos.length && <p>No site photos uploaded yet.</p>}
+    {!photos.length && <p>{compact ? "No photos yet." : "No site photos uploaded yet."}</p>}
     {photos.map(doc => <div className="photo-gallery-record" key={doc.id}>
       <button className="assignment-history" onClick={() => { setSelected(doc); setReject(false); setNote(""); setError("") }}>
         <Icon name="doc" />

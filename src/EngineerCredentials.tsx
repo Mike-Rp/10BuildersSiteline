@@ -13,7 +13,7 @@ import {
   credentialChoices,
   licenseNumberError,
 } from "../Thesis-Backend/src/domain/engineer-credentials.js"
-import { Button, Field } from "./ui"
+import { Button, Field, Icon } from "./ui"
 import { dateLabel } from "./model"
 type Credential = {
   revoked_at?: string
@@ -61,21 +61,23 @@ type Summary = {
   eligibleForNewAssignment: boolean
   eligibilityNote: string
 }
-function CredentialSpecializations({profession,tags,editable,onSave}:{profession:string|null;tags?:string[]|null;editable:boolean;onSave:(tags:string[])=>Promise<unknown>}) {
+function CredentialSpecializations({profession,tags,editable,onSave,profile=false}:{profile?:boolean;profession:string|null;tags?:string[]|null;editable:boolean;onSave:(tags:string[])=>Promise<unknown>}) {
  const [selected,setSelected]=useState<string[]>(tags||[])
  const signature=JSON.stringify(tags)
  useEffect(()=>setSelected(tags||[]),[signature])
- return <section className="credential-specializations"><h5>Areas of specialization</h5>{tags==null&&<p>Legacy associations have not been recorded. Existing account-level tags remain unchanged.</p>}{!editable?<p>{tags?.join(', ')||'No credential-specific specializations recorded.'}</p>:<><div className="tag-list account-choice-chips">{credentialChoices(profession, tags || []).map(tag=><button key={tag} type="button" className={`chip ${selected.includes(tag)?'selected':''}`} aria-pressed={selected.includes(tag)} disabled={!selected.includes(tag)&&selected.length>=3} onClick={()=>setSelected(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p>{selected.length}/3 selected for this credential</p><Button onClick={()=>void onSave(selected)}>Save this credential's specializations</Button></>}</section>
+ return <section className="credential-specializations"><h5>Areas of specialization</h5>{tags==null&&<p>Legacy associations have not been recorded. Existing account-level tags remain unchanged.</p>}{!editable?(profile && tags?.length ? <div className="personnel-tags">{tags.map(tag=><span key={tag}>{tag}</span>)}</div> : <p>{tags?.join(', ')||'No credential-specific specializations recorded.'}</p>):<><div className="tag-list account-choice-chips">{credentialChoices(profession, tags || []).map(tag=><button key={tag} type="button" className={`chip ${selected.includes(tag)?'selected':''}`} aria-pressed={selected.includes(tag)} disabled={!selected.includes(tag)&&selected.length>=3} onClick={()=>setSelected(current=>current.includes(tag)?current.filter(t=>t!==tag):[...current,tag])}>{tag}</button>)}</div><p>{selected.length}/3 selected for this credential</p><Button onClick={()=>void onSave(selected)}>Save this credential's specializations</Button></>}</section>
 }
 export default function EngineerCredentials({
   userId,
   admin = false,
   readOnly = false,
+  profile = false,
   onChanged,
 }: {
   userId: string
   admin?: boolean
   readOnly?: boolean
+  profile?: boolean
   onChanged?: () => void
 }) {
   const [data, setData] = useState<Summary>(),
@@ -145,6 +147,7 @@ export default function EngineerCredentials({
         <>
           <div className="credential-summary">
             <p className="credential-account-status">
+              {profile && <Icon name={data.eligibleForNewAssignment ? "check" : "alert"} size={18}/>}
               <strong>Account: {data.accountStatus}</strong> ·{" "}
               {data.eligibleForNewAssignment
                 ? "Credential requirements satisfied"
@@ -173,8 +176,9 @@ export default function EngineerCredentials({
                     {c.expiryStatus}
                   </p>
                   {c.document_url&&<Button onClick={()=>void downloadBlob(c.document_url!.replace(/^\/api\/v1/,'' )).then(blob=>{if(!blob)throw new Error('Document unavailable.');const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000)}).catch(e=>setError(e.message))}>View supporting credential document</Button>}
-                  <CredentialSpecializations profession={c.profession} tags={c.specializations} editable={admin&&!readOnly&&!busy&&!c.superseded_at} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{credential_id:c.id,specializations:tags}}))}/>
+                  <CredentialSpecializations profile={profile} profession={c.profession} tags={c.specializations} editable={admin&&!readOnly&&!busy&&!c.superseded_at} onSave={tags=>run(()=>api('/licenses/credentials/'+userId+'/specializations',{method:'PUT',json:{credential_id:c.id,specializations:tags}}))}/>
                   <p>
+                    {profile && <Icon name={c.revoked_at || c.correction_required ? "alert" : c.superseded_at ? "doc" : c.verification_status === "verified" ? "check" : "clock"} size={16}/>}
                     {c.superseded_at
                       ? "Superseded"
                       : c.revoked_at ? "Revoked" : c.correction_required ? "Requires correction" : c.verification_status === "verified"

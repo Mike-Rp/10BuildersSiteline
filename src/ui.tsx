@@ -16,6 +16,8 @@ export function Icon({ name, size = 20 }: {
   size?: number
 }) {
   const paths: Record<string, ReactNode> = {
+    info: <><circle cx="12" cy="12" r="9"/><path d="M12 10.5v6M12 7v1"/></>,
+    list: <><path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1" /></>,
     calculator: <><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M8 6h8M8 10h1m3 0h1m3 0h.01M8 14h1m3 0h1m3 0h.01M8 18h1m3 0h1m3-4v4" /></>,
     "panel-left-close": <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18m7-12-3 3 3 3" /></>,
     "panel-left-open": <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M13 9l3 3-3 3" /></>,

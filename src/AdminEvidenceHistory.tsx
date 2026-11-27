@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { api, registerFileUrl } from "./api/client"
 import type { Doc } from "./model"
-import { Badge, Button } from "./ui"
+import { Badge, Button, Icon } from "./ui"
 
 type EvidenceFile = { id: string; original_name: string | null; content_type: string | null }
 type EvidenceSubmission = {
@@ -21,7 +21,8 @@ type EvidenceSubmission = {
   files: EvidenceFile[]
 }
 
-export default function AdminEvidenceHistory({ projectId, onPreview }: {
+export default function AdminEvidenceHistory({ projectId, onPreview, compact = false }: {
+  compact?: boolean
   projectId: string
   onPreview: (doc: Doc) => void
 }) {
@@ -30,15 +31,15 @@ export default function AdminEvidenceHistory({ projectId, onPreview }: {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    if (!open) return
+    if (!open && (!compact || submissions !== undefined)) return
     let active = true
-    setSubmissions(undefined)
+    if (!compact) setSubmissions(undefined)
     setError("")
     api<EvidenceSubmission[]>(`/projects/${projectId}/evidence-history`)
       .then(rows => { if (active) setSubmissions(rows.slice().reverse()) })
       .catch(error => { if (active) setError(error.message) })
     return () => { active = false }
-  }, [open, projectId])
+  }, [open, projectId, compact])
 
   function previewAttachment(submission: EvidenceSubmission, file: EvidenceFile) {
     registerFileUrl(file.id, `/projects/${projectId}/phase-files/${file.id}`)
@@ -56,11 +57,11 @@ export default function AdminEvidenceHistory({ projectId, onPreview }: {
 
   return (
     <section className="detail-section">
-      <details className="opm-progress-history" onToggle={event => setOpen(event.currentTarget.open)}>
-        <summary><span>Phase evidence history</span><small>Read only</small></summary>
+      <details className={`opm-progress-history ${compact ? "project-record-disclosure" : ""}`} onToggle={event => setOpen(event.currentTarget.open)}>
+        <summary>{compact && <Icon name="clipboard" size={18}/>}<span>Phase evidence history</span><small>{compact ? error ? "Unavailable · Read only" : submissions ? `${submissions.length} record${submissions.length===1 ? "" : "s"}${submissions.some(row=>row.status==="pending") ? ` · ${submissions.filter(row=>row.status==="pending").length} pending` : ""} · Read only` : "Loading · Read only" : "Read only"}</small>{compact && <Icon name="chevron" size={16}/>}</summary>
         {error && <p role="alert">Unable to load phase evidence history. {error}</p>}
         {!submissions && !error && <p role="status">Loading phase evidence…</p>}
-        {submissions?.length === 0 && <p className="role-muted">No phase evidence has been submitted.</p>}
+        {submissions?.length === 0 && <p className="role-muted">{compact ? "No records yet." : "No phase evidence has been submitted."}</p>}
         {submissions?.map(submission => {
           const files = submission.files.length > 0 ? submission.files : submission.file_id
             ? [{ id: submission.file_id, original_name: submission.original_name, content_type: submission.content_type }]

@@ -62,3 +62,231 @@
 .site-offer-phase-choice { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .site-offer-phase-choice input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: #193b55; }
 .site-offer-response { margin-top: 16px; }
+
+/* Active Projects floating detail modal only. */
+#root .modal:has(.project-modal-monitoring) { display:flex; flex-direction:column; max-height:calc(100dvh - 32px); border-radius:12px; overflow:hidden; }
+#root .modal:has(.project-modal-monitoring) > .modal-header { flex:none; padding:16px 20px; background:white; z-index:1; }
+#root .modal:has(.project-modal-monitoring) > .modal-header h2 { font-size:22px; }
+#root .modal:has(.project-modal-monitoring) > .modal-body { min-height:0; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; padding:20px; background:#f6f8fb; }
+#root .project-modal-monitoring { margin-bottom:0; font-size:15px; }
+#root .project-modal-monitoring .monitor-heading { align-items:start; padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid #dce4ed; gap:16px; }
+#root .project-modal-monitoring .monitor-heading > div:first-child { flex:1 1 460px; }
+#root .project-modal-monitoring .monitor-heading h2 { font-size:32px; margin:4px 0 10px; line-height:1.2; }
+#root .project-modal-monitoring .monitor-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
+#root .project-modal-monitoring .monitor-main, #root .project-modal-monitoring .monitor-side { display:contents; }
+#root .project-modal-monitoring .monitor-card { border-radius:10px; padding:16px; }
+#root .project-modal-monitoring .monitor-card h3 { font-size:18px; margin:0 0 12px; }
+#root .project-modal-monitoring .project-client-account { margin:0 0 12px; padding:0; border:0; background:transparent; box-shadow:none; border-radius:0; }
+#root .project-modal-monitoring .project-client-account h3 { font-size:14px; margin:0 0 6px; }
+#root .project-modal-monitoring .project-client-account-record { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:4px 0; border:0; background:transparent; overflow-wrap:anywhere; }
+#root .project-modal-monitoring .project-client-account-record strong { font-size:16px; }
+#root .project-modal-monitoring .project-client-account-record span { font-size:14px; }
+#root .project-modal-monitoring .monitor-totals { flex:1 1 300px; max-width:400px; grid-template-columns:minmax(0,1fr); gap:12px; }
+#root .project-modal-monitoring .monitor-target { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; border:0; padding:0; }
+#root .project-modal-monitoring .monitor-target small { font-size:14px; }
+#root .project-modal-monitoring .monitor-target strong { font-size:16px; }
+#root .project-modal-monitoring .monitor-photo-empty { min-height:0; display:flex; align-items:center; justify-content:start; gap:10px; padding:12px; border-radius:8px; text-align:left; font-size:14px; }
+#root .project-modal-monitoring .monitor-photo-empty svg { width:22px; height:22px; margin:0; flex:none; }
+#root .project-modal-monitoring .monitor-facts { margin:12px 0; gap:10px 16px; }
+#root .project-modal-monitoring .monitor-facts dt, #root .project-modal-monitoring .monitor-muted, #root .project-modal-monitoring .monitor-updates small, #root .project-modal-monitoring .monitor-person small { font-size:14px; }
+#root .project-modal-monitoring .monitor-facts dd { font-size:16px; margin-top:3px; }
+#root .project-modal-monitoring .monitor-updates li { padding:8px 0; }
+#root .project-modal-monitoring .monitor-updates p { font-size:15px; line-height:1.45; }
+#root .project-modal-monitoring .monitor-person { margin:10px 0; align-items:start; }
+#root .project-modal-monitoring .monitor-person strong { font-size:16px; }
+#root .project-modal-monitoring .monitor-person .avatar { width:36px; height:36px; font-size:14px; }
+#root .project-modal-monitoring .tag-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+#root .project-modal-monitoring .tag-list > span { font-size:14px; padding:4px 8px; border-radius:6px; overflow-wrap:anywhere; }
+#root .project-modal-monitoring .monitor-note { font-size:14px; padding:10px; margin-top:10px; border-radius:6px; }
+#root .project-modal-monitoring .construction-phase-timeline li { min-height:0; padding-bottom:12px; }
+#root .project-modal-monitoring .construction-phase-timeline li strong { font-size:15px; }
+#root .project-modal-monitoring .construction-phase-timeline li small { font-size:14px; }
+#root .project-modal-monitoring .construction-phase-timeline li.current { background:#edf4fb; border-radius:8px; padding:8px; margin-bottom:10px; }
+#root .project-modal-monitoring .trade-company-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+#root .project-modal-monitoring .trade-company { min-width:0; padding:12px; border-radius:8px; }
+#root .project-modal-monitoring .trade-company h4 { font-size:16px; }
+#root .project-modal-monitoring .trade-allocation > p { margin:0 0 10px; font-size:14px; }
+#root .project-modal-monitoring .monitor-schedule .planned-timeline { margin:10px 0 0; padding:0; border:0; background:none; }
+#root .project-modal-monitoring .monitor-schedule .timeline-range, #root .project-modal-monitoring .monitor-schedule .timeline-meta { display:flex; flex-wrap:wrap; gap:8px; font-size:14px; }
+#root .project-modal-monitoring .monitor-schedule .project-schedule-details { padding:0; margin:0; border:0; background:none; font-size:14px; }
+#root .project-modal-monitoring .monitor-schedule .planned-timeline > .schedule-status-badge { display:none; }
+@media(max-width:800px) {
+ #root .project-modal-monitoring .monitor-grid { grid-template-columns:minmax(0,1fr); }
+ #root .project-modal-monitoring .monitor-totals { max-width:none; }
+ #root .modal:has(.project-modal-monitoring) { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+ #root .modal:has(.project-modal-monitoring) > .modal-body { padding:12px; }
+ #root .project-modal-monitoring .monitor-heading h2 { font-size:28px; }
+}
+
+/* Remaining sections of the same Project details modal. */
+#root .project-details-redesign { display:grid; gap:16px; min-width:0; font-size:15px; line-height:1.5; }
+#root .project-details-redesign > .detail-section { margin:0; padding:16px; border:1px solid #e1eaf2; border-radius:10px; background:white; min-width:0; }
+#root .project-details-redesign h3 { font-size:18px; line-height:1.4; margin:0 0 12px; }
+#root .project-details-redesign p { font-size:15px; margin:8px 0; overflow-wrap:anywhere; }
+#root .project-details-redesign small, #root .project-details-redesign .role-muted, #root .project-details-redesign .section-description { font-size:14px; }
+#root .project-details-redesign .opm-progress-history > summary { display:flex; align-items:center; justify-content:start; gap:8px; min-height:36px; font-size:18px; }
+#root .project-details-redesign .opm-progress-history > summary > span { flex:1; min-width:0; }
+#root .project-details-redesign .opm-progress-history > summary > small { flex:none; font-size:14px; }
+#root .project-details-redesign .opm-progress-history .detail-section { border:0; border-top:1px solid #e1eaf2; border-radius:0; padding:12px 0; margin:12px 0 0; background:none; }
+#root .project-details-redesign .photo-gallery-record { padding:0; margin:8px 0 0; }
+#root .project-details-redesign .photo-gallery-record .assignment-history { padding:10px; min-height:0; gap:10px; }
+#root .project-details-redesign .photo-gallery-record strong { font-size:16px; overflow-wrap:anywhere; }
+#root .project-details-redesign .project-review-timeline { min-width:0; }
+#root .project-details-redesign .project-review-timeline .history-row { display:grid; grid-template-columns:28px minmax(0,1fr) auto; align-items:start; position:relative; gap:10px; padding:0 0 14px; margin:0; border:0; min-height:0; background:none; }
+#root .project-details-redesign .project-review-timeline .history-row:not(:last-child)::after { content:""; position:absolute; top:28px; bottom:3px; left:13px; width:1px; background:#d8e2eb; }
+#root .project-details-redesign .history-row > span:first-child { width:28px; height:28px; display:grid; place-items:center; border-radius:50%; background:#e7f3ec; color:#28734d; }
+#root .project-details-redesign .history-row[data-review-state="pending"] > span:first-child { background:#fff3dc; color:#956113; }
+#root .project-details-redesign .history-row strong { font-size:16px; }
+#root .project-details-redesign .history-row p { font-size:14px; margin:4px 0 0; }
+#root .project-details-redesign .history-row > b { font-size:16px; }
+#root .project-details-redesign .scope-saved-summary { border:0; border-bottom:1px solid #e1eaf2; border-radius:0; padding:0 0 16px; margin:0 0 16px; font-size:15px; }
+#root .project-details-redesign .scope-saved-summary > p { display:grid; grid-template-columns:180px minmax(0,1fr); gap:8px; margin:8px 0; }
+#root .project-details-redesign .scope-saved-summary > p:last-child { display:block; font-size:14px; }
+#root .project-details-redesign details > summary { cursor:pointer; }
+#root .project-details-redesign details > summary:focus-visible { outline:2px solid #182d50; outline-offset:3px; }
+#root .project-details-redesign .pp-heading { gap:8px; margin-bottom:12px; }
+#root .project-details-redesign .pp-heading p, #root .project-details-redesign .pp-heading > span { font-size:14px; }
+#root .project-details-redesign .pp-comparison { border:0; border-radius:0; padding:0; background:transparent; }
+#root .project-details-redesign .pp-question { font-size:18px; }
+#root .project-details-redesign .pp-gap { font-size:14px; margin-bottom:6px; }
+#root .project-details-redesign .pp-bar-row { grid-template-columns:230px minmax(0,1fr) 100px; gap:12px; font-size:16px; margin:12px 0; }
+#root .project-details-redesign .pp-bar-row strong { font-size:16px; }
+#root .project-details-redesign .pp-scale { font-size:14px; margin-left:242px; margin-right:112px; }
+#root .project-details-redesign .pp-info { margin:12px 0; gap:12px; }
+#root .project-details-redesign .pp-info > div { padding:0; border:0; border-radius:0; background:none; font-size:15px; align-items:start; }
+#root .project-details-redesign .pp-calculation { margin:12px 0; font-size:14px; }
+#root .project-details-redesign .pp-calculation p, #root .project-details-redesign .pp-unavailable { font-size:14px; }
+#root .project-details-redesign .project-documents-section { padding:16px; border:1px solid #e1eaf2; background:white; border-radius:10px; min-width:0; }
+#root .project-details-redesign .project-documents-section > .detail-section { padding:0; margin:0; border:0; border-radius:0; background:none; }
+#root .project-details-redesign .project-documents-section > .detail-section + .detail-section { margin-top:8px; }
+#root .project-details-redesign .admin-project-document-folder { display:flex; padding:10px 12px; gap:10px; border-radius:8px; background:white; }
+#root .project-details-redesign .admin-project-document-folder small { font-size:14px; }
+#root .project-details-redesign .admin-project-document-folder .folder-open-label { font-size:0; gap:0; flex:none; }
+@container(max-width:600px) {
+ #root .project-details-redesign .pp-bar-row { grid-template-columns:minmax(0,1fr) 100px; gap:8px; }
+ #root .project-details-redesign .pp-bar-row > span:first-child { grid-column:1/-1; }
+ #root .project-details-redesign .pp-scale { margin-left:0; margin-right:108px; }
+}
+@media(max-width:600px) {
+ #root .project-details-redesign .scope-saved-summary > p { grid-template-columns:minmax(0,1fr); gap:3px; }
+ #root .project-details-redesign .pp-info { grid-template-columns:minmax(0,1fr); }
+ #root .project-details-redesign .opm-progress-history > summary { flex-wrap:wrap; }
+ #root .project-details-redesign .admin-project-document-folder { padding:10px; }
+}
+
+/* Independent section rows prevent a short sidebar from leaving a full-column gap. */
+#root .project-modal-monitoring .monitor-main > .monitor-card { order:1; }
+#root .project-modal-monitoring .monitor-main > .monitor-phases { order:2; }
+#root .project-modal-monitoring .monitor-side > .monitor-card:first-child { order:3; }
+#root .project-modal-monitoring .monitor-schedule { order:4; }
+#root .project-modal-monitoring .monitor-side > .monitor-card:nth-child(2) { order:5; grid-column:1/-1; }
+#root .project-modal-monitoring .monitor-review { order:6; grid-column:1/-1; }
+#root .project-modal-monitoring .monitor-main > .monitor-allocation { order:7; grid-column:1/-1; }
+#root .project-modal-monitoring .monitor-allocation .trade-company { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:12px 16px; }
+#root .project-modal-monitoring .monitor-allocation .trade-company > h4,
+#root .project-modal-monitoring .monitor-allocation .trade-company > .badge,
+#root .project-modal-monitoring .monitor-allocation .trade-company > p { grid-column:1/-1; margin:0; justify-self:start; }
+#root .project-modal-monitoring .monitor-allocation .trade-company > div { min-width:0; }
+#root .project-modal-monitoring .construction-phase-timeline li { padding-bottom:8px; }
+#root .project-details-redesign > .intake-next { margin:0; }
+#root .project-details-redesign > .detail-section { min-height:0; }
+@media(max-width:800px) {
+ #root .project-modal-monitoring .monitor-allocation .trade-company { grid-template-columns:minmax(0,1fr); }
+}
+
+/* Project details: full-width summary and records, with only the two long sections paired. */
+#root .project-modal-monitoring.monitor-arranged { display:grid; gap:16px; margin:0; }
+#root .monitor-arranged .monitor-heading { display:flex; flex-wrap:wrap; margin:0; padding:0 0 16px; gap:12px 16px; }
+#root .monitor-arranged .monitor-summary-facts { flex-basis:100%; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); margin:0; gap:12px 16px; }
+#root .monitor-arranged .monitor-paired-sections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; min-width:0; }
+#root .monitor-arranged .monitor-paired-sections.stacked { grid-template-columns:minmax(0,1fr); }
+#root .monitor-arranged .monitor-card { min-width:0; margin:0; min-height:0; height:auto; }
+#root .monitor-arranged .monitor-team-group + .monitor-team-group { margin-top:12px; }
+#root .monitor-arranged .monitor-team-group h4 { font-size:15px; margin:0 0 8px; color:#5d718f; }
+#root .monitor-arranged .monitor-person { align-items:center; margin:8px 0; }
+#root .monitor-arranged .monitor-person strong { font-size:16px; overflow-wrap:anywhere; min-width:0; }
+#root .monitor-arranged .monitor-combined-allocation > strong { display:inline-block; font-size:18px; margin-right:10px; }
+#root .monitor-arranged .monitor-combined-allocation .monitor-allocation { margin-top:12px; border-top:1px solid #e1eaf2; padding-top:12px; }
+#root .monitor-arranged .monitor-allocation .trade-company { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:12px 16px; }
+#root .monitor-arranged .monitor-allocation .trade-company > :is(h4,.badge,p) { grid-column:1/-1; margin:0; justify-self:start; }
+#root .monitor-arranged .monitor-allocation .trade-company > div { min-width:0; }
+#root .monitor-arranged .monitor-schedule-summary dl { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px 16px; margin:0; }
+#root .monitor-arranged .monitor-schedule-summary dt { font-size:14px; color:#5d718f; }
+#root .monitor-arranged .monitor-schedule-summary dd { margin:4px 0 0; font-size:16px; font-weight:600; }
+#root .monitor-arranged .monitor-schedule-summary .schedule-status-badge { white-space:normal; }
+#root .monitor-arranged .monitor-project-records > .detail-section { margin:12px 0 0; padding:12px 0 0; border:0; border-top:1px solid #e1eaf2; border-radius:0; background:none; min-height:0; }
+#root .monitor-arranged .monitor-project-records > .detail-section h3 { margin-bottom:10px; }
+#root .monitor-arranged .monitor-recent-records > summary { cursor:pointer; font-size:16px; font-weight:600; }
+#root .monitor-arranged .monitor-recent-records[open] > summary { margin-bottom:12px; }
+#root .monitor-arranged .monitor-recent-records .monitor-photo-roulette { max-width:640px; }
+#root .monitor-arranged .monitor-recent-records .monitor-photo img { max-height:280px; }
+#root .monitor-arranged .monitor-review { border-top:1px solid #e1eaf2; margin-top:12px; padding-top:12px; }
+@media(max-width:800px) {
+ #root .monitor-arranged .monitor-paired-sections { grid-template-columns:minmax(0,1fr); }
+ #root .monitor-arranged .monitor-summary-facts, #root .monitor-arranged .monitor-schedule-summary dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ #root .monitor-arranged .monitor-allocation .trade-company { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:400px) {
+ #root .monitor-arranged .monitor-schedule-summary dl { grid-template-columns:minmax(0,1fr); }
+}
+#root .monitor-arranged > .monitor-card { order:0; grid-column:auto; }
+#root .monitor-arranged .construction-phase-timeline :is(li.completed,li.current) small { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+#root .monitor-arranged .construction-phase-timeline li { min-height:0; padding-bottom:6px; }
+#root .monitor-arranged .construction-phase-timeline li:last-child { padding-bottom:0; }
+
+/* Focused scope, progress, schedule, and project-record refinements. */
+#root .project-details-redesign .scope-compact-facts { display:grid; gap:10px; margin:0; }
+#root .project-details-redesign .scope-compact-facts > div { display:grid; grid-template-columns:180px minmax(0,1fr); gap:8px; align-items:start; }
+#root .project-details-redesign .scope-compact-facts dt { font-size:14px; color:#5d718f; padding-top:4px; }
+#root .project-details-redesign .scope-compact-facts dd { margin:0; min-width:0; }
+#root .project-details-redesign .scope-saved-summary .tag-list { display:flex; flex-wrap:wrap; gap:6px; }
+#root .project-details-redesign .scope-saved-summary .tag-list > span { font-size:14px; padding:4px 8px; border:1px solid #dce5ef; background:#f3f7fb; border-radius:6px; overflow-wrap:anywhere; }
+#root .project-details-redesign .scope-conditions { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; margin-top:10px; font-size:14px; color:#5d718f; }
+#root .project-details-redesign .scope-conditions > span:last-child { display:inline-flex; align-items:center; gap:6px; color:#182d50; }
+#root .project-details-redesign .scope-data-note { font-size:14px; }
+#root .project-details-redesign .pp-heading { align-items:baseline; }
+#root .project-details-redesign .pp-heading > span { margin-left:auto; }
+#root .project-details-redesign .pp-bar-row { grid-template-columns:230px minmax(0,1fr) 140px; }
+#root .project-details-redesign .pp-bar-row strong { font-size:24px; line-height:1.3; font-variant-numeric:tabular-nums; }
+#root .project-details-redesign .pp-bar-row strong[title] { font-size:16px; }
+#root .project-details-redesign .pp-scale { margin-right:152px; }
+#root .project-details-redesign .pp-actions-row { display:flex; flex-wrap:wrap; align-items:start; gap:10px 16px; }
+#root .project-details-redesign .pp-calculation { flex:1 1 300px; margin:0; }
+#root .project-details-redesign .pp-calculation > summary { display:flex; align-items:center; gap:6px; min-height:40px; font-size:14px; color:#193b59; text-decoration:underline; text-underline-offset:3px; list-style:none; }
+#root .project-details-redesign .pp-calculation > summary::-webkit-details-marker { display:none; }
+#root .project-details-redesign .pp-actions-row > .button { min-height:40px; margin:0; }
+#root .monitor-arranged .monitor-schedule-heading { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin-bottom:12px; }
+#root .monitor-arranged .monitor-schedule-heading h3 { margin:0; }
+#root .monitor-arranged .monitor-schedule-summary dl { grid-template-columns:repeat(4,minmax(0,1fr)); }
+#root .monitor-arranged .monitor-schedule-summary dd { font-size:22px; line-height:1.3; font-variant-numeric:tabular-nums; }
+#root .monitor-arranged .monitor-project-records .project-record-disclosure > summary { display:flex; align-items:center; gap:8px; min-height:46px; font-size:16px; font-weight:600; cursor:pointer; list-style:none; }
+#root .monitor-arranged .project-record-disclosure > summary::before { content:none; }
+#root .monitor-arranged .project-record-disclosure > summary::-webkit-details-marker { display:none; }
+#root .monitor-arranged .project-record-disclosure > summary > span { flex:1; min-width:0; }
+#root .monitor-arranged .project-record-disclosure > summary small { font-size:14px; font-weight:400; color:#5d718f; }
+#root .monitor-arranged .project-record-disclosure > summary > svg { flex:none; }
+#root .monitor-arranged .project-record-disclosure > summary > svg:last-child { transition:transform .15s ease; }
+#root .monitor-arranged .project-record-disclosure[open] > summary > svg:last-child { transform:rotate(90deg); }
+#root .monitor-arranged .monitor-project-records > .detail-section { margin-top:0; padding-top:0; }
+#root .monitor-arranged .project-record-disclosure[open] > summary { margin-bottom:8px; }
+#root .monitor-arranged .monitor-project-records .opm-progress-history { margin:0; }
+@media(max-width:800px) {
+ #root .monitor-arranged .monitor-schedule-summary dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@container(max-width:600px) {
+ #root .project-details-redesign .pp-bar-row { grid-template-columns:minmax(0,1fr) 140px; }
+ #root .project-details-redesign .pp-scale { margin-left:0; margin-right:148px; }
+}
+@media(max-width:600px) {
+ #root .project-details-redesign .scope-compact-facts > div { grid-template-columns:minmax(0,1fr); gap:3px; }
+ #root .monitor-arranged .project-record-disclosure > summary { flex-wrap:wrap; padding-block:8px; }
+ #root .monitor-arranged .project-record-disclosure > summary small { flex-basis:100%; padding-left:26px; order:1; }
+ #root .project-details-redesign .pp-heading > span { margin-left:0; }
+}
+@media(prefers-reduced-motion:reduce) { #root .monitor-arranged .project-record-disclosure > summary > svg:last-child { transition:none; } }
+#root .monitor-arranged .monitor-record-approved-photos { max-width:640px; margin:8px 0 12px; }
+#root .monitor-arranged .monitor-record-approved-photos .monitor-photo img { max-height:280px; }
+@container(max-width:600px) {
+ #root .project-details-redesign .pp-bar-row { grid-template-columns:minmax(0,1fr) max-content; }
+ #root .project-details-redesign .pp-scale { display:none; }
+}

@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from "react"
 import {api} from "./api/client"
-import {Button,Modal} from "./ui"
+import {Button,Icon,Modal} from "./ui"
 import {downloadBlob} from "./panels"
 import {currentReportMonth,monthlyPrintDocument,reportDate,reportFraction,type MonthlyReport as Report} from "./monthly-report"
 import "./monthly-report.css"
@@ -48,24 +48,26 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
     }catch(reason){if(current===revision.current){if(reason instanceof PdfExporterLoadError)setPdfNeedsReload(true);else setError((reason as Error).message)}}finally{setExporting(false)}
   }
   const report=data?.report,pending=report?.pending
-  return <Modal title="Monthly Project Progress Summary" subtitle={report?.project.name||projects.find(p=>p.id===projectId)?.name} wide onClose={onClose}>
+  return <Modal title="Monthly progress report" subtitle={[report?.project.name||projects.find(p=>p.id===projectId)?.name,report?.project.type].filter(Boolean).join(" · ")} wide onClose={onClose}>
     <div className="monthly-report">
       <div className="monthly-report-controls">
-        {allowProjectChange && projects.length > 1 && <Button aria-expanded={projectSearchOpen} onClick={()=>setProjectSearchOpen(open=>!open)}>{projectSearchOpen ? "Cancel project change" : "Change project"}</Button>}
+        <label>Reporting month<input type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e=>setMonth(e.target.value)}/></label>
+        {allowProjectChange && projects.length > 1 && <Button icon="building" aria-expanded={projectSearchOpen} onClick={()=>setProjectSearchOpen(open=>!open)}>{projectSearchOpen ? "Cancel project change" : "Change project"}</Button>}
         {projectSearchOpen && <ReportProjectSearch projects={projects} value={projectId} onChange={id=>{
           setProjectId(id);setProjectSearchOpen(false);onProjectChange?.(id)
         }} />}
-        <label>Reporting month<input type="month" min="2000-01" max={currentReportMonth()} value={month} onChange={e=>setMonth(e.target.value)}/></label>
-        <Button onClick={()=>setRefresh(n=>n+1)} disabled={loading||!month||!projectId}>Refresh</Button>
       </div>
       {!projects.length&&<p>No authorized projects are available.</p>}
       {month>currentReportMonth()&&<p role="alert" className="error">Future reporting months are unavailable.</p>}
       {loading&&<p role="status">Loading monthly report…</p>}
-      {error&&<p role="alert" className="error">{error}</p>}
+      {error&&<div className="monthly-report-error" role="alert"><p className="error">{error}</p><Button disabled={loading||!month||!projectId} onClick={()=>setRefresh(n=>n+1)}>Retry report</Button></div>}
       {pdfNeedsReload&&<ReportPdfRecovery />}
       {report&&<>
-        <p className="role-muted">{report.project.type} · {report.period.monthToDate?"Month to date":"Month-end snapshot"} · {report.period.timezone}</p>
-        <p className="role-muted">{reportDate(report.period.start)} → {reportDate(report.period.cutoff)} (exclusive)<br/>Generated {reportDate(report.period.generatedAt)}</p>
+        <section className="monthly-report-info" aria-label="Reporting information">
+          <span className="monthly-report-period-kind">{report.period.monthToDate?"Month to date":"Month-end snapshot"}</span>
+          <dl><div><dt>Reporting period</dt><dd>{reportDate(report.period.start)} → {reportDate(report.period.cutoff)} <span>(exclusive cutoff)</span></dd></div>
+          <div><dt>Generated</dt><dd>{reportDate(report.period.generatedAt)}</dd></div><div><dt>Timezone</dt><dd>{report.period.timezone === "Asia/Manila" ? "Philippine time" : report.period.timezone}</dd></div></dl>
+        </section>
         {report.createdAfterPeriod ? <section className="monthly-report-not-applicable" role="status">
           <h3>Not applicable for this month</h3>
           <p>This project was created after the selected reporting period. Monthly progress and phase completions do not apply to this period.</p>
@@ -73,15 +75,22 @@ export default function MonthlyReport({projects,initialProjectId,initialMonth,on
           <p>Select a month from project creation onward to view verified progress and phases completed during that month.</p>
           <p className="role-muted">Project Overview shows current progress. This report covers only the selected historical month.</p>
         </section> : <>
-        {report.limitations.map(text=><p className="monthly-report-limitation" key={text}>{text}</p>)}
+        {!!report.limitations.length && <section className="monthly-report-limitation" aria-label="Reporting limitations"><Icon name="alert" size={18}/><div>{report.limitations.map(text=><p key={text}>{text}</p>)}</div></section>}
         <div className="monthly-report-metrics">
-          <section><h3>Verified progress</h3><strong>{report.opening.percentage===null?"Unavailable":`${report.opening.percentage.toFixed(1)}%`} → {report.closing.percentage===null?"Unavailable":`${report.closing.percentage.toFixed(1)}%`}</strong><p className="role-muted">Opening → closing</p></section>
+          <section><h3>Verified progress</h3><strong>{report.closing.percentage===null?"Unavailable":`${report.closing.percentage.toFixed(1)}%`}</strong><p className="role-muted">Closing progress · Opening: {report.opening.percentage===null?"Unavailable":`${report.opening.percentage.toFixed(1)}%`}</p></section>
           {report.projection!=="client"&&<section><h3>Activities approved</h3><strong>{report.approvals?.events??"Unavailable"}</strong><p className="role-muted">{report.approvals?`${report.approvals.distinctActivities} distinct activities`:"Historical or authorized detail unavailable"}</p></section>}
           <section><h3>Phases completed</h3><strong>{report.completedPhases?.length??"Unavailable"}</strong><p className="role-muted">Verified completion during period</p></section>
         </div>
-        {report.projection!=="client"&&<><p className="role-muted">{report.scopeLabel}</p><div className="monthly-report-secondary"><span>Rework confirmed: <strong>{report.rework?.confirmed??"Unavailable"}</strong></span><span>Approvals withdrawn: <strong>{report.rework?.withdrawals??"Unavailable"}</strong></span><span>Pending reviews: <strong>{pending?pending.evidence+pending.reports+pending.rework:"Unavailable"}</strong></span></div>{pending&&<p className="role-muted">Evidence {pending.evidence} · Reports {pending.reports} · Rework requests {pending.rework}, at the reporting cutoff</p>}</>}
+        {report.projection!=="client"&&<section className="monthly-report-activity"><h3>Project activity</h3><p className="role-muted">{report.scopeLabel} Pending review counts are measured at the reporting cutoff.</p><dl className="monthly-report-secondary">
+          <div><dt>Rework confirmed</dt><dd>{report.rework?.confirmed??"Unavailable"}</dd></div>
+          <div><dt>Approvals withdrawn</dt><dd>{report.rework?.withdrawals??"Unavailable"}</dd></div>
+          <div><dt>Pending reviews</dt><dd>{pending?pending.evidence+pending.reports+pending.rework:"Unavailable"}</dd></div>
+          <div><dt>Evidence</dt><dd>{pending?.evidence??"Unavailable"}</dd></div>
+          <div><dt>Reports</dt><dd>{pending?.reports??"Unavailable"}</dd></div>
+          <div><dt>Rework requests</dt><dd>{pending?.rework??"Unavailable"}</dd></div>
+        </dl></section>}
         <h3>Monthly progress movement</h3>
-        <div className="monthly-report-table"><table><thead><tr><th>Record</th><th>Verified value</th></tr></thead><tbody>
+        <div className="monthly-report-table monthly-report-movement"><table><thead><tr><th scope="col">Record</th><th scope="col">Verified value</th></tr></thead><tbody>
           <tr><td>Opening verified progress</td><td>{reportFraction(report.opening)}</td></tr>
           <tr><td>Closing verified progress</td><td>{reportFraction(report.closing)}</td></tr>
         </tbody></table></div>

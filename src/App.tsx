@@ -1,3 +1,4 @@
+import "./personnel-profile.css"
 import ProjectClientAccount from "./ProjectClientAccount"
 import SuggestedReassignment from "./SuggestedReassignment"
 import { scrollListAfterChange } from "./navigation-scroll"
@@ -34,7 +35,7 @@ import useSignOutConfirmation from "./useSignOutConfirmation"
 import useLoginBackConfirmation from "./useLoginBackConfirmation"
 import UrgentActionBanner from "./UrgentActionBanner"
 import { adminBannerItem, adminPriorityItems, type UrgentItem } from "./urgent-actions"
-import { ProjectScheduleDetails, useScheduleToday } from "./ScheduleStatus"
+import { useScheduleToday } from "./ScheduleStatus"
 import { delayedProjects } from "./domain/schedule-status"
 import { currentPhaseStatus, hasUnapprovedCorrectedEvidence } from "./domain/current-phase-status"
 import { licenseAccessPolicy } from "../Thesis-Backend/src/domain/license-access.js"
@@ -2323,50 +2324,12 @@ function AppInner() {
     const staff = [...new Set([p.opmId, ...p.team.map((t) => t.accountId)])]
       .map((id) => state.accounts.find((a) => a.id === id))
       .filter(Boolean) as Account[]
-    return (
-      <>
-        {!docsOnly && <ProjectClientAccount key={p.id} projectId={p.id} onSaved={reloadWorkspace} />}
-        {docsOnly && <>
-        <div className="detail-hero">
-          <span className="project-symbol">
-            <Icon name="building" size={28} />
-          </span>
-          <div>
-            <span className="eyebrow">
-              {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
-            </span>
-            <h3>{p.name}</h3>
-
-          </div>
-          <Status status={p.status} />
-        </div>
-        </>}
-        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} showClient />}
-        {!docsOnly && <><Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button><IntakeGuidance state={state} project={p} actor={actor} details /></>}
-        {!docsOnly && (
-          <>
-            <ProjectScheduleDetails project={p} today={scheduleToday} />
-            {p.subcontractorAllocation && <section className="detail-section"><TradeAllocationOverview state={state} project={p} /></section>}
-            <PlannedTimeline project={p} />
-            {p.status !== "active" && p.status !== "completed" && (
-              <div className="notice">
-                <Icon name="clock" />
-                <p>
-                  {p.note ||
-                    "Awaiting the assigned Office PM. Administrator submission does not accept assignments or activate client access."}{" "}
-                  {p.docs.slice(0, 6).filter((d) => d.uploaded).length}/6 Office
-                  PM documents uploaded.{" "}
-                  {p.team.filter((t) => t.status === "confirmed").length}/
-                  {p.team.length} phase assignments confirmed.
-                </p>
-              </div>
-            )}
-            {projectAssignments(p)}
-            <EngineerHistory projectId={p.id} />
-            {actor.role === "admin" && <AdminEvidenceHistory key={p.id} projectId={p.id} onPreview={previewDoc} />}
-            <section className="detail-section">
-              <h3>Site photo gallery</h3>
-              <SitePhotoGallery photos={p.workflow?.photos || []}
+    const projectRecords = (approvedPhotos?: ReactNode) => (<>
+            {actor.role === "admin" && <AdminEvidenceHistory compact key={p.id} projectId={p.id} onPreview={previewDoc} />}
+            <details className="detail-section project-record-disclosure">
+              <summary><Icon name="eye" size={18}/><span>Site photo gallery</span><small>{p.workflow?.photos?.length || 0} {p.workflow?.photos?.length===1 ? "photo" : "photos"}{p.workflow?.photos?.some(photo=>!photo.clientVisible && photo.photoReviewStatus!=="rejected") && <> · {p.workflow.photos.filter(photo=>!photo.clientVisible && photo.photoReviewStatus!=="rejected").length} pending</>}</small><Icon name="chevron" size={16}/></summary>
+              {approvedPhotos}
+              <SitePhotoGallery compact photos={p.workflow?.photos || []}
                 onApprove={p.status !== "completed" ? async photoId => {
                   const result = await sendWorkflow({ type: "release_photo", projectId: p.id, photoId })
                   if (!result.ok) throw new Error(result.error || "Photo release failed. Try again.")
@@ -2375,11 +2338,12 @@ function AppInner() {
                   const result = await sendWorkflow({ type: "reject_photo", projectId: p.id, photoId, note })
                   if (!result.ok) throw new Error(result.error || "Photo rejection failed. Try again.")
                 } : undefined} />
-            </section>
-            <section className="detail-section">
-              <h3>Project progress & review history</h3>
+            </details>
+            <details className="detail-section project-record-disclosure">
+              <summary><Icon name="activity" size={18}/><span>Progress &amp; review history</span><small>{projectHistory.length} {projectHistory.length===1 ? "record" : "records"}{projectHistory.some(row=>row.clientVisible===false) && <> · {projectHistory.filter(row=>row.clientVisible===false).length} pending</>}</small><Icon name="chevron" size={16}/></summary>
+              <div className="project-review-timeline">
               {recentHistory.length ? recentHistory.map((h, i) => (
-                <div className="history-row" key={i}>
+                <div className="history-row" data-review-state={h.clientVisible === false ? "pending" : "recorded"} key={i}>
                   <span>
                     <Icon
                       name={h.clientVisible === false ? "clock" : "check"}
@@ -2406,17 +2370,60 @@ function AppInner() {
                   </div>
                   <b>{h.progress}%</b>
                 </div>
-              )) : <p className="role-muted">No project progress or review history yet.</p>}
+              )) : <p className="role-muted">No records yet.</p>}
+              </div>
               {projectHistory.length > 3 && <div className="history-pagination" aria-label="Project history pagination">
                 <Button disabled={projectHistoryPage <= 1} onClick={(event) => { setProjectHistoryPage(page => Math.max(1, page - 1)); scrollListAfterChange(event.currentTarget) }}>Previous</Button>
                 <span>Page {projectHistoryPage} of {historyPageCount}</span>
                 <Button disabled={projectHistoryPage >= historyPageCount} onClick={(event) => { setProjectHistoryPage(page => Math.min(historyPageCount, page + 1)); scrollListAfterChange(event.currentTarget) }}>Next</Button>
               </div>}
-            </section>
+            </details>
+    </>)
+    return (
+      <div className={docsOnly ? undefined : "project-details-redesign"}>
+        {docsOnly && <>
+        <div className="detail-hero">
+          <span className="project-symbol">
+            <Icon name="building" size={28} />
+          </span>
+          <div>
+            <span className="eyebrow">
+              {p.type} · SL-{p.id.replace(/\D/g, "").padStart(3, "0")}
+            </span>
+            <h3>{p.name}</h3>
+
+          </div>
+          <Status status={p.status} />
+        </div>
+        </>}
+        {!docsOnly && <ProjectMonitoringOverview project={p} state={state} onPreview={previewDoc} showClient
+          accountSummary={<ProjectClientAccount key={p.id} projectId={p.id} onSaved={reloadWorkspace} />}
+          monthlyReport={<Button icon="doc" onClick={()=>setReportProjectId(p.id)}>Monthly report</Button>}
+          allocation={p.subcontractorAllocation ? <TradeAllocationOverview state={state} project={p} /> : undefined}
+          projectRecords={projectRecords}
+          scheduleSummary={<PlannedTimeline summary project={p} />} />}
+        {!docsOnly && <><IntakeGuidance state={state} project={p} actor={actor} details /></>}
+        {!docsOnly && (
+          <>
+            {p.status !== "active" && p.status !== "completed" && (
+              <div className="notice">
+                <Icon name="clock" />
+                <p>
+                  {p.note ||
+                    "Awaiting the assigned Office PM. Administrator submission does not accept assignments or activate client access."}{" "}
+                  {p.docs.slice(0, 6).filter((d) => d.uploaded).length}/6 Office
+                  PM documents uploaded.{" "}
+                  {p.team.filter((t) => t.status === "confirmed").length}/
+                  {p.team.length} phase assignments confirmed.
+                </p>
+              </div>
+            )}
+            {projectAssignments(p)}
+            <EngineerHistory projectId={p.id} />
             {p.status === "active" && (
               <section className="detail-section">
-                <ProjectScopeSummary scope={p.phaseScope} />
-                <ProjectProgress key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
+                <ProjectScopeSummary compact scope={p.phaseScope} />
+                <ProjectProgress compact key={p.id} project={{ ...p, phases: projectPhaseNames(p) }} />
               </section>
             )}
           </>
@@ -2426,10 +2433,12 @@ function AppInner() {
           onPreview={previewDoc}
           onResolve={(issueId, text) => resolveSubconIssue(p.id, issueId, text)}
         />
+        <div className={!docsOnly ? "project-documents-section" : undefined}>
+        {!docsOnly && <h3>Documents</h3>}
         <section className="detail-section">
           {!docsOnly && p.status === "active" ? <button type="button" className="admin-project-document-folder" aria-haspopup="dialog" onClick={() => setDocumentFolderProjectId(p.id)}>
-            <Icon name="folder" size={30} />
-            <span><strong>Project Documents</strong><small>{p.docs.filter(doc => doc.uploaded).length} of {p.docs.length} documents on file · View registered files and agreements</small></span>
+            <Icon name="folder" size={22} />
+            <span><strong>Project Documents</strong><small>{p.docs.filter(doc => doc.uploaded).length} of {p.docs.length} documents on file</small></span>
             <span className="folder-open-label">Open Folder<Icon name="chevron" size={16} /></span>
           </button> : <>
           <div className="section-title">
@@ -2458,8 +2467,8 @@ function AppInner() {
         </section>
         <section className="detail-section">
           {!docsOnly && p.status === "active" ? <button type="button" className="admin-project-document-folder" aria-haspopup="dialog" onClick={() => setAppointmentFolderProjectId(p.id)}>
-            <Icon name="folder" size={30} />
-            <span><strong>Site PM Appointment Agreements</strong><small>{appointmentStaff(p, state.accounts).filter(account => appointmentFor(p, account)).length} of {appointmentStaff(p, state.accounts).length} agreements on file · Project-specific Site PM appointments</small></span>
+            <Icon name="folder" size={22} />
+            <span><strong>Site PM Appointment Agreements</strong><small>{appointmentStaff(p, state.accounts).filter(account => appointmentFor(p, account)).length} of {appointmentStaff(p, state.accounts).length} agreements on file</small></span>
             <span className="folder-open-label">Open Folder<Icon name="chevron" size={16} /></span>
           </button> : <>
           <h3>Site PM appointment agreements</h3>
@@ -2495,10 +2504,11 @@ function AppInner() {
             ))}
           </>}
         </section>
+        </div>
         <div className="modal-actions">
           <Button onClick={() => setDialog(undefined)}>Close</Button>
         </div>
-      </>
+      </div>
     )
   }
   function accountDetails(a: Account, docsOnly = false) {
@@ -2512,92 +2522,32 @@ function AppInner() {
       ...(a.resignationHistory || []),
       ...(a.resignation ? [a.resignation] : []),
     ]
-    return (
-      <>
-        <div className="detail-hero">
-          <span className="avatar extra-large">{initials(a.name)}</span>
-          <div>
-            <span className="eyebrow">{ROLE_NAMES[a.role]}</span>
-            <h3>{a.name}</h3>
-            {a.jobTitle && <p>{a.jobTitle}</p>}
-            <p>{a.email}</p>
-          </div>
-          <Status status={a.status} />
-        </div>
-        {!docsOnly && (
-          <>
-            <div className="detail-grid account-detail-grid">
-              {["opm", "spm"].includes(a.role) && <div>
-                <small>PROJECT EXPERIENCE</small>
-                {EXPERIENCE_PROJECT_TYPES.map(type => <p key={type}>{experienceText(a.experienceByType, type)}</p>)}
-              </div>}
-              <div>
-                <small>CONTACT NUMBER</small>
-                <strong>{a.phone || "Not provided"}</strong>
-                {a.contactPerson && <p>Contact: {a.contactPerson}</p>}
-              </div>
-              <div>
-                <small>ADDED</small>
-                <strong>{dateLabel(a.added)}</strong>
-              </div>
-              <div>
-                <small>{a.role === "client" ? "ASSOCIATED PROJECTS" : "DISCIPLINE / SPECIALIZATION"}</small>
-                <strong>
-                  {[
-                    ...a.scope.map((s) =>
-                      a.role === "client" ? projectFor(s) : s,
-                    ),
-                    ...a.projectTypes,
-                  ].join(", ") || (a.role === "client" ? "No associated projects" : "Organization-wide")}
-                </strong>
-              </div>
-              {a.role === "client" && <div><small>ACTIVATION STATUS</small><strong>{clientActivationLabel(a.activationStatus)}</strong></div>}
-              {a.role !== "admin" && <div>
-                <small>{a.role === "client" ? "ACTIVE SITES" : "WORKLOAD"}</small>
-                <strong>
-                  {a.role === "client" ? projects.filter(project => project.status === "active").length : a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
-                </strong>
-              </div>}
-            </div>
-            {a.cooldown && a.cooldown > Date.now() && (
-              <div className="notice">
-                <Icon name="clock" />
-                <p>
-                  Office PM cooldown until{" "}
-                  {new Date(a.cooldown).toLocaleString()}. Not eligible for new
-                  recommendations.
+    const personnel = !docsOnly && a.role !== "client"
+    const capacity = a.singleProjectCommitment ? 1 : a.engineerCommitments ? 2 : state.rules.cap
+    const activeCount = workload(state, a.id)
+    const workloadLabel = a.engineerCommitments ? "project commitments" : "active projects"
+    const resignationNotice = (activeEmployeeProjects.length > 0 &&
+              a.role !== "client" &&
+              a.status === "active" &&
+              !a.assignmentHold && (
+                <p className="section-description">
+                  Routine resignation is restricted while{" "}
+                  {activeEmployeeProjects.length} active project assignment
+                  {activeEmployeeProjects.length === 1 ? "" : "s"} remain.
                 </p>
-                <Button
-                  onClick={() => updateAccount({ ...a, cooldown: undefined })}
-                >
-                  Clear cooldown
-                </Button>
-              </div>
-            )}
-            {a.assignmentHold && a.resignation?.status === "notice" && (
-              <div className="attention-strip">
-                <span className="attention-icon">
-                  <Icon name="clock" />
-                </span>
-                <div>
-                  <strong>Assignment Hold active</strong>
-                  <span>
-                    No new allocations · Deactivation effective{" "}
-                    {dateLabel(a.resignation.effectiveDate)}
-                  </span>
-                </div>
-              </div>
-            )}
+              ))
+    const managementActions = (
             <div className="profile-actions">
               {a.id===actor.id&&actor.role==='admin'&&<><Button icon="shield" onClick={()=>{setDialog(undefined);setSecurityTab('password');setSecurityOpen(true)}}>Change password</Button><Button onClick={()=>{setDialog(undefined);setSecurityTab('codes');setSecurityOpen(true)}}>Recovery codes</Button></>}
               {a.role === "client" && a.status !== "deactivated" && <Button variant="danger-ghost" icon="archive"
                 onClick={() => archiveClientAccount(a)}>Archive client account</Button>}
               {a.role !== "client" && <Button
+                className="personnel-edit-account"
                 disabled={a.status === "deactivated"}
                 icon="edit"
                 onClick={() => { setPage("Team"); setDialog({ kind: "edit-account", id: a.id }) }}
               >
-                {page === "Team" ? "Edit account" : "Edit in Team & accounts"}
+                {personnel ? "Edit in Team & accounts" : page === "Team" ? "Edit account" : "Edit in Team & accounts"}
               </Button>}
               {a.id !== admin.id &&
                 a.status !== "deactivated" &&
@@ -2632,16 +2582,92 @@ function AppInner() {
                   )
                 ))}
             </div>
-            {activeEmployeeProjects.length > 0 &&
-              a.role !== "client" &&
-              a.status === "active" &&
-              !a.assignmentHold && (
-                <p className="section-description">
-                  Routine resignation is restricted while{" "}
-                  {activeEmployeeProjects.length} active project assignment
-                  {activeEmployeeProjects.length === 1 ? "" : "s"} remain.
+    )
+    return (
+      <div className={personnel ? "personnel-profile" : undefined}>
+        <div className="detail-hero">
+          <span className="avatar extra-large">{initials(a.name)}</span>
+          <div>
+            <span className="eyebrow">{ROLE_NAMES[a.role]}</span>
+            <h3>{a.name}</h3>
+            {a.jobTitle && <p>{a.jobTitle}</p>}
+            <p>{a.email}</p>
+          </div>
+          <Status status={a.status} />
+        </div>
+        {!docsOnly && (
+          <>
+            {personnel ? <div className="personnel-summary-grid">
+              <section><h3>Contact information</h3><dl><div><dt>Mobile number</dt><dd>{a.phone || "Not provided"}</dd></div><div><dt>Date added</dt><dd>{dateLabel(a.added)}</dd></div>{a.contactPerson && <div><dt>Contact person</dt><dd>{a.contactPerson}</dd></div>}</dl></section>
+              {a.role !== "admin" && <section><h3>Current workload</h3><p className="personnel-workload-value"><strong>{activeCount} / {capacity}</strong> {workloadLabel}</p><meter min={0} max={capacity} value={Math.min(activeCount, capacity)} aria-label={`${workloadLabel}: ${activeCount} of ${capacity}`}/>{a.singleProjectCommitment && <p>{engineerAvailabilityLabel(a)}</p>}</section>}
+              {["opm", "spm"].includes(a.role) && <section><h3>Project experience</h3><dl className="personnel-experience">{EXPERIENCE_PROJECT_TYPES.map(type => <div key={type}><dt>{type}</dt><dd>{Object.hasOwn(a.experienceByType || {}, type) ? experienceText(a.experienceByType, type).replace(` in ${type}`, "") : "Not recorded"}</dd></div>)}</dl></section>}
+              <section><h3>Discipline / specialization</h3><div className="personnel-tags">{[...a.scope, ...a.projectTypes].map((tag, index) => <span key={`${tag}:${index}`}>{tag}</span>)}{!a.scope.length && !a.projectTypes.length && <span>Organization-wide</span>}</div></section>
+            </div> : <>
+            <div className="detail-grid account-detail-grid">
+              {["opm", "spm"].includes(a.role) && <div>
+                <small>PROJECT EXPERIENCE</small>
+                {EXPERIENCE_PROJECT_TYPES.map(type => <p key={type}>{experienceText(a.experienceByType, type)}</p>)}
+              </div>}
+              <div>
+                <small>CONTACT NUMBER</small>
+                <strong>{a.phone || "Not provided"}</strong>
+                {a.contactPerson && <p>Contact: {a.contactPerson}</p>}
+              </div>
+              <div>
+                <small>ADDED</small>
+                <strong>{dateLabel(a.added)}</strong>
+              </div>
+              <div>
+                <small>{a.role === "client" ? "ASSOCIATED PROJECTS" : "DISCIPLINE / SPECIALIZATION"}</small>
+                <strong>
+                  {[
+                    ...a.scope.map((s) =>
+                      a.role === "client" ? projectFor(s) : s,
+                    ),
+                    ...a.projectTypes,
+                  ].join(", ") || (a.role === "client" ? "No associated projects" : "Organization-wide")}
+                </strong>
+              </div>
+              {a.role === "client" && <div><small>ACTIVATION STATUS</small><strong>{clientActivationLabel(a.activationStatus)}</strong></div>}
+              {a.role !== "admin" && <div>
+                <small>{a.role === "client" ? "ACTIVE SITES" : "WORKLOAD"}</small>
+                <strong>
+                  {a.role === "client" ? projects.filter(project => project.status === "active").length : a.singleProjectCommitment?engineerAvailabilityLabel(a):`${workload(state,a.id)} / ${state.rules.cap} active projects`}
+                </strong>
+              </div>}
+            </div>
+            </>}
+            {a.cooldown && a.cooldown > Date.now() && (
+              <div className="notice">
+                <Icon name="clock" />
+                <p>
+                  Office PM cooldown until{" "}
+                  {new Date(a.cooldown).toLocaleString()}. Not eligible for new
+                  recommendations.
                 </p>
-              )}
+                <Button
+                  onClick={() => updateAccount({ ...a, cooldown: undefined })}
+                >
+                  Clear cooldown
+                </Button>
+              </div>
+            )}
+            {a.assignmentHold && a.resignation?.status === "notice" && (
+              <div className="attention-strip">
+                <span className="attention-icon">
+                  <Icon name="clock" />
+                </span>
+                <div>
+                  <strong>Assignment Hold active</strong>
+                  <span>
+                    No new allocations · Deactivation effective{" "}
+                    {dateLabel(a.resignation.effectiveDate)}
+                  </span>
+                </div>
+              </div>
+            )}
+            {!personnel && managementActions}
+            {!personnel && resignationNotice}
             {resignationRecords.length > 0 && (
               <section className="detail-section resignation-history">
                 <h3>Deactivation & resignation history</h3>
@@ -2680,11 +2706,11 @@ function AppInner() {
         {a.role !== "client" && (
           <>
             {["opm","spm"].includes(a.role) && <>
-              {page !== "Team" && <div className="notice">
+              {page !== "Team" && (personnel ? <p className="personnel-lock-notice"><Icon name="lock" size={16}/>Read only. Credentials are managed in Team & accounts.</p> : <div className="notice">
                 <p>Credentials and specializations are managed in Team & accounts. This view is read-only.</p>
                 <Button onClick={() => { setPage("Team"); setDialog({ kind: "account", id: a.id }) }}>Manage in Team & accounts</Button>
-              </div>}
-              <EngineerCredentials key={a.id} userId={a.id} admin readOnly={page !== "Team"} onChanged={()=>{void reloadWorkspace()}} />
+              </div>)}
+              <EngineerCredentials profile={personnel} key={a.id} userId={a.id} admin readOnly={page !== "Team"} onChanged={()=>{void reloadWorkspace()}} />
             </>}
             <WorkRecord userId={a.id} />
             <section className={`detail-section account-documents${a.docs.length ? "" : " is-empty"}`}>
@@ -2736,6 +2762,7 @@ function AppInner() {
             )}
           </section>
         )}
+        {personnel && <footer className="personnel-management-footer">{resignationNotice}{managementActions}{["opm","spm"].includes(a.role) && page !== "Team" && <Button onClick={() => { setPage("Team"); setDialog({ kind: "account", id: a.id }) }}>Manage credentials</Button>}</footer>}
         <div className="modal-actions">
           <Button onClick={() => setDialog(undefined)}>Close</Button>
           {docsOnly && (
@@ -2744,7 +2771,7 @@ function AppInner() {
             </Button>
           )}
         </div>
-      </>
+      </div>
     )
   }
   function companyDetails(c: Company) {

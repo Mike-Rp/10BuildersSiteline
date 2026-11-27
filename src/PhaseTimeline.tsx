@@ -7,12 +7,14 @@ export default function PhaseTimeline({
   completed = false,
   detailed = false,
   compact = false,
+  summarizeUpcoming = false,
 }: {
   phase: string
   phases?: string[]
   completed?: boolean
   detailed?: boolean
   compact?: boolean
+  summarizeUpcoming?: boolean
 }) {
   return (
     <ol
@@ -32,13 +34,13 @@ export default function PhaseTimeline({
           </span>
           <div>
             <strong>{item.name}</strong>
-            <small>
+            {!(summarizeUpcoming && item.state !== "completed" && item.state !== "current") && <small>
               {item.state === "completed"
                 ? "Completed"
                 : item.state === "current"
                   ? "Current construction phase"
-                  : "Starts after prior sign-off"}
-            </small>
+                  : summarizeUpcoming ? "Upcoming" : "Starts after prior sign-off"}
+            </small>}
           </div>
         </li>
       ))}

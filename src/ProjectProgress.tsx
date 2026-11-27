@@ -16,9 +16,10 @@ type ProgressView = {
   progressWeighting?: string
 }
 
-export default function ProjectProgress({ project, reportingDate = localToday() }: {
+export default function ProjectProgress({ project, reportingDate = localToday(), compact = false }: {
   project: ProgressView
   reportingDate?: string
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const previousScroll = useRef<{ element: HTMLElement; top: number } | null>(null)
@@ -55,7 +56,7 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     <div className="pp-heading"><div><h3>Project progress</h3><p>Overall approved checklist completion across all phases.</p></div>
       <span>Reporting date: {date(reportingDate)}</span></div>
     <button type="button" className="pp-comparison" aria-haspopup="dialog" aria-label={`View phase breakdown for ${project.name}`} onClick={event => showBreakdown(event.currentTarget)}>
-      <span className="pp-question">Where should we be today?</span>
+      {!compact && <span className="pp-question">Where should we be today?</span>}
       {gap && <span className="pp-gap">{gap}</span>}
       {bar("Planned completion", planned, "pp-planned", "Planned completion unavailable")}
       {bar("Actual approved completion", actual.percentage, "pp-actual", "Overall completion unavailable")}
@@ -65,10 +66,12 @@ export default function ProjectProgress({ project, reportingDate = localToday() 
     {actual.percentage === null && <p className="pp-unavailable">Overall completion unavailable. Complete authorized required-activity totals for every project phase are needed; missing scope is not counted as zero.</p>}
     <div className="pp-info">
       <div><Icon name="calendar" size={20} /><span><strong>Target dates</strong>{date(project.start)} → {date(project.end)}</span></div>
-      <div><Icon name="check" size={20} /><span><strong>Overall approved work</strong>{actual.required === null ? "Approved / required totals unavailable" : `${actual.approved} of ${actual.required} required activities approved`}</span></div>
+      <div><Icon name="check" size={20} /><span><strong>{compact ? "Approved activities" : "Overall approved work"}</strong>{actual.required === null ? "Approved / required totals unavailable" : compact ? `${actual.approved} / ${actual.required} required activities` : `${actual.approved} of ${actual.required} required activities approved`}</span></div>
     </div>
-    <p className="pp-note">Date-based baseline assumes uniform progress. Actual completion weights each required activity equally and excludes pending, rejected, missing, and optional activities. This project-wide measure can differ from phase-local progress shown elsewhere.</p>
+    <div className={compact ? "pp-actions-row" : undefined} style={!compact ? {display:"contents"} : undefined}>
+    {compact ? <details className="pp-calculation"><summary><Icon name="info" size={18}/>How progress is calculated</summary><p className="pp-note">Date-based baseline assumes uniform progress. Actual completion weights each required activity equally and excludes pending, rejected, missing, and optional activities. This project-wide measure can differ from phase-local progress shown elsewhere.</p></details> : <p className="pp-note">Date-based baseline assumes uniform progress. Actual completion weights each required activity equally and excludes pending, rejected, missing, and optional activities. This project-wide measure can differ from phase-local progress shown elsewhere.</p>}
     <Button icon="activity" onClick={event => showBreakdown(event.currentTarget)} aria-haspopup="dialog">View phase breakdown</Button>
+    </div>
     {open && createPortal(<Modal wide title="Progress by construction phase" subtitle={project.name} onClose={() => setOpen(false)}>
       <div className="project-progress pp-breakdown">
         <p>Office PM approved checklists: four for Mobilization and Closeout, three for each intermediate phase, per assigned engineer. Multi-engineer phases show the combined totals.</p>

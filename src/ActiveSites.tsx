@@ -278,7 +278,7 @@ export default function ActiveSites({
             ))}
         </div>
       )}
-      <div className="active-sites-view-tabs" role="tablist" aria-label="Active project views" onKeyDown={event => {
+      <div className="active-sites-view-tabs active-project-filter-tabs" role="tablist" aria-label="Active project views" onKeyDown={event => {
         const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
         const index = tabs.indexOf(event.target as HTMLButtonElement)
         if (index < 0) return
@@ -304,8 +304,10 @@ export default function ActiveSites({
           <p role="status">{filtered.length ? `Showing ${(current - 1) * size + 1}-${Math.min(current * size, filtered.length)} of ${filtered.length} projects` : "0 projects"}</p>
         </div>
         <div className="as-layout" role="group" aria-label="Project layout">
+          <div className="as-layout-segments">
           <Button variant={layout === "cards" ? "primary" : ""} aria-pressed={layout === "cards"} onClick={() => setLayout("cards")} icon="grid">Cards</Button>
-          <Button variant={layout === "list" ? "primary" : ""} aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="doc">List</Button>
+          <Button variant={layout === "list" ? "primary" : ""} aria-pressed={layout === "list"} onClick={() => setLayout("list")} icon="list">List</Button>
+          </div>
           {(query || type || phase || statusFilter !== "all" || scheduleFilter) && <Button variant="text-button" onClick={reset}>Clear filters</Button>}
         </div>
       </div>
